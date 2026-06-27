@@ -1,0 +1,14 @@
+.DS_Store
+node_modules
+.svelte
+.svelte-kit
+build
+functions
+.env
+
+# The big raw CSV is NOT committed (see README for the download command).
+data/raw/*.csv
+
+# NOTE: static/data/ (the generated JSON) IS committed, so the live site has
+# data without a build-time ETL step. It's ~8 MB for the sample. If you switch
+# to the full dataset, host that JSON externally (e.g. Cloudflare R2) instead.
