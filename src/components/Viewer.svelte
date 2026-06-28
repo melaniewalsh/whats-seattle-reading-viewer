@@ -95,25 +95,9 @@
 			: [...selectedIdxs, idx];
 	}
 
-	// How many titles of each format this author has (for the quick-pick buttons).
-	const formatCounts = $derived.by(() => {
-		const c = { ebook: 0, audiobook: 0, print: 0 };
-		current?.titles.forEach((t) => {
-			if (c[t.format] !== undefined) c[t.format]++;
-		});
-		return c;
-	});
-
-	// Select the top N titles by checkouts — optionally only of one format.
-	// Titles are already sorted most-borrowed first, so we just take the first matches.
-	function selectTop(formatKey, n = 10) {
-		if (!current) return;
-		const idxs = [];
-		for (let i = 0; i < current.titles.length && idxs.length < n; i++) {
-			if (!formatKey || current.titles[i].format === formatKey) idxs.push(i);
-		}
-		selectedIdxs = idxs;
-	}
+	// The 10 most-borrowed authors overall (authors.json is sorted by total),
+	// shown as quick-pick buttons under the search box.
+	const topAuthors = $derived(authors.slice(0, 10));
 
 	// The title list, filtered by the little search box (keeps original index).
 	const filteredTitles = $derived(
@@ -212,6 +196,22 @@
 		{/if}
 	</div>
 
+	<!-- quick-pick: the 10 most-borrowed authors -->
+	{#if topAuthors.length}
+		<div class="top-authors">
+			<span class="quick-label">Most borrowed:</span>
+			{#each topAuthors as a}
+				<button
+					class="chip"
+					class:current={current && current.name === a.name}
+					onclick={() => selectAuthor(a)}
+				>
+					{a.name}
+				</button>
+			{/each}
+		</div>
+	{/if}
+
 	<!-- ===== Selected author ===== -->
 	{#if current}
 		<div class="author">
@@ -249,7 +249,7 @@
 					aria-pressed={showAuthorLine}
 					onclick={() => (showAuthorLine = !showAuthorLine)}
 				>
-					{showAuthorLine ? "👁 Hide" : "＋ Show"} author total trend
+					{showAuthorLine ? "Hide" : "Show"} author total trend
 				</button>
 				{#if selectedIdxs.length}
 					<button class="clear" onclick={() => (selectedIdxs = [])}>
@@ -277,20 +277,6 @@
 
 			<!-- title list with filter -->
 			<div class="titles">
-				<!-- quick-pick: select this author's top 10 titles, by format or overall -->
-				<div class="quick">
-					<span class="quick-label">Quick-pick top 10:</span>
-					<button class="chip" onclick={() => selectTop(null)}>all titles</button>
-					{#if formatCounts.ebook}
-						<button class="chip" onclick={() => selectTop("ebook")}>ebooks</button>
-					{/if}
-					{#if formatCounts.audiobook}
-						<button class="chip" onclick={() => selectTop("audiobook")}>audiobooks</button>
-					{/if}
-					{#if formatCounts.print}
-						<button class="chip" onclick={() => selectTop("print")}>print</button>
-					{/if}
-				</div>
 				<input
 					class="title-filter"
 					type="search"
@@ -531,13 +517,13 @@
 		font-size: 0.85rem;
 	}
 
-	/* quick-pick chips */
-	.quick {
+	/* top-author quick-pick chips (under the search box) */
+	.top-authors {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 8px;
-		margin-bottom: 10px;
+		margin: 14px 0 4px;
 		font-family: var(--font-sans);
 	}
 	.quick-label {
@@ -558,6 +544,11 @@
 	.chip:hover {
 		background: var(--color-gray-100);
 		border-color: var(--color-fg-light);
+	}
+	.chip.current {
+		background: var(--color-fg);
+		border-color: var(--color-fg);
+		color: var(--color-white);
 	}
 
 	/* title list */
