@@ -41,6 +41,8 @@
 		]);
 		authors = a;
 		months = m.months;
+		// Show the most-borrowed author by default, so the page isn't empty.
+		if (authors.length) await selectAuthor(authors[0]);
 	});
 
 	// Expand a sparse series ([[monthIndex, count], ...]) into a full array of
@@ -93,6 +95,26 @@
 			: [...selectedIdxs, idx];
 	}
 
+	// How many titles of each format this author has (for the quick-pick buttons).
+	const formatCounts = $derived.by(() => {
+		const c = { ebook: 0, audiobook: 0, print: 0 };
+		current?.titles.forEach((t) => {
+			if (c[t.format] !== undefined) c[t.format]++;
+		});
+		return c;
+	});
+
+	// Select the top N titles by checkouts — optionally only of one format.
+	// Titles are already sorted most-borrowed first, so we just take the first matches.
+	function selectTop(formatKey, n = 10) {
+		if (!current) return;
+		const idxs = [];
+		for (let i = 0; i < current.titles.length && idxs.length < n; i++) {
+			if (!formatKey || current.titles[i].format === formatKey) idxs.push(i);
+		}
+		selectedIdxs = idxs;
+	}
+
 	// The title list, filtered by the little search box (keeps original index).
 	const filteredTitles = $derived(
 		current
@@ -135,7 +157,7 @@
 		const out = [];
 
 		if (showAuthorLine) {
-			out.push({ label: "All titles", color: INK, values: current.series, width: 2.75 });
+			out.push({ label: "Author total", color: INK, values: current.series, width: 2.75 });
 		}
 
 		if (selectedIdxs.length) {
@@ -161,7 +183,7 @@
 
 		// never leave the chart empty: fall back to the author line
 		if (out.length === 0) {
-			out.push({ label: "All titles", color: INK, values: current.series, width: 2.75 });
+			out.push({ label: "Author total", color: INK, values: current.series, width: 2.75 });
 		}
 		return out;
 	});
@@ -227,7 +249,7 @@
 					aria-pressed={showAuthorLine}
 					onclick={() => (showAuthorLine = !showAuthorLine)}
 				>
-					{showAuthorLine ? "✓ " : ""}Author total
+					{showAuthorLine ? "👁 Hide" : "＋ Show"} author total trend
 				</button>
 				{#if selectedIdxs.length}
 					<button class="clear" onclick={() => (selectedIdxs = [])}>
@@ -255,6 +277,20 @@
 
 			<!-- title list with filter -->
 			<div class="titles">
+				<!-- quick-pick: select this author's top 10 titles, by format or overall -->
+				<div class="quick">
+					<span class="quick-label">Quick-pick top 10:</span>
+					<button class="chip" onclick={() => selectTop(null)}>all titles</button>
+					{#if formatCounts.ebook}
+						<button class="chip" onclick={() => selectTop("ebook")}>ebooks</button>
+					{/if}
+					{#if formatCounts.audiobook}
+						<button class="chip" onclick={() => selectTop("audiobook")}>audiobooks</button>
+					{/if}
+					{#if formatCounts.print}
+						<button class="chip" onclick={() => selectTop("print")}>print</button>
+					{/if}
+				</div>
 				<input
 					class="title-filter"
 					type="search"
@@ -493,6 +529,35 @@
 		cursor: pointer;
 		font-family: var(--font-sans);
 		font-size: 0.85rem;
+	}
+
+	/* quick-pick chips */
+	.quick {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 10px;
+		font-family: var(--font-sans);
+	}
+	.quick-label {
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: var(--color-fg-light);
+	}
+	.chip {
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		padding: 4px 12px;
+		border-radius: 999px;
+		border: 1px solid var(--color-border);
+		background: var(--color-white);
+		color: var(--color-fg);
+		cursor: pointer;
+	}
+	.chip:hover {
+		background: var(--color-gray-100);
+		border-color: var(--color-fg-light);
 	}
 
 	/* title list */
