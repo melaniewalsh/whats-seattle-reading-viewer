@@ -34,7 +34,7 @@ cd whats-seattle-reading-viewer
 nvm install 22 && nvm use 22      # if you use nvm
 npm install
 
-# 3. install the ETL dependency
+# 3. install the data-prep dependency
 pip install duckdb
 
 # 4. get the sample data (the raw CSV is NOT in the repo — it's big)
@@ -42,7 +42,7 @@ curl -L -o data/raw/Checkouts_by_Title_2018-2022_15-checkouts.csv \
   https://raw.githubusercontent.com/melaniewalsh/Neat-Datasets/main/Checkouts_by_Title_2018-2022_15-checkouts.csv
 
 # 5. build the data files the site reads
-python3 etl/build_data.py
+python3 data-prep/build_data.py
 
 # 6. run the dev server
 npm run dev        # then open the URL it prints
@@ -72,7 +72,7 @@ in `Viewer.svelte` use it.
 
 ```
 whats-seattle-reading-viewer/
-├── etl/
+├── data-prep/
 │   ├── build_data.py        DuckDB: turns the raw CSV into small JSON files
 │   └── cluster_authors.py   STARTER TASK: merge duplicate author spellings
 ├── data/raw/                the raw SPL CSV (not committed — see Quick start)
@@ -96,7 +96,7 @@ whats-seattle-reading-viewer/
 ## How the data pipeline works
 
 The raw CSV has hundreds of thousands of rows (millions, for the full dataset).
-The website never loads it. Instead `etl/build_data.py` pre-computes everything:
+The website never loads it. Instead `data-prep/build_data.py` pre-computes everything:
 
 1. **DuckDB runs the aggregation as SQL directly on the CSV** — fast even at tens
    of millions of rows.
@@ -125,10 +125,10 @@ lives on the city's open-data portal: <https://data.seattle.gov> (search
 
 **What to do:**
 1. Download the full CSV and drop it in `data/raw/`.
-2. In `etl/build_data.py`, change `RAW_CSV` to point at your file.
+2. In `data-prep/build_data.py`, change `RAW_CSV` to point at your file.
 3. Consider raising `MIN_TITLE_CHECKOUTS` — the full data has a huge long tail of
    titles borrowed only once or twice.
-4. Run `python3 etl/build_data.py` and see how big `static/data/` gets.
+4. Run `python3 data-prep/build_data.py` and see how big `static/data/` gets.
 
 **Heads-up on size:** the full dataset's JSON may be hundreds of MB — too big to
 commit and serve from GitHub Pages. The fix is to host the generated JSON
@@ -147,15 +147,15 @@ times. Search "Octavia Butler" on the live site and you'll see **three** of her:
 | Butler, Octavia E. | 1,637 |
 | Octavia Butler | 303 |
 
-**What to do:** open `etl/cluster_authors.py`. Your job is to produce
-`etl/author_map.json`, a mapping from each raw name to one canonical name. The
-ETL already knows how to use it — see the **`CLUSTERING HOOK`** comment in
+**What to do:** open `data-prep/cluster_authors.py`. Your job is to produce
+`data-prep/author_map.json`, a mapping from each raw name to one canonical name. The
+data-prep script already knows how to use it — see the **`CLUSTERING HOOK`** comment in
 `build_data.py`. The file has a working baseline and `TODO`s pointing at the key
 missing piece (flipping `"Lastname, First"` → `"First Lastname"`).
 
 ```bash
-python3 etl/cluster_authors.py   # writes etl/author_map.json
-python3 etl/build_data.py        # rebuilds the site data, now merged
+python3 data-prep/cluster_authors.py   # writes data-prep/author_map.json
+python3 data-prep/build_data.py        # rebuilds the site data, now merged
 ```
 
 Verified example: with a map merging the three Butlers, her total becomes

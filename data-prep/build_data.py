@@ -27,7 +27,7 @@ Output (into web/static/data, served at /data on the site):
 HOW TO RUN
 ----------
     cd ~/kids-books-animals
-    python3 etl/build_data.py
+    python3 data-prep/build_data.py
 
 STUDENTS: good places to extend this are marked with "TODO".
 """
@@ -116,11 +116,11 @@ def main():
     )
 
     # ---- CLUSTERING HOOK ---------------------------------------------------
-    # If a student has produced etl/author_map.json (see etl/cluster_authors.py),
+    # If a student has produced data-prep/author_map.json (see data-prep/cluster_authors.py),
     # fold each mapped name into its canonical name here, so all the spellings of
     # one author are counted together. Without that file, names are used as-is.
     author_map = {}
-    map_path = PROJECT_DIR / "etl" / "author_map.json"
+    map_path = PROJECT_DIR / "data-prep" / "author_map.json"
     if map_path.exists():
         author_map = json.loads(map_path.read_text())
 

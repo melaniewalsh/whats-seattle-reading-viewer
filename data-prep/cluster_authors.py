@@ -17,7 +17,7 @@ produce a good `author_map.json`.
 
 WHAT TO PRODUCE
 ---------------
-Write a JSON file at etl/author_map.json shaped like:
+Write a JSON file at data-prep/author_map.json shaped like:
 
     {
       "Butler, Octavia E.": "Octavia E. Butler",
@@ -31,7 +31,7 @@ the most total checkouts).
 HOW THIS PLUGS IN
 -----------------
 In build_data.py, the cleaned `author` column is what everything groups by.
-After you create etl/author_map.json, add a step there that replaces each
+After you create data-prep/author_map.json, add a step there that replaces each
 author with author_map.get(author, author) before the aggregation. There is a
 clearly-marked "CLUSTERING HOOK" comment in build_data.py showing exactly where.
 
@@ -50,9 +50,9 @@ Beware: don't over-merge. Two real different people can share a last name.
 When unsure, keep them separate.
 
 Run it with:
-    python3 etl/cluster_authors.py
-then re-run the main ETL:
-    python3 etl/build_data.py
+    python3 data-prep/cluster_authors.py
+then re-run the main build:
+    python3 data-prep/build_data.py
 """
 
 import json
@@ -63,13 +63,13 @@ import duckdb
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 RAW_CSV = PROJECT_DIR / "data" / "raw" / "Checkouts_by_Title_2018-2022_15-checkouts.csv"
-OUT_MAP = PROJECT_DIR / "etl" / "author_map.json"
+OUT_MAP = PROJECT_DIR / "data-prep" / "author_map.json"
 
 
 def clean_display(name: str) -> str:
     """The display name, matching how build_data.py cleans authors (drop the
     trailing life dates, keep case + punctuation). Map keys must be in THIS form
-    so the ETL's CLUSTERING HOOK can match them."""
+    so the build script's CLUSTERING HOOK can match them."""
     return re.sub(r",\s*[0-9]{4}.*$", "", str(name)).strip()
 
 
@@ -120,7 +120,7 @@ def main():
 
     OUT_MAP.write_text(json.dumps(author_map, indent=2, ensure_ascii=False))
     print(f"Wrote {len(author_map):,} name -> canonical mappings to {OUT_MAP}")
-    print("Now run:  python3 etl/build_data.py")
+    print("Now run:  python3 data-prep/build_data.py")
 
 
 if __name__ == "__main__":
