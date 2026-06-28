@@ -100,7 +100,9 @@
 	// shown as quick-pick buttons under the search box.
 	const topAuthors = $derived(authors.slice(0, 15));
 
-	// The title list, filtered by the little search box (keeps original index).
+	// The title list, filtered by the little search box, sorted alphabetically so
+	// editions/variations of the same work sit next to each other. We keep each
+	// title's ORIGINAL index (used for selection and the per-title series).
 	const filteredTitles = $derived(
 		current
 			? current.titles
@@ -108,6 +110,7 @@
 					.filter(
 						(t) => !titleFilter.trim() || t.title.toLowerCase().includes(titleFilter.trim().toLowerCase())
 					)
+					.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }))
 			: []
 	);
 
@@ -118,8 +121,8 @@
 		);
 	}
 
-	// Name the bundle after its first title in the list (titles are sorted
-	// most-checked-out first), plus a count of the rest.
+	// Name the bundle after its most-borrowed selected title (lowest original
+	// index = most checkouts), plus a count of the rest.
 	const bundleLabel = $derived.by(() => {
 		if (!current || !selectedIdxs.length) return "";
 		const firstIdx = Math.min(...selectedIdxs);
