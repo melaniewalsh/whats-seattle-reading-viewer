@@ -242,7 +242,7 @@
 					disabled={selectedIdxs.length === 0}
 					onclick={() => (bundleMode = !bundleMode)}
 				>
-					{bundleMode ? "✓ " : ""}Bundle selected
+					{bundleMode ? "✓ " : ""}Bundle selected titles
 				</button>
 				<Switch bind:checked={showAuthorLine} labelText="Author total trend" />
 				{#if selectedIdxs.length}
