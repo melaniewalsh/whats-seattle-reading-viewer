@@ -10,6 +10,7 @@
 	import { base } from "$app/paths";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/LineChart.svelte";
+	import Switch from "$components/ui/Switch.svelte";
 
 	// Colors for individual title lines. The author-total line is ink-black,
 	// and a bundle is drawn in the accent red.
@@ -243,14 +244,7 @@
 				>
 					{bundleMode ? "✓ " : ""}Bundle selected
 				</button>
-				<button
-					class="toggle toggle-author"
-					class:active={showAuthorLine}
-					aria-pressed={showAuthorLine}
-					onclick={() => (showAuthorLine = !showAuthorLine)}
-				>
-					{showAuthorLine ? "Hide" : "Show"} author total trend
-				</button>
+				<Switch bind:checked={showAuthorLine} labelText="Author total trend" />
 				{#if selectedIdxs.length}
 					<button class="clear" onclick={() => (selectedIdxs = [])}>
 						Clear {selectedIdxs.length} selected
@@ -459,12 +453,7 @@
 		opacity: 0.4;
 		cursor: not-allowed;
 	}
-	/* "on" states get a filled, colored background */
-	.toggle-author.active {
-		background: var(--color-fg);
-		border-color: var(--color-fg);
-		color: var(--color-white);
-	}
+	/* "on" state gets a filled, colored background */
 	.toggle-bundle.active {
 		background: #e3120b;
 		border-color: #e3120b;
