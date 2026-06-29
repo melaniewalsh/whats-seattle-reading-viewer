@@ -12,13 +12,13 @@ Search any author and explore their Seattle Public Library checkout trends over 
 - [How it's deployed](#how-its-deployed)
 - [Project structure](#project-structure)
 - [How the data pipeline works](#how-the-data-pipeline-works)
-- [HDSSI projects](#student-projects) ← **HDSSI**
+- [HDSSI projects](#hdssi) ← **HDSSI**
 - [What the viewer can do](#what-the-viewer-can-do)
 - [Learning resources](#learning-resources)
 
 ---
 
-## Quick start {#quick-start}
+## Quick start
 
 You need **Node 22+**, **Python 3**, and a couple of packages.
 
@@ -49,7 +49,7 @@ npm run dev        # then open the URL it prints
 
 ---
 
-## How it's deployed {#how-its-deployed}
+## How it's deployed
 
 Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds the SvelteKit site and publishes it to **GitHub Pages**. There's no server and no database — it's a fully static site, which is why it's free to host.
 
@@ -59,7 +59,7 @@ The site lives at a sub-path (`/whats-seattle-reading-viewer/`), so the build pa
 
 ---
 
-## Project structure {#project-structure}
+## Project structure
 
 ```
 whats-seattle-reading-viewer/
@@ -84,7 +84,7 @@ whats-seattle-reading-viewer/
 
 ---
 
-## How the data pipeline works {#how-the-data-pipeline-works}
+## How the data pipeline works
 
 The raw CSV has hundreds of thousands of rows (millions, for the full dataset). The website never loads it. Instead `data-prep/build_data.py` pre-computes everything:
 
@@ -99,7 +99,7 @@ Two places to plug in for `build_data.py`:
 
 ---
 
-## HDSSI {#student-projects}
+## HDSSI
 
 Here are some things we can work on for HDSSI.
 
@@ -139,7 +139,7 @@ Verified example: with a map merging the three Butlers, her total becomes **12,5
 
 ---
 
-## What the viewer can do {#what-the-viewer-can-do}
+## What the viewer can do
 
 - **Search** an author and chart their total checkouts per month.
 - **Tick titles** (with a filter box) to chart each as its own line; each title shows a format **badge** (ebook / audio / print).
@@ -149,7 +149,7 @@ Verified example: with a map merging the three Butlers, her total becomes **12,5
 
 ---
 
-## Learning resources {#learning-resources}
+## Learning resources
 
 New to Svelte or DuckDB? [**LEARNING.md**](LEARNING.md) has a curated, ordered list of tutorials and docs for both — flagged where they match this project's stack (Svelte 5 runes, DuckDB's Python API), plus SQL basics and a table mapping each technology to the files that use it.
 
