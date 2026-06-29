@@ -151,10 +151,7 @@ Verified example: with a map merging the three Butlers, her total becomes **12,5
 
 ## Learning resources {#learning-resources}
 
-New to Svelte or DuckDB? **[LEARNING.md](LEARNING.md)** has a curated, ordered list
-of tutorials and docs for both — flagged where they match this project's stack
-(Svelte 5 runes, DuckDB's Python API), plus SQL basics and a table mapping each
-technology to the files that use it.
+New to Svelte or DuckDB? [**LEARNING.md**](LEARNING.md) has a curated, ordered list of tutorials and docs for both — flagged where they match this project's stack (Svelte 5 runes, DuckDB's Python API), plus SQL basics and a table mapping each technology to the files that use it.
 
 ---
 

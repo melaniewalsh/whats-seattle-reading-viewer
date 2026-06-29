@@ -26,7 +26,7 @@ Output (into web/static/data, served at /data on the site):
 
 HOW TO RUN
 ----------
-    cd ~/kids-books-animals
+    cd ~/whats-seattle-reading-viewer
     python3 data-prep/build_data.py
 
 STUDENTS: good places to extend this are marked with "TODO".

@@ -74,7 +74,7 @@ def clean_display(name: str) -> str:
 
 
 def normalize(name: str) -> str:
-    """A rough key for deciding two names are the same. STUDENT: make this smarter."""
+    """A rough key for deciding two names are the same. FOR STUDENTs: let's try to make this better!"""
     n = clean_display(name).lower()
     # TODO: flip "lastname, first" -> "first lastname"  (this is what merges
     #       "Octavia E. Butler" with "Butler, Octavia E." — the main task!)
