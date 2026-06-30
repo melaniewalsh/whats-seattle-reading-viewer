@@ -122,7 +122,7 @@ def main():
     author_map = {}
     map_path = PROJECT_DIR / "data-prep" / "author_map.json"
     if map_path.exists():
-        author_map = json.loads(map_path.read_text())
+        author_map = json.loads(map_path.read_text(encoding="utf-8"))
 
     if author_map:
         print(f"  applying author_map.json ({len(author_map):,} merges)")

@@ -65,23 +65,60 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 RAW_CSV = PROJECT_DIR / "data" / "raw" / "Checkouts_by_Title_2018-2022_15-checkouts.csv"
 OUT_MAP = PROJECT_DIR / "data-prep" / "author_map.json"
 
-
+"""
 def clean_display(name: str) -> str:
-    """The display name, matching how build_data.py cleans authors (drop the
+    The display name, matching how build_data.py cleans authors (drop the
     trailing life dates, keep case + punctuation). Map keys must be in THIS form
-    so the build script's CLUSTERING HOOK can match them."""
+    so the build script's CLUSTERING HOOK can match them.
     return re.sub(r",\s*[0-9]{4}.*$", "", str(name)).strip()
-
+"""
 
 def normalize(name: str) -> str:
     """A rough key for deciding two names are the same. FOR STUDENTs: let's try to make this better!"""
-    n = clean_display(name).lower()
-    # TODO: flip "lastname, first" -> "first lastname"  (this is what merges
-    #       "Octavia E. Butler" with "Butler, Octavia E." — the main task!)
-    # TODO: strip middle initials? handle "Jr."? ignore accents?
-    n = re.sub(r"[^a-z0-9 ]", "", n)
-    n = re.sub(r"\s+", " ", n).strip()
-    return n
+    if not name:
+        return ""
+
+    # lowercasing, dash stripping, parenthesis
+    creator = name.lower().strip('-').strip()
+    # matches parenthesis and whats inside
+    creator = re.sub(r'\(.*?\)', '', creator)
+
+    # splitting by commas
+    parts = [p.strip() for p in creator.split(',') if p.strip()]
+
+    # find and extracting the suffix from the parts first so it doesnt break in cases like 'L. E. Modesitt, Jr.'
+    suffix = None
+    cleaned_parts = []
+    # suffix pattern to match the suffix standing alone or near punctuation
+    # meant to avoid catching names containing 'sr' or 'jr'
+    suffix_pattern = r"(?:^|\s|,|\.)(jr\.?|sr\.?|ii|iii|iv|v|vi)\b"
+
+    for part in parts:
+        if re.match(suffix_pattern, part):
+            suffix = part.replace('.', '')  # Strip dots from suffix
+        else:
+            cleaned_parts.append(part)
+
+            # do "Last, First" format reversal if 2 main parts remain
+    if len(cleaned_parts) == 2:
+        cleaned_parts.reverse()
+        creator = ' '.join(cleaned_parts)
+    else:
+        creator = ' '.join(cleaned_parts)
+
+    # remaining years, extra spaces, and fix abbreviations
+    # 4 digit sequence, optional hyphen
+    creator = re.sub(r'\b\d{4}-?\b', '', creator)
+    # 2 upper case letters followed by period
+    creator = re.sub(r'([a-zA-Z]{2})\.', r'\1', creator)
+    # consecutive whitespaces
+    creator = re.sub(r'\s+', ' ', creator).strip()
+
+    # re-attach suffix
+    if suffix:
+        creator = f"{creator} {suffix}"
+
+    return creator
 
 
 def main():
@@ -101,7 +138,8 @@ def main():
     # Add up their checkouts per display name first.
     display_totals = {}
     for name, total in rows:
-        d = clean_display(name)
+        #d = clean_display(name)
+        d = name
         display_totals[d] = display_totals.get(d, 0) + int(total)
 
     # Group display names that share a normalized key; canonical = most-borrowed.
@@ -118,7 +156,7 @@ def main():
             if display != canonical:
                 author_map[display] = canonical
 
-    OUT_MAP.write_text(json.dumps(author_map, indent=2, ensure_ascii=False))
+    OUT_MAP.write_text(json.dumps(author_map, indent=2, ensure_ascii=False), encoding='utf-8')
     print(f"Wrote {len(author_map):,} name -> canonical mappings to {OUT_MAP}")
     print("Now run:  python3 data-prep/build_data.py")
 
