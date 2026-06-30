@@ -1,6 +1,6 @@
 <script>
 	import { getContext } from "svelte";
-	import Viewer from "$components/Viewer.svelte";
+	import Viewer from "$components/StackedViewer.svelte";
 
 	const copy = getContext("copy");
 </script>
