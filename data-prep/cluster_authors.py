@@ -69,7 +69,7 @@ def clean_display(name: str) -> str:
     The display name, matching how build_data.py cleans authors (drop the
     trailing life dates, keep case + punctuation). Map keys must be in THIS form
     so the build script's CLUSTERING HOOK can match them.
-    return re.sub(r",\s*[0-9]{4}.*$", "", str(name)).strip()
+    #return re.sub(r",\s*[0-9]{4}.*$", "", str(name)).strip()
 """
 
 import re
@@ -99,10 +99,10 @@ def normalize(name: str) -> str:
             suffix = part.replace(".", "").strip() # Strip dots from suffix
         else:
             cleaned_parts.append(part)
-
+            
     # Parsing out middle initials/names using \b[A-Za-z]\.?\b or words
     middle_name = None
-    if len(cleaned_parts) > 1:
+    if len(cleaned_parts) > 2:
         # Check if a middle name/initial exists between first and last name
         possible_middle = cleaned_parts[1]
         if re.search(r"\b[A-Za-z]\.?\b", possible_middle) or len(possible_middle.split()) > 0:
