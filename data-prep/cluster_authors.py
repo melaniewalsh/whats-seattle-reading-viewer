@@ -59,6 +59,8 @@ import json
 import re
 from pathlib import Path
 import duckdb
+import re
+
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 RAW_CSV = PROJECT_DIR / "data" / "raw" / "Checkouts_by_Title_2018-2022_15-checkouts.csv"
@@ -72,7 +74,6 @@ def clean_display(name: str) -> str:
     #return re.sub(r",\s*[0-9]{4}.*$", "", str(name)).strip()
 """
 
-import re
 
 def normalize(name: str) -> str:
     """A rough key for deciding two names are the same."""
@@ -99,7 +100,7 @@ def normalize(name: str) -> str:
             suffix = part.replace(".", "").strip() # Strip dots from suffix
         else:
             cleaned_parts.append(part)
-            
+
     # Parsing out middle initials/names using \b[A-Za-z]\.?\b or words
     middle_name = None
     if len(cleaned_parts) > 2:
@@ -262,6 +263,7 @@ def main():
         if key is not None:
             buckets.setdefault(key, []).append(canonical)
 
+    #checks for same titles
     uf = UnionFind(entities.keys())
     for members in buckets.values():
         if len(members) < 2:
