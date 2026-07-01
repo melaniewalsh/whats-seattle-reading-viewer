@@ -1,5 +1,6 @@
 <script>
 	import { getContext } from "svelte";
+	import { base } from "$app/paths";
 	import Viewer from "$components/Viewer.svelte";
 
 	const copy = getContext("copy");
@@ -8,6 +9,7 @@
 <svelte:boundary onerror={(e) => console.error(e)}>
 	<article>
 		<header class="headline">
+			<img class="logo" src="{base}/favicon.png" alt="" width="88" height="88" />
 			<h1>{copy.title}</h1>
 			<p class="dek">{copy.dek}</p>
 		</header>
@@ -28,6 +30,12 @@
 		max-width: 720px;
 		margin: 8px auto 32px;
 		text-align: center;
+	}
+	.logo {
+		display: block;
+		width: 88px;
+		height: 88px;
+		margin: 0 auto 12px;
 	}
 	.headline h1 {
 		font-family: var(--font-serif);
