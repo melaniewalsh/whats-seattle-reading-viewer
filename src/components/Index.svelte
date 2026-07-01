@@ -16,7 +16,17 @@
 
 		<Viewer />
 
-		<p class="note">{copy.note}</p>
+		<p class="note">
+			Data source:
+			<a
+				href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6"
+				target="_blank"
+				rel="noopener"
+			>
+				Seattle Public Library — Checkouts by Title
+			</a>
+			(a sample, 2018–2022).
+		</p>
 	</article>
 </svelte:boundary>
 
@@ -64,5 +74,12 @@
 		font-size: 0.85rem;
 		color: var(--color-fg-light);
 		text-align: center;
+	}
+	.note a {
+		color: #357abd;
+		text-decoration: underline;
+	}
+	.note a:hover {
+		color: #26597f;
 	}
 </style>
