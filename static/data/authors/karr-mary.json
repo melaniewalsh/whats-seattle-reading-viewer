@@ -1,1 +1,1 @@
-{"name": "Karr, Mary", "total": 15, "series": [[0, 15]], "titles": [{"title": "The Liars' Club : a memoir / Mary Karr ; [with a new introduction by the author].", "total": 15, "fmt": "print", "series": [[0, 15]]}]}
+{"name": "Karr, Mary", "total": 30, "series": [[0, 15], [31, 15]], "titles": [{"title": "The Liars' Club : a memoir / Mary Karr ; [with a new introduction by the author].", "total": 15, "fmt": "print", "series": [[0, 15]]}, {"title": "The Liars' Club: A Memoir", "total": 15, "fmt": "ebook", "series": [[31, 15]]}]}
