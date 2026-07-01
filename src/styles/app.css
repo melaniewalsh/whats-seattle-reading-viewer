@@ -4,6 +4,13 @@
 @import "reset.css";
 @import "ui.css"; /* optional for bits UI components */
 
+/* Force a pure #ffffff page background. The theme's --color-white is
+   oklch(100% 0 0), which some browsers render a touch off-white. */
+html,
+body {
+	background-color: #ffffff;
+}
+
 /* colors defined in variables.css */
 :root {
 	/* font */
