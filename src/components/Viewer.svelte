@@ -33,6 +33,7 @@
 	let bundleMode = $state(false); // sum ticked titles into one line?
 	let showAuthorLine = $state(true); // show the author-total line?
 	let bundleName = $state(""); // optional user-typed name for the bundle
+	let titleSort = $state("alpha"); // "alpha" | "checkouts" — how to sort the title list
 
 	onMount(async () => {
 		// Load the search index and the shared month axis together.
@@ -100,19 +101,24 @@
 	// shown as quick-pick buttons under the search box.
 	const topAuthors = $derived(authors.slice(0, 25));
 
-	// The title list, filtered by the little search box, sorted alphabetically so
-	// editions/variations of the same work sit next to each other. We keep each
+	// The title list, filtered by the little search box. Sorted either
+	// alphabetically (so editions of the same work sit together) or by number of
+	// checkouts (most-borrowed first), depending on `titleSort`. We keep each
 	// title's ORIGINAL index (used for selection and the per-title series).
-	const filteredTitles = $derived(
-		current
-			? current.titles
-					.map((t, idx) => ({ ...t, idx }))
-					.filter(
-						(t) => !titleFilter.trim() || t.title.toLowerCase().includes(titleFilter.trim().toLowerCase())
-					)
-					.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }))
-			: []
-	);
+	const filteredTitles = $derived.by(() => {
+		if (!current) return [];
+		const list = current.titles
+			.map((t, idx) => ({ ...t, idx }))
+			.filter(
+				(t) => !titleFilter.trim() || t.title.toLowerCase().includes(titleFilter.trim().toLowerCase())
+			);
+		if (titleSort === "checkouts") {
+			list.sort((a, b) => b.total - a.total);
+		} else {
+			list.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }));
+		}
+		return list;
+	});
 
 	// Add up the series of every ticked title, month by month (the "bundle").
 	function sumSelected() {
@@ -274,6 +280,23 @@
 
 			<!-- title list with filter -->
 			<div class="titles">
+				<div class="sort-row">
+					<span class="sort-label">Sort titles:</span>
+					<button
+						class="sort-btn"
+						class:active={titleSort === "alpha"}
+						onclick={() => (titleSort = "alpha")}
+					>
+						A–Z
+					</button>
+					<button
+						class="sort-btn"
+						class:active={titleSort === "checkouts"}
+						onclick={() => (titleSort = "checkouts")}
+					>
+						Most borrowed
+					</button>
+				</div>
 				<input
 					class="title-filter"
 					type="search"
@@ -538,6 +561,38 @@
 		border-color: var(--color-fg-light);
 	}
 	.chip.current {
+		background: var(--color-fg);
+		border-color: var(--color-fg);
+		color: var(--color-white);
+	}
+
+	/* sort control */
+	.sort-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 10px;
+		font-family: var(--font-sans);
+	}
+	.sort-label {
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: var(--color-fg-light);
+	}
+	.sort-btn {
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		padding: 4px 12px;
+		border-radius: 999px;
+		border: 1px solid var(--color-border);
+		background: var(--color-white);
+		color: var(--color-fg);
+		cursor: pointer;
+	}
+	.sort-btn:hover {
+		background: var(--color-gray-100);
+	}
+	.sort-btn.active {
 		background: var(--color-fg);
 		border-color: var(--color-fg);
 		color: var(--color-white);
