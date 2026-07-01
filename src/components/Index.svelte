@@ -45,6 +45,10 @@
 		letter-spacing: -0.005em;
 		margin: 0 0 16px;
 		color: #6aa9dd;
+		/* Recoleta only ships one weight here, so fatten the strokes a touch and
+		   add a soft drop shadow for a bit more presence. */
+		-webkit-text-stroke: 0.6px #6aa9dd;
+		text-shadow: 1.5px 2px 0 rgba(53, 122, 189, 0.16);
 	}
 	.dek {
 		font-family: var(--font-sans);
