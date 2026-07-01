@@ -59,7 +59,6 @@ import json
 import re
 from pathlib import Path
 import duckdb
-import re
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
