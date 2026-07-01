@@ -43,6 +43,7 @@
 		line-height: 1.05;
 		letter-spacing: -0.01em;
 		margin: 0 0 16px;
+		color: #6aa9dd;
 	}
 	.dek {
 		font-family: var(--font-sans);
