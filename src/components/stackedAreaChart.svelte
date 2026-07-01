@@ -14,7 +14,7 @@
 			.range([margin.left, width - margin.right])
 	);
 
-	// Stack data and map top/bottom boundaries
+	// Stacks data and map top/bottom boundaries
 	const stackedSeries = $derived.by(() => {
 		let currentBottom = new Array(months.length || 0).fill(0);
 		return series.map(s => {
@@ -65,16 +65,16 @@
 		const svg = event.currentTarget.ownerSVGElement || event.currentTarget;
 		const r = svg.getBoundingClientRect();
 		
-		// 1. Find the horizontal index (Month)
+		// horizontal index (Month)
 		const px = (event.clientX - r.left) * (width / r.width);
 		const i = Math.round(x.invert(px));
 		hoverIndex = Math.min(Math.max(i, 0), months.length - 1);
 
-		// 2. Find the vertical data value corresponding to cursor height
+		// vertical data value corresponding to cursor height
 		const py = (event.clientY - r.top) * (height / r.height);
 		const dataY = y.invert(py);
 
-		// 3. Find which specific layer bounding box contains this Y data value
+		// specific layer bounding box contains this Y data value
 		const activeLayer = stackedSeries.find(s => {
 			const bottomVal = s.bottom[hoverIndex];
 			const topVal = s.top[hoverIndex];
@@ -121,17 +121,34 @@
 
 
     // stackedAreaChart.svelte
-    // Calculate the total checkouts of ONLY the selected/grouped items
-    const groupedTotal = $derived(
-        hoverIndex !== null && stackedSeries.length > 0
-            ? stackedSeries.reduce((sum, s) => s.isSelected ? sum + s.values[hoverIndex] : sum, 0)
+    // Other books that belong to the same selection group as the hovered book
+    const groupSiblings = $derived(
+        selectedItem && selectedItem.groupIndex !== undefined && selectedItem.groupIndex !== -1
+            ? stackedSeries.filter(s => s.groupIndex === selectedItem.groupIndex)
+            : []
+    );
+
+    // Sum of just the hovered book's own group, for the hovered month (for monthly totals)
+    const groupTotal = $derived(
+        hoverIndex !== null && groupSiblings.length > 0
+            ? groupSiblings.reduce((sum, s) => sum + s.values[hoverIndex], 0)
             : 0
     );
 
-    // Check if we have more than one selected item to warrant showing a bundle total
-    const selectedCount = $derived(
-        stackedSeries.filter(s => s.isSelected).length
-    );
+    // opacity for a given area layer, given the current hover state
+    function pathOpacity(p) {
+        if (!hoveredSeriesKey) return 0.9;
+        if (p.label === hoveredSeriesKey) return 0.95;
+        if (
+            selectedItem &&
+            p.groupIndex !== undefined &&
+            p.groupIndex !== -1 &&
+            p.groupIndex === selectedItem.groupIndex
+        ) {
+            return 0.7;
+        }
+        return 0.3;
+    }
 </script>
 
 <div class="chart-container">
@@ -161,7 +178,7 @@
 				fill={p.color} 
 				stroke="var(--color-bg, #fff)" 
 				stroke-width="0.5" 
-				opacity={hoveredSeriesKey && hoveredSeriesKey !== p.label ? 0.35 : 0.9} 
+				opacity={pathOpacity(p)} 
 				class="area-path"
 			/>
 		{/each}
@@ -205,10 +222,10 @@
                 </div>
             </div>
 
-            {#if selectedCount > 1}
-                <div class="tooltip-total" style="border-top: 1px dashed #ccc; color: #e3120b;">
-                    <span>Grouped Total</span>
-                    <span>{groupedTotal}</span>
+            {#if groupSiblings.length > 1}
+                <div class="tooltip-total" style="border-top: 1px dashed #ccc; color: {selectedItem.color};">
+                    <span>Group Total</span>
+                    <span>{groupTotal}</span>
                 </div>
             {/if}
 

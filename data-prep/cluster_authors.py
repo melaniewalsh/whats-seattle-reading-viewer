@@ -58,7 +58,6 @@ then re-run the main build:
 import json
 import re
 from pathlib import Path
-
 import duckdb
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -73,88 +72,224 @@ def clean_display(name: str) -> str:
     return re.sub(r",\s*[0-9]{4}.*$", "", str(name)).strip()
 """
 
+import re
+
 def normalize(name: str) -> str:
-    """A rough key for deciding two names are the same. FOR STUDENTs: let's try to make this better!"""
+    """A rough key for deciding two names are the same."""
     if not name:
         return ""
 
-    # lowercasing, dash stripping, parenthesis
-    creator = name.lower().strip('-').strip()
+    # lowercasing, dash stripping, parenthesis creator
+    creator = name.lower().strip("-").strip()
+    
     # matches parenthesis and whats inside
-    creator = re.sub(r'\(.*?\)', '', creator)
-
+    creator = re.sub(r"\(.*?\)", "", creator)
+    
     # splitting by commas
-    parts = [p.strip() for p in creator.split(',') if p.strip()]
+    parts = [p.strip() for p in creator.split(",") if p.strip()]
 
-    # find and extracting the suffix from the parts first so it doesnt break in cases like 'L. E. Modesitt, Jr.'
+    # extract suffix first so it doesn't break in cases like L. E. Modesitt, Jr.
     suffix = None
     cleaned_parts = []
+    
     # suffix pattern to match the suffix standing alone or near punctuation
-    # meant to avoid catching names containing 'sr' or 'jr'
     suffix_pattern = r"(?:^|\s|,|\.)(jr\.?|sr\.?|ii|iii|iv|v|vi)\b"
-
     for part in parts:
         if re.match(suffix_pattern, part):
-            suffix = part.replace('.', '')  # Strip dots from suffix
+            suffix = part.replace(".", "").strip() # Strip dots from suffix
         else:
             cleaned_parts.append(part)
 
-            # do "Last, First" format reversal if 2 main parts remain
+    # Parsing out middle initials/names using \b[A-Za-z]\.?\b or words
+    middle_name = None
+    if len(cleaned_parts) > 1:
+        # Check if a middle name/initial exists between first and last name
+        possible_middle = cleaned_parts[1]
+        if re.search(r"\b[A-Za-z]\.?\b", possible_middle) or len(possible_middle.split()) > 0:
+            middle_name = possible_middle
+            # Keep only the first name in cleaned_parts for re-ordering
+            cleaned_parts = [cleaned_parts[0], cleaned_parts[-1]]
+
+    # do Last, First format reversal if 2 main parts remain
     if len(cleaned_parts) == 2:
         cleaned_parts.reverse()
-        creator = ' '.join(cleaned_parts)
+        creator = " ".join(cleaned_parts)
     else:
-        creator = ' '.join(cleaned_parts)
+        creator = " ".join(cleaned_parts)
+
+    # re-attach middle name in the same relative position
+    if middle_name:
+        creator = f"{creator} {middle_name}"
 
     # remaining years, extra spaces, and fix abbreviations
     # 4 digit sequence, optional hyphen
-    creator = re.sub(r'\b\d{4}-?\b', '', creator)
+    creator = re.sub(r"\b\d{4}-?\b", "", creator)
+    
     # 2 upper case letters followed by period
-    creator = re.sub(r'([a-zA-Z]{2})\.', r'\1', creator)
+    creator = re.sub(r"([a-zA-Z]{2})\.", r"\1", creator)
+    
     # consecutive whitespaces
-    creator = re.sub(r'\s+', ' ', creator).strip()
+    creator = re.sub(r"\s+", " ", creator).strip()
 
     # re-attach suffix
     if suffix:
         creator = f"{creator} {suffix}"
-
+        
     return creator
+
+def name_tokens(name: str):
+    """
+    #Rough first/last-name tokenization, uses the same comma-flip and
+    suffix/date stripping logic as normalize(), returning token list
+    instead of a joined string
+    """
+    if not name:
+        return []
+
+    s = name.lower().strip("-").strip()
+    # drop elements in parenthesis
+    s = re.sub(r"\(.*?\)", "", s) 
+
+    parts = [p.strip() for p in s.split(",") if p.strip()]
+
+    suffix_pattern = r"(?:^|\s|,|\.)(jr\.?|sr\.?|ii|iii|iv|v|vi)\b"
+    cleaned_parts = []
+    for part in parts:
+        if not re.match(suffix_pattern, part):
+            cleaned_parts.append(part)
+
+    if len(cleaned_parts) == 2:
+        # converts last, first middle format to first middle last
+        cleaned_parts.reverse()  
+    s = " ".join(cleaned_parts)
+
+    # drop life dates (matches 4 numbers)
+    s = re.sub(r"\b\d{4}-?\b", "", s)
+    # de-abbreviate trailing periods (matches last two letters replaces without)         
+    s = re.sub(r"([a-zA-Z]{2})\.", r"\1", s)  
+    #  remove periods or commas
+    s = re.sub(r"[.,]", " ", s)
+    #replace consecutive whitespaces with singular 
+    s = re.sub(r"\s+", " ", s).strip()
+
+    return [t for t in s.split(" ") if t]
+
+
+def first_last_key(name: str):
+    """(first_token, last_token) used to find same-person candidates that
+    normalize() didn't already merge (e.g. missing/extra middle name)."""
+    tokens = name_tokens(name)
+    if len(tokens) < 2:
+        return None
+    return (tokens[0], tokens[-1])
+
+
+def has_middle_name(name: str) -> bool:
+    return len(name_tokens(name)) > 2
+
+
+def normalize_title(title: str) -> str:
+    t = str(title or "").lower().strip()
+    t = re.sub(r"[^a-z0-9\s]", "", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+class UnionFind:
+    def __init__(self, items):
+        self.parent = {item: item for item in items}
+
+    def find(self, x):
+        while self.parent[x] != x:
+            self.parent[x] = self.parent[self.parent[x]]
+            x = self.parent[x]
+        return x
+
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[ra] = rb
 
 
 def main():
     con = duckdb.connect()
-    # Get each distinct raw author and their total checkouts.
+    # Get each distinct raw author/title pair and total checkouts.
     rows = con.execute(
         """
-        SELECT Creator AS name, sum(Checkouts) AS total
+        SELECT Creator AS name, Title AS title, sum(Checkouts) AS total
         FROM read_csv_auto(?, ignore_errors=true)
         WHERE Creator IS NOT NULL
-        GROUP BY Creator
+        GROUP BY Creator, Title
         """,
         [str(RAW_CSV)],
     ).fetchall()
 
-    # Several raw strings can share one display name (e.g. with/without dates).
-    # Add up their checkouts per display name first.
+    # Several raw rows can share one display name add up their checkouts and collect their titles per display name first
     display_totals = {}
-    for name, total in rows:
+    display_titles = {}
+    for name, title, total in rows:
         #d = clean_display(name)
         d = name
         display_totals[d] = display_totals.get(d, 0) + int(total)
+        if title:
+            display_titles.setdefault(d, set()).add(normalize_title(title))
 
-    # Group display names that share a normalized key; canonical = most-borrowed.
-    groups = {}  # normalized_key -> list of (display_name, total)
+    # canonical = most borrowed spelling in each group.
+    groups = {}  # normalized_key to list of (display_name, total)
     for display, total in display_totals.items():
         groups.setdefault(normalize(display), []).append((display, total))
 
-    author_map = {}
+    raw_to_pass1 = {}      # raw display name to pass-1 canonical
+    entities = {}          # pass-1 canonical
     for members in groups.values():
-        if len(members) < 2:
-            continue  # nothing to merge
         canonical = max(members, key=lambda m: m[1])[0]  # most checkouts wins
+        checkouts = sum(total for _, total in members)
+        titles = set()
         for display, _ in members:
-            if display != canonical:
-                author_map[display] = canonical
+            raw_to_pass1[display] = canonical
+            titles |= display_titles.get(display, set())
+        entities[canonical] = {"checkouts": checkouts, "titles": titles}
+
+    """
+    normalize() can fail to merge spellings that differ only by a middle
+    name/initial (ex"Octavia Butler" vs "Octavia E. Butler").
+    confirm they're the same person by checking for an overlapping title,
+    then merge using the middle name spelling
+    """
+    buckets = {}  # list of pass-1 canonical names
+    for canonical in entities:
+        key = first_last_key(canonical)
+        if key is not None:
+            buckets.setdefault(key, []).append(canonical)
+
+    uf = UnionFind(entities.keys())
+    for members in buckets.values():
+        if len(members) < 2:
+            continue
+        for i in range(len(members)):
+            for j in range(i + 1, len(members)):
+                a, b = members[i], members[j]
+                if entities[a]["titles"] & entities[b]["titles"]:
+                    uf.union(a, b)
+
+    # build final canonical middle name break ties by checkouts.
+    components = {}  #root to list of pass-1 canonical names
+    for canonical in entities:
+        components.setdefault(uf.find(canonical), []).append(canonical)
+
+    pass1_to_final = {}
+    for members in components.values():
+        with_middle = [m for m in members if has_middle_name(m)]
+        candidates = with_middle if with_middle else members
+        final_canonical = max(candidates, key=lambda m: entities[m]["checkouts"])
+        for m in members:
+            pass1_to_final[m] = final_canonical
+
+    author_map = {}
+    for raw, pass1_canonical in raw_to_pass1.items():
+        final_canonical = pass1_to_final[pass1_canonical]
+        if raw != final_canonical:
+            author_map[raw] = final_canonical
 
     OUT_MAP.write_text(json.dumps(author_map, indent=2, ensure_ascii=False), encoding='utf-8')
     print(f"Wrote {len(author_map):,} name -> canonical mappings to {OUT_MAP}")
