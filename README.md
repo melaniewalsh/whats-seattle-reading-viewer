@@ -53,6 +53,24 @@ npm run dev        # then open the URL it prints
 
 Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds the SvelteKit site and publishes it to **GitHub Pages**. There's no server and no database — it's a fully static site, which is why it's free to host.
 
+> ## ⚠️ Changing the data? You MUST re-run the pipeline and commit the result.
+>
+> **The deploy only rebuilds the website — it does NOT run the Python pipeline.**
+> The site reads the pre-generated JSON in `static/data/`. So if you edit
+> anything under `data-prep/` (the clustering, the threshold, the raw CSV), the
+> live site will **not** change until you regenerate and commit that JSON:
+>
+> ```bash
+> python3 data-prep/cluster_authors.py   # only if you changed the clustering
+> python3 data-prep/build_data.py        # regenerates static/data/
+> git add static/data data-prep/author_map.json
+> git commit -m "regenerate data"
+> git push
+> ```
+>
+> If you push code under `data-prep/` **without** these steps, nothing on the
+> site changes — this is the #1 gotcha.
+
 The site lives at a sub-path (`/whats-seattle-reading-viewer/`), so the build passes a `BASE_PATH`; this is wired up in `svelte.config.js` and the data fetches in `Viewer.svelte` use it.
 
 **First-time setup (once per repo):** in the repo's **Settings → Pages**, set **Source = GitHub Actions**. After that every push deploys automatically.

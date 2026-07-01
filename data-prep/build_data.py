@@ -34,6 +34,7 @@ STUDENTS: good places to extend this are marked with "TODO".
 
 import json
 import re
+import shutil
 from collections import defaultdict
 from pathlib import Path
 
@@ -75,6 +76,10 @@ def slugify(name: str) -> str:
 
 
 def main():
+    # Start fresh so authors removed since the last run (e.g. merged by the
+    # author map) don't leave stale files behind.
+    if AUTHORS_DIR.exists():
+        shutil.rmtree(AUTHORS_DIR)
     AUTHORS_DIR.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect()
 
