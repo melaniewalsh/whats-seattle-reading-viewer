@@ -38,12 +38,15 @@
 		margin: 0 auto 12px;
 	}
 	.headline h1 {
-		font-family: var(--font-serif);
-		font-size: clamp(2.2rem, 6vw, 3.4rem);
+		font-family: "Baloo Bhai", var(--font-serif);
+		font-weight: 700;
+		font-size: clamp(2.6rem, 7vw, 4rem);
 		line-height: 1.05;
-		letter-spacing: -0.01em;
+		letter-spacing: 0.005em;
 		margin: 0 0 16px;
 		color: #6aa9dd;
+		/* soft drop shadow gives the rounded letters a puffy, sticker-like feel */
+		text-shadow: 2px 3px 0 rgba(53, 122, 189, 0.18);
 	}
 	.dek {
 		font-family: var(--font-sans);

@@ -11,6 +11,15 @@ body {
 	background-color: #ffffff;
 }
 
+/* "Baloo Bhai" — a rounded, puffy display font for the headline (bubble letters). */
+@font-face {
+	font-family: "Baloo Bhai";
+	src: url("https://pudding.cool/assets/fonts/baloo-bhai/baloo-bhai-2-v28-latin-700.woff2") format("woff2");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
 /* colors defined in variables.css */
 :root {
 	/* font */
