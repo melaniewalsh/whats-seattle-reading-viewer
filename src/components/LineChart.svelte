@@ -56,14 +56,17 @@
 
 	// ---- Hover: find the nearest month and show its values in a tooltip ----
 	let hoverIndex = $state(null);
+	let hoverY = $state(0); // the cursor's y (in chart coords), so the tooltip can follow it
 	function onMove(event) {
 		// Measure against the <svg> (not the inner rect) and rescale screen pixels
 		// to the chart's coordinate system, so the dot lands under the cursor.
 		const svg = event.currentTarget.ownerSVGElement;
 		const r = svg.getBoundingClientRect();
-		const px = (event.clientX - r.left) * (width / r.width);
+		const scale = width / r.width;
+		const px = (event.clientX - r.left) * scale;
 		const i = Math.round(x.invert(px));
 		hoverIndex = Math.min(Math.max(i, 0), months.length - 1);
+		hoverY = (event.clientY - r.top) * scale;
 	}
 
 	// "2020-09" -> "Sep 2020"
@@ -73,10 +76,12 @@
 		return `${MONTH_NAMES[Number(mo) - 1]} ${yr}`;
 	}
 
-	// Keep the tooltip from spilling off the chart edges.
-	const tooltipLeft = $derived(
-		hoverIndex === null ? 0 : Math.min(Math.max(x(hoverIndex), 80), width - 80)
-	);
+	// Position the tooltip OFF TO THE SIDE of the hovered point so it never covers
+	// it: to the left when hovering the right half of the chart, else to the right.
+	// It follows the cursor vertically.
+	const tooltipOnLeft = $derived(hoverIndex !== null && x(hoverIndex) > width / 2);
+	const tooltipLeft = $derived(hoverIndex === null ? 0 : x(hoverIndex) + (tooltipOnLeft ? -14 : 14));
+	const tooltipTop = $derived(Math.min(Math.max(hoverY - 14, margin.top), height - margin.bottom - 70));
 </script>
 
 <div class="chart" bind:clientWidth={width}>
@@ -128,7 +133,7 @@
 
 	<!-- tooltip -->
 	{#if hoverIndex !== null}
-		<div class="tooltip" style="left: {tooltipLeft}px;">
+		<div class="tooltip" class:on-left={tooltipOnLeft} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
 			<div class="tt-head">
 				<strong>{formatMonth(months[hoverIndex])}</strong>
 				<span class="tt-unit">checkouts</span>
@@ -171,8 +176,8 @@
 	}
 	.tooltip {
 		position: absolute;
-		top: 0;
-		transform: translateX(-50%);
+		/* left/top are set inline; sits to the RIGHT of the point by default */
+		transform: translateY(-4px);
 		background: var(--color-white);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-sm);
@@ -180,9 +185,13 @@
 		font-family: var(--font-sans);
 		font-size: 12px;
 		pointer-events: none;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 		white-space: nowrap;
 		max-width: 280px;
+	}
+	/* when hovering the right half of the chart, flip to the left of the point */
+	.tooltip.on-left {
+		transform: translate(-100%, -4px);
 	}
 	.tooltip .tt-head {
 		display: flex;
