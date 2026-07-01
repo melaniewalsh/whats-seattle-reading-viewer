@@ -96,9 +96,9 @@
 			: [...selectedIdxs, idx];
 	}
 
-	// The 15 most-borrowed authors overall (authors.json is sorted by total),
+	// The 25 most-borrowed authors overall (authors.json is sorted by total),
 	// shown as quick-pick buttons under the search box.
-	const topAuthors = $derived(authors.slice(0, 15));
+	const topAuthors = $derived(authors.slice(0, 25));
 
 	// The title list, filtered by the little search box, sorted alphabetically so
 	// editions/variations of the same work sit next to each other. We keep each
