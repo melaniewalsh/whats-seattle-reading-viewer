@@ -89,16 +89,6 @@
 		return { ebook: "ebook", audiobook: "audio", print: "print", other: "other" }[f] || f;
 	}
 
-	// ----- Selection groups -----
-	// By default (no group active), ticking a title is a plain single
-	// selection — just that one book, drawn as its own line. A title only
-	// joins a group once you create a group (or click back onto an earlier
-	// one) to make it "active" — then ticks add/remove titles from that
-	// group instead. A title can only have one owner — group or single — at
-	// a time, so picking it up somewhere new releases it from wherever it
-	// was before. Clicking a chip in the groups panel re-activates that
-	// group for editing, so you can always go back and adjust an earlier one.
-
 	function addGroup() {
 		const g = { id: ++groupIdCounter, name: "", idxs: [] };
 		groups = [...groups, g];
@@ -233,7 +223,6 @@
 </script>
 
 <div class="viewer">
-	<!-- ===== Search ===== -->
 	<div class="search">
 		<input
 			type="search"
@@ -284,7 +273,6 @@
 			{/if}
 			<LineChart months={current.months} series={chartSeries} />
 
-			<!-- legend -->
 			<ul class="legend">
                 {#each groups as g, gi (g.id)}
                     {#if g.idxs.length}
@@ -296,7 +284,6 @@
                 {/each}
             </ul>
 
-			<!-- options -->
 			<div class="options">
 				<Switch bind:checked={showAuthorLine} labelText="Author total trend" />
 			</div>
@@ -347,10 +334,10 @@
 						/>
 					</div>
 					<p class="editing-hint">
-						Editing <strong>{groupLabel(activeGroup)}</strong> — tick titles below to add or remove them.
+						Editing <strong>{groupLabel(activeGroup)}</strong>: tick titles below to add or remove them.
 					</p>
 				{:else}
-					<p class="editing-hint">Single selection — each ticked title below gets its own line. Create a group above to combine titles into one.</p>
+					<p class="editing-hint">Single selection: each ticked title below gets its own line. Create a group above to combine titles into one.</p>
 				{/if}
 			</div>
 
