@@ -274,7 +274,7 @@
                 {#each singleIdxs as idx, i (idx)}
                     <li><span class="sw" style="background:{TITLE_COLORS[i % TITLE_COLORS.length]}"></span>{current.titles[idx].title}</li>
                 {/each}
-            </ul
+            </ul>
 			<div class="groups-panel">
 				<div class="groups-header">
 					<span class="groups-label">Selection groups</span>
