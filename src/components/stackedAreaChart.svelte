@@ -208,8 +208,6 @@
 			{/if}
 		{/if}
 	</svg>
-
-	<!-- Fixed Isolated Tooltip Element -->
 	{#if hoverIndex !== null && selectedItem}
         <div class="tooltip" style="left: {tooltipLeft}px; top: {margin.top}px;">
             <div class="tooltip-date">{formatMonth(months[hoverIndex])}</div>

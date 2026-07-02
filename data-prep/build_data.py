@@ -36,6 +36,7 @@ import json
 import re
 from collections import defaultdict
 from pathlib import Path
+from time import perf_counter
 
 import duckdb
 
@@ -75,6 +76,7 @@ def slugify(name: str) -> str:
 
 
 def main():
+    start_time = perf_counter()
     AUTHORS_DIR.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect()
 
@@ -111,6 +113,7 @@ def main():
             Checkouts AS checkouts
         FROM raw
         WHERE Creator IS NOT NULL
+        AND MaterialType != 'SoundDisk' ;
         """,
         [NAME_DATE_RE],
     )
@@ -191,6 +194,7 @@ def main():
 
     for author, total in author_totals:
         slug = slugify(author)
+        slug = re.sub(r"[^a-zA-Z0-9_-]", "", slug)[:100]
         if slug in used_slugs:
             used_slugs[slug] += 1
             slug = f"{slug}-{used_slugs[slug]}"
@@ -219,6 +223,9 @@ def main():
     print(f"  {len(authors_index):,} authors")
     print(f"  shared axis -> {OUT_DIR/'meta.json'}")
     print(f"  search index -> {OUT_DIR/'authors.json'}")
+    end_time = perf_counter()
+    elapsed_time = end_time - start_time
+    print(f"Elapsed time: {elapsed_time:.4f} seconds")
 
 
 if __name__ == "__main__":

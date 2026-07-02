@@ -59,10 +59,11 @@ import json
 import re
 from pathlib import Path
 import duckdb
+from time import perf_counter
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-RAW_CSV = PROJECT_DIR / "data" / "raw" / "Checkouts_by_Title_2018-2022_15-checkouts.csv"
+RAW_CSV = PROJECT_DIR / "data" / "raw" / "spl-monthly-checkouts_2005-2025.csv"
 OUT_MAP = PROJECT_DIR / "data-prep" / "author_map.json"
 
 """
@@ -74,7 +75,9 @@ def clean_display(name: str) -> str:
 """
 
 
+
 def normalize(name: str) -> str:
+    
     """A rough key for deciding two names are the same."""
     if not name:
         return ""
@@ -134,10 +137,14 @@ def normalize(name: str) -> str:
     # re-attach suffix
     if suffix:
         creator = f"{creator} {suffix}"
-        
+
+    #t_duration = time.perf_counter() - t_start   
+    #print(f"Time for normalize function: {t_duration:.6f} seconds")
     return creator
 
 def name_tokens(name: str):
+    #t_start = time.perf_counter()
+
     """
     #Rough first/last-name tokenization, uses the same comma-flip and
     suffix/date stripping logic as normalize(), returning token list
@@ -172,6 +179,8 @@ def name_tokens(name: str):
     #replace consecutive whitespaces with singular 
     s = re.sub(r"\s+", " ", s).strip()
 
+    #t_duration = time.perf_counter() - t_start   
+    #print(f"Time for name_tokens function: {t_duration:.6f} seconds")
     return [t for t in s.split(" ") if t]
 
 
@@ -212,6 +221,8 @@ class UnionFind:
 
 
 def main():
+    start_time = perf_counter()
+
     con = duckdb.connect()
     # Get each distinct raw author/title pair and total checkouts.
     rows = con.execute(
@@ -295,6 +306,9 @@ def main():
     OUT_MAP.write_text(json.dumps(author_map, indent=2, ensure_ascii=False), encoding='utf-8')
     print(f"Wrote {len(author_map):,} name -> canonical mappings to {OUT_MAP}")
     print("Now run:  python3 data-prep/build_data.py")
+    end_time = perf_counter()
+    elapsed_time = end_time - start_time
+    print(f"Elapsed time: {elapsed_time:.4f} seconds")
 
 
 if __name__ == "__main__":

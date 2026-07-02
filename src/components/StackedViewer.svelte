@@ -1,19 +1,12 @@
 <script>
 	// StackedViewer.svelte
-	// =============
-	// Search an author -> see a line of their total checkouts -> tick individual
-	// titles to chart them. You can also:
-	//   • "Bundle" the ticked titles into ONE line (treat every edition / format
-	//     of a work as a single thing), and
-	//   • hide the author-total line to show only what you've ticked.
 	import { onMount } from "svelte";
 	import { base } from "$app/paths";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import Switch from "$components/ui/Switch.svelte";
 
-	// Colors for individual title lines. The author-total line is ink-black,
-	// and a bundle is drawn in the accent red.
+	// Colors for title lines.
 	const TITLE_COLORS = [
 		"#e3120b", "#1f7a4d", "#e58a00", "#6a4c93",
 		"#0b7285", "#c2255c", "#5c940d", "#7048e8"
@@ -41,7 +34,7 @@
 		]);
 		authors = a;
 		months = m.months;
-		// Show the most-borrowed author by default, so the page isn't empty.
+		// Show the most borrowed author by default, so the page isn't empty.
 		if (authors.length) await selectAuthor(authors[0]);
 	});
 
@@ -53,7 +46,7 @@
 		return arr;
 	}
 
-	// Filter the author list as the user types (debounced so it stays snappy).
+	// Filter the author list as the user types 
 	const runSearch = debounce((q) => {
 		const needle = q.trim().toLowerCase();
 		results =
@@ -103,8 +96,7 @@
 		}
 	}
 
-	// strip a title out of every group and out of the single-selection list,
-	// so it can be picked up fresh by whichever owner is claiming it next
+	// strip a title out of every group and out of the single-selection list, so it can be picked up by whichever owner is claiming it next.
 	function releaseTitle(idx) {
 		groups.forEach((g) => {
 			if (g.idxs.includes(idx)) g.idxs = g.idxs.filter((i) => i !== idx);
@@ -149,7 +141,7 @@
 
 	// The title list, filtered by the little search box, sorted alphabetically so
 	// editions/variations of the same work sit next to each other. We keep each
-	// title's ORIGINAL index (used for selection and the per-title series).
+	// title's original index for selection and the per-title series.
 	const filteredTitles = $derived(
 		current
 			? current.titles
@@ -282,11 +274,7 @@
                 {#each singleIdxs as idx, i (idx)}
                     <li><span class="sw" style="background:{TITLE_COLORS[i % TITLE_COLORS.length]}"></span>{current.titles[idx].title}</li>
                 {/each}
-            </ul>
-
-			<div class="options">
-				<Switch bind:checked={showAuthorLine} labelText="Author total trend" />
-			</div>
+            </ul
 			<div class="groups-panel">
 				<div class="groups-header">
 					<span class="groups-label">Selection groups</span>
