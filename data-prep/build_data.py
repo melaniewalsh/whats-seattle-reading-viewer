@@ -254,7 +254,7 @@ def main():
 
     # -- Write one file per author -------------------------------------------
     print(f"Writing {len(author_totals):,} author files ...")
-    authors_index = []
+    authors_index = {}
     used_slugs = {}
 
     for author, total in author_totals:
@@ -278,9 +278,6 @@ def main():
             "titles": titles,
         }
 
-        #(AUTHORS_DIR / f"{slug}.json").write_text(json.dumps(payload))
-        #authors_index.append({"slug": slug, "name": author, "total": int(total)})
-
         name_parts = normalize(author).split()
 
         if len(name_parts) >= 2:
@@ -297,11 +294,12 @@ def main():
 
         author_initials_dir.mkdir(parents=True, exist_ok=True)
         file_path.write_text(json.dumps(payload))
-        authors_index.append({
-            "slug": slug,
+
+        authors_index[slug] = {
+            "initials": author_initials,
             "name": author,
             "total": int(total)
-        })
+        }
 
     # -- Write the shared axis + the search index ----------------------------
     (OUT_DIR / "meta.json").write_text(json.dumps({"months": months}))
