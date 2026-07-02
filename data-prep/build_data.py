@@ -37,7 +37,6 @@ import re
 from collections import defaultdict
 from pathlib import Path
 from time import perf_counter
-
 import duckdb
 
 # ---------------------------------------------------------------------------
@@ -67,6 +66,72 @@ CASE upper(MaterialType)
     ELSE 'other'
 END
 """
+
+def normalize(name: str) -> str:
+    
+    """A rough key for deciding two names are the same."""
+    if not name:
+        return ""
+
+    # lowercasing, dash stripping, parenthesis creator
+    creator = name.lower().strip("-").strip()
+    
+    # matches parenthesis and whats inside
+    creator = re.sub(r"\(.*?\)", "", creator)
+    
+    # splitting by commas
+    parts = [p.strip() for p in creator.split(",") if p.strip()]
+
+    # extract suffix first so it doesn't break in cases like L. E. Modesitt, Jr.
+    suffix = None
+    cleaned_parts = []
+    
+    # suffix pattern to match the suffix standing alone or near punctuation
+    suffix_pattern = r"(?:^|\s|,|\.)(jr\.?|sr\.?|ii|iii|iv|v|vi)\b"
+    for part in parts:
+        if re.match(suffix_pattern, part):
+            suffix = part.replace(".", "").strip() # Strip dots from suffix
+        else:
+            cleaned_parts.append(part)
+
+    # Parsing out middle initials/names using \b[A-Za-z]\.?\b or words
+    middle_name = None
+    if len(cleaned_parts) > 2:
+        # Check if a middle name/initial exists between first and last name
+        possible_middle = cleaned_parts[1]
+        if re.search(r"\b[A-Za-z]\.?\b", possible_middle) or len(possible_middle.split()) > 0:
+            middle_name = possible_middle
+            # Keep only the first name in cleaned_parts for re-ordering
+            cleaned_parts = [cleaned_parts[0], cleaned_parts[-1]]
+
+    # do Last, First format reversal if 2 main parts remain
+    if len(cleaned_parts) == 2:
+        cleaned_parts.reverse()
+        creator = " ".join(cleaned_parts)
+    else:
+        creator = " ".join(cleaned_parts)
+
+    # re-attach middle name in the same relative position
+    if middle_name:
+        creator = f"{creator} {middle_name}"
+
+    # remaining years, extra spaces, and fix abbreviations
+    # 4 digit sequence, optional hyphen
+    creator = re.sub(r"\b\d{4}-?\b", "", creator)
+    
+    # 2 upper case letters followed by period
+    creator = re.sub(r"([a-zA-Z]{2})\.", r"\1", creator)
+    
+    # consecutive whitespaces
+    creator = re.sub(r"\s+", " ", creator).strip()
+
+    # re-attach suffix
+    if suffix:
+        creator = f"{creator} {suffix}"
+
+    #t_duration = time.perf_counter() - t_start   
+    #print(f"Time for normalize function: {t_duration:.6f} seconds")
+    return creator
 
 
 def slugify(name: str) -> str:
@@ -212,8 +277,31 @@ def main():
             "series": author_series[author],   # sparse [[mi, c], ...]
             "titles": titles,
         }
-        (AUTHORS_DIR / f"{slug}.json").write_text(json.dumps(payload))
-        authors_index.append({"slug": slug, "name": author, "total": int(total)})
+
+        #(AUTHORS_DIR / f"{slug}.json").write_text(json.dumps(payload))
+        #authors_index.append({"slug": slug, "name": author, "total": int(total)})
+
+        name_parts = normalize(author).split()
+
+        if len(name_parts) >= 2:
+            author_initials = (name_parts[0][0] + name_parts[-1][0]).upper()
+        elif len(name_parts) == 1:
+            # Single names
+            author_initials = name_parts[0][0].upper()
+        else:
+            # Fallback for empty author strings
+            author_initials = "Missing"
+        
+        author_initials_dir = AUTHORS_DIR / author_initials
+        file_path = author_initials_dir / f"{slug}.json"
+
+        author_initials_dir.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(json.dumps(payload))
+        authors_index.append({
+            "slug": slug,
+            "name": author,
+            "total": int(total)
+        })
 
     # -- Write the shared axis + the search index ----------------------------
     (OUT_DIR / "meta.json").write_text(json.dumps({"months": months}))
