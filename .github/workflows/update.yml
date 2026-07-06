@@ -10,32 +10,44 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
-    steps:
-      - uses: actions/checkout@v4
+    env:
+      R_LIBS_USER: ${{ github.workspace }}/R/library
 
-      - uses: r-lib/actions/setup-r@v2
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.1"
 
-      - name: Set library path
-        run: mkdir -p ~/.local/share/R/library
+      - name: Create R library directory
+        run: mkdir -p $R_LIBS_USER
 
       - name: Cache R packages
         uses: actions/cache@v4
         with:
-          path: ~/.local/share/R/library
+          path: ${{ env.R_LIBS_USER }}
           key: r-pkgs-${{ runner.os }}-${{ hashFiles('**/Month_Loop_SPL.R') }}
+          restore-keys: r-pkgs-
 
       - name: Install R dependencies
         run: |
-          Rscript -e 'install.packages(c("httr","jsonlite","purrr","aws.s3"),
-            repos="https://cloud.r-project.org",
-            lib="~/.local/share/R/library")'
+          Rscript -e 'install.packages(
+            c("httr", "jsonlite", "purrr", "aws.s3"),
+            repos = "https://cloud.r-project.org",
+            lib = Sys.getenv("R_LIBS_USER")
+          )'
 
-      - name: Run script
+      - name: Verify installation (debug step)
+        run: |
+          Rscript -e '.libPaths(Sys.getenv("R_LIBS_USER")); print(installed.packages()[,1])'
+
+      - name: Run data pull script
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
-          Rscript -e '.libPaths("~/.local/share/R/library")'
+          Rscript -e '.libPaths(Sys.getenv("R_LIBS_USER"))'
           Rscript "Data Pull/Month_Loop_SPL.R"
