@@ -5,9 +5,8 @@ library(purrr)
 library(aws.s3)
 
 Sys.setenv(
-  AWS_ACCESS_KEY_ID = "91cf97a458d8076ba17aca1780e24891",
-  AWS_SECRET_ACCESS_KEY = "663dd4c2e9fcb1094dc66d854244866f423e009928f1b849ecf722cbcca593a0",
-  AWS_S3_ENDPOINT = "dd55a988a4598a3425259692fe6f7ba1.r2.cloudflarestorage.com"
+  AWS_ACCESS_KEY_ID = Sys.getenv("R2_ACCESS_KEY_ID"),
+  AWS_SECRET_ACCESS_KEY = Sys.getenv("R2_SECRET_ACCESS_KEY"),
 )
 Sys.unsetenv("AWS_DEFAULT_REGION")
 r2_endpoint <- "dd55a988a4598a3425259692fe6f7ba1.r2.cloudflarestorage.com"
