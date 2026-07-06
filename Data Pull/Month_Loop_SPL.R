@@ -6,7 +6,7 @@ library(aws.s3)
 
 Sys.setenv(
   AWS_ACCESS_KEY_ID = Sys.getenv("R2_ACCESS_KEY_ID"),
-  AWS_SECRET_ACCESS_KEY = Sys.getenv("R2_SECRET_ACCESS_KEY"),
+  AWS_SECRET_ACCESS_KEY = Sys.getenv("R2_SECRET_ACCESS_KEY")
 )
 Sys.unsetenv("AWS_DEFAULT_REGION")
 r2_endpoint <- "dd55a988a4598a3425259692fe6f7ba1.r2.cloudflarestorage.com"
