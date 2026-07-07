@@ -1,10 +1,10 @@
 <script>
 	// StackedViewer.svelte
 	import { onMount } from "svelte";
-	import { base } from "$app/paths";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import Switch from "$components/ui/Switch.svelte";
+	import { getMonths, searchAuthors, getAuthor } from "$components/db.js";
 
 	// Colors for title lines.
 	const TITLE_COLORS = [
@@ -27,20 +27,12 @@
 	let showAuthorLine = $state(true);
 
 	onMount(async () => {
-		// Load the search index and the shared month axis together.
-		// authors.json is now a dict keyed by slug -> { initials, name, total },
-		// since build_data.py buckets each author's file into an
-		// authors/<INITIALS>/ subfolder. Flatten it into an array (keeping the
-		// slug and initials on each entry) so the rest of the component can
-		// work with it the same way it did with the old array format.
-		const [a, m] = await Promise.all([
-			fetch(`${base}/data/authors.json`).then((r) => r.json()),
-			fetch(`${base}/data/meta.json`).then((r) => r.json())
-		]);
-		authors = Object.entries(a)
-				.map(([slug, info]) => ({ slug, ...info }))
-				.sort((x, y) => y.total - x.total);
-		months = m.months;
+		// The site queries a single SQLite database (static/data/library.sqlite3)
+		// directly over HTTP range requests via sql.js-httpvfs -- see db.js.
+		// months is the shared x-axis; the top authors seed the "Most borrowed"
+		// chips (and an empty search returns the top authors by total).
+		months = await getMonths();
+		authors = await searchAuthors("", 25);
 		// Show the most borrowed author by default, so the page isn't empty.
 		if (authors.length) await selectAuthor(authors[0]);
 	});
@@ -66,38 +58,23 @@
 				.map((w) => w[0].toUpperCase());
 	}
 
-	// Filter the author list as the user types.
-	const runSearch = debounce((q) => {
-		const needle = q.trim().toLowerCase();
+	// Filter the author list as the user types -- a full-text (or LIKE) query
+	// against the authors table in the SQLite database.
+	const runSearch = debounce(async (q) => {
+		const needle = q.trim();
 		if (needle.length < 2) {
 			results = [];
 			return;
 		}
-
-		const letters = typedLetters(q);
-
-		// Narrow to authors whose initials bucket shares a letter with at least
-		// one of the words typed - i.e. only "open" the matching folders
-		// instead of scanning every author.
-		let candidates = authors.filter(
-				(a) => a.initials && letters.some((l) => a.initials.includes(l))
-		);
-
-		// Fall back to the full list if the initials filter comes up empty
-		// (e.g. the typed word doesn't correspond to a name part build_data.py
-		// used for the initials, like a typo or a title-case mismatch), so a
-		// valid search never dead-ends.
-		if (!candidates.length) candidates = authors;
-
-		results = candidates.filter((a) => a.name.toLowerCase().includes(needle)).slice(0, 25);
+		results = await searchAuthors(needle, 25);
 	}, 120);
 	$effect(() => runSearch(query));
 
 	async function selectAuthor(a) {
-		// Files now live under a per-initials subfolder, e.g.
-		// authors/OB/octavia-butler.json instead of authors/octavia-butler.json.
-		const res = await fetch(`${base}/data/authors/${a.initials}/${a.slug}.json`);
-		const data = await res.json();
+		// One author's drilldown (their series + every qualifying title) comes
+		// from a couple of indexed queries into the SQLite database.
+		const data = await getAuthor(a.slug);
+		if (!data) return;
 		// expand the sparse series the ETL produced into full arrays
 		data.months = months;
 		data.series = densify(data.series);

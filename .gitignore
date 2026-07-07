@@ -12,3 +12,11 @@ data/raw/*.csv
 # NOTE: static/data/ (the generated JSON) IS committed, so the live site has
 # data without a build-time ETL step. It's ~8 MB for the sample. If you switch
 # to the full dataset, host that JSON externally (e.g. Cloudflare R2) instead.
+# Built database + DuckDB build artifacts (never commit; built in CI / on a VM)
+static/data/library.sqlite3
+data-prep/.duckdb_spill/
+data-prep/workspace.duckdb
+data/raw/*.parquet
+data/raw/monthly/
+data/raw/monthly_parquet/
+data/raw/spl-monthly-checkouts_2005-2025.csv

@@ -15,12 +15,13 @@
 // npm install sql.js-httpvfs
 // -----------------------------------------------------------------------
 import pkg from 'sql.js-httpvfs';
+import { base } from '$app/paths';
 const { createDbWorker } = pkg;
 
 // Path to the built database, served at /data on the site (see build_data.py
-// OUT_DIR). Adjust base path here if the site is served from a subpath
-// (e.g. GitHub Pages project sites at username.github.io/repo/).
-const DB_URL = `${import.meta.env.BASE_URL ?? '/'}data/library.sqlite3`.replace(/\/+/g, '/');
+// OUT_DIR). `base` is '' locally and '/<repo>' on GitHub Pages project sites,
+// so this resolves correctly in both.
+const DB_URL = `${base}/data/library.sqlite3`;
 
 // sql.js-httpvfs needs its own worker + wasm files reachable by URL. Vite
 // resolves these to hashed, fingerprinted asset URLs at build time.
@@ -66,7 +67,7 @@ async function hasFts5() {
 					"SELECT name FROM sqlite_master WHERE type='table' AND name='authors_fts'"
 				);
 				return rows.length > 0;
-			} catch {
+			} catch (error) {
 				console.error("No FTS5 available:", error);
 				return false;
 			}
