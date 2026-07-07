@@ -205,7 +205,7 @@ DB_INSERT_BATCH = 5_000
 DUCKDB_SPILL_DIR = PROJECT_DIR / "data-prep" / ".duckdb_spill"
 
 # Cap on how much RAM DuckDB will use before spilling to DUCKDB_SPILL_DIR.
-DUCKDB_MEMORY_LIMIT = "6GB"
+DUCKDB_MEMORY_LIMIT = os.environ.get("DUCKDB_MEMORY_LIMIT", "6GB")
 
 # How many title rows DuckDB packs into each Arrow RecordBatch when
 # streaming the title aggregation into titles_by_author. Bounds Python-side

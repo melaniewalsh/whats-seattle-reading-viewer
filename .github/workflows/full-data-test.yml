@@ -56,6 +56,9 @@ jobs:
           # build_data.py reads R2_* names; repo secrets are named AWS_*.
           R2_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # Runner has ~7 GB RAM. Cap DuckDB low so it spills to (now-freed) disk
+          # instead of OOMing, leaving headroom for the Python-side author dict.
+          DUCKDB_MEMORY_LIMIT: 3GB
           # NOTE: not setting R2_ENDPOINT_URL -- the AWS_S3_ENDPOINT secret is a
           # bare host (for the R aws.s3 package), which boto3 rejects. build_data.py
           # already defaults to the correct full https:// R2 endpoint.
