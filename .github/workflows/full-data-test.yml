@@ -1,0 +1,73 @@
+name: Full-data build test
+
+# Builds the FULL library.sqlite3 from the R2 bucket and reports its size and
+# row counts -- but does NOT deploy, so it can't affect the live site. This is
+# the "measure first" run: we need the DB size (Pages caps a site at ~1 GB) and
+# the build's disk/time footprint before wiring it into the real deploy.
+#
+# Runs once when this file is pushed (the paths filter keeps it from re-running
+# on every unrelated push), and can be re-run manually once it's on the default
+# branch.
+
+on:
+  push:
+    branches: [data_loading_improvements]
+    paths: [".github/workflows/full-data-test.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      # Free ~25 GB so the raw files + Parquet cache + DuckDB spill have room.
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          echo "=== disk before build ===" && df -h /
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install duckdb boto3 orjson
+
+      - name: Build full library.sqlite3 from R2
+        env:
+          # build_data.py reads R2_* names; repo secrets are named AWS_*.
+          R2_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT_URL: ${{ secrets.AWS_S3_ENDPOINT }}
+        run: python3 data-prep/build_data.py
+
+      - name: Report DB size, row counts, disk
+        run: |
+          echo "=== library.sqlite3 file ==="
+          ls -lh static/data/library.sqlite3
+          echo "=== contents ==="
+          python3 - <<'PY'
+          import sqlite3, json, os
+          p = "static/data/library.sqlite3"
+          print(f"file size: {os.path.getsize(p)/1e6:.1f} MB")
+          db = sqlite3.connect(p)
+          print("authors:", db.execute("SELECT count(*) FROM authors").fetchone()[0])
+          print("titles :", db.execute("SELECT count(*) FROM titles").fetchone()[0])
+          m = json.loads(db.execute("SELECT value FROM meta WHERE key='months'").fetchone()[0])
+          print(f"months : {len(m)}  ({m[0]} … {m[-1]})")
+          PY
+          echo "=== disk after build ===" && df -h /
+
+      # Upload the DB so you can download + inspect it. continue-on-error so a
+      # too-big-to-upload DB still leaves the size numbers above in the log.
+      - name: Upload library.sqlite3 as an artifact
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: library-sqlite3
+          path: static/data/library.sqlite3
+          retention-days: 7
