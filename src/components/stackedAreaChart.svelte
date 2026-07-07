@@ -42,8 +42,7 @@
 
 	// Shows before anyone has searched: the top authors by
 	// total checkouts (same "no query -> top N" behavior searchAuthors
-	// uses server-side). Auto-select the #1 author too, so the chart shows
-	// something immediately.
+	// uses server-side). Auto-select the #1 author.
 	$effect(() => {
 		if (seriesProp || activeSlug) return;
 		searchAuthors('', 10)
@@ -55,9 +54,8 @@
 	});
 
 	// Load the selected author's own series + qualifying titles the moment
-	// activeSlug changes. One query for the author row, one for their
-	// titles (see db.js:getAuthor), both satisfied by a couple of indexed
-	// page reads rather than downloading the whole database.
+	// activeSlug changes. 
+	// One query for the author row, one for their titles (see db.js:getAuthor)
 	$effect(() => {
 		if (seriesProp) return;
 		const slugToLoad = activeSlug;
