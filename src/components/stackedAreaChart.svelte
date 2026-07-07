@@ -1,12 +1,126 @@
 <script>
     // StackedAreaChart.svelte
 	import { scaleLinear, area as d3area, max as d3max } from 'd3';
+	import { getMonths, searchAuthors, getAuthor, densify } from './db.js';
 
-	let { months = [], series = [] } = $props();
-	
+	// Both props are now optional. Pass explicitly for pre-fetched/
+	// embedded/test use.
+	let {
+		months: monthsProp = null,
+		series: seriesProp = null,
+		slug: initialSlug = null,
+		topTitles = 8
+	} = $props();
+
 	let width = $state(720);
 	const height = 380;
 	const margin = { top: 16, right: 16, bottom: 28, left: 44 };
+
+	const PALETTE = [
+		'#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
+		'#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac'
+	];
+
+	let loadedMonths = $state([]);
+	let query = $state('');
+	let searchResults = $state([]);
+	// svelte-ignore state_referenced_locally: initialSlug only
+	// seeds the starting value, activeSlug is the source after that
+	let activeSlug = $state(initialSlug);
+	let activeAuthor = $state(null);
+	let dbLoading = $state(false);
+	let dbError = $state(null);
+	let searchTimer;
+
+	// Shared x-axis: one query, cached in db.js, reused by every instance.
+	$effect(() => {
+		if (monthsProp) return;
+		getMonths()
+			.then((m) => (loadedMonths = m))
+			.catch((e) => (dbError = e?.message ?? String(e)));
+	});
+
+	// Shows before anyone has searched: the top authors by
+	// total checkouts (same "no query -> top N" behavior searchAuthors
+	// uses server-side). Auto-select the #1 author too, so the chart shows
+	// something immediately.
+	$effect(() => {
+		if (seriesProp || activeSlug) return;
+		searchAuthors('', 10)
+			.then((r) => {
+				searchResults = r;
+				if (r.length > 0) activeSlug = r[0].slug;
+			})
+			.catch((e) => (dbError = e?.message ?? String(e)));
+	});
+
+	// Load the selected author's own series + qualifying titles the moment
+	// activeSlug changes. One query for the author row, one for their
+	// titles (see db.js:getAuthor), both satisfied by a couple of indexed
+	// page reads rather than downloading the whole database.
+	$effect(() => {
+		if (seriesProp) return;
+		const slugToLoad = activeSlug;
+		if (!slugToLoad) return;
+		dbLoading = true;
+		dbError = null;
+		getAuthor(slugToLoad)
+			.then((a) => {
+				activeAuthor = a;
+				dbLoading = false;
+			})
+			.catch((e) => {
+				dbError = e?.message ?? String(e);
+				dbLoading = false;
+			});
+	});
+
+	function onSearchInput(event) {
+		query = event.target.value;
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(async () => {
+			try {
+				searchResults = await searchAuthors(query, 12);
+			} catch (e) {
+				dbError = e?.message ?? String(e);
+			}
+		}, 200);
+	}
+
+	function selectAuthor(slug) {
+		activeSlug = slug;
+		searchResults = [];
+		query = '';
+	}
+
+	// Turn the loaded author into stacked layers: one per qualifying title,
+	// plus a catch-all "Other titles" layer covering the gap between the
+	// author's real total and the shown titles since build_data.py only keeps
+	// per-title series for titles checked out >= MIN_TITLE_CHECKOUTS times,
+	// so without this the stack would silently under-count the long tail.
+	const derivedSeries = $derived.by(() => {
+		if (!activeAuthor || !loadedMonths.length) return [];
+		const monthCount = loadedMonths.length;
+		const shown = activeAuthor.titles.slice(0, topTitles);
+		const layers = shown.map((t, i) => ({
+			label: t.title,
+			values: densify(t.series, monthCount),
+			color: PALETTE[i % PALETTE.length],
+			groupIndex: 0
+		}));
+		const authorTotals = densify(activeAuthor.series, monthCount);
+		const otherValues = authorTotals.map((total, i) => {
+			const shownSum = layers.reduce((sum, l) => sum + l.values[i], 0);
+			return Math.max(0, total - shownSum);
+		});
+		if (otherValues.some((v) => v > 0)) {
+			layers.push({ label: 'Other titles', values: otherValues, color: '#ccc', groupIndex: -1 });
+		}
+		return layers;
+	});
+
+	const months = $derived(monthsProp ?? loadedMonths);
+	const series = $derived(seriesProp ?? derivedSeries);
 
 	const x = $derived(
 		scaleLinear()
@@ -152,7 +266,51 @@
 </script>
 
 <div class="chart-container">
-	<svg {width} {height} viewBox="0 0 {width} {height}" onpointermove={onMove} onpointerleave={onLeave}>
+	{#if !seriesProp}
+		<div class="author-search">
+			<input
+				type="text"
+				placeholder="Search authors..."
+				value={query}
+				oninput={onSearchInput}
+			/>
+			{#if searchResults.length > 0}
+				<ul class="search-results">
+					{#each searchResults as r (r.slug)}
+						<li>
+							<button type="button" onclick={() => selectAuthor(r.slug)}>
+								<span class="result-name">{r.name}</span>
+								<span class="result-total">{r.total.toLocaleString()}</span>
+							</button>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</div>
+
+		{#if dbError}
+			<p class="db-status db-error">Couldn't load data: {dbError}</p>
+		{:else if dbLoading}
+			<p class="db-status">Loading…</p>
+		{:else if activeAuthor}
+			<h3 class="author-heading">
+				{activeAuthor.name}
+				<span class="author-total">{activeAuthor.total.toLocaleString()} checkouts</span>
+			</h3>
+		{:else if !activeSlug}
+			<p class="db-status">Search for an author, or pick one below, to see checkouts over time.</p>
+		{/if}
+	{/if}
+
+	<svg
+		{width}
+		{height}
+		viewBox="0 0 {width} {height}"
+		role="img"
+		aria-label="Checkouts over time, stacked by title"
+		onpointermove={onMove}
+		onpointerleave={onLeave}
+	>
 		<!-- Y Axis Ticks & Gridlines -->
 		{#each yTicks as tick}
 			<g class="tick y-tick" transform="translate(0, {y(tick)})">
@@ -313,9 +471,86 @@
 		font-weight: bold;
 		color: #666;
 	}
+
+	.author-search {
+		position: relative;
+		margin-bottom: 10px;
+		max-width: 320px;
+	}
+
+	.author-search input {
+		width: 100%;
+		box-sizing: border-box;
+		padding: 8px 10px;
+		font-size: 14px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+	}
+
+	.search-results {
+		position: absolute;
+		z-index: 20;
+		top: 100%;
+		left: 0;
+		right: 0;
+		margin: 4px 0 0;
+		padding: 4px;
+		list-style: none;
+		background: #fff;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+		max-height: 260px;
+		overflow-y: auto;
+	}
+
+	.search-results li button {
+		display: flex;
+		justify-content: space-between;
+		width: 100%;
+		padding: 6px 8px;
+		background: none;
+		border: none;
+		border-radius: 3px;
+		font-size: 13px;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.search-results li button:hover {
+		background: #f2f2f2;
+	}
+
+	.result-total {
+		color: #888;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.db-status {
+		font-size: 13px;
+		color: #666;
+		margin: 6px 0 10px;
+	}
+
+	.db-error {
+		color: #b00020;
+	}
+
+	.author-heading {
+		display: flex;
+		align-items: baseline;
+		gap: 10px;
+		font-size: 16px;
+		margin: 0 0 10px;
+	}
+
+	.author-total {
+		font-size: 13px;
+		font-weight: normal;
+		color: #666;
+	}
     /* stackedAreaChart.svelte */
     .area-path {
-        /* Add 'd' and 'fill' to the transition for fluid sorting and bundling */
-        transition: opacity 0.15s ease, fill 0.4s ease, d 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    }
+    	transition: opacity 0.15s ease, fill 0.4s ease;
+	}
 </style>
