@@ -687,6 +687,11 @@ def main():
                 """,
                 [str(local_csv)],
             )
+            # Delete the raw CSV as soon as it's cached to Parquet. The full CSV
+            # corpus is ~12 GB; keeping it around alongside the Parquet cache and
+            # DuckDB's spill files overruns a CI runner's disk. Parquet is the
+            # source of truth from here on, so the CSV is safe to drop.
+            local_csv.unlink(missing_ok=True)
         print(f"  cached  ({perf_counter() - t0:.2f}s)")
 
     # cache the original bulk CSV as Parquet once, then always read from that
