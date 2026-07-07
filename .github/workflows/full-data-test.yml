@@ -12,7 +12,9 @@ name: Full-data build test
 on:
   push:
     branches: [data_loading_improvements]
-    paths: [".github/workflows/full-data-test.yml"]
+    paths:
+      - ".github/workflows/full-data-test.yml"
+      - "data-prep/build_data.py"
   workflow_dispatch:
 
 permissions:

@@ -116,6 +116,7 @@ import re
 import sqlite3
 from pathlib import Path
 from time import perf_counter
+from concurrent.futures import ThreadPoolExecutor
 import csv
 
 try:
@@ -634,12 +635,18 @@ def sync_new_files_from_r2():
         return []
 
     MONTHLY_RAW_DIR.mkdir(parents=True, exist_ok=True)
-    downloaded = []
-    for key in new_keys:
+
+    # Download in parallel -- boto3 clients are thread-safe, and these are
+    # network-bound, so a handful of threads cuts wall time a lot vs. one-at-a-
+    # time. Order of `downloaded` doesn't matter; every shard is read together.
+    def _download(key):
         local_path = MONTHLY_RAW_DIR / key.rsplit("/", 1)[-1]
-        print(f"    downloading {key} ...")
         s3.download_file(R2_BUCKET, key, str(local_path))
-        downloaded.append((key, local_path))
+        print(f"    downloaded {key}")
+        return (key, local_path)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        downloaded = list(pool.map(_download, new_keys))
     return downloaded
 
 
