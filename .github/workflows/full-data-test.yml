@@ -25,12 +25,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Free ~25 GB so the raw files + Parquet cache + DuckDB spill have room.
+      # Free ~25 GB on the workspace disk (/).
       - name: Free up disk space
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
                       /opt/hostedtoolcache/CodeQL /usr/local/share/boost
-          echo "=== disk before build ===" && df -h /
+          echo "=== / ===" && df -h / && echo "=== /mnt ===" && df -h /mnt
+
+      # DuckDB spills big intermediate sort/hash data during the title
+      # aggregation and it overran the workspace disk (~25 GB). The runner's
+      # /mnt volume has ~65 GB, so point the spill dir there via a symlink
+      # (build_data.py hardcodes data-prep/.duckdb_spill as its temp_directory).
+      - name: Put DuckDB spill on the big /mnt volume
+        run: |
+          sudo mkdir -p /mnt/duckdb_spill
+          sudo chmod 777 /mnt/duckdb_spill
+          ln -sfn /mnt/duckdb_spill data-prep/.duckdb_spill
 
       - uses: actions/setup-python@v5
         with:
