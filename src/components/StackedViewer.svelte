@@ -26,7 +26,8 @@
 	let titleFilter = $state(""); // text filter for the title list
 	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = stacked by title
 	let titleSort = $state("borrowed"); // 'borrowed' = most checkouts first; 'alpha' = A–Z
-	let isolatedKey = $state(null); // when set, the chart shows ONLY this series ('author' | 'g<id>' | 's<idx>')
+	let isolatedKeys = $state([]); // when non-empty, the chart shows ONLY these series (keys 'g<id>' | 's<idx>'); multiple = compare
+	let showAuthorTotal = $state(true); // show the author's aggregate total line in the line view
 	let dragIdx = $state(null); // title index currently being dragged onto a group pill
 	let dragOverId = $state(null); // group pill currently under the dragged title
 
@@ -93,7 +94,8 @@
 		singleIdxs = [];
 		titleFilter = "";
 		chartMode = "line";
-		isolatedKey = null;
+		isolatedKeys = [];
+		showAuthorTotal = true;
 		query = "";
 		results = [];
 	}
@@ -119,7 +121,7 @@
 		if (activeGroupId === id) {
 			activeGroupId = groups.length ? groups[groups.length - 1].id : null;
 		}
-		if (isolatedKey === `g${id}`) isolatedKey = null;
+		isolatedKeys = isolatedKeys.filter((k) => k !== `g${id}`);
 	}
 
 	// Finish editing the active group (clearer "I'm done adding titles" action).
@@ -127,10 +129,28 @@
 		activeGroupId = null;
 	}
 
-	// Show ONLY this series (group / single title / author), or clear if it's
-	// already the isolated one.
+	// "Only" is a toggle you can apply to more than one line at once: the chart
+	// shows just the isolated set, so ticking two titles' "Only" compares them
+	// head to head. Clicking an already-isolated line drops it back out.
 	function toggleIsolate(key) {
-		isolatedKey = isolatedKey === key ? null : key;
+		isolatedKeys = isolatedKeys.includes(key)
+				? isolatedKeys.filter((k) => k !== key)
+				: [...isolatedKeys, key];
+	}
+	const isIsolated = (key) => isolatedKeys.includes(key);
+	function clearIsolate() {
+		isolatedKeys = [];
+	}
+
+	// Human label for a series key (used for the chart title while isolating).
+	function keyLabel(key) {
+		if (!current) return "";
+		if (key.startsWith("g")) {
+			const g = groups.find((g) => g.id === Number(key.slice(1)));
+			return g ? groupLabel(g) : "";
+		}
+		if (key.startsWith("s")) return current.titles[Number(key.slice(1))]?.title ?? "";
+		return "";
 	}
 
 	// Sum a set of title indices into one densified series (for a group's line).
@@ -254,12 +274,7 @@
 	// stacked-area view, show the group name(s).
 	const plotTitle = $derived.by(() => {
 		if (!current) return "";
-		if (isolatedKey === "author") return current.name;
-		if (isolatedKey?.startsWith("g")) {
-			const g = groups.find((g) => g.id === Number(isolatedKey.slice(1)));
-			return g ? groupLabel(g) : "";
-		}
-		if (isolatedKey?.startsWith("s")) return current.titles[Number(isolatedKey.slice(1))]?.title ?? "";
+		if (isolatedKeys.length) return isolatedKeys.map(keyLabel).filter(Boolean).join("  vs  ");
 		if (chartMode === "area" && groups.length) return groups.map(groupLabel).join(" · ");
 		return "";
 	});
@@ -317,7 +332,7 @@
 	// individually-ticked title.
 	const lineParts = $derived.by(() => {
 		if (!current) return [];
-		const parts = [authorLine];
+		const parts = showAuthorTotal ? [authorLine] : [];
 		groups.forEach((g, gi) => {
 			if (g.idxs.length) {
 				parts.push({
@@ -342,15 +357,19 @@
 		return parts;
 	});
 
-	// The set of title indices an isolate key refers to (null = show everything).
+	// The union of title indices the isolated keys refer to (null = show all).
 	function isolatedIdxSet() {
-		if (!isolatedKey || isolatedKey === "author") return null;
-		if (isolatedKey.startsWith("g")) {
-			const g = groups.find((g) => g.id === Number(isolatedKey.slice(1)));
-			return new Set(g ? g.idxs : []);
+		if (!isolatedKeys.length) return null;
+		const set = new Set();
+		for (const key of isolatedKeys) {
+			if (key.startsWith("g")) {
+				const g = groups.find((g) => g.id === Number(key.slice(1)));
+				if (g) g.idxs.forEach((i) => set.add(i));
+			} else if (key.startsWith("s")) {
+				set.add(Number(key.slice(1)));
+			}
 		}
-		if (isolatedKey.startsWith("s")) return new Set([Number(isolatedKey.slice(1))]);
-		return null;
+		return set;
 	}
 
 	// A prolific author can have 1000+ qualifying titles; drawing a stacked-area
@@ -387,7 +406,7 @@
 	const displaySeries = $derived.by(() => {
 		if (!current) return [];
 		if (chartMode === "line") {
-			if (isolatedKey) return lineParts.filter((s) => s.key === isolatedKey);
+			if (isolatedKeys.length) return lineParts.filter((s) => isolatedKeys.includes(s.key));
 			return lineParts;
 		}
 		// area mode
@@ -463,33 +482,52 @@
 
 			{#if groups.some((g) => g.idxs.length) || singleIdxs.length}
 				<ul class="legend">
+					{#if chartMode === "line"}
+						<li class="legend-item" class:dim={!showAuthorTotal || isolatedKeys.length}>
+							<span class="sw" style="background:{INK}"></span>
+							<span class="lg-name">{current.name} — total</span>
+							<button
+									class="only-btn"
+									title={showAuthorTotal ? "Hide the author's total line" : "Show the author's total line"}
+									onclick={() => (showAuthorTotal = !showAuthorTotal)}
+							>{showAuthorTotal ? "Hide" : "Show"}</button>
+						</li>
+					{/if}
 					{#each groups as g, gi (g.id)}
 						{#if g.idxs.length}
-							<li class="legend-item" class:dim={isolatedKey && isolatedKey !== `g${g.id}`}>
+							<li class="legend-item" class:dim={isolatedKeys.length && !isIsolated(`g${g.id}`)}>
 								<span class="sw" style="background:{groupColor(gi)}"></span>
 								<span class="lg-name">{groupLabel(g)}</span>
 								<button
 										class="only-btn"
-										class:on={isolatedKey === `g${g.id}`}
-										title="Show only this group"
+										class:on={isIsolated(`g${g.id}`)}
+										title="Show only this group (click more than one to compare)"
 										onclick={() => toggleIsolate(`g${g.id}`)}
-								>{isolatedKey === `g${g.id}` ? "Show all" : "Only"}</button>
+								>Only</button>
 							</li>
 						{/if}
 					{/each}
 					{#each singleIdxs as idx, i (idx)}
-						<li class="legend-item" class:dim={isolatedKey && isolatedKey !== `s${idx}`}>
+						<li class="legend-item" class:dim={isolatedKeys.length && !isIsolated(`s${idx}`)}>
 							<span class="sw" style="background:{singleColor(i)}"></span>
 							<span class="lg-name">{current.titles[idx].title}</span>
 							<button
 									class="only-btn"
-									class:on={isolatedKey === `s${idx}`}
-									title="Show only this title"
+									class:on={isIsolated(`s${idx}`)}
+									title="Show only this title (click more than one to compare)"
 									onclick={() => toggleIsolate(`s${idx}`)}
-							>{isolatedKey === `s${idx}` ? "Show all" : "Only"}</button>
+							>Only</button>
 						</li>
 					{/each}
+					{#if isolatedKeys.length}
+						<li class="legend-item">
+							<button class="show-all-btn" onclick={clearIsolate}>Show all</button>
+						</li>
+					{/if}
 				</ul>
+				{#if isolatedKeys.length === 1}
+					<p class="compare-hint">Click “Only” on another line to compare them side by side.</p>
+				{/if}
 			{/if}
 			<div class="groups-panel">
 				<div class="groups-header">
@@ -788,6 +826,29 @@
 		background: var(--color-fg);
 		border-color: var(--color-fg);
 		color: var(--color-white);
+	}
+
+	.show-all-btn {
+		font-family: var(--font-sans);
+		font-size: 0.72rem;
+		font-weight: 600;
+		padding: 3px 12px;
+		border-radius: 999px;
+		border: 1px solid var(--color-fg);
+		background: var(--color-fg);
+		color: var(--color-white);
+		cursor: pointer;
+	}
+
+	.show-all-btn:hover {
+		opacity: 0.85;
+	}
+
+	.compare-hint {
+		font-family: var(--font-sans);
+		font-size: 0.78rem;
+		color: var(--color-fg-light);
+		margin: 6px 2px 0;
 	}
 
 	.editing-banner {
