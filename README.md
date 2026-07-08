@@ -11,6 +11,7 @@ Search any author and explore their Seattle Public Library checkout trends over 
 -   [The short version](#short-version)
 -   [Quick start](#quick-start)
 -   [How it's deployed](#how-its-deployed)
+-   [Updating the data after a change](#updating-data)
 -   [How the data pipeline works](#how-the-data-pipeline-works)
 -   [Project structure](#project-structure)
 -   [HDSSI projects](#hdssi) ← **HDSSI**
@@ -91,6 +92,42 @@ Two more one-time things:
 
 -   The build workflow needs to *write* to the buckets, so make sure the R2 keys in the repo's GitHub secrets (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`) have access.
 -   In the repo's **Settings → Pages**, set **Source = GitHub Actions**.
+
+------------------------------------------------------------------------
+
+## Updating the data after a change {#updating-data}
+
+Say you refined the author clustering (`author_map.json`), changed `MIN_TITLE_CHECKOUTS`, or edited anything else in `data-prep/`. The data only refreshes on its own once a month — here's how to push your change to the live site now.
+
+The rebuild happens in the cloud (it reads ~50M rows, which is too much for a laptop), so you **don't** rebuild the whole thing locally. You commit your change, then click one button to run the build on GitHub's servers.
+
+**The steps:**
+
+1.  **Make your change and check it in.** For clustering, that means running `python3 data-prep/cluster_authors.py` to (re)generate `data-prep/author_map.json`, then committing it:
+
+    ``` bash
+    python3 data-prep/cluster_authors.py     # writes data-prep/author_map.json
+    git add data-prep/author_map.json         # (plus any code you changed)
+    git commit -m "Refine author clustering"
+    git push
+    ```
+
+    > ⚠️ **`author_map.json` must be committed and pushed.** The cloud build reads it straight from the repo — if it's only on your laptop, the rebuild won't see your merges.
+
+2.  **Run the build.** Go to the repo's **Actions** tab → **"Build full database and upload to R2"** → **Run workflow** (leave the branch on `main`) → **Run workflow**. This reruns `data-prep/build_data.py` with your changes and uploads the fresh per-author files to R2.
+
+3.  **Wait ~30–40 minutes.** The full dataset is big. When the run goes green, it's done — the new files (with `NA` gone, your merges applied, etc.) are on R2, and the **old ones are automatically cleaned up** (the upload mirrors the build, so author files whose spellings got merged away are removed).
+
+4.  **Refresh the live site.** That's it — **no site redeploy needed.** The data lives on R2 separately from the website, so a data change shows up as soon as the build finishes (a hard-refresh, ⌘⇧R, clears any cached files).
+
+**Preview locally before you push (recommended).** Before triggering the 40-minute cloud build, it's worth confirming your change looks right on a smaller scale:
+
+``` bash
+python3 data-prep/build_data.py   # builds into static/data/ (see Quick start for data sources)
+npm run dev                        # check that the merge / change looks correct
+```
+
+Then do steps 1–2 above to push it live.
 
 ------------------------------------------------------------------------
 
