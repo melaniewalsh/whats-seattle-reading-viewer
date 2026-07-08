@@ -43,6 +43,15 @@ export async function getMonths() {
 	return monthsPromise;
 }
 
+// Junk "authors": the raw data dumps every checkout with a missing/unknown
+// author name into a single placeholder ("NA"), which balloons into a 75 MB,
+// 132k-title file that crashes the tab if it's fetched + charted. It's the #1
+// entry by total, so the auto-load-top-author-on-open behaviour would hit it
+// every time. Drop these from the index so they can't be shown or auto-loaded.
+// (build_data.py also excludes them at the source now; this is the belt to that
+// suspenders, and keeps already-built indexes safe.)
+const JUNK_AUTHOR_NAMES = new Set(['', 'NA', 'N/A', 'Unknown', 'unknown', 'Various', 'various']);
+
 // The search index: [[slug, name, total], ...] sorted total-DESC. Loaded once
 // (a few MB, gzipped on the wire + CDN-cached), then every keystroke searches
 // it in memory. We also cache a parallel lowercased-name array so the
@@ -52,10 +61,10 @@ function getIndex() {
 	if (!indexPromise) {
 		indexPromise = fetch(`${DATA_BASE}/search-index.json`)
 			.then((r) => r.json())
-			.then((rows) => ({
-				rows,
-				lower: rows.map((r) => r[1].toLowerCase())
-			}));
+			.then((all) => {
+				const rows = all.filter((r) => !JUNK_AUTHOR_NAMES.has(r[1]));
+				return { rows, lower: rows.map((r) => r[1].toLowerCase()) };
+			});
 	}
 	return indexPromise;
 }

@@ -821,8 +821,14 @@ def main():
             Checkouts AS checkouts
         FROM raw
         WHERE Creator IS NOT NULL
+        -- Drop placeholder "authors" the catalog uses for missing/unknown
+        -- names. "NA" alone is ~48M checkouts across 132k titles -- lumped into
+        -- one fake author it becomes a 75 MB file that crashes the browser when
+        -- charted, and it's the #1 entry by total. These aren't real authors.
+        AND upper(trim(Creator)) NOT IN ('NA', 'N/A', 'UNKNOWN', 'VARIOUS', 'ANONYMOUS')
+        AND trim(regexp_replace(Creator, {_sql_literal(NAME_DATE_RE)}, '')) != ''
         AND MaterialType != 'SOUNDDISC'
-        AND CheckoutYear BETWEEN 2005 AND 2030 
+        AND CheckoutYear BETWEEN 2005 AND 2030
     """
 
     # ---- CLUSTERING HOOK ---------------------------------------------------
