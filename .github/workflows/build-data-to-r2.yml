@@ -46,7 +46,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install duckdb boto3 orjson pyarrow
+      - run: pip install duckdb boto3 orjson pyarrow python-dotenv rapidfuzz
+
+      # Regenerate data-prep/author_map.json from the CURRENT cluster_authors.py
+      # so improvements to the clustering go live without anyone running it
+      # locally. build_data.py (next step) reads this file via its CLUSTERING
+      # HOOK. The map committed in the repo is just a fallback; this overwrites
+      # it for the build.
+      - name: Regenerate author clusters
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          # Don't let a clustering failure block the whole data rebuild -- fall
+          # back to the author_map.json committed in the repo.
+          python3 data-prep/cluster_authors.py \
+            || echo "cluster_authors.py failed -- falling back to the committed author_map.json"
+          if [ -f data-prep/author_map.json ]; then
+            echo "author_map.json in place ($(wc -c < data-prep/author_map.json) bytes)"
+          else
+            echo "no author_map.json -- building without author merges"
+          fi
 
       - name: Build per-author JSON files from R2
         env:
