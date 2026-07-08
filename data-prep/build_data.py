@@ -216,7 +216,7 @@ TITLE_FETCH_CHUNK = 200_000
 # Only keep a title in an author's drill-down list if it was checked out at
 # least this many times (ever). Trims the long tail; the author's total and
 # trend line still count every checkout. Set to 0 to keep everything.
-MIN_TITLE_CHECKOUTS = 10
+MIN_TITLE_CHECKOUTS = 50
 
 # Pattern that strips a trailing ", 1966-" / ", 1945 July 28-" from a name.
 NAME_DATE_RE = r",\s*[0-9]{4}.*$"
