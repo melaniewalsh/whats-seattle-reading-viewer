@@ -1,0 +1,89 @@
+name: Build full database and upload to R2
+
+# Builds the full library.sqlite3 from R2's monthly files (~18 min) and uploads
+# the finished database back to R2, where the live site reads it directly over
+# HTTP range requests (sql.js-httpvfs). The website deploy (deploy.yml) is
+# separate and fast -- it never rebuilds this DB.
+#
+# TRIGGERS: monthly + manual ONLY (not on push). The monthly run is staggered a
+# few hours after the R2 data pull (update.yml @ 06:00) so it reads fresh data.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 12 5 * *" # 5th, 12:00 UTC (after update.yml's 06:00 data pull)
+
+permissions:
+  contents: read
+
+env:
+  # The PUBLIC R2 bucket the finished DB is uploaded to (see README for the
+  # one-time Cloudflare setup: public access + CORS). Override here if you name
+  # the bucket differently.
+  R2_DB_BUCKET: spl-checkouts-public
+  DB_OBJECT_KEY: library.sqlite3
+  R2_ENDPOINT_URL: https://dd55a988a4598a3425259692fe6f7ba1.r2.cloudflarestorage.com
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reclaim ~30 GB so the build's disk (CSVs + Parquet + DuckDB spill) fits.
+      - name: Free up disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install duckdb boto3 orjson pyarrow
+
+      - name: Build per-author JSON files from R2
+        env:
+          # build_data.py reads R2_* names; repo secrets are named AWS_*.
+          R2_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # ~7 GB runner RAM: cap DuckDB low so it spills to disk instead of OOM.
+          DUCKDB_MEMORY_LIMIT: 3GB
+        run: |
+          python3 data-prep/build_data.py
+          echo "author files: $(find static/data/authors -type f | wc -l)"
+          ls -lh static/data/meta.json static/data/search-index.json
+
+      - name: Upload data files to the public R2 bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          # The search index is the one biggish file the browser downloads on
+          # load. Store it gzipped with Content-Encoding so the browser gets it
+          # transparently decompressed (a few MB instead of ~15 MB).
+          gzip -9 -c static/data/search-index.json > /tmp/search-index.json.gz
+          aws s3 cp /tmp/search-index.json.gz \
+            "s3://${R2_DB_BUCKET}/search-index.json" \
+            --endpoint-url "$R2_ENDPOINT_URL" \
+            --content-type application/json \
+            --content-encoding gzip
+
+          # Everything else: meta.json + the ~350k tiny authors/*.json files.
+          # Bump concurrency so that many small PUTs don't crawl. --delete makes
+          # R2 mirror this build, dropping authors a higher threshold removed --
+          # but keep the old library.sqlite3 around as a warm fallback (it's the
+          # preserved sqlite-httpvfs-version's data; cheap to keep on R2).
+          aws configure set default.s3.max_concurrent_requests 128
+          aws s3 sync static/data/ "s3://${R2_DB_BUCKET}/" \
+            --endpoint-url "$R2_ENDPOINT_URL" \
+            --exclude "search-index.json" \
+            --exclude "library.sqlite3" \
+            --delete
+          echo "Uploaded meta.json + search-index.json + author files to r2://${R2_DB_BUCKET}/"

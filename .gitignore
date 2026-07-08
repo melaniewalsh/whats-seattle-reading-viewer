@@ -9,6 +9,14 @@ functions
 # The big raw CSV is NOT committed (see README for the download command).
 data/raw/*.csv
 
-# NOTE: static/data/ (the generated JSON) IS committed, so the live site has
-# data without a build-time ETL step. It's ~8 MB for the sample. If you switch
-# to the full dataset, host that JSON externally (e.g. Cloudflare R2) instead.
+# Generated data is NOT committed anymore -- build_data.py writes it (meta.json,
+# search-index.json, ~350k authors/*.json) and CI uploads it to Cloudflare R2,
+# which the live site fetches directly. Build it locally with
+# `python3 data-prep/build_data.py` to preview; it stays out of git.
+static/data/
+data-prep/.duckdb_spill/
+data-prep/workspace.duckdb
+data/raw/*.parquet
+data/raw/monthly/
+data/raw/monthly_parquet/
+data/raw/spl-monthly-checkouts_2005-2025.csv

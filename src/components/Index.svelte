@@ -1,6 +1,7 @@
 <script>
 	import { getContext } from "svelte";
-	import Viewer from "$components/Viewer.svelte";
+	import { base } from "$app/paths";
+	import Viewer from "$components/StackedViewer.svelte";
 
 	const copy = getContext("copy");
 </script>
@@ -8,13 +9,24 @@
 <svelte:boundary onerror={(e) => console.error(e)}>
 	<article>
 		<header class="headline">
+			<img class="logo" src="{base}/favicon.png" alt="" width="88" height="88" />
 			<h1>{copy.title}</h1>
 			<p class="dek">{copy.dek}</p>
 		</header>
 
 		<Viewer />
 
-		<p class="note">{copy.note}</p>
+		<p class="note">
+			Data source:
+			<a
+				href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6"
+				target="_blank"
+				rel="noopener"
+			>
+				Seattle Public Library — Checkouts by Title
+			</a>
+			(2006–2026).
+		</p>
 	</article>
 </svelte:boundary>
 
@@ -29,12 +41,24 @@
 		margin: 8px auto 32px;
 		text-align: center;
 	}
+	.logo {
+		display: block;
+		width: 88px;
+		height: 88px;
+		margin: 0 auto 12px;
+	}
 	.headline h1 {
-		font-family: var(--font-serif);
-		font-size: clamp(2.2rem, 6vw, 3.4rem);
-		line-height: 1.05;
-		letter-spacing: -0.01em;
+		font-family: "Recoleta", var(--font-serif);
+		font-weight: 400;
+		font-size: clamp(2.3rem, 6vw, 3.6rem);
+		line-height: 1.08;
+		letter-spacing: -0.005em;
 		margin: 0 0 16px;
+		color: #6aa9dd;
+		/* Recoleta only ships one weight here, so fatten the strokes a touch and
+		   add a soft drop shadow for a bit more presence. */
+		-webkit-text-stroke: 0.6px #6aa9dd;
+		text-shadow: 1.5px 2px 0 rgba(53, 122, 189, 0.16);
 	}
 	.dek {
 		font-family: var(--font-sans);
@@ -50,5 +74,12 @@
 		font-size: 0.85rem;
 		color: var(--color-fg-light);
 		text-align: center;
+	}
+	.note a {
+		color: #357abd;
+		text-decoration: underline;
+	}
+	.note a:hover {
+		color: #26597f;
 	}
 </style>
