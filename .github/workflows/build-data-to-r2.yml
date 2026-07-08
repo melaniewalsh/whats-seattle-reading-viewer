@@ -12,6 +12,11 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 12 5 * *" # 5th, 12:00 UTC (after update.yml's 06:00 data pull)
+  # TEMPORARY: lets us run this from the branch to populate R2 the first time
+  # (workflow_dispatch only works once the workflow is on main). Remove after.
+  push:
+    branches: [data_loading_improvements]
+    paths: [".github/workflows/build-data-to-r2.yml"]
 
 permissions:
   contents: read

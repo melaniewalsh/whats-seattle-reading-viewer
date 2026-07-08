@@ -27,8 +27,7 @@ const { createDbWorker } = pkg;
 // (see the README "Deploy" section). In local dev we use the sample DB you
 // build into static/data/ with `python3 data-prep/build_data.py`.
 //
-// TODO: replace this with your real public R2 URL once the bucket is set up.
-const R2_DB_URL = "https://REPLACE-WITH-YOUR-PUBLIC-R2-URL/library.sqlite3";
+const R2_DB_URL = "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/library.sqlite3";
 const DB_URL = import.meta.env.PROD ? R2_DB_URL : `${base}/data/library.sqlite3`;
 
 // sql.js-httpvfs needs its own worker + wasm files reachable by URL. Vite
