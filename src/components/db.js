@@ -46,7 +46,12 @@ function getWorker() {
 					config: {
 						serverMode: 'full',
 						url: DB_URL,
-						requestChunkSize: 8192
+						// Each range request to R2 costs ~0.1s of latency, so tiny chunks
+						// mean dozens of round-trips per query. 1 MB chunks fetch far more
+						// per request (and sql.js-httpvfs caches them), so a whole author
+						// loads in a few requests instead of ~50.
+						requestChunkSize: 1048576
+
 					}
 				}
 			],

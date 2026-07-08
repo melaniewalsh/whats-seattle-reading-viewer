@@ -187,12 +187,13 @@ MONTHLY_PARQUET_DIR = PROJECT_DIR / "data" / "raw" / "monthly_parquet"
 # sync_new_files_from_r2() and the end of main().
 PROCESSED_FILES_CSV = PROJECT_DIR / "data-prep" / "processed_files.csv"
 
-# SQLite page size in bytes. Small pages mean a single indexed lookup (an
-# author's series, or their titles) touches fewer bytes per HTTP range
-# request when the site queries this file directly over the network with
-# sql.js-httpvfs. Must be set right after opening a brand-new (empty) db --
-# SQLite only lets you change it before the first CREATE TABLE.
-DB_PAGE_SIZE = 1024
+# SQLite page size in bytes. Over a high-latency network, the cost is the
+# NUMBER of range requests, not bytes-per-request -- so bigger pages are better:
+# they make the B-tree shallower and pack more per page, so a lookup touches
+# fewer pages (and the browser fetches them in large chunks anyway; see
+# requestChunkSize in db.js). Must be set on a brand-new (empty) db, before the
+# first CREATE TABLE.
+DB_PAGE_SIZE = 8192
 
 # How many rows to batch per executemany()/commit while loading the db.
 # Keeps one transaction from growing to hold 350k+ rows of undo/redo log in
