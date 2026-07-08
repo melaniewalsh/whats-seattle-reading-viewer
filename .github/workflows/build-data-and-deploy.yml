@@ -16,7 +16,7 @@ name: Build full database and deploy
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 6 5 * *" # 06:00 UTC on the 5th of each month
+    - cron: "0 12 5 * *" # 5th, 12:00 UTC — a few hours after the R2 data pull (update.yml @ 06:00)
 
 permissions:
   contents: read
