@@ -4,6 +4,22 @@
 @import "reset.css";
 @import "ui.css"; /* optional for bits UI components */
 
+/* Force a pure #ffffff page background. The theme's --color-white is
+   oklch(100% 0 0), which some browsers render a touch off-white. */
+html,
+body {
+	background-color: #ffffff;
+}
+
+/* "Recoleta" — an elegant, gently-rounded display serif for the headline. */
+@font-face {
+	font-family: "Recoleta";
+	src: url("https://pudding.cool/assets/fonts/recoleta/recoleta.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
 /* colors defined in variables.css */
 :root {
 	/* font */
@@ -41,7 +57,7 @@
 	--color-button-bg-primary: var(--color-gray-900);
 	--color-button-fg-secondary: var(--color-white);
 	--color-button-bg-secondary: var(--color-gray-500);
-	--color-input-bg: var(--color-gray-50);
+	--color-input-bg: var(--color-white);
 	--color-input-fg: var(--color-gray-900);
 	--color-placeholder: var(--color-gray-500);
 
