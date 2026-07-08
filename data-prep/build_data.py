@@ -113,6 +113,7 @@ STUDENTS: good places to extend this are marked with "TODO".
 import json
 import os
 import re
+import shutil
 import sqlite3
 from pathlib import Path
 from time import perf_counter
@@ -430,6 +431,70 @@ def stream_author_records(record_batch_reader, author_rows, slug_by_author, meta
     for author, total, series in author_rows:
         if author not in seen:
             yield (slug_by_author[author], author, total, series, [])
+
+
+def write_author_files(out_dir, months, record_stream, counters):
+    """Write the site's data as plain static JSON files -- one tiny file per
+    author -- instead of a single SQLite database queried over HTTP range
+    requests.
+
+    Why the change: the SQLite-over-HTTP approach (sql.js-httpvfs) works, but a
+    single author drilldown makes the browser walk a B-tree scattered across a
+    ~500 MB file, which is dozens of small range requests over the network.
+    Served from R2's un-cached, rate-limited public URL that was slow and would
+    trip the rate limiter. One file per author turns each drilldown into a
+    SINGLE fetch of a few hundred bytes -- fast, and exactly the small-static-
+    file pattern a CDN is built to cache. See src/components/db.js.
+
+    Output (into out_dir, served at /data on the site and mirrored to R2):
+
+      meta.json                      -> {"months": [...]}  the shared month axis
+      search-index.json              -> [[slug, name, total], ...] sorted by
+                                        total DESC. Loaded once by the search
+                                        box, then searched in-memory. Uploaded
+                                        gzipped (see the deploy workflow) so the
+                                        one-time download stays small.
+      authors/<shard>/<slug>.json    -> {"name","total","series","titles"} --
+                                        one author's own sparse series plus every
+                                        qualifying title's sparse series, the
+                                        same shape getAuthor() used to return.
+
+    <shard> is the first two characters of the slug, so ~350k author files land
+    in ~1k tidy subdirectories instead of one unwieldy directory.
+    """
+    authors_dir = out_dir / "authors"
+    # Start clean: a rebuild with a higher threshold produces fewer authors, and
+    # we don't want last run's now-dropped author files lingering on R2.
+    if authors_dir.exists():
+        shutil.rmtree(authors_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    (out_dir / "meta.json").write_bytes(_dumps({"months": months}))
+
+    search_index = []
+    made_dirs = set()
+    n_authors = 0
+    for slug, name, total, series, titles in record_stream:
+        n_authors += 1
+        shard = slug[:2] or "__"
+        if shard not in made_dirs:
+            (authors_dir / shard).mkdir(parents=True, exist_ok=True)
+            made_dirs.add(shard)
+        # `titles` is already a list of {title,total,fmt,series} dicts, sorted
+        # total-DESC by stream_author_records(); write it straight through.
+        (authors_dir / shard / f"{slug}.json").write_bytes(
+            _dumps({"name": name, "total": total, "series": series, "titles": titles})
+        )
+        search_index.append([slug, name, total])
+
+    # record_stream doesn't arrive strictly total-DESC (authors WITH titles come
+    # out alphabetical), so rank the search index here. The site shows the top
+    # slice before anyone types and ranks live matches by total.
+    search_index.sort(key=lambda row: row[2], reverse=True)
+    (out_dir / "search-index.json").write_bytes(_dumps(search_index))
+
+    print(f"  wrote {n_authors:,} author files into {authors_dir} ({len(made_dirs)} shards)")
+    return n_authors
 
 
 def build_sqlite(db_path, months, record_stream, counters):
@@ -906,13 +971,13 @@ def main():
     # into the db as they arrive, so at most one insert-batch's worth of
     # nested payloads exists in memory at a time so not every author's
     # title list sitting in memory simultaneously before writing starts.
-    print(f"Building {DB_PATH.name} ...")
+    print(f"Writing per-author JSON files into {OUT_DIR} ...")
     t0 = perf_counter()
     counters = {"n_titles": 0}
     record_stream = stream_author_records(
         record_batch_reader, author_rows, slug_by_author, meta_by_author, counters
     )
-    n_authors = build_sqlite(DB_PATH, months, record_stream, counters)
+    n_authors = write_author_files(OUT_DIR, months, record_stream, counters)
     print(f"  {n_authors:,} authors, {counters['n_titles']:,} qualifying titles")
     print(f"  ({perf_counter() - t0:.2f}s)")
 
@@ -924,7 +989,10 @@ def main():
 
     print("Done.")
     print(f"  {n_authors:,} authors")
-    print(f"  {DB_PATH.stat().st_size / 1e6:,.1f} MB -> {DB_PATH}")
+    total_bytes = sum(f.stat().st_size for f in OUT_DIR.rglob("*") if f.is_file())
+    index_bytes = (OUT_DIR / "search-index.json").stat().st_size
+    print(f"  {total_bytes / 1e6:,.1f} MB total across {OUT_DIR} "
+          f"(search-index.json alone: {index_bytes / 1e6:,.1f} MB) -> uploaded to R2")
     elapsed_time = perf_counter() - start_time
     print(f"Elapsed time: {elapsed_time:.4f} seconds")
 
