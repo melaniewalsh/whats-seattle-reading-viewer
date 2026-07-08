@@ -72,7 +72,7 @@ except ImportError:  # pragma: no cover - boto3 is only needed to LIST keys now
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-RAW_CSV = PROJECT_DIR / "data" / "raw" / "Checkouts_by_Title_2018-2022_15-checkouts.csv"
+RAW_CSV = PROJECT_DIR / "data" / "raw" / "spl-monthly-checkouts_2005-2025.csv"
 OUT_MAP = PROJECT_DIR / "data-prep" / "author_map.json"
 PROCESSED_FILES_CSV = PROJECT_DIR / "data-prep" / "processed_files.csv"
 
