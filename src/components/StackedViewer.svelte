@@ -26,6 +26,9 @@
 	let titleFilter = $state(""); // text filter for the title list
 	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = stacked by title
 	let titleSort = $state("borrowed"); // 'borrowed' = most checkouts first; 'alpha' = A–Z
+	let isolatedKey = $state(null); // when set, the chart shows ONLY this series ('author' | 'g<id>' | 's<idx>')
+	let dragIdx = $state(null); // title index currently being dragged onto a group pill
+	let dragOverId = $state(null); // group pill currently under the dragged title
 
 	onMount(async () => {
 		// The site queries a single SQLite database (static/data/library.sqlite3)
@@ -90,6 +93,7 @@
 		singleIdxs = [];
 		titleFilter = "";
 		chartMode = "line";
+		isolatedKey = null;
 		query = "";
 		results = [];
 	}
@@ -99,8 +103,12 @@
 		return {ebook: "ebook", audiobook: "audio", print: "print", other: "other"}[f] || f;
 	}
 
+	// Make a new group. If titles are currently single-selected, seed the group
+	// with them (so "select a few, then hit New group" bundles them in one go)
+	// and clear the single selection.
 	function addGroup() {
-		const g = {id: ++groupIdCounter, name: "", idxs: []};
+		const g = {id: ++groupIdCounter, name: "", idxs: [...singleIdxs]};
+		singleIdxs = [];
 		groups = [...groups, g];
 		activeGroupId = g.id;
 		return g;
@@ -111,6 +119,42 @@
 		if (activeGroupId === id) {
 			activeGroupId = groups.length ? groups[groups.length - 1].id : null;
 		}
+		if (isolatedKey === `g${id}`) isolatedKey = null;
+	}
+
+	// Finish editing the active group (clearer "I'm done adding titles" action).
+	function finishGroup() {
+		activeGroupId = null;
+	}
+
+	// Show ONLY this series (group / single title / author), or clear if it's
+	// already the isolated one.
+	function toggleIsolate(key) {
+		isolatedKey = isolatedKey === key ? null : key;
+	}
+
+	// Sum a set of title indices into one densified series (for a group's line).
+	function sumSeries(idxs) {
+		const out = new Array(months.length).fill(0);
+		for (const idx of idxs) {
+			const s = current.titles[idx].series;
+			for (let i = 0; i < out.length; i++) out[i] += s[i];
+		}
+		return out;
+	}
+
+	const groupColor = (gi) => TITLE_COLORS[gi % TITLE_COLORS.length];
+	const singleColor = (i) => TITLE_COLORS[i % TITLE_COLORS.length];
+
+	// Drag-and-drop: drop a title onto a group pill to add it to that group.
+	function dropOnGroup(id) {
+		if (dragIdx === null) return;
+		const g = groups.find((g) => g.id === id);
+		if (g && !g.idxs.includes(dragIdx)) {
+			releaseTitle(dragIdx);
+			g.idxs = [...g.idxs, dragIdx];
+		}
+		dragIdx = null;
 	}
 
 	// strip a title out of every group and out of the single-selection list, so it can be picked up by whichever owner is claiming it next.
@@ -221,7 +265,8 @@
 				color,
 				values: t.series,
 				isSelected: isGrouped || isSingle, // Expose this flag for sorting and tooltip logic
-				groupIndex: gi // which group this book belongs to (-1 if none/single)
+				groupIndex: gi, // which group this book belongs to (-1 if none/single)
+				titleIdx: idx // original title index, for isolate filtering
 			};
 		});
 
@@ -238,19 +283,63 @@
 	// The author's own total checkouts as one bold line -- the default view.
 	const authorLine = $derived(
 			current
-					? {label: current.name, color: INK, values: current.series, groupIndex: -2, isAggregate: true}
+					? {key: "author", label: current.name, color: INK, values: current.series, groupIndex: -2, isAggregate: true}
 					: null
 	);
 
-	// What the chart actually draws. The default "line" view is the author's
-	// aggregate total, plus any titles the user has ticked (each its own line so
-	// they can be compared). The "area" view is the full stacked-by-title chart.
+	// Line-mode series (before isolation): the author's total, plus ONE
+	// aggregated line per group (summed over its titles) and one line per
+	// individually-ticked title.
+	const lineParts = $derived.by(() => {
+		if (!current) return [];
+		const parts = [authorLine];
+		groups.forEach((g, gi) => {
+			if (g.idxs.length) {
+				parts.push({
+					key: `g${g.id}`,
+					label: groupLabel(g),
+					color: groupColor(gi),
+					values: sumSeries(g.idxs),
+					groupIndex: gi,
+					isGroup: true
+				});
+			}
+		});
+		singleIdxs.forEach((idx, i) => {
+			parts.push({
+				key: `s${idx}`,
+				label: current.titles[idx].title,
+				color: singleColor(i),
+				values: current.titles[idx].series,
+				isSingle: true
+			});
+		});
+		return parts;
+	});
+
+	// The set of title indices an isolate key refers to (null = show everything).
+	function isolatedIdxSet() {
+		if (!isolatedKey || isolatedKey === "author") return null;
+		if (isolatedKey.startsWith("g")) {
+			const g = groups.find((g) => g.id === Number(isolatedKey.slice(1)));
+			return new Set(g ? g.idxs : []);
+		}
+		if (isolatedKey.startsWith("s")) return new Set([Number(isolatedKey.slice(1))]);
+		return null;
+	}
+
+	// What the chart actually draws. "line": author total + per-group and
+	// per-title lines. "area": the stacked-by-title chart. Either way, when a
+	// series is isolated we show only it.
 	const displaySeries = $derived.by(() => {
 		if (!current) return [];
 		if (chartMode === "line") {
-			return [authorLine, ...chartSeries.filter((s) => s.isSelected)];
+			if (isolatedKey) return lineParts.filter((s) => s.key === isolatedKey);
+			return lineParts;
 		}
-		return chartSeries;
+		// area mode
+		const only = isolatedIdxSet();
+		return only ? chartSeries.filter((s) => only.has(s.titleIdx)) : chartSeries;
 	});
 </script>
 
@@ -318,20 +407,36 @@
 			{/if}
 			<LineChart months={current.months} series={displaySeries} mode={chartMode}/>
 
-			<ul class="legend">
-				{#each groups as g, gi (g.id)}
-					{#if g.idxs.length}
-						<li><span class="sw"
-								  style="background:{TITLE_COLORS[gi % TITLE_COLORS.length]}"></span>{groupLabel(g)}
+			{#if groups.some((g) => g.idxs.length) || singleIdxs.length}
+				<ul class="legend">
+					{#each groups as g, gi (g.id)}
+						{#if g.idxs.length}
+							<li class="legend-item" class:dim={isolatedKey && isolatedKey !== `g${g.id}`}>
+								<span class="sw" style="background:{groupColor(gi)}"></span>
+								<span class="lg-name">{groupLabel(g)}</span>
+								<button
+										class="only-btn"
+										class:on={isolatedKey === `g${g.id}`}
+										title="Show only this group"
+										onclick={() => toggleIsolate(`g${g.id}`)}
+								>{isolatedKey === `g${g.id}` ? "Show all" : "Only"}</button>
+							</li>
+						{/if}
+					{/each}
+					{#each singleIdxs as idx, i (idx)}
+						<li class="legend-item" class:dim={isolatedKey && isolatedKey !== `s${idx}`}>
+							<span class="sw" style="background:{singleColor(i)}"></span>
+							<span class="lg-name">{current.titles[idx].title}</span>
+							<button
+									class="only-btn"
+									class:on={isolatedKey === `s${idx}`}
+									title="Show only this title"
+									onclick={() => toggleIsolate(`s${idx}`)}
+							>{isolatedKey === `s${idx}` ? "Show all" : "Only"}</button>
 						</li>
-					{/if}
-				{/each}
-				{#each singleIdxs as idx, i (idx)}
-					<li><span class="sw"
-							  style="background:{TITLE_COLORS[i % TITLE_COLORS.length]}"></span>{current.titles[idx].title}
-					</li>
-				{/each}
-			</ul>
+					{/each}
+				</ul>
+			{/if}
 			<div class="groups-panel">
 				<div class="groups-header">
 					<span class="groups-label">Selection groups</span>
@@ -345,8 +450,12 @@
 								<button
 										class="group-chip"
 										class:active={g.id === activeGroupId}
+										class:drag-over={dragOverId === g.id}
 										style="--chip-color: {TITLE_COLORS[gi % TITLE_COLORS.length]}"
 										onclick={() => (activeGroupId = activeGroupId === g.id ? null : g.id)}
+										ondragover={(e) => { e.preventDefault(); dragOverId = g.id; }}
+										ondragleave={() => (dragOverId === g.id && (dragOverId = null))}
+										ondrop={(e) => { e.preventDefault(); dropOnGroup(g.id); dragOverId = null; }}
 								>
 									<span class="chip-sw"></span>
 									<span class="chip-name">{groupLabel(g)}</span>
@@ -360,6 +469,13 @@
 				{/if}
 
 				{#if activeGroup}
+					<div class="editing-banner">
+						<span class="editing-text">
+							Adding titles to <strong>{groupLabel(activeGroup)}</strong> — tick titles below,
+							or drag them onto the group.
+						</span>
+						<button class="done-btn" onclick={finishGroup}>Done</button>
+					</div>
 					<div class="bundle-name">
 						<label for="group-name-input">Name this group</label>
 						<input
@@ -369,10 +485,8 @@
 								placeholder={groupLabel(activeGroup)}
 						/>
 					</div>
-					<p class="editing-hint">
-						Editing <strong>{groupLabel(activeGroup)}</strong>: tick titles below to add or remove them.
-						Click the group again to stop editing.
-					</p>
+				{:else if groups.length}
+					<p class="editing-hint">Click a group to edit it, or drag a title onto a group to add it.</p>
 				{/if}
 			</div>
 
@@ -411,7 +525,13 @@
 										? TITLE_COLORS[singleIdx % TITLE_COLORS.length]
 										: ""}
 						{@const isCurrentOwner = activeGroupId ? owner?.id === activeGroupId : single}
-						<li>
+						<li
+								class="title-row"
+								class:dragging={dragIdx === t.idx}
+								draggable={groups.length > 0}
+								ondragstart={() => (dragIdx = t.idx)}
+								ondragend={() => { dragIdx = null; dragOverId = null; }}
+						>
 							<label
 									class:selected={owner !== null || single}
 									style={ownerColor ? `--chip-color:${ownerColor}` : ""}
@@ -569,6 +689,95 @@
 		height: 12px;
 		border-radius: 2px;
 		flex: none;
+	}
+
+	.legend-item {
+		max-width: none;
+	}
+
+	.legend-item.dim {
+		opacity: 0.4;
+	}
+
+	.legend-item .lg-name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		max-width: 240px;
+	}
+
+	.only-btn {
+		flex: none;
+		font-family: var(--font-sans);
+		font-size: 0.7rem;
+		font-weight: 600;
+		padding: 2px 8px;
+		border-radius: 999px;
+		border: 1px solid var(--color-border);
+		background: var(--color-white);
+		color: var(--color-fg-light);
+		cursor: pointer;
+	}
+
+	.only-btn:hover {
+		border-color: var(--color-fg-light);
+		color: var(--color-fg);
+	}
+
+	.only-btn.on {
+		background: var(--color-fg);
+		border-color: var(--color-fg);
+		color: var(--color-white);
+	}
+
+	.editing-banner {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin: 12px 0 0;
+		padding: 10px 12px;
+		border-radius: var(--radius-sm);
+		background: var(--color-white);
+		border: 1.5px solid var(--color-fg);
+	}
+
+	.editing-text {
+		flex: 1;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		color: var(--color-fg);
+	}
+
+	.done-btn {
+		flex: none;
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
+		padding: 6px 18px;
+		border-radius: 999px;
+		border: none;
+		background: var(--color-fg);
+		color: var(--color-white);
+		cursor: pointer;
+	}
+
+	.done-btn:hover {
+		opacity: 0.85;
+	}
+
+	.group-chip.drag-over {
+		border-color: var(--chip-color, var(--color-fg));
+		background: var(--chip-color, var(--color-fg));
+		color: var(--color-white);
+		box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+	}
+
+	.title-row[draggable="true"] {
+		cursor: grab;
+	}
+
+	.title-row.dragging {
+		opacity: 0.5;
 	}
 
 	/* options row */
