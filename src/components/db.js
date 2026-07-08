@@ -21,7 +21,15 @@ const { createDbWorker } = pkg;
 // Path to the built database, served at /data on the site (see build_data.py
 // OUT_DIR). `base` is '' locally and '/<repo>' on GitHub Pages project sites,
 // so this resolves correctly in both.
-const DB_URL = `${base}/data/library.sqlite3`;
+// In production the full database is served from a PUBLIC Cloudflare R2 bucket
+// (built + uploaded monthly by .github/workflows/build-data-to-r2.yml). R2 must
+// have public read + a CORS rule that allows this site to make Range requests
+// (see the README "Deploy" section). In local dev we use the sample DB you
+// build into static/data/ with `python3 data-prep/build_data.py`.
+//
+// TODO: replace this with your real public R2 URL once the bucket is set up.
+const R2_DB_URL = "https://REPLACE-WITH-YOUR-PUBLIC-R2-URL/library.sqlite3";
+const DB_URL = import.meta.env.PROD ? R2_DB_URL : `${base}/data/library.sqlite3`;
 
 // sql.js-httpvfs needs its own worker + wasm files reachable by URL. Vite
 // resolves these to hashed, fingerprinted asset URLs at build time.
