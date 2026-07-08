@@ -24,7 +24,8 @@
 	let groupIdCounter = 0; // increasing id source for groups
 	let singleIdxs = $state([]); // titles ticked while no group was active
 	let titleFilter = $state(""); // text filter for the title list
-	let showAuthorLine = $state(true);
+	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = stacked by title
+	let titleSort = $state("borrowed"); // 'borrowed' = most checkouts first; 'alpha' = A–Z
 
 	onMount(async () => {
 		// The site queries a single SQLite database (static/data/library.sqlite3)
@@ -88,7 +89,7 @@
 		activeGroupId = null;
 		singleIdxs = [];
 		titleFilter = "";
-		showAuthorLine = true;
+		chartMode = "line";
 		query = "";
 		results = [];
 	}
@@ -155,9 +156,10 @@
 	// shown as quick-pick buttons under the search box.
 	const topAuthors = $derived(authors.slice(0, 15));
 
-	// The title list, filtered by the little search box, sorted alphabetically so
-	// editions/variations of the same work sit next to each other. We keep each
-	// title's original index for selection and the per-title series.
+	// The title list, filtered by the little search box. Sorted either by most
+	// borrowed (default -- matches the chart's biggest layers) or alphabetically
+	// (so editions/variations of the same work sit next to each other). We keep
+	// each title's original index for selection and the per-title series.
 	const filteredTitles = $derived(
 			current
 					? current.titles
@@ -165,7 +167,11 @@
 							.filter(
 									(t) => !titleFilter.trim() || t.title.toLowerCase().includes(titleFilter.trim().toLowerCase())
 							)
-							.sort((a, b) => a.title.localeCompare(b.title, undefined, {sensitivity: "base", numeric: true}))
+							.sort((a, b) =>
+									titleSort === "alpha"
+											? a.title.localeCompare(b.title, undefined, {sensitivity: "base", numeric: true})
+											: b.total - a.total
+							)
 					: []
 	);
 
@@ -184,9 +190,9 @@
 		return extra > 0 ? `${firstTitle}  +${extra} more` : firstTitle;
 	}
 
-	// When the author line is toggled off, show the group name(s) as the chart's title.
+	// In the stacked-area view, show the group name(s) as the chart's title.
 	const plotTitle = $derived(
-			!showAuthorLine && groups.length ? groups.map(groupLabel).join(" · ") : ""
+			chartMode === "area" && groups.length ? groups.map(groupLabel).join(" · ") : ""
 	);
 
 	// StackedViewer.svelte
@@ -227,6 +233,24 @@
 		});
 
 		return mapped;
+	});
+
+	// The author's own total checkouts as one bold line -- the default view.
+	const authorLine = $derived(
+			current
+					? {label: current.name, color: INK, values: current.series, groupIndex: -2, isAggregate: true}
+					: null
+	);
+
+	// What the chart actually draws. The default "line" view is the author's
+	// aggregate total, plus any titles the user has ticked (each its own line so
+	// they can be compared). The "area" view is the full stacked-by-title chart.
+	const displaySeries = $derived.by(() => {
+		if (!current) return [];
+		if (chartMode === "line") {
+			return [authorLine, ...chartSeries.filter((s) => s.isSelected)];
+		}
+		return chartSeries;
 	});
 </script>
 
@@ -276,10 +300,23 @@
 				{current.total.toLocaleString()} checkouts · {current.titles.length} titles
 			</p>
 
+			<div class="mode-toggle" role="group" aria-label="Chart type">
+				<button
+						type="button"
+						class:active={chartMode === "line"}
+						onclick={() => (chartMode = "line")}
+				>Total (line)</button>
+				<button
+						type="button"
+						class:active={chartMode === "area"}
+						onclick={() => (chartMode = "area")}
+				>By title (stacked)</button>
+			</div>
+
 			{#if plotTitle}
 				<p class="plot-title">{plotTitle}</p>
 			{/if}
-			<LineChart months={current.months} series={chartSeries}/>
+			<LineChart months={current.months} series={displaySeries} mode={chartMode}/>
 
 			<ul class="legend">
 				{#each groups as g, gi (g.id)}
@@ -298,39 +335,29 @@
 			<div class="groups-panel">
 				<div class="groups-header">
 					<span class="groups-label">Selection groups</span>
-					<button class="new-group" onclick={addGroup}>+ New group</button>
+					<button class="new-group" onclick={addGroup}>Make a new group of related titles</button>
 				</div>
 
-				<ul class="group-chips">
-					<li class="group-chip-row">
-						<button
-								class="group-chip single-chip"
-								class:active={activeGroupId === null}
-								onclick={() => (activeGroupId = null)}
-						>
-							<span class="chip-name">Single selection</span>
-							{#if singleIdxs.length}
-								<span class="chip-count">{singleIdxs.length}</span>
-							{/if}
-						</button>
-					</li>
-					{#each groups as g, gi (g.id)}
-						<li class="group-chip-row">
-							<button
-									class="group-chip"
-									class:active={g.id === activeGroupId}
-									style="--chip-color: {TITLE_COLORS[gi % TITLE_COLORS.length]}"
-									onclick={() => (activeGroupId = g.id)}
-							>
-								<span class="chip-sw"></span>
-								<span class="chip-name">{groupLabel(g)}</span>
-								<span class="chip-count">{g.idxs.length}</span>
-							</button>
-							<button class="chip-remove" title="Delete group" onclick={() => removeGroup(g.id)}>×
-							</button>
-						</li>
-					{/each}
-				</ul>
+				{#if groups.length}
+					<ul class="group-chips">
+						{#each groups as g, gi (g.id)}
+							<li class="group-chip-row">
+								<button
+										class="group-chip"
+										class:active={g.id === activeGroupId}
+										style="--chip-color: {TITLE_COLORS[gi % TITLE_COLORS.length]}"
+										onclick={() => (activeGroupId = activeGroupId === g.id ? null : g.id)}
+								>
+									<span class="chip-sw"></span>
+									<span class="chip-name">{groupLabel(g)}</span>
+									<span class="chip-count">{g.idxs.length}</span>
+								</button>
+								<button class="chip-remove" title="Delete group" onclick={() => removeGroup(g.id)}>×
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
 
 				{#if activeGroup}
 					<div class="bundle-name">
@@ -344,21 +371,34 @@
 					</div>
 					<p class="editing-hint">
 						Editing <strong>{groupLabel(activeGroup)}</strong>: tick titles below to add or remove them.
+						Click the group again to stop editing.
 					</p>
-				{:else}
-					<p class="editing-hint">Single selection: each ticked title below gets its own line. Create a group
-						above to combine titles into one.</p>
 				{/if}
 			</div>
 
 			<div class="titles">
-				<input
-						class="title-filter"
-						type="search"
-						placeholder="Filter titles…"
-						bind:value={titleFilter}
-						autocomplete="off"
-				/>
+				<div class="titles-header">
+					<input
+							class="title-filter"
+							type="search"
+							placeholder="Filter titles…"
+							bind:value={titleFilter}
+							autocomplete="off"
+					/>
+					<div class="sort-toggle" role="group" aria-label="Sort titles">
+						<span class="sort-label">Sort:</span>
+						<button
+								type="button"
+								class:active={titleSort === "borrowed"}
+								onclick={() => (titleSort = "borrowed")}
+						>Most borrowed</button>
+						<button
+								type="button"
+								class:active={titleSort === "alpha"}
+								onclick={() => (titleSort = "alpha")}
+						>A–Z</button>
+					</div>
+				</div>
 				<ul class="title-list">
 					{#each filteredTitles as t}
 						{@const owner = groupForTitle(t.idx)}
@@ -772,16 +812,83 @@
 		color: var(--color-white);
 	}
 
+	/* chart type toggle (line vs stacked area) + title sort toggle share a look */
+	.mode-toggle {
+		display: inline-flex;
+		gap: 0;
+		margin: 0 0 14px;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		overflow: hidden;
+		font-family: var(--font-sans);
+	}
+
+	.mode-toggle button {
+		padding: 6px 16px;
+		font-size: 0.85rem;
+		background: var(--color-white);
+		border: none;
+		color: var(--color-fg-light);
+		cursor: pointer;
+	}
+
+	.mode-toggle button + button {
+		border-left: 1px solid var(--color-border);
+	}
+
+	.mode-toggle button.active {
+		background: var(--color-fg);
+		color: var(--color-white);
+		font-weight: 600;
+	}
+
 	/* title list */
+	.titles-header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 8px;
+	}
+
 	.title-filter {
-		width: 100%;
+		flex: 1;
+		min-width: 180px;
 		padding: 9px 12px;
 		font-family: var(--font-sans);
 		font-size: 0.9rem;
 		background: var(--color-input-bg);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-sm);
-		margin-bottom: 8px;
+	}
+
+	.sort-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-family: var(--font-sans);
+		font-size: 0.8rem;
+	}
+
+	.sort-label {
+		color: var(--color-fg-light);
+	}
+
+	.sort-toggle button {
+		padding: 5px 10px;
+		font-size: 0.8rem;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		color: var(--color-fg-light);
+		cursor: pointer;
+	}
+
+	.sort-toggle button.active {
+		background: var(--color-fg);
+		border-color: var(--color-fg);
+		color: var(--color-white);
+		font-weight: 600;
 	}
 
 	.title-list {

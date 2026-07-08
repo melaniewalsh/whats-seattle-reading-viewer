@@ -1,15 +1,19 @@
 <script>
     // StackedAreaChart.svelte
-	import { scaleLinear, area as d3area, max as d3max } from 'd3';
+	import { scaleLinear, area as d3area, line as d3line, max as d3max } from 'd3';
 	import { getMonths, searchAuthors, getAuthor, densify } from './db.js';
 
 	// Both props are now optional. Pass explicitly for pre-fetched/
 	// embedded/test use.
+	// `mode` picks the chart type: 'area' stacks the series by title, 'line'
+	// overlays each series as its own (unstacked) line -- used for the default
+	// single "author's total checkouts" view.
 	let {
 		months: monthsProp = null,
 		series: seriesProp = null,
 		slug: initialSlug = null,
-		topTitles = 8
+		topTitles = 8,
+		mode = 'area'
 	} = $props();
 
 	let width = $state(720);
@@ -126,7 +130,10 @@
 			.range([margin.left, width - margin.right])
 	);
 
-	// Stacks data and map top/bottom boundaries
+	// Area mode stacks the series; line mode overlays them from a zero baseline.
+	// `layers` is the mode-appropriate render list -- each carries a `top` array
+	// used by the hover dot (the running stacked total in area mode, or just the
+	// series' own values in line mode).
 	const stackedSeries = $derived.by(() => {
 		let currentBottom = new Array(months.length || 0).fill(0);
 		return series.map(s => {
@@ -140,10 +147,18 @@
 		});
 	});
 
+	const lineLayers = $derived(series.map((s) => ({ ...s, bottom: null, top: s.values })));
+
+	const layers = $derived(mode === 'line' ? lineLayers : stackedSeries);
+
 	const yMax = $derived.by(() => {
-		if (!stackedSeries.length) return 1;
-		const lastSeries = stackedSeries[stackedSeries.length - 1];
-		return d3max(lastSeries.top) || 1;
+		if (!layers.length) return 1;
+		if (mode === 'line') {
+			let m = 0;
+			for (const s of layers) for (const v of s.values) if (v > m) m = v;
+			return m || 1;
+		}
+		return d3max(layers[layers.length - 1].top) || 1;
 	});
 
 	const y = $derived(
@@ -153,13 +168,22 @@
 			.range([height - margin.bottom, margin.top])
 	);
 
-	const paths = $derived(
+	const areaPaths = $derived(
 		stackedSeries.map((s) => ({
 			...s,
 			d: d3area()
 				.x((_, i) => x(i))
 				.y0((_, i) => y(s.bottom[i]))
 				.y1((_, i) => y(s.top[i]))(s.values)
+		}))
+	);
+
+	const linePaths = $derived(
+		lineLayers.map((s) => ({
+			...s,
+			d: d3line()
+				.x((_, i) => x(i))
+				.y((_, i) => y(s.values[i]))(s.values)
 		}))
 	);
 
@@ -186,14 +210,23 @@
 		const py = (event.clientY - r.top) * (height / r.height);
 		const dataY = y.invert(py);
 
-		// specific layer bounding box contains this Y data value
-		const activeLayer = stackedSeries.find(s => {
-			const bottomVal = s.bottom[hoverIndex];
-			const topVal = s.top[hoverIndex];
-			return dataY >= bottomVal && dataY <= topVal;
-		});
-
-		hoveredSeriesKey = activeLayer ? activeLayer.label : null;
+		if (mode === 'line') {
+			// pick the line whose value at this month sits closest to the cursor
+			let best = null, bestDist = Infinity;
+			for (const s of layers) {
+				const d = Math.abs(y(s.values[hoverIndex]) - py);
+				if (d < bestDist) { bestDist = d; best = s; }
+			}
+			hoveredSeriesKey = best ? best.label : null;
+		} else {
+			// specific stacked layer whose band contains this Y data value
+			const activeLayer = stackedSeries.find(s => {
+				const bottomVal = s.bottom[hoverIndex];
+				const topVal = s.top[hoverIndex];
+				return dataY >= bottomVal && dataY <= topVal;
+			});
+			hoveredSeriesKey = activeLayer ? activeLayer.label : null;
+		}
 	}
 
 	function onLeave() {
@@ -217,25 +250,30 @@
 		hoverIndex === null ? 0 : Math.min(Math.max(x(hoverIndex), 100), width - 100)
 	);
 
-	// Get overall total for the hovered month
-	const hoveredTotal = $derived(
-		hoverIndex !== null && stackedSeries.length > 0 
-			? stackedSeries[stackedSeries.length - 1].top[hoverIndex] 
-			: 0
-	);
+	// Get overall total for the hovered month. In area mode that's the top of
+	// the stack; in line mode it's the aggregate ("author total") line if one is
+	// present, else the largest line value.
+	const hoveredTotal = $derived.by(() => {
+		if (hoverIndex === null || !layers.length) return 0;
+		if (mode === 'line') {
+			const agg = layers.find((s) => s.isAggregate);
+			return agg ? agg.values[hoverIndex] : Math.max(...layers.map((s) => s.values[hoverIndex]));
+		}
+		return stackedSeries[stackedSeries.length - 1].top[hoverIndex];
+	});
 
 	// Extract the single selected book series object matching user hover
 	const selectedItem = $derived(
 		(hoverIndex !== null && hoveredSeriesKey)
-			? stackedSeries.find(s => s.label === hoveredSeriesKey)
+			? layers.find(s => s.label === hoveredSeriesKey)
 			: null
 	);
 
 
-    // stackedAreaChart.svelte
     // Other books that belong to the same selection group as the hovered book
+    // (a stacked-area concept only; lines don't stack).
     const groupSiblings = $derived(
-        selectedItem && selectedItem.groupIndex !== undefined && selectedItem.groupIndex !== -1
+        mode !== 'line' && selectedItem && selectedItem.groupIndex !== undefined && selectedItem.groupIndex !== -1
             ? stackedSeries.filter(s => s.groupIndex === selectedItem.groupIndex)
             : []
     );
@@ -305,7 +343,7 @@
 		{height}
 		viewBox="0 0 {width} {height}"
 		role="img"
-		aria-label="Checkouts over time, stacked by title"
+		aria-label="Checkouts over time"
 		onpointermove={onMove}
 		onpointerleave={onLeave}
 	>
@@ -327,17 +365,30 @@
 
 		<line x1={margin.left} x2={width - margin.right} y1={height - margin.bottom} y2={height - margin.bottom} stroke="#ccc" />
 
-		<!-- Area Layers -->
-		{#each paths as p}
-			<path 
-				d={p.d} 
-				fill={p.color} 
-				stroke="var(--color-bg, #fff)" 
-				stroke-width="0.5" 
-				opacity={pathOpacity(p)} 
-				class="area-path"
-			/>
-		{/each}
+		<!-- Layers: overlaid lines (line mode) or stacked areas (area mode) -->
+		{#if mode === 'line'}
+			{#each linePaths as p}
+				<path
+					d={p.d}
+					fill="none"
+					stroke={p.color}
+					stroke-width={p.isAggregate ? 2.5 : 1.75}
+					opacity={pathOpacity(p)}
+					class="line-path"
+				/>
+			{/each}
+		{:else}
+			{#each areaPaths as p}
+				<path
+					d={p.d}
+					fill={p.color}
+					stroke="var(--color-bg, #fff)"
+					stroke-width="0.5"
+					opacity={pathOpacity(p)}
+					class="area-path"
+				/>
+			{/each}
+		{/if}
 
 		<!-- Hover Target Markers -->
 		{#if hoverIndex !== null}
@@ -404,6 +455,13 @@
 	}
 
 	.area-path {
+		transition: opacity 0.15s ease;
+	}
+
+	.line-path {
+		fill: none;
+		stroke-linejoin: round;
+		stroke-linecap: round;
 		transition: opacity 0.15s ease;
 	}
 
