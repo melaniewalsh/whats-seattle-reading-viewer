@@ -219,6 +219,22 @@
 					: []
 	);
 
+	// Prolific authors have hundreds-to-thousands of titles (J.K. Rowling ~190,
+	// James Patterson ~1500). Rendering a DOM row for every one janks or hangs
+	// the tab, so only render the first slice and let the filter box find the
+	// rest. Selected titles are always shown so a selection never "disappears".
+	const TITLE_RENDER_CAP = 120;
+	const visibleTitles = $derived.by(() => {
+		if (filteredTitles.length <= TITLE_RENDER_CAP) return filteredTitles;
+		const head = filteredTitles.slice(0, TITLE_RENDER_CAP);
+		const seen = new Set(head.map((t) => t.idx));
+		const selectedTail = filteredTitles
+				.slice(TITLE_RENDER_CAP)
+				.filter((t) => !seen.has(t.idx) && (isSingleSelected(t.idx) || groupForTitle(t.idx)));
+		return [...head, ...selectedTail];
+	});
+	const hiddenTitleCount = $derived(filteredTitles.length - visibleTitles.length);
+
 	// Currently-active group object (or null if none selected/created yet).
 	const activeGroup = $derived(groups.find((g) => g.id === activeGroupId) ?? null);
 
@@ -234,10 +250,19 @@
 		return extra > 0 ? `${firstTitle}  +${extra} more` : firstTitle;
 	}
 
-	// In the stacked-area view, show the group name(s) as the chart's title.
-	const plotTitle = $derived(
-			chartMode === "area" && groups.length ? groups.map(groupLabel).join(" · ") : ""
-	);
+	// Chart title. When a series is isolated ("Only"), name it. Otherwise, in the
+	// stacked-area view, show the group name(s).
+	const plotTitle = $derived.by(() => {
+		if (!current) return "";
+		if (isolatedKey === "author") return current.name;
+		if (isolatedKey?.startsWith("g")) {
+			const g = groups.find((g) => g.id === Number(isolatedKey.slice(1)));
+			return g ? groupLabel(g) : "";
+		}
+		if (isolatedKey?.startsWith("s")) return current.titles[Number(isolatedKey.slice(1))]?.title ?? "";
+		if (chartMode === "area" && groups.length) return groups.map(groupLabel).join(" · ");
+		return "";
+	});
 
 	// StackedViewer.svelte
 	const chartSeries = $derived.by(() => {
@@ -328,9 +353,37 @@
 		return null;
 	}
 
+	// A prolific author can have 1000+ qualifying titles; drawing a stacked-area
+	// layer for each one janks/hangs the tab. Keep the biggest AREA_LAYER_CAP
+	// layers (plus anything the user selected) and roll the rest into one "Other
+	// titles" band, so the stack total is preserved but stays fast to render.
+	const AREA_LAYER_CAP = 30;
+	function capAreaLayers(all) {
+		if (all.length <= AREA_LAYER_CAP) return all;
+		const kept = [];
+		const rest = [];
+		for (const s of all) {
+			if (s.isSelected || kept.length < AREA_LAYER_CAP) kept.push(s);
+			else rest.push(s);
+		}
+		if (!rest.length) return kept;
+		const monthCount = months.length;
+		const otherValues = new Array(monthCount).fill(0);
+		for (const s of rest) for (let i = 0; i < monthCount; i++) otherValues[i] += s.values[i];
+		kept.push({
+			label: `Other titles (${rest.length})`,
+			color: "var(--color-gray-200)",
+			values: otherValues,
+			isSelected: false,
+			groupIndex: -1,
+			titleIdx: -1
+		});
+		return kept;
+	}
+
 	// What the chart actually draws. "line": author total + per-group and
-	// per-title lines. "area": the stacked-by-title chart. Either way, when a
-	// series is isolated we show only it.
+	// per-title lines. "area": the stacked-by-title chart (capped). Either way,
+	// when a series is isolated we show only it.
 	const displaySeries = $derived.by(() => {
 		if (!current) return [];
 		if (chartMode === "line") {
@@ -339,7 +392,8 @@
 		}
 		// area mode
 		const only = isolatedIdxSet();
-		return only ? chartSeries.filter((s) => only.has(s.titleIdx)) : chartSeries;
+		const areaAll = only ? chartSeries.filter((s) => only.has(s.titleIdx)) : chartSeries;
+		return capAreaLayers(areaAll);
 	});
 </script>
 
@@ -514,7 +568,7 @@
 					</div>
 				</div>
 				<ul class="title-list">
-					{#each filteredTitles as t}
+					{#each visibleTitles as t (t.idx)}
 						{@const owner = groupForTitle(t.idx)}
 						{@const ownerIdx = owner ? groups.indexOf(owner) : -1}
 						{@const single = isSingleSelected(t.idx)}
@@ -552,6 +606,12 @@
 						</li>
 					{/each}
 				</ul>
+				{#if hiddenTitleCount > 0}
+					<p class="titles-more">
+						Showing the top {visibleTitles.length} titles. {hiddenTitleCount.toLocaleString()} more —
+						type in the filter above to find a specific one.
+					</p>
+				{/if}
 			</div>
 		</div>
 	{:else}
@@ -1173,6 +1233,13 @@
 	.badge-other {
 		background: var(--color-gray-100);
 		color: var(--color-fg-light);
+	}
+
+	.titles-more {
+		font-family: var(--font-sans);
+		font-size: 0.8rem;
+		color: var(--color-fg-light);
+		margin: 8px 2px 0;
 	}
 
 	.hint {
