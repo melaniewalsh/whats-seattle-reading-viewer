@@ -27,7 +27,7 @@ env:
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
 
@@ -46,7 +46,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install duckdb boto3 orjson pyarrow
+      - run: pip install duckdb boto3 orjson pyarrow python-dotenv rapidfuzz
+
+      # Regenerate data-prep/author_map.json from the CURRENT cluster_authors.py
+      # so improvements to the clustering go live without anyone running it
+      # locally. build_data.py (next step) reads this file via its CLUSTERING
+      # HOOK. The map committed in the repo is just a fallback; this overwrites
+      # it for the build.
+      - name: Regenerate author clusters
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          # Don't let a clustering failure block the whole data rebuild -- fall
+          # back to the author_map.json committed in the repo.
+          python3 data-prep/cluster_authors.py \
+            || echo "cluster_authors.py failed -- falling back to the committed author_map.json"
+          if [ -f data-prep/author_map.json ]; then
+            echo "author_map.json in place ($(wc -c < data-prep/author_map.json) bytes)"
+          else
+            echo "no author_map.json -- building without author merges"
+          fi
 
       - name: Build per-author JSON files from R2
         env:
@@ -56,6 +76,12 @@ jobs:
           # ~7 GB runner RAM: cap DuckDB low so it spills to disk instead of OOM.
           DUCKDB_MEMORY_LIMIT: 3GB
         run: |
+          # cluster_authors.py and build_data.py share data-prep/processed_files.csv
+          # as their "already handled" ledger. The clustering step above read all
+          # the monthly files and marked them processed, which would make the build
+          # think there's nothing to sync. Reset the ledger so the build re-syncs
+          # the raw data from R2 as usual.
+          rm -f data-prep/processed_files.csv
           python3 data-prep/build_data.py
           echo "author files: $(find static/data/authors -type f | wc -l)"
           ls -lh static/data/meta.json static/data/search-index.json
@@ -73,17 +99,24 @@ jobs:
             "s3://${R2_DB_BUCKET}/search-index.json" \
             --endpoint-url "$R2_ENDPOINT_URL" \
             --content-type application/json \
-            --content-encoding gzip
+            --content-encoding gzip \
+            --only-show-errors
 
           # Everything else: meta.json + the ~350k tiny authors/*.json files.
-          # Bump concurrency so that many small PUTs don't crawl. --delete makes
-          # R2 mirror this build, dropping authors a higher threshold removed --
-          # but keep the old library.sqlite3 around as a warm fallback (it's the
-          # preserved sqlite-httpvfs-version's data; cheap to keep on R2).
-          aws configure set default.s3.max_concurrent_requests 128
-          aws s3 sync static/data/ "s3://${R2_DB_BUCKET}/" \
-            --endpoint-url "$R2_ENDPOINT_URL" \
+          # `aws s3 sync` is painfully slow at this many small files (it timed out
+          # the 60-min job). rclone is built for it: parallel listing (--fast-list)
+          # and high concurrency. `sync` mirrors the build, dropping files for
+          # authors that were merged/removed; we exclude the separately-uploaded
+          # search index and keep the old library.sqlite3 warm fallback.
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+          export RCLONE_CONFIG_R2_TYPE=s3
+          export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
+          export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
+          export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
+          export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT_URL"
+          rclone sync static/data/ "R2:${R2_DB_BUCKET}/" \
+            --transfers 128 --checkers 128 --fast-list --s3-no-check-bucket \
             --exclude "search-index.json" \
             --exclude "library.sqlite3" \
-            --delete
+            --stats 30s --stats-one-line
           echo "Uploaded meta.json + search-index.json + author files to r2://${R2_DB_BUCKET}/"
