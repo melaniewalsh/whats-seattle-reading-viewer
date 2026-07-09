@@ -227,19 +227,24 @@
 		t = t.split(" / ")[0]; // drop "/ by Author ; illustrations by ..."
 		t = t.replace(/&/g, " and "); // "beasts & where" -> "beasts and where"
 		t = t.replace(/\([^)]*\)/g, " "); // drop "(unabridged)" etc.
-		// Repeatedly strip a trailing ": ..." segment when it's edition/format
-		// noise -- series/book/volume, "the original screenplay", "read by <narrator>",
-		// illustrated/deluxe/anniversary editions, etc. Stop at the first segment
-		// that ISN'T noise (that's a real subtitle, e.g. "The Crimes of Grindelwald").
+		// Repeatedly strip a trailing ":"/";" segment when it's edition/format noise
+		// (series/book/volume, "the original screenplay", "read by <narrator>",
+		// illustrated/anniversary editions, "a novel", etc.) OR an "or, ..."
+		// alternative title (e.g. "Slaughterhouse-Five: or, The Children's Crusade"
+		// is the same book). Stop at the first segment that's a real distinct
+		// subtitle (e.g. "The Crimes of Grindelwald"), so those stay separate.
 		const NOISE = /(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|autobiography|poems|essays)/i;
 		let prev;
 		do {
 			prev = t;
-			t = t.replace(/:\s*[^:]*$/, (seg) => (NOISE.test(seg) ? " " : seg));
+			t = t.replace(/[:;]\s*[^:;]*$/, (seg) => (NOISE.test(seg) || /[:;]\s*or[\s,]/i.test(seg) ? " " : seg));
 		} while (t !== prev);
 		t = t.replace(/\b(unabridged|abridged|audiobook|e-?book|large print|compact disc|sound recording)\b/g, " ");
+		t = t.replace(/\b(the|a|an)\b/g, " "); // drop articles so "Look at the birdie" == "Look at Birdie"
 		t = t.replace(/['’]/g, ""); // sorcerer's -> sorcerers
-		t = t.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+		// Remove ALL non-alphanumerics INCLUDING spaces/hyphens, so word-boundary
+		// differences don't matter ("Slaughter-House Five" == "Slaughterhouse-Five").
+		t = t.replace(/[^a-z0-9]+/g, "");
 		return t;
 	}
 
