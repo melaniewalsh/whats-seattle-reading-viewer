@@ -27,7 +27,7 @@ env:
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
 
@@ -103,16 +103,20 @@ jobs:
             --only-show-errors
 
           # Everything else: meta.json + the ~350k tiny authors/*.json files.
-          # Bump concurrency so many small PUTs don't crawl, and --only-show-errors
-          # so aws doesn't print (and GitHub doesn't ingest) a line per file -- at
-          # hundreds of thousands of files that per-file logging is itself a huge
-          # bottleneck. --delete makes R2 mirror this build, dropping authors that
-          # got merged/removed, but keep the old library.sqlite3 warm fallback.
-          aws configure set default.s3.max_concurrent_requests 128
-          aws s3 sync static/data/ "s3://${R2_DB_BUCKET}/" \
-            --endpoint-url "$R2_ENDPOINT_URL" \
+          # `aws s3 sync` is painfully slow at this many small files (it timed out
+          # the 60-min job). rclone is built for it: parallel listing (--fast-list)
+          # and high concurrency. `sync` mirrors the build, dropping files for
+          # authors that were merged/removed; we exclude the separately-uploaded
+          # search index and keep the old library.sqlite3 warm fallback.
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+          export RCLONE_CONFIG_R2_TYPE=s3
+          export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
+          export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
+          export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
+          export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT_URL"
+          rclone sync static/data/ "R2:${R2_DB_BUCKET}/" \
+            --transfers 128 --checkers 128 --fast-list --s3-no-check-bucket \
             --exclude "search-index.json" \
             --exclude "library.sqlite3" \
-            --delete \
-            --only-show-errors
+            --stats 30s --stats-one-line
           echo "Uploaded meta.json + search-index.json + author files to r2://${R2_DB_BUCKET}/"
