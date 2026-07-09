@@ -227,19 +227,26 @@
 		margin-bottom: 2px;
 	}
 
+	/* "Years" label is redundant with the year axis below the slider; keep it in
+	   the DOM for screen readers but hide it visually. */
 	.brush-label {
-		font-size: 0.7rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: var(--color-fg-light);
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 
+	/* the current range (e.g. "2018–2022") is redundant with the year labels on
+	   the slider axis, so it's hidden -- kept in the DOM for screen readers. */
 	.brush-range {
-		font-size: 0.82rem;
-		font-weight: 600;
-		font-variant-numeric: tabular-nums;
-		color: var(--color-fg);
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 
 	.brush-range .dash {
@@ -281,13 +288,13 @@
 	}
 
 	.area-sel {
-		fill: #6aa9dd; /* the site's headline blue */
-		fill-opacity: 0.75;
+		fill: var(--color-fg);
+		fill-opacity: 0.55;
 	}
 
 	.win {
 		fill: none;
-		stroke: #357abd;
+		stroke: var(--color-fg);
 		stroke-width: 1;
 		stroke-opacity: 0.5;
 	}
@@ -314,24 +321,24 @@
 	}
 
 	.handle-line {
-		stroke: #357abd;
+		stroke: var(--color-fg);
 		stroke-width: 1;
 	}
 
 	.handle-grip {
 		fill: var(--color-white);
-		stroke: #357abd;
+		stroke: var(--color-fg);
 		stroke-width: 1.5;
 	}
 
 	.grip-tick {
-		stroke: #357abd;
+		stroke: var(--color-fg);
 		stroke-width: 1.5;
 	}
 
 	.handle:hover .handle-grip,
 	.handle:focus-visible .handle-grip {
-		fill: #357abd;
+		fill: var(--color-fg);
 	}
 
 	.handle:hover .grip-tick,

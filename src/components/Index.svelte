@@ -39,17 +39,22 @@
 			</div>
 		</details>
 
-		<p class="note">
-			Data source:
-			<a
-				href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6"
-				target="_blank"
-				rel="noopener"
-			>
-				Seattle Public Library — Checkouts by Title
-			</a>
-			(2006–2026).
-		</p>
+		<footer class="chart-footer">
+			<p class="cf-source">
+				Data source:
+				<a
+					href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6"
+					target="_blank"
+					rel="noopener"
+				>Seattle Public Library — Checkouts by Title</a>
+				(2006–2026)
+			</p>
+			<p class="cf-attr">
+				What Is Seattle Reading? · University of Washington Information School
+				<span class="cf-sep">·</span>
+				<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a>
+			</p>
+		</footer>
 	</article>
 </svelte:boundary>
 
@@ -92,19 +97,31 @@
 		color: var(--color-fg-light);
 		margin: 0;
 	}
-	.note {
+	/* OurWorldinData-style source + attribution footer */
+	.chart-footer {
 		max-width: 720px;
-		margin: 40px auto 0;
+		margin: 28px auto 0;
+		padding-top: 12px;
+		border-top: 1px solid var(--color-border);
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: 0.8rem;
+		line-height: 1.5;
 		color: var(--color-fg-light);
-		text-align: center;
 	}
-	.note a {
+	.chart-footer p {
+		margin: 0;
+	}
+	.cf-attr {
+		margin-top: 2px;
+	}
+	.cf-sep {
+		margin: 0 4px;
+	}
+	.chart-footer a {
 		color: #357abd;
 		text-decoration: underline;
 	}
-	.note a:hover {
+	.chart-footer a:hover {
 		color: #26597f;
 	}
 

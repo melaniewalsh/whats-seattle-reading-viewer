@@ -27,12 +27,18 @@
 	let titleFilter = $state(""); // text filter for the title list
 	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = stacked by title
 	let titleSort = $state("work"); // 'work' = editions grouped by work; 'borrowed' = most checkouts; 'alpha' = A–Z
-	let workOrder = $state("name"); // in 'work' mode, order the works by 'name' (A–Z) or 'checkouts' (total)
+	let workOrder = $state("checkouts"); // in 'work' mode, order the works by 'checkouts' (total, default) or 'name' (A–Z)
 	let isolatedKeys = $state([]); // when non-empty, the chart shows ONLY these series (keys 'g<id>' | 's<idx>'); multiple = compare
 	let showAuthorTotal = $state(true); // show the author's aggregate total line in the line view
 	let dragIdx = $state(null); // title index currently being dragged onto a group pill
 	let dragGroupId = $state(null); // group pill currently being dragged (to merge into another)
 	let dragOverId = $state(null); // group pill currently under the dragged title/pill
+	// Manual overrides to the auto work-clustering: edition idx -> the work key it
+	// should belong to (a merge target, or its own `excl-<idx>` key when pulled out
+	// of a cluster). Empty = pure auto-clustering.
+	let workAssign = $state({});
+	let dragWorkKey = $state(null); // work row being dragged in the table (to merge into another)
+	let dragOverWorkKey = $state(null); // work row currently under the dragged work
 	let autoGroupNote = $state(""); // feedback after "Group editions into works"
 	let loadError = $state(""); // message when an author fails to load
 	let loading = $state(false); // true while an author's data is being fetched
@@ -68,8 +74,13 @@
 		months = await getMonths();
 		yearHi = Math.max(months.length - 1, 0);
 		authors = await searchAuthors("", 25);
-		// Show the most borrowed author by default, so the page isn't empty.
-		if (authors.length) await selectAuthor(authors[0]);
+		// Open on Kevin Kwan by default (a nice multi-edition example); fall back
+		// to the most-borrowed author if he isn't in the index.
+		const defaultAuthor =
+				authors.find((a) => a.slug === "kevin-kwan") ||
+				(await searchAuthors("kevin kwan", 5)).find((a) => a.slug === "kevin-kwan") ||
+				authors[0];
+		if (defaultAuthor) await selectAuthor(defaultAuthor);
 	});
 
 	// Expand a sparse series ([[monthIndex, count], ...]) into a full array of
@@ -134,7 +145,9 @@
 		showAuthorTotal = true;
 		autoGroupNote = "";
 		titleSort = "work";
-		workOrder = "name";
+		workOrder = "checkouts";
+		expandedWorks = [];
+		workAssign = {};
 		yearLo = 0;
 		yearHi = Math.max(months.length - 1, 0);
 		query = "";
@@ -287,13 +300,14 @@
 		if (!current) return;
 		const buckets = new Map();
 		current.titles.forEach((t, idx) => {
-			const key = normalizeWorkKey(t.title);
+			const key = effectiveKey(idx, t.title);
 			if (!key) return;
 			if (!buckets.has(key)) buckets.set(key, []);
 			buckets.get(key).push(idx);
 		});
+		// Top works by total checkouts -- include single-edition works too, so the
+		// 5 most-borrowed works always show even if some aren't multi-edition.
 		const works = [...buckets.values()]
-				.filter((idxs) => idxs.length >= 2)
 				.map((idxs) => ({ idxs, total: idxs.reduce((s, i) => s + current.titles[i].total, 0) }))
 				.sort((a, b) => b.total - a.total)
 				.slice(0, MAX_AUTO_GROUPS);
@@ -311,20 +325,44 @@
 		const merged = works.reduce((s, w) => s + w.idxs.length, 0);
 		autoGroupNote = works.length
 				? `Showing the top ${works.length} works (${merged} editions). Tick more works in the table, drag titles between groups, or delete a group to adjust.`
-				: "No multi-edition works found to merge for this author.";
+				: "No works to show for this author.";
+	}
+
+	// The work key an edition actually belongs to: its manual override if any
+	// (a merge target, or an `excl-<idx>` singleton when excluded), else the
+	// auto-computed key. Everything work-related routes through this.
+	function effectiveKey(idx, title) {
+		return workAssign[idx] ?? normalizeWorkKey(title);
+	}
+
+	// Pull one edition out of its work cluster into its own singleton work.
+	function excludeEdition(idx) {
+		workAssign = { ...workAssign, [idx]: `excl-${idx}` };
+	}
+
+	// Merge one work into another: reassign every edition currently in srcKey to
+	// destKey (used when a work row is dragged onto another in the table).
+	function mergeWorks(srcKey, destKey) {
+		if (!current || srcKey === destKey) return;
+		const updates = {};
+		current.titles.forEach((t, idx) => {
+			if (effectiveKey(idx, t.title) === srcKey) updates[idx] = destKey;
+		});
+		workAssign = { ...workAssign, ...updates };
 	}
 
 	// Map of workKey -> { idxs (all editions of the work), name }. Powers the
-	// per-work "Plot" tick in the title table.
+	// per-work "Plot" tick and the collapsible work rows in the title table.
 	const workGroups = $derived.by(() => {
 		const m = new Map();
 		if (!current) return m;
 		current.titles.forEach((t, idx) => {
-			const key = normalizeWorkKey(t.title);
+			const key = effectiveKey(idx, t.title);
 			if (!key) return;
-			if (!m.has(key)) m.set(key, { idxs: [], name: cleanTitleForDisplay(t.title) || t.title, topTotal: -1 });
+			if (!m.has(key)) m.set(key, { idxs: [], name: cleanTitleForDisplay(t.title) || t.title, topTotal: -1, total: 0 });
 			const w = m.get(key);
 			w.idxs.push(idx);
+			w.total += t.total;
 			if (t.total > w.topTotal) {
 				w.topTotal = t.total;
 				w.name = cleanTitleForDisplay(t.title) || t.title;
@@ -369,6 +407,7 @@
 			removeGroup(existing.id);
 		} else {
 			w.idxs.forEach((i) => releaseTitle(i));
+			// Name the group with the work's (short) title.
 			groups = [...groups, { id: ++groupIdCounter, name: w.name, idxs: [...w.idxs] }];
 		}
 	}
@@ -455,7 +494,7 @@
 		let rows = current.titles.map((t, idx) => ({
 			...t,
 			idx,
-			workKey: normalizeWorkKey(t.title),
+			workKey: effectiveKey(idx, t.title),
 			workName: cleanTitleForDisplay(t.title) || t.title
 		}));
 
@@ -465,18 +504,19 @@
 		if (titleSort === "alpha") {
 			rows.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }));
 		} else if (titleSort === "work") {
-			// Group editions of a work together. Works are ordered either A–Z by
-			// name or by combined checkouts (click the Work / Checkouts header).
-			// Editions within a work always lead with the best-known (most-borrowed).
-			const workTotal = new Map();
-			if (workOrder === "checkouts") {
-				for (const r of rows) workTotal.set(r.workKey, (workTotal.get(r.workKey) || 0) + r.total);
-			}
+			// Group editions of a work together, ordered A–Z by the work's name or
+			// by its combined checkouts. CRITICAL: sort on a *per-work* value (from
+			// workGroups), not the per-edition workName -- editions of one work have
+			// different display names, so sorting by those would scatter them and
+			// break the "consecutive editions" grouping the table relies on.
+			// Editions within a work lead with the best-known (most-borrowed).
+			const wName = (key) => workGroups.get(key)?.name ?? key;
+			const wTotal = (key) => workGroups.get(key)?.total ?? 0;
 			rows.sort((a, b) => {
 				const cmp =
 						workOrder === "checkouts"
-								? (workTotal.get(b.workKey) || 0) - (workTotal.get(a.workKey) || 0)
-								: a.workName.localeCompare(b.workName, undefined, { sensitivity: "base", numeric: true });
+								? wTotal(b.workKey) - wTotal(a.workKey)
+								: wName(a.workKey).localeCompare(wName(b.workKey), undefined, { sensitivity: "base", numeric: true });
 				if (cmp) return cmp;
 				if (a.workKey !== b.workKey) return a.workKey < b.workKey ? -1 : 1;
 				return b.total - a.total;
@@ -514,6 +554,43 @@
 		});
 	});
 	const hiddenTitleCount = $derived(filteredTitles.length - visibleTitles.length);
+
+	// In "by work" sort, roll the (already work-sorted) editions up into one
+	// collapsible block per work: a single header row you can expand to see and
+	// edit the individual editions underneath.
+	const WORK_BLOCK_CAP = 150;
+	const workBlocks = $derived.by(() => {
+		if (titleSort !== "work") return [];
+		// Group by work key into a Map first (guarantees exactly one block per key,
+		// regardless of row order), then sort the blocks. Grouping by consecutive
+		// rows was fragile -- editions of one work could be sorted apart and produce
+		// two blocks with the same key (a duplicate keyed-each key).
+		const byKey = new Map();
+		for (const t of filteredTitles) {
+			if (!byKey.has(t.workKey)) {
+				byKey.set(t.workKey, { key: t.workKey, name: workGroups.get(t.workKey)?.name ?? t.workName, editions: [], total: 0 });
+			}
+			const blk = byKey.get(t.workKey);
+			blk.editions.push(t);
+			blk.total += t.total;
+		}
+		const blocks = [...byKey.values()];
+		for (const b of blocks) b.editions.sort((x, y) => y.total - x.total);
+		blocks.sort((a, b) =>
+				workOrder === "checkouts"
+						? b.total - a.total
+						: a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) || (a.key < b.key ? -1 : 1)
+		);
+		return blocks;
+	});
+	const visibleWorkBlocks = $derived(workBlocks.slice(0, WORK_BLOCK_CAP));
+	const hiddenWorkCount = $derived(Math.max(0, workBlocks.length - visibleWorkBlocks.length));
+
+	let expandedWorks = $state([]); // work keys currently expanded in the table
+	const isExpanded = (key) => expandedWorks.includes(key);
+	function toggleExpand(key) {
+		expandedWorks = isExpanded(key) ? expandedWorks.filter((k) => k !== key) : [...expandedWorks, key];
+	}
 
 	// Currently-active group object (or null if none selected/created yet).
 	const activeGroup = $derived(groups.find((g) => g.id === activeGroupId) ?? null);
@@ -782,7 +859,7 @@
 					<span class="groups-label">Selection groups</span>
 					<div class="groups-actions">
 						<button class="auto-group" onclick={autoGroupByWork} title="Plot the 5 most-borrowed works (their editions grouped into one line each)">
-							✨ Show top work groups
+							Show top works
 						</button>
 						<button class="new-group" onclick={addGroup}>Make a new group</button>
 					</div>
@@ -810,14 +887,13 @@
 						{/if}
 						{#each sortedGroups as g (g.id)}
 							<li class="group-chip-row" class:dim={isolatedKeys.length && !isIsolated(`g${g.id}`)}>
-								<button
+								<span
 										class="group-chip"
 										class:active={g.id === activeGroupId}
 										class:drag-over={dragOverId === g.id}
 										style="--chip-color: {groupColorFor(g)}"
-										title="Click to edit its titles · drag onto another group to merge them"
+										title="Drag onto another group to merge them"
 										draggable="true"
-										onclick={() => (activeGroupId = activeGroupId === g.id ? null : g.id)}
 										ondragstart={() => (dragGroupId = g.id)}
 										ondragend={() => { dragGroupId = null; dragOverId = null; }}
 										ondragover={(e) => { e.preventDefault(); if (dragGroupId !== g.id) dragOverId = g.id; }}
@@ -825,9 +901,18 @@
 										ondrop={(e) => { e.preventDefault(); dropOnGroup(g.id); dragOverId = null; }}
 								>
 									<span class="chip-sw"></span>
-									<span class="chip-name">{groupLabel(g)}</span>
-									<span class="chip-count">{g.idxs.length}</span>
-								</button>
+									<span
+											class="chip-name"
+											onmousemove={(e) => (hoverTip = { text: groupLabel(g), x: e.clientX, y: e.clientY })}
+											onmouseleave={() => (hoverTip = null)}
+									>{groupLabel(g)}</span>
+								</span>
+								<button
+										class="chip-edit"
+										class:on={g.id === activeGroupId}
+										title="Edit which titles are in this group"
+										onclick={() => (activeGroupId = activeGroupId === g.id ? null : g.id)}
+								>{g.id === activeGroupId ? "Done" : "Edit"}</button>
 								<button
 										class="chip-only"
 										class:on={isIsolated(`g${g.id}`)}
@@ -841,7 +926,11 @@
 							<li class="group-chip-row" class:dim={isolatedKeys.length && !isIsolated(`s${idx}`)}>
 								<span class="group-chip static-chip" style="--chip-color: {singleColor(i)}">
 									<span class="chip-sw"></span>
-									<span class="chip-name">{current.titles[idx].title}</span>
+									<span
+											class="chip-name"
+											onmousemove={(e) => (hoverTip = { text: current.titles[idx].title, x: e.clientX, y: e.clientY })}
+											onmouseleave={() => (hoverTip = null)}
+									>{current.titles[idx].title}</span>
 								</span>
 								<button
 										class="chip-only"
@@ -913,6 +1002,9 @@
 						>A–Z</button>
 					</div>
 				</div>
+				{#if titleSort === "work"}
+					<p class="table-hint">Highlighted rows are works with multiple editions. Drag one work onto another to merge them; expand a work and hit <em>exclude</em> to split an edition off.</p>
+				{/if}
 				<div class="title-table" role="table" aria-label="Titles, grouped by work" style="--work-w:{workColW}px; --edition-w:{editionColW}px">
 					<div class="tt-head" role="row">
 						<span class="tt-cell tt-plot" role="columnheader" title="Tick to plot a title on the chart">Add to plot</span>
@@ -947,76 +1039,143 @@
 							>{#if titleSort === "work" && workOrder === "checkouts"}↓&nbsp;{/if}Checkouts</button>
 						</span>
 					</div>
-					<ul class="title-list" role="rowgroup">
-						{#each visibleTitles as t (t.idx)}
-							{@const owner = groupForTitle(t.idx)}
-							{@const ownerIdx = owner ? groups.indexOf(owner) : -1}
-							{@const single = isSingleSelected(t.idx)}
-							{@const singleIdx = single ? singleIdxs.indexOf(t.idx) : -1}
-							{@const ownerColor = owner
-									? TITLE_COLORS[ownerIdx % TITLE_COLORS.length]
-									: single
-											? TITLE_COLORS[singleIdx % TITLE_COLORS.length]
-											: ""}
-							{@const isCurrentOwner = activeGroupId ? owner?.id === activeGroupId : single}
-							<li
-									class="title-row"
-									role="row"
-									class:dragging={dragIdx === t.idx}
-									class:work-start={titleSort === "work" && t.firstOfWork}
-									draggable={groups.length > 0}
-									ondragstart={() => (dragIdx = t.idx)}
-									ondragend={() => { dragIdx = null; dragOverId = null; }}
+					{#snippet editionRow(t, showWork, indent)}
+						{@const owner = groupForTitle(t.idx)}
+						{@const ownerIdx = owner ? groups.indexOf(owner) : -1}
+						{@const single = isSingleSelected(t.idx)}
+						{@const singleIdx = single ? singleIdxs.indexOf(t.idx) : -1}
+						{@const ownerColor = owner
+								? TITLE_COLORS[ownerIdx % TITLE_COLORS.length]
+								: single
+										? TITLE_COLORS[singleIdx % TITLE_COLORS.length]
+										: ""}
+						{@const isCurrentOwner = activeGroupId ? owner?.id === activeGroupId : single}
+						<li
+								class="title-row"
+								role="row"
+								class:dragging={dragIdx === t.idx}
+								draggable={groups.length > 0}
+								ondragstart={() => (dragIdx = t.idx)}
+								ondragend={() => { dragIdx = null; dragOverId = null; }}
+						>
+							<label
+									class="tt-row"
+									role="presentation"
+									class:selected={owner !== null || single}
+									style={ownerColor ? `--chip-color:${ownerColor}` : ""}
 							>
-								<label
-										class="tt-row"
-										role="presentation"
-										class:selected={owner !== null || single}
-										style={ownerColor ? `--chip-color:${ownerColor}` : ""}
+								<span class="tt-cell tt-plot" role="cell">
+									<input
+											type="checkbox"
+											aria-label="Plot “{t.title}” on the chart"
+											checked={isCurrentOwner}
+											onchange={() => toggleTitle(t.idx)}
+									/>
+								</span>
+								<span class="tt-cell tt-work" role="cell" title={showWork ? t.workName : ""}>
+									{#if showWork}
+										<span class="tt-work-name">{t.workName}</span>
+									{:else if indent}
+										<button
+												class="exclude-btn"
+												title="Pull this edition out of the work — make it its own work"
+												onclick={() => excludeEdition(t.idx)}
+										>exclude</button>
+									{/if}
+								</span>
+								<span
+										class="tt-cell tt-edition"
+										class:indent
+										role="cell"
+										onmousemove={(e) => (hoverTip = { text: t.title, x: e.clientX, y: e.clientY })}
+										onmouseleave={() => (hoverTip = null)}
+								>
+									{#if (owner || single) && !isCurrentOwner}
+										<span class="other-group-dot"
+											  title="In “{owner ? groupLabel(owner) : t.title}”"></span>
+									{/if}
+									<span class="t-name">{t.title}</span>
+								</span>
+								<span class="tt-cell tt-format" role="cell">
+									<span class="badge badge-{t.format}">{formatLabel(t.format)}</span>
+								</span>
+								<span class="tt-cell tt-count" role="cell">{t.total.toLocaleString()}</span>
+							</label>
+						</li>
+					{/snippet}
+
+					<ul class="title-list" role="rowgroup">
+						{#if titleSort === "work"}
+							{#each visibleWorkBlocks as w (w.key)}
+								{@const multi = w.editions.length > 1}
+								{@const fmts = [...new Set(w.editions.map((e) => e.format))]}
+								<li
+										class="work-header"
+										role="row"
+										class:cluster={multi}
+										class:expanded={multi && isExpanded(w.key)}
+										class:work-drop={dragOverWorkKey === w.key}
+										draggable="true"
+										ondragstart={() => (dragWorkKey = w.key)}
+										ondragend={() => { dragWorkKey = null; dragOverWorkKey = null; }}
+										ondragover={(e) => { if (dragWorkKey && dragWorkKey !== w.key) { e.preventDefault(); dragOverWorkKey = w.key; } }}
+										ondragleave={() => (dragOverWorkKey === w.key && (dragOverWorkKey = null))}
+										ondrop={(e) => { e.preventDefault(); if (dragWorkKey && dragWorkKey !== w.key) mergeWorks(dragWorkKey, w.key); dragWorkKey = null; dragOverWorkKey = null; }}
 								>
 									<span class="tt-cell tt-plot" role="cell">
 										<input
 												type="checkbox"
-												aria-label="Plot “{t.title}” on the chart"
-												checked={isCurrentOwner}
-												onchange={() => toggleTitle(t.idx)}
+												class="plot-check"
+												aria-label={multi ? `Plot the work “${w.name}” (${w.editions.length} editions) on the chart` : `Plot “${w.name}” on the chart`}
+												title={multi ? `Plot “${w.name}” — all ${w.editions.length} editions as one line` : `Plot “${w.name}”`}
+												checked={isWorkPlotted(w.key)}
+												onchange={() => toggleWork(w.key)}
 										/>
 									</span>
-									<span class="tt-cell tt-work" role="cell" title={t.workName}>
-										{#if t.firstOfWork}
-											<span class="tt-work-name">{t.workName}</span>
-											{#if (workGroups.get(t.workKey)?.idxs.length ?? 1) > 1}
-												<button
-														class="plot-all"
-														class:on={isWorkPlotted(t.workKey)}
-														title="Plot the whole work — all {workGroups.get(t.workKey)?.idxs.length} editions as one line"
-														onclick={() => toggleWork(t.workKey)}
-												>{isWorkPlotted(t.workKey) ? "✓ whole work" : "add whole work"}</button>
-											{/if}
+									<span class="tt-cell tt-work" role="cell" title={w.name}>
+										{#if multi}
+											<button
+													class="disclosure"
+													aria-expanded={isExpanded(w.key)}
+													aria-label="{isExpanded(w.key) ? 'Collapse' : 'Expand'} the {w.editions.length} editions of {w.name}"
+													onclick={() => toggleExpand(w.key)}
+											>{isExpanded(w.key) ? "▾" : "▸"}</button>
+										{:else}
+											<span class="disclosure-spacer" aria-hidden="true"></span>
 										{/if}
+										<span class="tt-work-name">{w.name}</span>
 									</span>
-									<span
-											class="tt-cell tt-edition"
-											role="cell"
-											onmousemove={(e) => (hoverTip = { text: t.title, x: e.clientX, y: e.clientY })}
-											onmouseleave={() => (hoverTip = null)}
-									>
-										{#if (owner || single) && !isCurrentOwner}
-											<span class="other-group-dot"
-												  title="In “{owner ? groupLabel(owner) : t.title}”"></span>
-										{/if}
-										<span class="t-name">{t.title}</span>
-									</span>
+									{#if multi}
+										<button class="tt-cell tt-edition ed-summary" onclick={() => toggleExpand(w.key)}>
+											<span class="cluster-badge">{w.editions.length} editions</span>{isExpanded(w.key) ? "" : " — click to edit"}
+										</button>
+									{:else}
+										<span class="tt-cell tt-edition ed-single" role="cell">single edition</span>
+									{/if}
 									<span class="tt-cell tt-format" role="cell">
-										<span class="badge badge-{t.format}">{formatLabel(t.format)}</span>
+										{#each fmts as f}<span class="badge badge-{f}">{formatLabel(f)}</span>{/each}
 									</span>
-									<span class="tt-cell tt-count" role="cell">{t.total.toLocaleString()}</span>
-								</label>
-							</li>
-						{/each}
+									<span class="tt-cell tt-count" role="cell">{w.total.toLocaleString()}</span>
+								</li>
+								{#if multi && isExpanded(w.key)}
+									{#each w.editions as t (t.idx)}
+										{@render editionRow(t, false, true)}
+									{/each}
+								{/if}
+							{/each}
+						{:else}
+							{#each visibleTitles as t (t.idx)}
+								{@render editionRow(t, t.firstOfWork, false)}
+							{/each}
+						{/if}
 					</ul>
 				</div>
-				{#if hiddenTitleCount > 0}
+				{#if titleSort === "work" && hiddenWorkCount > 0}
+					<p class="titles-more">
+						Showing the top {visibleWorkBlocks.length} works. {hiddenWorkCount.toLocaleString()} more —
+						type in the filter above to find a specific one.
+					</p>
+				{:else if titleSort !== "work" && hiddenTitleCount > 0}
 					<p class="titles-more">
 						Showing the top {visibleTitles.length} titles. {hiddenTitleCount.toLocaleString()} more —
 						type in the filter above to find a specific one.
@@ -1414,7 +1573,7 @@
 		background: var(--color-white);
 		color: var(--color-fg);
 		cursor: pointer;
-		max-width: 220px;
+		max-width: 420px;
 		transition: background 0.12s, border-color 0.12s, color 0.12s;
 	}
 
@@ -1462,9 +1621,10 @@
 	}
 
 	.chip-name {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		/* show the full title -- wrap instead of truncating */
+		white-space: normal;
+		overflow-wrap: anywhere;
+		word-break: break-word;
 	}
 
 	.chip-count {
@@ -1533,6 +1693,29 @@
 	.chip-only.end {
 		border-right: 1.5px solid var(--color-border);
 		border-radius: 0 999px 999px 0;
+	}
+
+	/* the "Edit" segment in a group pill (sits between the name and "Only") */
+	.chip-edit {
+		display: flex;
+		align-items: center;
+		font-family: var(--font-sans);
+		font-size: 0.72rem;
+		font-weight: 600;
+		padding: 0 10px;
+		border: 1.5px solid var(--color-border);
+		border-right: none;
+		background: var(--color-white);
+		color: var(--color-fg-light);
+		cursor: pointer;
+	}
+	.chip-edit:hover {
+		color: var(--color-fg);
+	}
+	.chip-edit.on {
+		background: var(--color-fg);
+		border-color: var(--color-fg);
+		color: var(--color-white);
 	}
 
 	.editing-hint {
@@ -1681,7 +1864,8 @@
 	}
 
 	.tt-head,
-	.tt-row {
+	.tt-row,
+	.work-header {
 		display: grid;
 		/* Work + Edition widths are user-resizable via the header drag handles.
 		   Edition grows to fill, but never shrinks below --edition-w -- drag it
@@ -1690,6 +1874,113 @@
 		align-items: center;
 		gap: 10px;
 		padding: 8px 12px;
+	}
+
+	/* one row per work; click to expand its editions */
+	.work-header {
+		font-family: var(--font-sans);
+		font-size: 0.9rem;
+		font-weight: 500;
+		cursor: pointer;
+		border-top: 1px solid var(--color-gray-100);
+	}
+	.title-list > li:first-child.work-header {
+		border-top: none;
+	}
+	.work-header:hover {
+		background: var(--color-gray-100);
+	}
+
+	/* a real work cluster (2+ editions) -- highlight it with an accent bar + tint
+	   so it stands apart from single-edition rows */
+	.work-header.cluster {
+		background: #f7f3fb;
+		box-shadow: inset 3px 0 0 0 #6a4c93;
+		border-top-color: #e6dcf1;
+	}
+	.work-header.cluster:hover {
+		background: #f1eaf8;
+	}
+
+	.work-header[draggable="true"] {
+		cursor: grab;
+	}
+
+	/* a work row being hovered as a merge target while another work is dragged */
+	.work-header.work-drop {
+		background: #efe7f7;
+		box-shadow: inset 0 0 0 2px #6a4c93;
+	}
+
+	.exclude-btn {
+		font-family: var(--font-sans);
+		font-size: 0.72rem;
+		padding: 2px 9px;
+		border-radius: 999px;
+		border: 1px solid var(--color-border);
+		background: var(--color-white);
+		color: var(--color-fg-light);
+		cursor: pointer;
+	}
+	.exclude-btn:hover {
+		border-color: #c2255c;
+		color: #c2255c;
+	}
+
+	.disclosure {
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-size: 1.05rem;
+		line-height: 1;
+		color: #6a4c93;
+		padding: 0 6px 0 0;
+		flex: none;
+	}
+	.disclosure:hover {
+		color: #4e3670;
+	}
+	.disclosure-spacer {
+		width: 22px;
+		flex: none;
+	}
+	.ed-summary {
+		min-width: 0;
+		text-align: left;
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		color: var(--color-fg-light);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.cluster-badge {
+		display: inline-block;
+		background: #efe7f7;
+		color: #6a4c93;
+		font-weight: 600;
+		font-size: 0.72rem;
+		padding: 1px 8px;
+		border-radius: 999px;
+	}
+	.ed-single {
+		color: var(--color-gray-400, #b0b0b0);
+		font-size: 0.8rem;
+		font-style: italic;
+	}
+	/* format column can show several badges for a multi-format work */
+	.work-header .tt-format {
+		display: flex;
+		gap: 4px;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+	/* indent the edition title when it's shown nested under an expanded work */
+	.tt-edition.indent {
+		padding-left: 20px;
 	}
 
 	.tt-head {
@@ -1803,9 +2094,9 @@
 		color: var(--color-fg);
 		min-width: 0;
 		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 3px;
+		flex-direction: row;
+		align-items: center;
+		gap: 4px;
 	}
 
 	.tt-work-name {
@@ -1921,6 +2212,18 @@
 		font-size: 0.8rem;
 		color: var(--color-fg-light);
 		margin: 8px 2px 0;
+	}
+
+	.table-hint {
+		font-family: var(--font-sans);
+		font-size: 0.8rem;
+		color: var(--color-fg-light);
+		margin: 0 2px 8px;
+	}
+	.table-hint em {
+		font-style: normal;
+		font-weight: 600;
+		color: #c2255c;
 	}
 
 	.hint {
