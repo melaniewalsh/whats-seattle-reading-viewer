@@ -482,6 +482,7 @@
 		pointer-events: none;
 		box-shadow: 0 6px 16px rgba(0,0,0,0.12);
 		min-width: 165px;
+		max-width: 300px;
 		z-index: 10;
 	}
 
@@ -495,7 +496,7 @@
 
 	.tooltip-row {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		margin-bottom: 3px;
 		padding: 2px 0;
 	}
@@ -505,6 +506,8 @@
 		height: 10px;
 		border-radius: 2px;
 		margin-right: 8px;
+		margin-top: 3px;
+		flex: none;
 		display: inline-block;
 	}
 
@@ -512,10 +515,15 @@
 		flex-grow: 1;
 		margin-right: 16px;
 		color: #444;
+		/* show the full title on hover -- wrap instead of clipping */
+		word-break: break-word;
+		line-height: 1.35;
 	}
 
 	.value {
 		font-weight: bold;
+		flex: none;
+		white-space: nowrap;
 	}
 
 	.tooltip-total {

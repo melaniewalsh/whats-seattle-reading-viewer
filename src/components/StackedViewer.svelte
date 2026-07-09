@@ -25,11 +25,36 @@
 	let singleIdxs = $state([]); // titles ticked while no group was active
 	let titleFilter = $state(""); // text filter for the title list
 	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = stacked by title
-	let titleSort = $state("borrowed"); // 'borrowed' = most checkouts first; 'alpha' = A–Z
+	let titleSort = $state("work"); // 'work' = editions grouped by work; 'borrowed' = most checkouts; 'alpha' = A–Z
+	let workOrder = $state("name"); // in 'work' mode, order the works by 'name' (A–Z) or 'checkouts' (total)
 	let isolatedKeys = $state([]); // when non-empty, the chart shows ONLY these series (keys 'g<id>' | 's<idx>'); multiple = compare
 	let showAuthorTotal = $state(true); // show the author's aggregate total line in the line view
 	let dragIdx = $state(null); // title index currently being dragged onto a group pill
-	let dragOverId = $state(null); // group pill currently under the dragged title
+	let dragGroupId = $state(null); // group pill currently being dragged (to merge into another)
+	let dragOverId = $state(null); // group pill currently under the dragged title/pill
+	let autoGroupNote = $state(""); // feedback after "Group editions into works"
+	let loadError = $state(""); // message when an author fails to load
+	let hoverTip = $state(null); // { text, x, y } instant tooltip for full edition titles
+	let workColW = $state(150); // resizable width (px) of the title-table Work column
+	let editionColW = $state(240); // min width (px) of the Edition column (drag to see full titles)
+
+	// Drag a column divider in the title table to widen a column.
+	function startColResize(event, which) {
+		event.preventDefault();
+		const startX = event.clientX;
+		const startW = which === "work" ? workColW : editionColW;
+		const onMove = (e) => {
+			const w = Math.max(60, startW + (e.clientX - startX));
+			if (which === "work") workColW = w;
+			else editionColW = w;
+		};
+		const onUp = () => {
+			window.removeEventListener("pointermove", onMove);
+			window.removeEventListener("pointerup", onUp);
+		};
+		window.addEventListener("pointermove", onMove);
+		window.addEventListener("pointerup", onUp);
+	}
 
 	onMount(async () => {
 		// The site queries a single SQLite database (static/data/library.sqlite3)
@@ -77,9 +102,13 @@
 
 	async function selectAuthor(a) {
 		// One author's drilldown (their series + every qualifying title) comes
-		// from a couple of indexed queries into the SQLite database.
+		// from their static JSON file (see db.js).
+		loadError = "";
 		const data = await getAuthor(a.slug);
-		if (!data) return;
+		if (!data) {
+			loadError = `Couldn't load "${a.name}". (In local preview only the sample authors are available; on the live site every author loads.)`;
+			return;
+		}
 		// expand the sparse series the ETL produced into full arrays
 		data.months = months;
 		data.series = densify(data.series);
@@ -96,6 +125,9 @@
 		chartMode = "line";
 		isolatedKeys = [];
 		showAuthorTotal = true;
+		autoGroupNote = "";
+		titleSort = "work";
+		workOrder = "name";
 		query = "";
 		results = [];
 	}
@@ -165,16 +197,113 @@
 
 	const groupColor = (gi) => TITLE_COLORS[gi % TITLE_COLORS.length];
 	const singleColor = (i) => TITLE_COLORS[i % TITLE_COLORS.length];
+	// A group's color is fixed to its position in `groups` (the chart uses the
+	// same), so the pills can be displayed in any order without colors shuffling.
+	const groupColorFor = (g) => groupColor(groups.findIndex((x) => x.id === g.id));
+	// Non-empty groups, displayed alphabetically by name.
+	const sortedGroups = $derived(
+			[...groups]
+					.filter((g) => g.idxs.length)
+					.sort((a, b) => groupLabel(a).localeCompare(groupLabel(b), undefined, { sensitivity: "base", numeric: true }))
+	);
 
-	// Drag-and-drop: drop a title onto a group pill to add it to that group.
+	// --- Auto-cluster titles into "works" ----------------------------------
+	// The same book shows up many times (print / audio / ebook / illustrated /
+	// unabridged), differing only in cataloging boilerplate. Strip that boilerplate
+	// to a "work key" so all the editions of one work collapse to the same string.
+	// e.g. every "Harry Potter and the Sorcerer's Stone ..." variant ->
+	//      "harry potter and the sorcerers stone".
+	function normalizeWorkKey(title) {
+		let t = (title || "").toLowerCase();
+		t = t.split(" / ")[0]; // drop "/ by Author ; illustrations by ..."
+		t = t.replace(/&/g, " and "); // "beasts & where" -> "beasts and where"
+		t = t.replace(/\([^)]*\)/g, " "); // drop "(unabridged)" etc.
+		// Repeatedly strip a trailing ": ..." segment when it's edition/format
+		// noise -- series/book/volume, "the original screenplay", "read by <narrator>",
+		// illustrated/deluxe/anniversary editions, etc. Stop at the first segment
+		// that ISN'T noise (that's a real subtitle, e.g. "The Crimes of Grindelwald").
+		const NOISE = /(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|autobiography|poems|essays)/i;
+		let prev;
+		do {
+			prev = t;
+			t = t.replace(/:\s*[^:]*$/, (seg) => (NOISE.test(seg) ? " " : seg));
+		} while (t !== prev);
+		t = t.replace(/\b(unabridged|abridged|audiobook|e-?book|large print|compact disc|sound recording)\b/g, " ");
+		t = t.replace(/['’]/g, ""); // sorcerer's -> sorcerers
+		t = t.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+		return t;
+	}
+
+	// A readable name for a work, taken from its best-known edition's title.
+	function cleanTitleForDisplay(title) {
+		let t = (title || "").split(" / ")[0];
+		t = t.replace(/\s*:\s*.*$/, ""); // drop subtitle after the first colon
+		t = t.replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
+		return t;
+	}
+
+	// Cluster the current author's titles into works and seed the groups. Only
+	// works with 2+ editions are grouped (that's where the dedup value is); the
+	// top ones by total are kept so the line chart stays readable. This REPLACES
+	// any existing groups -- it's a "do it for me" starting point the user revises.
+	const MAX_AUTO_GROUPS = 12;
+	function autoGroupByWork() {
+		if (!current) return;
+		const buckets = new Map();
+		current.titles.forEach((t, idx) => {
+			const key = normalizeWorkKey(t.title);
+			if (!key) return;
+			if (!buckets.has(key)) buckets.set(key, []);
+			buckets.get(key).push(idx);
+		});
+		const works = [...buckets.values()]
+				.filter((idxs) => idxs.length >= 2)
+				.map((idxs) => ({ idxs, total: idxs.reduce((s, i) => s + current.titles[i].total, 0) }))
+				.sort((a, b) => b.total - a.total)
+				.slice(0, MAX_AUTO_GROUPS);
+
+		groups = works.map((w) => {
+			const topIdx = w.idxs.reduce((best, i) => (current.titles[i].total > current.titles[best].total ? i : best), w.idxs[0]);
+			return { id: ++groupIdCounter, name: cleanTitleForDisplay(current.titles[topIdx].title), idxs: [...w.idxs] };
+		});
+		singleIdxs = [];
+		activeGroupId = null;
+		isolatedKeys = [];
+		chartMode = "line";
+		const merged = works.reduce((s, w) => s + w.idxs.length, 0);
+		autoGroupNote = works.length
+				? `Grouped ${merged} editions into ${works.length} works. Drag titles between groups, or delete a group, to fix anything.`
+				: "No multi-edition works found to merge for this author.";
+	}
+
+	// Drag-and-drop onto a group pill: either a title (add it) or another group
+	// pill (merge the two groups into one).
 	function dropOnGroup(id) {
-		if (dragIdx === null) return;
-		const g = groups.find((g) => g.id === id);
-		if (g && !g.idxs.includes(dragIdx)) {
-			releaseTitle(dragIdx);
-			g.idxs = [...g.idxs, dragIdx];
+		if (dragGroupId !== null && dragGroupId !== id) {
+			mergeGroups(dragGroupId, id);
+		} else if (dragIdx !== null) {
+			const g = groups.find((g) => g.id === id);
+			if (g && !g.idxs.includes(dragIdx)) {
+				releaseTitle(dragIdx);
+				g.idxs = [...g.idxs, dragIdx];
+			}
 		}
 		dragIdx = null;
+		dragGroupId = null;
+	}
+
+	// Merge the dragged group's titles into the target group, then drop the
+	// now-empty source group. Keeps the target's name.
+	function mergeGroups(srcId, destId) {
+		const src = groups.find((g) => g.id === srcId);
+		const dest = groups.find((g) => g.id === destId);
+		if (!src || !dest) return;
+		const merged = [...dest.idxs];
+		for (const i of src.idxs) if (!merged.includes(i)) merged.push(i);
+		dest.idxs = merged;
+		groups = groups.filter((g) => g.id !== srcId);
+		if (activeGroupId === srcId) activeGroupId = destId;
+		isolatedKeys = isolatedKeys.filter((k) => k !== `g${srcId}`);
 	}
 
 	// strip a title out of every group and out of the single-selection list, so it can be picked up by whichever owner is claiming it next.
@@ -220,38 +349,72 @@
 	// shown as quick-pick buttons under the search box.
 	const topAuthors = $derived(authors.slice(0, 15));
 
-	// The title list, filtered by the little search box. Sorted either by most
-	// borrowed (default -- matches the chart's biggest layers) or alphabetically
-	// (so editions/variations of the same work sit next to each other). We keep
-	// each title's original index for selection and the per-title series.
-	const filteredTitles = $derived(
-			current
-					? current.titles
-							.map((t, idx) => ({...t, idx}))
-							.filter(
-									(t) => !titleFilter.trim() || t.title.toLowerCase().includes(titleFilter.trim().toLowerCase())
-							)
-							.sort((a, b) =>
-									titleSort === "alpha"
-											? a.title.localeCompare(b.title, undefined, {sensitivity: "base", numeric: true})
-											: b.total - a.total
-							)
-					: []
-	);
+	// The title table, filtered by the little search box. Each row is annotated
+	// with its normalized "work" (so editions of the same book share a work name
+	// and key) and can be sorted three ways: by work (editions of a book grouped
+	// together -- the clustering view), most borrowed, or A–Z.
+	const filteredTitles = $derived.by(() => {
+		if (!current) return [];
+		let rows = current.titles.map((t, idx) => ({
+			...t,
+			idx,
+			workKey: normalizeWorkKey(t.title),
+			workName: cleanTitleForDisplay(t.title) || t.title
+		}));
+
+		const f = titleFilter.trim().toLowerCase();
+		if (f) rows = rows.filter((r) => r.title.toLowerCase().includes(f) || r.workName.toLowerCase().includes(f));
+
+		if (titleSort === "alpha") {
+			rows.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }));
+		} else if (titleSort === "work") {
+			// Group editions of a work together. Works are ordered either A–Z by
+			// name or by combined checkouts (click the Work / Checkouts header).
+			// Editions within a work always lead with the best-known (most-borrowed).
+			const workTotal = new Map();
+			if (workOrder === "checkouts") {
+				for (const r of rows) workTotal.set(r.workKey, (workTotal.get(r.workKey) || 0) + r.total);
+			}
+			rows.sort((a, b) => {
+				const cmp =
+						workOrder === "checkouts"
+								? (workTotal.get(b.workKey) || 0) - (workTotal.get(a.workKey) || 0)
+								: a.workName.localeCompare(b.workName, undefined, { sensitivity: "base", numeric: true });
+				if (cmp) return cmp;
+				if (a.workKey !== b.workKey) return a.workKey < b.workKey ? -1 : 1;
+				return b.total - a.total;
+			});
+		} else {
+			rows.sort((a, b) => b.total - a.total);
+		}
+		return rows;
+	});
 
 	// Prolific authors have hundreds-to-thousands of titles (J.K. Rowling ~190,
 	// James Patterson ~1500). Rendering a DOM row for every one janks or hangs
 	// the tab, so only render the first slice and let the filter box find the
 	// rest. Selected titles are always shown so a selection never "disappears".
+	// Also flag the first row of each work so the table can show the work name
+	// once and draw a divider between works (only meaningful in "by work" sort).
 	const TITLE_RENDER_CAP = 120;
 	const visibleTitles = $derived.by(() => {
-		if (filteredTitles.length <= TITLE_RENDER_CAP) return filteredTitles;
-		const head = filteredTitles.slice(0, TITLE_RENDER_CAP);
-		const seen = new Set(head.map((t) => t.idx));
-		const selectedTail = filteredTitles
-				.slice(TITLE_RENDER_CAP)
-				.filter((t) => !seen.has(t.idx) && (isSingleSelected(t.idx) || groupForTitle(t.idx)));
-		return [...head, ...selectedTail];
+		let rows;
+		if (filteredTitles.length <= TITLE_RENDER_CAP) {
+			rows = filteredTitles;
+		} else {
+			const head = filteredTitles.slice(0, TITLE_RENDER_CAP);
+			const seen = new Set(head.map((t) => t.idx));
+			const selectedTail = filteredTitles
+					.slice(TITLE_RENDER_CAP)
+					.filter((t) => !seen.has(t.idx) && (isSingleSelected(t.idx) || groupForTitle(t.idx)));
+			rows = [...head, ...selectedTail];
+		}
+		let prevWork = null;
+		return rows.map((r) => {
+			const firstOfWork = titleSort === "work" ? r.workKey !== prevWork : true;
+			prevWork = r.workKey;
+			return { ...r, firstOfWork };
+		});
 	});
 	const hiddenTitleCount = $derived(filteredTitles.length - visibleTitles.length);
 
@@ -272,10 +435,12 @@
 
 	// Chart title. When a series is isolated ("Only"), name it. Otherwise, in the
 	// stacked-area view, show the group name(s).
+	// Only title the chart when exactly one line/work is on screen -- naming it.
+	// When several are shown (a comparison), the legend does the labeling and a
+	// long concatenated title just clutters, so leave it blank.
 	const plotTitle = $derived.by(() => {
 		if (!current) return "";
-		if (isolatedKeys.length) return isolatedKeys.map(keyLabel).filter(Boolean).join("  vs  ");
-		if (chartMode === "area" && groups.length) return groups.map(groupLabel).join(" · ");
+		if (isolatedKeys.length === 1) return keyLabel(isolatedKeys[0]);
 		return "";
 	});
 
@@ -454,6 +619,10 @@
 		</div>
 	{/if}
 
+	{#if loadError}
+		<p class="load-error">{loadError}</p>
+	{/if}
+
 	<!-- ===== Selected author ===== -->
 	{#if current}
 		<div class="author">
@@ -480,72 +649,50 @@
 			{/if}
 			<LineChart months={current.months} series={displaySeries} mode={chartMode}/>
 
-			{#if groups.some((g) => g.idxs.length) || singleIdxs.length}
-				<ul class="legend">
-					{#if chartMode === "line"}
-						<li class="legend-item" class:dim={!showAuthorTotal || isolatedKeys.length}>
-							<span class="sw" style="background:{INK}"></span>
-							<span class="lg-name">{current.name} — total</span>
-							<button
-									class="only-btn"
-									title={showAuthorTotal ? "Hide the author's total line" : "Show the author's total line"}
-									onclick={() => (showAuthorTotal = !showAuthorTotal)}
-							>{showAuthorTotal ? "Hide" : "Show"}</button>
-						</li>
-					{/if}
-					{#each groups as g, gi (g.id)}
-						{#if g.idxs.length}
-							<li class="legend-item" class:dim={isolatedKeys.length && !isIsolated(`g${g.id}`)}>
-								<span class="sw" style="background:{groupColor(gi)}"></span>
-								<span class="lg-name">{groupLabel(g)}</span>
-								<button
-										class="only-btn"
-										class:on={isIsolated(`g${g.id}`)}
-										title="Show only this group (click more than one to compare)"
-										onclick={() => toggleIsolate(`g${g.id}`)}
-								>Only</button>
-							</li>
-						{/if}
-					{/each}
-					{#each singleIdxs as idx, i (idx)}
-						<li class="legend-item" class:dim={isolatedKeys.length && !isIsolated(`s${idx}`)}>
-							<span class="sw" style="background:{singleColor(i)}"></span>
-							<span class="lg-name">{current.titles[idx].title}</span>
-							<button
-									class="only-btn"
-									class:on={isIsolated(`s${idx}`)}
-									title="Show only this title (click more than one to compare)"
-									onclick={() => toggleIsolate(`s${idx}`)}
-							>Only</button>
-						</li>
-					{/each}
-					{#if isolatedKeys.length}
-						<li class="legend-item">
-							<button class="show-all-btn" onclick={clearIsolate}>Show all</button>
-						</li>
-					{/if}
-				</ul>
-				{#if isolatedKeys.length === 1}
-					<p class="compare-hint">Click “Only” on another line to compare them side by side.</p>
-				{/if}
-			{/if}
 			<div class="groups-panel">
 				<div class="groups-header">
 					<span class="groups-label">Selection groups</span>
-					<button class="new-group" onclick={addGroup}>Make a new group of related titles</button>
+					<div class="groups-actions">
+						<button class="auto-group" onclick={autoGroupByWork} title="Automatically group editions/formats of the same book">
+							✨ Show work groups
+						</button>
+						<button class="new-group" onclick={addGroup}>Make a new group</button>
+					</div>
 				</div>
+				{#if autoGroupNote}
+					<p class="auto-group-note">{autoGroupNote}</p>
+				{/if}
 
-				{#if groups.length}
+				{#if (groups.some((g) => g.idxs.length) || singleIdxs.length)}
+					<!-- This doubles as the chart legend: every line on the chart is a row
+					     here, with its color, an "Only" toggle to isolate it, and controls. -->
 					<ul class="group-chips">
-						{#each groups as g, gi (g.id)}
-							<li class="group-chip-row">
+						{#if chartMode === "line"}
+							<li class="group-chip-row" class:dim={!showAuthorTotal || isolatedKeys.length}>
+								<span class="group-chip static-chip" style="--chip-color: {INK}">
+									<span class="chip-sw"></span>
+									<span class="chip-name">Author total</span>
+								</span>
+								<button
+										class="chip-only end"
+										title={showAuthorTotal ? "Hide the author's total line" : "Show the author's total line"}
+										onclick={() => (showAuthorTotal = !showAuthorTotal)}
+								>{showAuthorTotal ? "Hide" : "Show"}</button>
+							</li>
+						{/if}
+						{#each sortedGroups as g (g.id)}
+							<li class="group-chip-row" class:dim={isolatedKeys.length && !isIsolated(`g${g.id}`)}>
 								<button
 										class="group-chip"
 										class:active={g.id === activeGroupId}
 										class:drag-over={dragOverId === g.id}
-										style="--chip-color: {TITLE_COLORS[gi % TITLE_COLORS.length]}"
+										style="--chip-color: {groupColorFor(g)}"
+										title="Click to edit its titles · drag onto another group to merge them"
+										draggable="true"
 										onclick={() => (activeGroupId = activeGroupId === g.id ? null : g.id)}
-										ondragover={(e) => { e.preventDefault(); dragOverId = g.id; }}
+										ondragstart={() => (dragGroupId = g.id)}
+										ondragend={() => { dragGroupId = null; dragOverId = null; }}
+										ondragover={(e) => { e.preventDefault(); if (dragGroupId !== g.id) dragOverId = g.id; }}
 										ondragleave={() => (dragOverId === g.id && (dragOverId = null))}
 										ondrop={(e) => { e.preventDefault(); dropOnGroup(g.id); dragOverId = null; }}
 								>
@@ -553,11 +700,39 @@
 									<span class="chip-name">{groupLabel(g)}</span>
 									<span class="chip-count">{g.idxs.length}</span>
 								</button>
-								<button class="chip-remove" title="Delete group" onclick={() => removeGroup(g.id)}>×
-								</button>
+								<button
+										class="chip-only"
+										class:on={isIsolated(`g${g.id}`)}
+										title="Show only this (click more than one to compare)"
+										onclick={() => toggleIsolate(`g${g.id}`)}
+								>Only</button>
+								<button class="chip-remove" title="Delete group" onclick={() => removeGroup(g.id)}>×</button>
 							</li>
 						{/each}
+						{#each singleIdxs as idx, i (idx)}
+							<li class="group-chip-row" class:dim={isolatedKeys.length && !isIsolated(`s${idx}`)}>
+								<span class="group-chip static-chip" style="--chip-color: {singleColor(i)}">
+									<span class="chip-sw"></span>
+									<span class="chip-name">{current.titles[idx].title}</span>
+								</span>
+								<button
+										class="chip-only"
+										class:on={isIsolated(`s${idx}`)}
+										title="Show only this (click more than one to compare)"
+										onclick={() => toggleIsolate(`s${idx}`)}
+								>Only</button>
+								<button class="chip-remove" title="Remove this title" onclick={() => toggleTitle(idx)}>×</button>
+							</li>
+						{/each}
+						{#if isolatedKeys.length}
+							<li class="group-chip-row">
+								<button class="show-all-btn" onclick={clearIsolate}>Show all</button>
+							</li>
+						{/if}
 					</ul>
+					{#if isolatedKeys.length === 1}
+						<p class="compare-hint">Click “Only” on another line to compare them side by side.</p>
+					{/if}
 				{/if}
 
 				{#if activeGroup}
@@ -595,6 +770,11 @@
 						<span class="sort-label">Sort:</span>
 						<button
 								type="button"
+								class:active={titleSort === "work"}
+								onclick={() => (titleSort = "work")}
+						>By work</button>
+						<button
+								type="button"
 								class:active={titleSort === "borrowed"}
 								onclick={() => (titleSort = "borrowed")}
 						>Most borrowed</button>
@@ -605,45 +785,85 @@
 						>A–Z</button>
 					</div>
 				</div>
-				<ul class="title-list">
-					{#each visibleTitles as t (t.idx)}
-						{@const owner = groupForTitle(t.idx)}
-						{@const ownerIdx = owner ? groups.indexOf(owner) : -1}
-						{@const single = isSingleSelected(t.idx)}
-						{@const singleIdx = single ? singleIdxs.indexOf(t.idx) : -1}
-						{@const ownerColor = owner
-								? TITLE_COLORS[ownerIdx % TITLE_COLORS.length]
-								: single
-										? TITLE_COLORS[singleIdx % TITLE_COLORS.length]
-										: ""}
-						{@const isCurrentOwner = activeGroupId ? owner?.id === activeGroupId : single}
-						<li
-								class="title-row"
-								class:dragging={dragIdx === t.idx}
-								draggable={groups.length > 0}
-								ondragstart={() => (dragIdx = t.idx)}
-								ondragend={() => { dragIdx = null; dragOverId = null; }}
-						>
-							<label
-									class:selected={owner !== null || single}
-									style={ownerColor ? `--chip-color:${ownerColor}` : ""}
+				<div class="title-table" style="--work-w:{workColW}px; --edition-w:{editionColW}px">
+					<div class="tt-head">
+						<span class="tt-cell tt-check"></span>
+						<span class="tt-cell tt-work">
+							<button
+									class="col-sort"
+									class:active={titleSort === "work" && workOrder === "name"}
+									title="Group by work, ordered A–Z"
+									onclick={() => { titleSort = "work"; workOrder = "name"; }}
+							>Work{#if titleSort === "work" && workOrder === "name"}&nbsp;↓{/if}</button>
+							<span class="col-resize" title="Drag to resize" onpointerdown={(e) => startColResize(e, "work")}></span>
+						</span>
+						<span class="tt-cell tt-edition">
+							Edition
+							<span class="col-resize" title="Drag to widen and see full titles" onpointerdown={(e) => startColResize(e, "edition")}></span>
+						</span>
+						<span class="tt-cell tt-format">Format</span>
+						<span class="tt-cell tt-count">
+							<button
+									class="col-sort"
+									class:active={titleSort === "work" && workOrder === "checkouts"}
+									title="Group by work, ordered by total checkouts"
+									onclick={() => { titleSort = "work"; workOrder = "checkouts"; }}
+							>{#if titleSort === "work" && workOrder === "checkouts"}↓&nbsp;{/if}Checkouts</button>
+						</span>
+					</div>
+					<ul class="title-list">
+						{#each visibleTitles as t (t.idx)}
+							{@const owner = groupForTitle(t.idx)}
+							{@const ownerIdx = owner ? groups.indexOf(owner) : -1}
+							{@const single = isSingleSelected(t.idx)}
+							{@const singleIdx = single ? singleIdxs.indexOf(t.idx) : -1}
+							{@const ownerColor = owner
+									? TITLE_COLORS[ownerIdx % TITLE_COLORS.length]
+									: single
+											? TITLE_COLORS[singleIdx % TITLE_COLORS.length]
+											: ""}
+							{@const isCurrentOwner = activeGroupId ? owner?.id === activeGroupId : single}
+							<li
+									class="title-row"
+									class:dragging={dragIdx === t.idx}
+									class:work-start={titleSort === "work" && t.firstOfWork}
+									draggable={groups.length > 0}
+									ondragstart={() => (dragIdx = t.idx)}
+									ondragend={() => { dragIdx = null; dragOverId = null; }}
 							>
-								<input
-										type="checkbox"
-										checked={isCurrentOwner}
-										onchange={() => toggleTitle(t.idx)}
-								/>
-								{#if (owner || single) && !isCurrentOwner}
-									<span class="other-group-dot"
-										  title="In “{owner ? groupLabel(owner) : t.title}”"></span>
-								{/if}
-								<span class="t-name">{t.title}</span>
-								<span class="badge badge-{t.format}">{formatLabel(t.format)}</span>
-								<span class="t-count">{t.total.toLocaleString()}</span>
-							</label>
-						</li>
-					{/each}
-				</ul>
+								<label
+										class="tt-row"
+										class:selected={owner !== null || single}
+										style={ownerColor ? `--chip-color:${ownerColor}` : ""}
+								>
+									<span class="tt-cell tt-check">
+										<input
+												type="checkbox"
+												checked={isCurrentOwner}
+												onchange={() => toggleTitle(t.idx)}
+										/>
+									</span>
+									<span class="tt-cell tt-work" title={t.workName}>{t.firstOfWork ? t.workName : ""}</span>
+									<span
+											class="tt-cell tt-edition"
+											onmousemove={(e) => (hoverTip = { text: t.title, x: e.clientX, y: e.clientY })}
+											onmouseleave={() => (hoverTip = null)}
+									>
+										{#if (owner || single) && !isCurrentOwner}
+											<span class="other-group-dot"
+												  title="In “{owner ? groupLabel(owner) : t.title}”"></span>
+										{/if}
+										<span class="t-name">{t.title}</span>
+									</span>
+									<span class="tt-cell tt-format">
+										<span class="badge badge-{t.format}">{formatLabel(t.format)}</span>
+									</span>
+									<span class="tt-cell tt-count">{t.total.toLocaleString()}</span>
+								</label>
+							</li>
+						{/each}
+					</ul>
+				</div>
 				{#if hiddenTitleCount > 0}
 					<p class="titles-more">
 						Showing the top {visibleTitles.length} titles. {hiddenTitleCount.toLocaleString()} more —
@@ -654,6 +874,10 @@
 		</div>
 	{:else}
 		<p class="hint">Start typing an author's name above.</p>
+	{/if}
+
+	{#if hoverTip}
+		<div class="title-tip" style="left:{hoverTip.x + 14}px; top:{hoverTip.y + 16}px">{hoverTip.text}</div>
 	{/if}
 </div>
 
@@ -966,6 +1190,12 @@
 		letter-spacing: 0.04em;
 	}
 
+	.groups-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
 	.new-group {
 		font-family: var(--font-sans);
 		font-size: 0.85rem;
@@ -980,6 +1210,29 @@
 
 	.new-group:hover {
 		opacity: 0.85;
+	}
+
+	.auto-group {
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
+		padding: 6px 14px;
+		border-radius: 999px;
+		border: 1.5px solid #6a4c93;
+		background: #6a4c93;
+		color: var(--color-white);
+		cursor: pointer;
+	}
+
+	.auto-group:hover {
+		opacity: 0.85;
+	}
+
+	.auto-group-note {
+		font-family: var(--font-sans);
+		font-size: 0.8rem;
+		color: var(--color-fg-light);
+		margin: 10px 0 0;
 	}
 
 	.group-chips {
@@ -1083,6 +1336,51 @@
 	.chip-remove:hover {
 		color: #e3120b;
 		border-color: #e3120b;
+	}
+
+	/* row dims when another line is isolated / the author total is hidden */
+	.group-chip-row.dim {
+		opacity: 0.4;
+	}
+
+	/* non-interactive pill (author-total + single-title legend rows) */
+	.static-chip {
+		cursor: default;
+	}
+
+	.static-chip:hover {
+		border-color: var(--color-border);
+	}
+
+	/* the "Only" isolate toggle, between the pill and the × */
+	.chip-only {
+		display: flex;
+		align-items: center;
+		font-family: var(--font-sans);
+		font-size: 0.72rem;
+		font-weight: 600;
+		padding: 0 10px;
+		border: 1.5px solid var(--color-border);
+		border-right: none;
+		background: var(--color-white);
+		color: var(--color-fg-light);
+		cursor: pointer;
+	}
+
+	.chip-only:hover {
+		color: var(--color-fg);
+	}
+
+	.chip-only.on {
+		background: var(--color-fg);
+		border-color: var(--color-fg);
+		color: var(--color-white);
+	}
+
+	/* when the button is the last thing in the row (author total's Hide/Show) */
+	.chip-only.end {
+		border-right: 1.5px solid var(--color-border);
+		border-radius: 0 999px 999px 0;
 	}
 
 	.editing-hint {
@@ -1221,46 +1519,161 @@
 		font-weight: 600;
 	}
 
+	/* Title table: Work | Edition | Format | Checkouts (with a leading checkbox).
+	   The header and every row share one grid template so columns line up. */
+	.title-table {
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		max-height: 360px;
+		overflow: auto; /* one scroll box: vertical for rows, horizontal for wide columns */
+	}
+
+	.tt-head,
+	.tt-row {
+		display: grid;
+		/* Work + Edition widths are user-resizable via the header drag handles.
+		   Edition grows to fill, but never shrinks below --edition-w -- drag it
+		   wider than the table and the whole table scrolls horizontally. */
+		grid-template-columns: 26px var(--work-w, 150px) minmax(var(--edition-w, 240px), 1fr) auto 84px;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 12px;
+	}
+
+	.tt-head {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		font-family: var(--font-sans);
+		font-size: 0.7rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--color-fg-light);
+		background: var(--color-gray-100);
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	/* clickable header labels that set the "by work" ordering */
+	.col-sort {
+		font: inherit;
+		text-transform: inherit;
+		letter-spacing: inherit;
+		color: inherit;
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.col-sort:hover {
+		color: var(--color-fg);
+	}
+
+	.col-sort.active {
+		color: var(--color-fg);
+	}
+
+	.tt-count .col-sort {
+		width: 100%;
+		text-align: right;
+	}
+
+	/* the draggable divider on the right edge of a resizable header cell */
+	.tt-work,
+	.tt-edition {
+		position: relative;
+	}
+
+	.col-resize {
+		position: absolute;
+		top: 0;
+		right: -5px;
+		width: 10px;
+		height: 100%;
+		cursor: col-resize;
+		z-index: 2;
+	}
+
+	.col-resize::after {
+		content: "";
+		position: absolute;
+		top: 3px;
+		bottom: 3px;
+		left: 4px;
+		width: 2px;
+		background: var(--color-border);
+		border-radius: 1px;
+	}
+
+	.col-resize:hover::after {
+		background: var(--color-fg-light);
+	}
+
 	.title-list {
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		max-height: 280px;
-		overflow-y: auto;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
 	}
 
-	.title-list li + li label {
+	.title-list li + li .tt-row {
 		border-top: 1px solid var(--color-gray-100);
 	}
 
-	.title-list label {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 9px 12px;
+	/* a heavier divider where a new work begins (only in "by work" sort) */
+	.title-list li.work-start + li.work-start,
+	.title-list li.work-start {
+		border-top: 1px solid var(--color-border);
+	}
+	.title-list li.work-start:first-child {
+		border-top: none;
+	}
+
+	.tt-row {
 		cursor: pointer;
 		font-family: var(--font-sans);
 		font-size: 0.9rem;
 	}
 
-	.title-list label:hover {
+	.tt-row:hover {
 		background: var(--color-gray-100);
 	}
 
-	.title-list label.selected {
+	.tt-row.selected {
 		background: var(--color-gray-100);
 		font-weight: 600;
 		box-shadow: inset 3px 0 0 0 var(--chip-color, var(--color-fg));
 	}
 
-	.title-list .t-name {
-		flex: 1;
-		min-width: 0;
+	.tt-work {
+		font-weight: 600;
+		color: var(--color-fg);
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	.title-list .t-count {
+	.tt-edition {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+		color: var(--color-fg-light);
+	}
+
+	.tt-edition .t-name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.tt-check {
+		display: flex;
+		align-items: center;
+	}
+
+	.tt-count {
+		text-align: right;
 		color: var(--color-fg-light);
 		font-variant-numeric: tabular-nums;
 	}
@@ -1308,5 +1721,33 @@
 		color: var(--color-fg-light);
 		text-align: center;
 		margin-top: 28px;
+	}
+
+	/* instant, cursor-following tooltip showing a title's full text */
+	.title-tip {
+		position: fixed;
+		z-index: 100;
+		max-width: 360px;
+		padding: 7px 10px;
+		background: var(--color-fg);
+		color: var(--color-white);
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		line-height: 1.35;
+		border-radius: 6px;
+		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+		pointer-events: none;
+		word-break: break-word;
+	}
+
+	.load-error {
+		font-family: var(--font-sans);
+		font-size: 0.9rem;
+		color: #b00020;
+		background: #fdecef;
+		border: 1px solid #f5c2cb;
+		border-radius: var(--radius-sm);
+		padding: 10px 12px;
+		margin: 16px 0 0;
 	}
 </style>
