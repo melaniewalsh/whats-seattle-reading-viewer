@@ -253,7 +253,7 @@
 	// top ones by total are kept so the line chart stays readable. This REPLACES
 	// any existing groups -- it's a "do it for me" starting point the user revises.
 	const MAX_AUTO_GROUPS = 12;
-	function autoGroupByWork() {
+	function autoGroupByWork(opts = {}) {
 		if (!current) return;
 		const buckets = new Map();
 		current.titles.forEach((t, idx) => {
@@ -275,7 +275,9 @@
 		singleIdxs = [];
 		activeGroupId = null;
 		isolatedKeys = [];
-		chartMode = "line";
+		// The ✨ button jumps to the line view to show one line per work; when
+		// the stacked view triggers this automatically, stay put.
+		if (!opts.keepChartMode) chartMode = "line";
 		const merged = works.reduce((s, w) => s + w.idxs.length, 0);
 		autoGroupNote = works.length
 				? `Grouped ${merged} editions into ${works.length} works. Drag titles between groups, or delete a group, to fix anything.`
@@ -657,7 +659,15 @@
 				<button
 						type="button"
 						class:active={chartMode === "area"}
-						onclick={() => (chartMode = "area")}
+						onclick={() => {
+							// First visit to the stacked view with nothing selected yet:
+							// cluster editions into works automatically so the stack is
+							// colored by work instead of an all-gray pile of editions.
+							if (chartMode !== "area" && !groups.length && !singleIdxs.length) {
+								autoGroupByWork({ keepChartMode: true });
+							}
+							chartMode = "area";
+						}}
 				>By title (stacked)</button>
 			</div>
 
