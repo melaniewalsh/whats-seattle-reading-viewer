@@ -3,6 +3,7 @@
 	import { onMount } from "svelte";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
+	import YearBrush from "$components/YearBrush.svelte";
 	import Switch from "$components/ui/Switch.svelte";
 	import { getMonths, searchAuthors, getAuthor } from "$components/db.js";
 
@@ -37,6 +38,8 @@
 	let hoverTip = $state(null); // { text, x, y } instant tooltip for full edition titles
 	let workColW = $state(150); // resizable width (px) of the title-table Work column
 	let editionColW = $state(240); // min width (px) of the Edition column (drag to see full titles)
+	let yearLo = $state(0); // first month index shown (set by the YearBrush)
+	let yearHi = $state(0); // last month index shown (inclusive)
 
 	// Drag a column divider in the title table to widen a column.
 	function startColResize(event, which) {
@@ -62,6 +65,7 @@
 		// months is the shared x-axis; the top authors seed the "Most borrowed"
 		// chips (and an empty search returns the top authors by total).
 		months = await getMonths();
+		yearHi = Math.max(months.length - 1, 0);
 		authors = await searchAuthors("", 25);
 		// Show the most borrowed author by default, so the page isn't empty.
 		if (authors.length) await selectAuthor(authors[0]);
@@ -128,6 +132,8 @@
 		autoGroupNote = "";
 		titleSort = "work";
 		workOrder = "name";
+		yearLo = 0;
+		yearHi = Math.max(months.length - 1, 0);
 		query = "";
 		results = [];
 	}
@@ -579,6 +585,17 @@
 		const areaAll = only ? chartSeries.filter((s) => only.has(s.titleIdx)) : chartSeries;
 		return capAreaLayers(areaAll);
 	});
+
+	// ---- Year window (the YearBrush under the chart) -----------------------
+	// When the brush is narrowed, slice the month axis and every series to the
+	// window so the chart re-scales to just those years.
+	const isYearFiltered = $derived(months.length > 0 && (yearLo > 0 || yearHi < months.length - 1));
+	const viewMonths = $derived(isYearFiltered ? months.slice(yearLo, yearHi + 1) : months);
+	const viewSeries = $derived(
+		isYearFiltered
+			? displaySeries.map((s) => ({ ...s, values: s.values.slice(yearLo, yearHi + 1) }))
+			: displaySeries
+	);
 </script>
 
 <div class="viewer">
@@ -647,7 +664,11 @@
 			{#if plotTitle}
 				<p class="plot-title">{plotTitle}</p>
 			{/if}
-			<LineChart months={current.months} series={displaySeries} mode={chartMode}/>
+			<LineChart months={viewMonths} series={viewSeries} mode={chartMode}/>
+
+			{#if months.length > 1}
+				<YearBrush {months} values={current.series} bind:lo={yearLo} bind:hi={yearHi} />
+			{/if}
 
 			<div class="groups-panel">
 				<div class="groups-header">
@@ -1749,5 +1770,33 @@
 		border-radius: var(--radius-sm);
 		padding: 10px 12px;
 		margin: 16px 0 0;
+	}
+
+	/* phones: tighten things up (the title table keeps its own horizontal
+	   scroll, so nothing pushes the page wider than the screen) */
+	@media (max-width: 600px) {
+		.author {
+			margin-top: 28px;
+		}
+
+		.author h2 {
+			font-size: 1.6rem;
+		}
+
+		.groups-panel {
+			padding: 12px;
+		}
+
+		.group-chip {
+			max-width: 160px;
+		}
+
+		.chip-name {
+			max-width: 120px;
+		}
+
+		.title-table {
+			max-height: 300px;
+		}
 	}
 </style>

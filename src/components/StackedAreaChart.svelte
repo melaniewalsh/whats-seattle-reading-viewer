@@ -16,8 +16,11 @@
 		mode = 'area'
 	} = $props();
 
+	// Measured from the container (bind:clientWidth) so the chart fits any
+	// screen -- without this the SVG renders at a fixed 720px and pushes the
+	// whole page sideways on phones.
 	let width = $state(720);
-	const height = 380;
+	const height = $derived(width < 520 ? 300 : 380);
 	const margin = { top: 16, right: 16, bottom: 28, left: 44 };
 
 	const PALETTE = [
@@ -188,11 +191,16 @@
 	);
 
 	const yTicks = $derived(y.ticks(5));
-	const xTicks = $derived(
-		months
+	// One tick per January, thinned so year labels never collide on a
+	// narrow screen (~44px per label).
+	const xTicks = $derived.by(() => {
+		const all = months
 			.map((m, i) => ({ i, year: m.slice(0, 4), isJan: m.endsWith('-01') }))
-			.filter((d) => d.isJan)
-	);
+			.filter((d) => d.isJan);
+		const maxLabels = Math.max(2, Math.floor((width - margin.left - margin.right) / 44));
+		const step = Math.ceil(all.length / maxLabels);
+		return all.filter((_, i) => i % step === 0);
+	});
 
 	let hoverIndex = $state(null);
 	let hoveredSeriesKey = $state(null); // Track the active book layer
@@ -301,7 +309,7 @@
     }
 </script>
 
-<div class="chart-container">
+<div class="chart-container" bind:clientWidth={width}>
 	{#if !seriesProp}
 		<div class="author-search">
 			<input
@@ -339,8 +347,6 @@
 	{/if}
 
 	<svg
-		{width}
-		{height}
 		viewBox="0 0 {width} {height}"
 		role="img"
 		aria-label="Checkouts over time"
@@ -445,12 +451,14 @@
 <style>
 	.chart-container {
 		position: relative;
-		width: max-content;
+		width: 100%;
 		font-family: sans-serif;
 	}
 
 	svg {
 		display: block;
+		width: 100%;
+		height: auto;
 		overflow: visible;
 	}
 
