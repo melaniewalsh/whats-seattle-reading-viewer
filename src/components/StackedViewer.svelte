@@ -1129,6 +1129,7 @@
 												aria-label={multi ? `Plot the work “${w.name}” (${w.editions.length} editions) on the chart` : `Plot “${w.name}” on the chart`}
 												title={multi ? `Plot “${w.name}” — all ${w.editions.length} editions as one line` : `Plot “${w.name}”`}
 												checked={isWorkPlotted(w.key)}
+												indeterminate={!isWorkPlotted(w.key) && w.editions.some((e) => groupForTitle(e.idx) || isSingleSelected(e.idx))}
 												onchange={() => toggleWork(w.key)}
 										/>
 									</span>
