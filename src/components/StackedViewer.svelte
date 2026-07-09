@@ -328,15 +328,22 @@
 				: "No works to show for this author.";
 	}
 
-	// The work key an edition actually belongs to: its manual override if any
-	// (a merge target, or an `excl-<idx>` singleton when excluded), else the
-	// auto-computed key. Everything work-related routes through this.
+	// The work key an edition actually belongs to. Precedence:
+	//   1. If it's in a selection group, that GROUP is its work -- so editing a
+	//      group's membership (add/remove a title) moves it in the table too, and
+	//      the pills and the table's work clusters stay in sync.
+	//   2. Else a manual table override (drag-merge target, or `excl-<idx>` when
+	//      excluded).
+	//   3. Else the auto-computed key.
 	function effectiveKey(idx, title) {
+		for (const g of groups) if (g.idxs.includes(idx)) return `g${g.id}`;
 		return workAssign[idx] ?? normalizeWorkKey(title);
 	}
 
-	// Pull one edition out of its work cluster into its own singleton work.
+	// Pull one edition out of its work cluster into its own singleton work. Also
+	// take it out of any group first, so the exclusion actually sticks.
 	function excludeEdition(idx) {
+		releaseTitle(idx);
 		workAssign = { ...workAssign, [idx]: `excl-${idx}` };
 	}
 
@@ -368,6 +375,12 @@
 				w.name = cleanTitleForDisplay(t.title) || t.title;
 			}
 		});
+		// A group-defined work takes its name from the group label (which the user
+		// may have renamed), so the table row matches the pill.
+		for (const g of groups) {
+			const w = m.get(`g${g.id}`);
+			if (w) w.name = groupLabel(g);
+		}
 		return m;
 	});
 
