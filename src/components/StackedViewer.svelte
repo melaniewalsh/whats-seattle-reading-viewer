@@ -221,6 +221,9 @@
 	//      "harry potter and the sorcerers stone".
 	function normalizeWorkKey(title) {
 		let t = (title || "").toLowerCase();
+		// Fold accents to plain ASCII so "Galápagos" and "Galapagos" match
+		// (otherwise "á" gets stripped to a space and the keys diverge).
+		t = t.normalize("NFD").replace(/[̀-ͯ]/g, "");
 		t = t.split(" / ")[0]; // drop "/ by Author ; illustrations by ..."
 		t = t.replace(/&/g, " and "); // "beasts & where" -> "beasts and where"
 		t = t.replace(/\([^)]*\)/g, " "); // drop "(unabridged)" etc.
