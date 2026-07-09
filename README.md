@@ -16,6 +16,7 @@ Search any author and explore their Seattle Public Library checkout trends over 
 -   [Project structure](#project-structure)
 -   [HDSSI projects](#hdssi) ← **HDSSI**
 -   [What the viewer can do](#what-the-viewer-can-do)
+-   [Grouping editions into works](#works-clustering)
 -   [Learning resources](#learning-resources)
 
 ------------------------------------------------------------------------
@@ -219,6 +220,27 @@ Verified example: with a map merging the three Butlers, her total becomes **12,5
 -   **Groups:** bundle related titles (editions, a series) into a **single aggregated line**. Make a group from the titles you've ticked, **name** it, and **drag** more titles onto it. In the stacked view a group's titles cluster together.
 -   **Only / isolate:** hit **Only** on any group or title to show just that one line; its name becomes the chart title.
 -   Hover the chart for a **tooltip** with the month and per-line counts.
+
+------------------------------------------------------------------------
+
+## Grouping editions into works {#works-clustering}
+
+The same book appears in the catalog many times — print, ebook, audiobook,
+reprints, translations — each as a separate title. The viewer can **cluster
+those editions into a single "work"** so you chart one line for "Sorcerer's
+Stone" instead of four.
+
+It works by stripping the predictable catalog boilerplate (the `/ by Author …`
+credit, `: … Book 1` series subtitles, `(unabridged)` tags, accents, articles,
+punctuation) down to a normalized **work key**, then grouping titles that share
+it. It runs **in your browser, per author**, so it's instant and — importantly —
+**you can correct it**: hit **"✨ Show top work groups"** to auto-plot the 5
+most-borrowed works, use the **"add whole work"** button in the title table, and
+drag titles between groups to fix any mistake.
+
+This is **separate** from the author-name merging done in the data pipeline
+(`cluster_authors.py`). For the full algorithm and every design decision, see
+[**docs/title-clustering.md**](docs/title-clustering.md).
 
 ------------------------------------------------------------------------
 
