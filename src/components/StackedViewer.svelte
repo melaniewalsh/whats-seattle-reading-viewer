@@ -35,6 +35,7 @@
 	let dragOverId = $state(null); // group pill currently under the dragged title/pill
 	let autoGroupNote = $state(""); // feedback after "Group editions into works"
 	let loadError = $state(""); // message when an author fails to load
+	let loading = $state(false); // true while an author's data is being fetched
 	let hoverTip = $state(null); // { text, x, y } instant tooltip for full edition titles
 	let workColW = $state(150); // resizable width (px) of the title-table Work column
 	let editionColW = $state(240); // min width (px) of the Edition column (drag to see full titles)
@@ -108,9 +109,11 @@
 		// One author's drilldown (their series + every qualifying title) comes
 		// from their static JSON file (see db.js).
 		loadError = "";
-		const data = await getAuthor(a.slug);
+		loading = true;
+		const data = await getAuthor(a.slug).catch(() => null);
 		if (!data) {
-			loadError = `Couldn't load "${a.name}". (In local preview only the sample authors are available; on the live site every author loads.)`;
+			loading = false;
+			loadError = `Couldn't load "${displayName(a.name)}". (In local preview only the sample authors are available; on the live site every author loads.)`;
 			return;
 		}
 		// expand the sparse series the ETL produced into full arrays
@@ -136,11 +139,30 @@
 		yearHi = Math.max(months.length - 1, 0);
 		query = "";
 		results = [];
+		loading = false;
 	}
 
 	// Short label shown in a title's format badge.
 	function formatLabel(f) {
 		return {ebook: "ebook", audiobook: "audio", print: "print", other: "other"}[f] || f;
+	}
+
+	// The catalog stores author names inconsistently -- often all-lowercase
+	// ("mo willems") or "Lastname, First" ("Davis, Jim"). Tidy them for display:
+	// flip the comma form and Title-Case the words, while leaving already
+	// mixed-case names (McDonald, DeLillo) alone.
+	function titleCaseWord(w) {
+		if (w === w.toLowerCase() || w === w.toUpperCase()) {
+			return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+		}
+		return w;
+	}
+	function displayName(name) {
+		if (!name) return name;
+		let n = name.trim();
+		const comma = n.match(/^([^,]+),\s*(.+)$/);
+		if (comma) n = `${comma[2].trim()} ${comma[1].trim()}`;
+		return n.replace(/\S+/g, titleCaseWord);
 	}
 
 	// Make a new group. If titles are currently single-selected, seed the group
@@ -260,7 +282,7 @@
 	// works with 2+ editions are grouped (that's where the dedup value is); the
 	// top ones by total are kept so the line chart stays readable. This REPLACES
 	// any existing groups -- it's a "do it for me" starting point the user revises.
-	const MAX_AUTO_GROUPS = 12;
+	const MAX_AUTO_GROUPS = 5;
 	function autoGroupByWork(opts = {}) {
 		if (!current) return;
 		const buckets = new Map();
@@ -288,8 +310,67 @@
 		if (!opts.keepChartMode) chartMode = "line";
 		const merged = works.reduce((s, w) => s + w.idxs.length, 0);
 		autoGroupNote = works.length
-				? `Grouped ${merged} editions into ${works.length} works. Drag titles between groups, or delete a group, to fix anything.`
+				? `Showing the top ${works.length} works (${merged} editions). Tick more works in the table, drag titles between groups, or delete a group to adjust.`
 				: "No multi-edition works found to merge for this author.";
+	}
+
+	// Map of workKey -> { idxs (all editions of the work), name }. Powers the
+	// per-work "Plot" tick in the title table.
+	const workGroups = $derived.by(() => {
+		const m = new Map();
+		if (!current) return m;
+		current.titles.forEach((t, idx) => {
+			const key = normalizeWorkKey(t.title);
+			if (!key) return;
+			if (!m.has(key)) m.set(key, { idxs: [], name: cleanTitleForDisplay(t.title) || t.title, topTotal: -1 });
+			const w = m.get(key);
+			w.idxs.push(idx);
+			if (t.total > w.topTotal) {
+				w.topTotal = t.total;
+				w.name = cleanTitleForDisplay(t.title) || t.title;
+			}
+		});
+		return m;
+	});
+
+	// Is every edition of this work currently on the chart (as a group, or in the
+	// group being edited)?
+	function isWorkPlotted(key) {
+		const w = workGroups.get(key);
+		if (!w || !w.idxs.length) return false;
+		if (activeGroupId) {
+			const g = groups.find((g) => g.id === activeGroupId);
+			return !!g && w.idxs.every((i) => g.idxs.includes(i));
+		}
+		return groups.some((g) => w.idxs.every((i) => g.idxs.includes(i)));
+	}
+
+	// Add (or remove) a whole work -- all its editions as one aggregated line.
+	// If a group is being edited, the editions go into that group; otherwise the
+	// work becomes its own group (named after the work).
+	function toggleWork(key) {
+		const w = workGroups.get(key);
+		if (!w || !w.idxs.length) return;
+		if (activeGroupId) {
+			const g = groups.find((g) => g.id === activeGroupId);
+			if (!g) return;
+			if (w.idxs.every((i) => g.idxs.includes(i))) {
+				g.idxs = g.idxs.filter((i) => !w.idxs.includes(i));
+			} else {
+				w.idxs.forEach((i) => releaseTitle(i));
+				g.idxs = [...new Set([...g.idxs, ...w.idxs])];
+			}
+			return;
+		}
+		const existing = groups.find(
+				(g) => g.idxs.length === w.idxs.length && w.idxs.every((i) => g.idxs.includes(i))
+		);
+		if (existing) {
+			removeGroup(existing.id);
+		} else {
+			w.idxs.forEach((i) => releaseTitle(i));
+			groups = [...groups, { id: ++groupIdCounter, name: w.name, idxs: [...w.idxs] }];
+		}
 	}
 
 	// Drag-and-drop onto a group pill: either a title (add it) or another group
@@ -610,7 +691,9 @@
 
 <div class="viewer">
 	<div class="search">
+		<label class="sr-only" for="author-search">Search for an author</label>
 		<input
+				id="author-search"
 				type="search"
 				placeholder="Search an author — try Octavia Butler, or Mo Willems"
 				bind:value={query}
@@ -621,12 +704,14 @@
 				{#each results as a}
 					<li>
 						<button onclick={() => selectAuthor(a)}>
-							<span>{a.name}</span>
+							<span>{displayName(a.name)}</span>
 							<span class="count">{a.total.toLocaleString()}</span>
 						</button>
 					</li>
 				{/each}
 			</ul>
+		{:else if query.trim().length >= 2}
+			<p class="no-results">No authors found for “{query.trim()}”.</p>
 		{/if}
 	</div>
 
@@ -640,7 +725,7 @@
 						class:current={current && current.name === a.name}
 						onclick={() => selectAuthor(a)}
 				>
-					{a.name}
+					{displayName(a.name)}
 				</button>
 			{/each}
 		</div>
@@ -650,10 +735,14 @@
 		<p class="load-error">{loadError}</p>
 	{/if}
 
+	{#if loading}
+		<p class="loading" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span>Loading…</p>
+	{/if}
+
 	<!-- ===== Selected author ===== -->
 	{#if current}
 		<div class="author">
-			<h2>{current.name}</h2>
+			<h2>{displayName(current.name)}</h2>
 			<p class="meta">
 				{current.total.toLocaleString()} checkouts · {current.titles.length} titles
 			</p>
@@ -692,8 +781,8 @@
 				<div class="groups-header">
 					<span class="groups-label">Selection groups</span>
 					<div class="groups-actions">
-						<button class="auto-group" onclick={autoGroupByWork} title="Automatically group editions/formats of the same book">
-							✨ Show work groups
+						<button class="auto-group" onclick={autoGroupByWork} title="Plot the 5 most-borrowed works (their editions grouped into one line each)">
+							✨ Show top work groups
 						</button>
 						<button class="new-group" onclick={addGroup}>Make a new group</button>
 					</div>
@@ -824,10 +913,14 @@
 						>A–Z</button>
 					</div>
 				</div>
-				<div class="title-table" style="--work-w:{workColW}px; --edition-w:{editionColW}px">
-					<div class="tt-head">
-						<span class="tt-cell tt-check"></span>
-						<span class="tt-cell tt-work">
+				<div class="title-table" role="table" aria-label="Titles, grouped by work" style="--work-w:{workColW}px; --edition-w:{editionColW}px">
+					<div class="tt-head" role="row">
+						<span class="tt-cell tt-plot" role="columnheader" title="Tick to plot a title on the chart">Add to plot</span>
+						<span
+								class="tt-cell tt-work"
+								role="columnheader"
+								aria-sort={titleSort === "work" && workOrder === "name" ? "ascending" : "none"}
+						>
 							<button
 									class="col-sort"
 									class:active={titleSort === "work" && workOrder === "name"}
@@ -836,12 +929,16 @@
 							>Work{#if titleSort === "work" && workOrder === "name"}&nbsp;↓{/if}</button>
 							<span class="col-resize" title="Drag to resize" onpointerdown={(e) => startColResize(e, "work")}></span>
 						</span>
-						<span class="tt-cell tt-edition">
+						<span class="tt-cell tt-edition" role="columnheader">
 							Edition
 							<span class="col-resize" title="Drag to widen and see full titles" onpointerdown={(e) => startColResize(e, "edition")}></span>
 						</span>
-						<span class="tt-cell tt-format">Format</span>
-						<span class="tt-cell tt-count">
+						<span class="tt-cell tt-format" role="columnheader">Format</span>
+						<span
+								class="tt-cell tt-count"
+								role="columnheader"
+								aria-sort={titleSort === "work" && workOrder === "checkouts" ? "descending" : "none"}
+						>
 							<button
 									class="col-sort"
 									class:active={titleSort === "work" && workOrder === "checkouts"}
@@ -850,7 +947,7 @@
 							>{#if titleSort === "work" && workOrder === "checkouts"}↓&nbsp;{/if}Checkouts</button>
 						</span>
 					</div>
-					<ul class="title-list">
+					<ul class="title-list" role="rowgroup">
 						{#each visibleTitles as t (t.idx)}
 							{@const owner = groupForTitle(t.idx)}
 							{@const ownerIdx = owner ? groups.indexOf(owner) : -1}
@@ -864,6 +961,7 @@
 							{@const isCurrentOwner = activeGroupId ? owner?.id === activeGroupId : single}
 							<li
 									class="title-row"
+									role="row"
 									class:dragging={dragIdx === t.idx}
 									class:work-start={titleSort === "work" && t.firstOfWork}
 									draggable={groups.length > 0}
@@ -872,19 +970,34 @@
 							>
 								<label
 										class="tt-row"
+										role="presentation"
 										class:selected={owner !== null || single}
 										style={ownerColor ? `--chip-color:${ownerColor}` : ""}
 								>
-									<span class="tt-cell tt-check">
+									<span class="tt-cell tt-plot" role="cell">
 										<input
 												type="checkbox"
+												aria-label="Plot “{t.title}” on the chart"
 												checked={isCurrentOwner}
 												onchange={() => toggleTitle(t.idx)}
 										/>
 									</span>
-									<span class="tt-cell tt-work" title={t.workName}>{t.firstOfWork ? t.workName : ""}</span>
+									<span class="tt-cell tt-work" role="cell" title={t.workName}>
+										{#if t.firstOfWork}
+											<span class="tt-work-name">{t.workName}</span>
+											{#if (workGroups.get(t.workKey)?.idxs.length ?? 1) > 1}
+												<button
+														class="plot-all"
+														class:on={isWorkPlotted(t.workKey)}
+														title="Plot the whole work — all {workGroups.get(t.workKey)?.idxs.length} editions as one line"
+														onclick={() => toggleWork(t.workKey)}
+												>{isWorkPlotted(t.workKey) ? "✓ whole work" : "add whole work"}</button>
+											{/if}
+										{/if}
+									</span>
 									<span
 											class="tt-cell tt-edition"
+											role="cell"
 											onmousemove={(e) => (hoverTip = { text: t.title, x: e.clientX, y: e.clientY })}
 											onmouseleave={() => (hoverTip = null)}
 									>
@@ -894,10 +1007,10 @@
 										{/if}
 										<span class="t-name">{t.title}</span>
 									</span>
-									<span class="tt-cell tt-format">
+									<span class="tt-cell tt-format" role="cell">
 										<span class="badge badge-{t.format}">{formatLabel(t.format)}</span>
 									</span>
-									<span class="tt-cell tt-count">{t.total.toLocaleString()}</span>
+									<span class="tt-cell tt-count" role="cell">{t.total.toLocaleString()}</span>
 								</label>
 							</li>
 						{/each}
@@ -1573,7 +1686,7 @@
 		/* Work + Edition widths are user-resizable via the header drag handles.
 		   Edition grows to fill, but never shrinks below --edition-w -- drag it
 		   wider than the table and the whole table scrolls horizontally. */
-		grid-template-columns: 26px var(--work-w, 150px) minmax(var(--edition-w, 240px), 1fr) auto 84px;
+		grid-template-columns: 62px var(--work-w, 150px) minmax(var(--edition-w, 240px), 1fr) auto 84px;
 		align-items: center;
 		gap: 10px;
 		padding: 8px 12px;
@@ -1688,8 +1801,42 @@
 	.tt-work {
 		font-weight: 600;
 		color: var(--color-fg);
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 3px;
+	}
+
+	.tt-work-name {
 		overflow: hidden;
 		text-overflow: ellipsis;
+		max-width: 100%;
+	}
+
+	/* the "+ whole work" option under a work's name -- adds all its editions as
+	   one aggregated line (a button, not a second checkbox) */
+	.plot-all {
+		font-family: var(--font-sans);
+		font-size: 0.68rem;
+		font-weight: 600;
+		padding: 1px 7px;
+		border-radius: 999px;
+		border: 1px solid var(--color-border);
+		background: var(--color-white);
+		color: #6a4c93;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.plot-all:hover {
+		border-color: #6a4c93;
+	}
+
+	.plot-all.on {
+		background: #6a4c93;
+		border-color: #6a4c93;
+		color: var(--color-white);
 	}
 
 	.tt-edition {
@@ -1709,6 +1856,27 @@
 	.tt-check {
 		display: flex;
 		align-items: center;
+	}
+
+	.tt-plot {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	/* let the "Add to plot" header wrap to two lines, centered */
+	.tt-head .tt-plot {
+		white-space: normal;
+		text-align: center;
+		line-height: 1.15;
+	}
+
+	/* the work-level "plot the whole work" tick -- a distinct color from the
+	   per-edition checkbox so it reads as a different, work-level action */
+	.viewer .plot-check {
+		accent-color: #6a4c93;
+		width: 18px;
+		height: 18px;
 	}
 
 	.tt-count {
@@ -1788,6 +1956,56 @@
 		border-radius: var(--radius-sm);
 		padding: 10px 12px;
 		margin: 16px 0 0;
+	}
+
+	/* visually hidden but available to screen readers (form labels, etc.) */
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
+	.no-results {
+		font-family: var(--font-sans);
+		font-size: 0.9rem;
+		color: var(--color-fg-light);
+		margin: 8px 4px 0;
+	}
+
+	.loading {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		font-family: var(--font-sans);
+		color: var(--color-fg-light);
+		margin: 24px 0;
+	}
+
+	.spinner {
+		width: 18px;
+		height: 18px;
+		border: 2.5px solid var(--color-gray-200, #e0e0e0);
+		border-top-color: var(--color-fg);
+		border-radius: 50%;
+		animation: spin 0.7s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.spinner {
+			animation-duration: 2.5s;
+		}
 	}
 
 	/* phones: tighten things up (the title table keeps its own horizontal
