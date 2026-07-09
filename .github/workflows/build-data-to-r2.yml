@@ -76,6 +76,12 @@ jobs:
           # ~7 GB runner RAM: cap DuckDB low so it spills to disk instead of OOM.
           DUCKDB_MEMORY_LIMIT: 3GB
         run: |
+          # cluster_authors.py and build_data.py share data-prep/processed_files.csv
+          # as their "already handled" ledger. The clustering step above read all
+          # the monthly files and marked them processed, which would make the build
+          # think there's nothing to sync. Reset the ledger so the build re-syncs
+          # the raw data from R2 as usual.
+          rm -f data-prep/processed_files.csv
           python3 data-prep/build_data.py
           echo "author files: $(find static/data/authors -type f | wc -l)"
           ls -lh static/data/meta.json static/data/search-index.json
