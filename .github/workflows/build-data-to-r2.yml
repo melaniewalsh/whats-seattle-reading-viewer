@@ -99,17 +99,20 @@ jobs:
             "s3://${R2_DB_BUCKET}/search-index.json" \
             --endpoint-url "$R2_ENDPOINT_URL" \
             --content-type application/json \
-            --content-encoding gzip
+            --content-encoding gzip \
+            --only-show-errors
 
           # Everything else: meta.json + the ~350k tiny authors/*.json files.
-          # Bump concurrency so that many small PUTs don't crawl. --delete makes
-          # R2 mirror this build, dropping authors a higher threshold removed --
-          # but keep the old library.sqlite3 around as a warm fallback (it's the
-          # preserved sqlite-httpvfs-version's data; cheap to keep on R2).
+          # Bump concurrency so many small PUTs don't crawl, and --only-show-errors
+          # so aws doesn't print (and GitHub doesn't ingest) a line per file -- at
+          # hundreds of thousands of files that per-file logging is itself a huge
+          # bottleneck. --delete makes R2 mirror this build, dropping authors that
+          # got merged/removed, but keep the old library.sqlite3 warm fallback.
           aws configure set default.s3.max_concurrent_requests 128
           aws s3 sync static/data/ "s3://${R2_DB_BUCKET}/" \
             --endpoint-url "$R2_ENDPOINT_URL" \
             --exclude "search-index.json" \
             --exclude "library.sqlite3" \
-            --delete
+            --delete \
+            --only-show-errors
           echo "Uploaded meta.json + search-index.json + author files to r2://${R2_DB_BUCKET}/"
