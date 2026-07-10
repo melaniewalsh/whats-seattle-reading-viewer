@@ -349,6 +349,12 @@
 		setTimeout(() => (shareMsg = ""), 3200);
 	}
 
+	// Abbreviate a big checkout count: 28,244,964 -> "28.2M". Smaller totals
+	// (authors) stay exact.
+	function abbrevCount(n) {
+		return n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : n.toLocaleString();
+	}
+
 	// Short label shown in a title's format badge.
 	function formatLabel(f) {
 		return {ebook: "ebook", audiobook: "audio", print: "print", other: "other"}[f] || f;
@@ -467,7 +473,7 @@
 		// alternative title (e.g. "Slaughterhouse-Five: or, The Children's Crusade"
 		// is the same book). Stop at the first segment that's a real distinct
 		// subtitle (e.g. "The Crimes of Grindelwald"), so those stay separate.
-		const NOISE = /(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|autobiography|poems|essays|\bserie|\blivre|\btome|\blibro|\btomo|\bedicion)/i;
+		const NOISE = /(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|autobiography|poems|essays|playscript|\bscript\b|\bproduction|\bserie|\blivre|\btome|\blibro|\btomo|\bedicion)/i;
 		let prev;
 		do {
 			prev = t;
@@ -1107,9 +1113,9 @@
 			<h2>{isOverview ? current.name : displayName(current.name)}</h2>
 			<p class="meta">
 				{#if isOverview}
-					{current.total.toLocaleString()} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
+					{abbrevCount(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 				{:else}
-					{current.total.toLocaleString()} checkouts · {current.titles.length} titles
+					{abbrevCount(current.total)} checkouts · {current.titles.length} titles
 				{/if}
 			</p>
 
@@ -1146,6 +1152,14 @@
 				{/if}
 				<LineChart months={viewMonths} series={viewSeries} mode={chartMode}/>
 			</div>
+
+			{#if isOverview && chartMode === "area"}
+				<div class="format-legend">
+					{#each [...OVERVIEW_FORMATS].reverse() as f}
+						<span class="fmt-leg"><span class="fmt-sw" style="background:{f.color}"></span>{f.label}</span>
+					{/each}
+				</div>
+			{/if}
 
 			{#if months.length > 1}
 				<YearBrush {months} values={current.series} bind:lo={yearLo} bind:hi={yearHi} />
@@ -1681,6 +1695,30 @@
 		border-radius: var(--radius-md);
 		background: var(--color-gray-100);
 	}
+	/* format legend for the overview "by format" area chart */
+	.format-legend {
+		display: flex;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 18px;
+		margin: 10px 0 2px;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: var(--color-fg);
+	}
+	.fmt-leg {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.fmt-sw {
+		width: 12px;
+		height: 12px;
+		border-radius: 3px;
+		flex: none;
+	}
+
 	.chart-action {
 		display: inline-flex;
 		align-items: center;
