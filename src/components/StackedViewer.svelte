@@ -1152,12 +1152,12 @@
 			{/if}
 
 			<div class="chart-actions">
-				<button class="chart-action square" onclick={downloadChart} title="Download the chart as a PNG image" aria-label="Download image">
-					<span aria-hidden="true">⤓</span>
+				<button class="chart-action" onclick={downloadChart} title="Download the chart as a PNG image">
+					<span aria-hidden="true">⤓</span> Download image
 				</button>
 				<div class="share-wrap">
-					<button class="chart-action square" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-label="Share" aria-haspopup="true" aria-expanded={shareOpen}>
-						<span aria-hidden="true">↗</span>
+					<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
+						<span aria-hidden="true">↗</span> Share
 					</button>
 					{#if shareOpen}
 						<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
@@ -2511,11 +2511,23 @@
 	.split-side .tt-row,
 	.split-side .work-header {
 		/* narrow Work column, wide Edition column so expanded edition titles
-		   show as much of their (long) titles as possible */
-		grid-template-columns: 28px minmax(54px, 0.72fr) minmax(0, 1.95fr) auto 50px;
+		   show as much of their (long) titles as possible; the last column is
+		   wide enough for the "Checkouts" header + comma'd values so nothing
+		   spills off the right edge. */
+		grid-template-columns: 26px minmax(50px, 0.7fr) minmax(0, 1.7fr) auto auto;
 		gap: 7px;
 		padding: 7px 9px;
 		font-size: 0.8rem;
+	}
+	/* keep the Checkouts header/value on one line, right-aligned, and a touch
+	   smaller so its (auto-sized) column doesn't get too wide */
+	.split-side .tt-count {
+		text-align: right;
+		white-space: nowrap;
+	}
+	.split-side .tt-head .tt-count {
+		font-size: 0.64rem;
+		letter-spacing: 0.02em;
 	}
 	.split-side .title-table {
 		max-height: 460px;
