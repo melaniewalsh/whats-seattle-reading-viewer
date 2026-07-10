@@ -43,6 +43,65 @@ export async function getMonths() {
 	return monthsPromise;
 }
 
+// Library-wide monthly totals for the default "all checkouts" landing view.
+// Queried live from Seattle's Open Data (Socrata) API and aggregated
+// server-side -- one small request, filtered to books/ebooks/audiobooks so it
+// stays on-theme with the rest of the tool. The app token just identifies the
+// app for a higher rate limit (public data; safe to ship). Passed as a query
+// param, not a header, so the request stays a simple GET (no CORS preflight).
+const SODA_RESOURCE = 'https://data.seattle.gov/resource/tmmm-ytt6.json';
+const SODA_APP_TOKEN = 'bHWsGtRFRP9x8Hl8lYivqM1hQ';
+let allCheckoutsPromise = null;
+
+// MaterialType (as stored by SPL) -> the format bucket the app uses elsewhere.
+const FMT_BUCKET = { BOOK: 'print', EBOOK: 'ebook', AUDIOBOOK: 'audiobook' };
+
+/**
+ * Book/ebook/audiobook checkouts per month, aligned to getMonths(). Returns
+ * both the grand total (for the default line) and a per-format breakdown (for
+ * the stacked-area view): { total: [...], print: [...], ebook: [...],
+ * audiobook: [...] }.
+ */
+export async function getAllCheckouts() {
+	if (!allCheckoutsPromise) {
+		allCheckoutsPromise = (async () => {
+			const months = await getMonths();
+			// Fast path: a tiny precomputed file (data-prep/build_overview.py),
+			// served from the app's own origin -- loads instantly instead of
+			// waiting seconds for the live API to aggregate ~51M rows.
+			try {
+				const pre = await fetch(`${base}/overview.json`).then((r) => (r.ok ? r.json() : null));
+				if (pre && Array.isArray(pre.total) && pre.total.length === months.length) return pre;
+			} catch { /* fall through to the live API */ }
+			// Fallback: live Socrata aggregation (works before the file is built).
+			const params = new URLSearchParams({
+				'$select': 'checkoutyear,checkoutmonth,materialtype,sum(checkouts) as total',
+				'$where': "checkoutyear>=2018 and checkoutyear<=2022 and materialtype in('BOOK','EBOOK','AUDIOBOOK')",
+				'$group': 'checkoutyear,checkoutmonth,materialtype',
+				'$limit': '5000',
+				'$$app_token': SODA_APP_TOKEN
+			});
+			const res = await fetch(`${SODA_RESOURCE}?${params}`);
+			if (!res.ok) throw new Error(`SODA request failed: ${res.status}`);
+			const rows = await res.json();
+			const idx = new Map(months.map((m, i) => [m, i]));
+			const zero = () => new Array(months.length).fill(0);
+			const out = { total: zero(), print: zero(), ebook: zero(), audiobook: zero() };
+			for (const r of rows) {
+				const key = `${r.checkoutyear}-${String(r.checkoutmonth).padStart(2, '0')}`;
+				const i = idx.get(key);
+				if (i === undefined) continue;
+				const bucket = FMT_BUCKET[r.materialtype];
+				const v = Number(r.total) || 0;
+				if (bucket) out[bucket][i] += v;
+				out.total[i] += v;
+			}
+			return out;
+		})();
+	}
+	return allCheckoutsPromise;
+}
+
 // Junk "authors": the raw data dumps every checkout with a missing/unknown
 // author name into a single placeholder ("NA"), which balloons into a 75 MB,
 // 132k-title file that crashes the tab if it's fetched + charted. It's the #1

@@ -5,7 +5,7 @@
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 	import Switch from "$components/ui/Switch.svelte";
-	import { getMonths, searchAuthors, getAuthor } from "$components/db.js";
+	import { getMonths, searchAuthors, getAuthor, getAllCheckouts } from "$components/db.js";
 
 	// Colors for title lines.
 	const TITLE_COLORS = [
@@ -49,6 +49,7 @@
 	let yearLo = $state(0); // first month index shown (set by the YearBrush)
 	let yearHi = $state(0); // last month index shown (inclusive)
 	let currentSlug = $state(null); // slug of the selected author (for shareable URLs)
+	let isOverview = $state(false); // true when showing the library-wide "all checkouts" landing view (no per-title data)
 	let mobileTableOpen = $state(false); // on narrow screens the title table opens as a drawer
 	let tableCollapsed = $state(false); // on desktop the title table can be collapsed to just its header
 	let autoHidAuthorTotal = $state(false); // whether we've auto-hidden the author-total line for this author yet
@@ -96,18 +97,52 @@
 		months = await getMonths();
 		yearHi = Math.max(months.length - 1, 0);
 		authors = await searchAuthors("", 25);
-		// A shared link (?author=slug) wins; otherwise open on Kevin Kwan by default
-		// (a nice multi-edition example), falling back to the most-borrowed author.
+		// A shared link (?author=slug) opens that author; otherwise the default
+		// landing view is the library-wide "all checkouts" line, from which the
+		// user searches for a specific author.
 		let wantSlug = null;
 		try { wantSlug = new URLSearchParams(window.location.search).get("author"); } catch {}
-		const defaultAuthor =
-				(wantSlug && (authors.find((a) => a.slug === wantSlug)
-					|| (await searchAuthors(wantSlug.replace(/-/g, " "), 8)).find((a) => a.slug === wantSlug))) ||
-				authors.find((a) => a.slug === "kevin-kwan") ||
-				(await searchAuthors("kevin kwan", 5)).find((a) => a.slug === "kevin-kwan") ||
-				authors[0];
-		if (defaultAuthor) await selectAuthor(defaultAuthor);
+		if (wantSlug) {
+			const a = authors.find((x) => x.slug === wantSlug)
+					|| (await searchAuthors(wantSlug.replace(/-/g, " "), 8)).find((x) => x.slug === wantSlug);
+			if (a) { await selectAuthor(a); return; }
+		}
+		await loadOverview();
 	});
+
+	// Load the default "all Seattle checkouts" view (a single total line).
+	async function loadOverview() {
+		loadError = "";
+		loading = true;
+		const data = await getAllCheckouts().catch(() => null);
+		if (!data) {
+			loading = false;
+			loadError = "Couldn't load the Seattle-wide totals right now. Search for an author to explore the data.";
+			return;
+		}
+		current = {
+			name: "All Seattle Public Library checkouts",
+			total: data.total.reduce((s, v) => s + v, 0),
+			series: data.total,
+			formats: { print: data.print, ebook: data.ebook, audiobook: data.audiobook },
+			titles: []
+		};
+		currentSlug = null;
+		isOverview = true;
+		// reset the controls
+		groups = []; singleIdxs = []; activeGroupId = null; titleFilter = "";
+		chartMode = "line"; isolatedKeys = []; showAuthorTotal = true;
+		autoHidAuthorTotal = false; autoGroupNote = ""; workAssign = {};
+		expandedWorks = []; workOrder = "checkouts"; titleSort = "work";
+		yearLo = 0; yearHi = Math.max(months.length - 1, 0);
+		mobileTableOpen = false; tableCollapsed = false; query = ""; results = [];
+		try {
+			const url = new URL(window.location.href);
+			url.searchParams.delete("author");
+			window.history.replaceState({}, "", url);
+		} catch {}
+		loading = false;
+	}
 
 	// Expand a sparse series ([[monthIndex, count], ...]) into a full array of
 	// length months.length, filling the gaps with 0.
@@ -173,6 +208,7 @@
 		});
 		current = data;
 		currentSlug = a.slug;
+		isOverview = false;
 		mobileTableOpen = false;
 		// reflect the author in the URL so the page is shareable / reloadable
 		try {
@@ -508,7 +544,8 @@
 			showAuthorTotal = true;
 			autoHidAuthorTotal = false;
 		} else {
-			autoGroupByWork();
+			autoGroupByWork({ keepChartMode: true });
+			chartMode = "area"; // show the works stacked as an area chart
 		}
 	}
 
@@ -955,11 +992,36 @@
 		return kept;
 	}
 
+	// The default overview's stacked-by-format area series (print / ebook /
+	// audiobook), built from the per-format monthly totals fetched from the API.
+	const OVERVIEW_FORMATS = [
+		{ key: "print", label: "Print", format: "print", color: "#6a4c93" },
+		{ key: "ebook", label: "Ebook", format: "ebook", color: "#e58a00" },
+		{ key: "audiobook", label: "Audiobook", format: "audiobook", color: "#1f7a4d" }
+	];
+	const overviewAreaSeries = $derived.by(() => {
+		if (!current || !current.formats) return [];
+		return OVERVIEW_FORMATS.map((f, i) => ({
+			key: f.key,
+			label: f.label,
+			color: f.color,
+			values: current.formats[f.key] ?? [],
+			format: f.format,
+			groupName: f.label,
+			isSelected: true,
+			groupIndex: i,
+			titleIdx: -(100 + i)
+		}));
+	});
+
 	// What the chart actually draws. "line": author total + per-group and
 	// per-title lines. "area": the stacked-by-title chart (capped). Either way,
 	// when a series is isolated we show only it.
 	const displaySeries = $derived.by(() => {
 		if (!current) return [];
+		if (isOverview) {
+			return chartMode === "area" ? overviewAreaSeries : [authorLine].filter(Boolean);
+		}
 		if (chartMode === "line") {
 			if (isolatedKeys.length) return lineParts.filter((s) => isolatedKeys.includes(s.key));
 			return lineParts;
@@ -983,46 +1045,48 @@
 </script>
 
 <div class="viewer">
-	<div class="search">
-		<label class="sr-only" for="author-search">Search for an author</label>
-		<input
-				id="author-search"
-				type="search"
-				placeholder="Search an author — try Octavia Butler, or Mo Willems"
-				bind:value={query}
-				autocomplete="off"
-		/>
-		{#if results.length}
-			<ul class="results">
-				{#each results as a}
-					<li>
-						<button onclick={() => selectAuthor(a)}>
-							<span>{displayName(a.name)}</span>
-							<span class="count">{a.total.toLocaleString()}</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
-		{:else if query.trim().length >= 2}
-			<p class="no-results">No authors found for “{query.trim()}”.</p>
-		{/if}
-	</div>
-
-	<!-- quick-pick: the 10 most-borrowed authors -->
-	{#if topAuthors.length}
-		<div class="top-authors">
-			<span class="quick-label">Most borrowed:</span>
-			{#each topAuthors as a}
-				<button
-						class="chip"
-						class:current={current && current.name === a.name}
-						onclick={() => selectAuthor(a)}
-				>
-					{displayName(a.name)}
-				</button>
-			{/each}
+	{#snippet authorPicker()}
+		<div class="search">
+			<label class="sr-only" for="author-search">Search for an author</label>
+			<input
+					id="author-search"
+					type="search"
+					placeholder="Search an author — try Octavia Butler, or Mo Willems"
+					bind:value={query}
+					autocomplete="off"
+			/>
+			{#if results.length}
+				<ul class="results">
+					{#each results as a}
+						<li>
+							<button onclick={() => selectAuthor(a)}>
+								<span>{displayName(a.name)}</span>
+								<span class="count">{a.total.toLocaleString()}</span>
+							</button>
+						</li>
+					{/each}
+				</ul>
+			{:else if query.trim().length >= 2}
+				<p class="no-results">No authors found for “{query.trim()}”.</p>
+			{/if}
 		</div>
-	{/if}
+
+		<!-- quick-pick: the 10 most-borrowed authors -->
+		{#if topAuthors.length}
+			<div class="top-authors">
+				<span class="quick-label">Most borrowed:</span>
+				{#each topAuthors as a}
+					<button
+							class="chip"
+							class:current={current && current.name === a.name}
+							onclick={() => selectAuthor(a)}
+					>
+						{displayName(a.name)}
+					</button>
+				{/each}
+			</div>
+		{/if}
+	{/snippet}
 
 	{#if loadError}
 		<p class="load-error">{loadError}</p>
@@ -1037,19 +1101,26 @@
 		<div class="author">
 			<div class="split" class:collapsed={tableCollapsed}>
 			<div class="split-main">
-			<h2>{displayName(current.name)}</h2>
+			{#if !isOverview}
+				<button class="back-to-all" onclick={loadOverview}>‹ All Seattle checkouts</button>
+			{/if}
+			<h2>{isOverview ? current.name : displayName(current.name)}</h2>
 			<p class="meta">
-				{current.total.toLocaleString()} checkouts · {current.titles.length} titles
+				{#if isOverview}
+					{current.total.toLocaleString()} checkouts · books, ebooks &amp; audiobooks · 2018–2022
+				{:else}
+					{current.total.toLocaleString()} checkouts · {current.titles.length} titles
+				{/if}
 			</p>
 
-			<div class="mode-toggle" role="group" aria-label="Chart type">
+						<div class="mode-toggle" role="group" aria-label="Chart type">
 				<button
 						type="button"
 						class:active={chartMode === "line"}
 						onclick={() => (chartMode = "line")}
 				>
 					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><polyline points="2,18 8,11 13,15 22,4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-					Line
+					{isOverview ? "Total" : "Line"}
 				</button>
 				<button
 						type="button"
@@ -1058,18 +1129,18 @@
 							// First visit to the stacked view with nothing selected yet:
 							// cluster editions into works automatically so the stack is
 							// colored by work instead of an all-gray pile of editions.
-							if (chartMode !== "area" && !groups.length && !singleIdxs.length) {
+							if (!isOverview && chartMode !== "area" && !groups.length && !singleIdxs.length) {
 								autoGroupByWork({ keepChartMode: true });
 							}
 							chartMode = "area";
 						}}
 				>
 					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M2 19 L8 11 L13 15 L22 5 L22 20 L2 20 Z" fill="currentColor" opacity="0.85"/></svg>
-					Area
+					{isOverview ? "By format" : "Area"}
 				</button>
 			</div>
 
-			<div class="chart-wrap" bind:this={chartWrap}>
+						<div class="chart-wrap" bind:this={chartWrap}>
 				{#if plotTitle}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
@@ -1081,12 +1152,12 @@
 			{/if}
 
 			<div class="chart-actions">
-				<button class="chart-action" onclick={downloadChart} title="Download the chart as a PNG image">
-					<span aria-hidden="true">⤓</span> Download image
+				<button class="chart-action square" onclick={downloadChart} title="Download the chart as a PNG image" aria-label="Download image">
+					<span aria-hidden="true">⤓</span>
 				</button>
 				<div class="share-wrap">
-					<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
-						<span aria-hidden="true">↗</span> Share
+					<button class="chart-action square" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-label="Share" aria-haspopup="true" aria-expanded={shareOpen}>
+						<span aria-hidden="true">↗</span>
 					</button>
 					{#if shareOpen}
 						<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
@@ -1101,12 +1172,19 @@
 						</div>
 					{/if}
 				</div>
+				{#if !isOverview}
 				<button class="chart-action edit-titles-btn" onclick={() => (mobileTableOpen = true)}>
 					<span aria-hidden="true">✎</span> Add/edit titles
 				</button>
+				{/if}
 				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 			</div>
 
+			<div class="picker-below">
+				{@render authorPicker()}
+			</div>
+
+			{#if !isOverview}
 			<div class="groups-panel">
 				<div class="groups-header">
 					<span class="groups-label">On the chart</span>
@@ -1232,8 +1310,10 @@
 					<p class="editing-hint">Click a work to edit it, or drag a title onto a work to add it.</p>
 				{/if}
 			</div>
+			{/if}
 			</div><!-- /.split-main -->
 
+			{#if !isOverview}
 			<div class="split-side" class:open={mobileTableOpen} class:collapsed={tableCollapsed} bind:this={sideEl}>
 				<div class="side-mobile-head">
 					<span>Add / remove works</span>
@@ -1456,10 +1536,12 @@
 				{/if}
 			</div>
 			</div><!-- /.split-side -->
+			{/if}
 			</div><!-- /.split -->
 		</div>
 	{:else}
-		<p class="hint">Start typing an author's name above.</p>
+		{@render authorPicker()}
+		<p class="hint">Search for an author to begin.</p>
 	{/if}
 
 	{#if hoverTip}
@@ -1550,6 +1632,22 @@
 		margin-top: 52px;
 	}
 
+	.back-to-all {
+		display: inline-block;
+		margin-bottom: 8px;
+		padding: 0;
+		background: none;
+		border: none;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: var(--color-fg-light);
+		cursor: pointer;
+	}
+	.back-to-all:hover {
+		color: var(--color-fg);
+	}
+
 	/* On desktop the titles/search table sits stacked BELOW the plot. On narrow
 	   screens the table instead opens as a bottom drawer from the top-right
 	   "Add/edit titles" button (see the mobile media query). */
@@ -1569,8 +1667,19 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
+		justify-content: flex-end; /* download / share sit at the right, OWID-style */
 		gap: 8px;
-		margin: 12px 0 4px;
+		margin: 10px 0 4px;
+	}
+
+	/* the author search + "most borrowed" chips, relocated below the chart --
+	   in the same gray panel styling as the "on the chart" section below it */
+	.picker-below {
+		margin: 8px 0 14px;
+		padding: 14px 16px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-gray-100);
 	}
 	.chart-action {
 		display: inline-flex;
@@ -1594,6 +1703,19 @@
 	.chart-action span {
 		opacity: 0.7;
 		font-size: 0.95em;
+	}
+	/* square icon-only buttons (download / share) */
+	.chart-action.square {
+		width: 34px;
+		height: 34px;
+		padding: 0;
+		justify-content: center;
+		border-radius: 8px;
+		font-size: 1.05rem;
+	}
+	.chart-action.square span {
+		opacity: 0.85;
+		font-size: 1em;
 	}
 	.edit-titles-btn {
 		display: none; /* mobile only -- positioned top-right in the mobile media query */
@@ -1620,7 +1742,7 @@
 	.share-menu {
 		position: absolute;
 		top: calc(100% + 6px);
-		left: 0;
+		right: 0; /* anchored to the right, since the button now sits on the right */
 		z-index: 41;
 		display: flex;
 		flex-direction: column;

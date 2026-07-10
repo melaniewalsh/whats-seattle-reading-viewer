@@ -191,6 +191,14 @@
 	);
 
 	const yTicks = $derived(y.ticks(5));
+
+	// Abbreviate axis numbers: 700000 -> "700k", 1200000 -> "1.2M", 1500 -> "1.5k".
+	function abbrevNum(n) {
+		const a = Math.abs(n);
+		if (a >= 1e6) { const v = n / 1e6; return (Number.isInteger(v) ? v : v.toFixed(1)) + "M"; }
+		if (a >= 1e3) { const v = n / 1e3; return (Number.isInteger(v) ? v : v.toFixed(1)) + "k"; }
+		return String(n);
+	}
 	// One tick per January, thinned so year labels never collide on a
 	// narrow screen (~44px per label).
 	const xTicks = $derived.by(() => {
@@ -374,7 +382,7 @@
 		{#each yTicks as tick}
 			<g class="tick y-tick" transform="translate(0, {y(tick)})">
 				<line x1={margin.left} x2={width - margin.right} stroke="#eee" />
-				<text x={margin.left - 8} dx="-4" dy="4" text-anchor="end">{tick}</text>
+				<text x={margin.left - 8} dx="-4" dy="4" text-anchor="end">{abbrevNum(tick)}</text>
 			</g>
 		{/each}
 
@@ -439,7 +447,7 @@
                 <!-- one "medium pill" per edition of the hovered work -->
                 <div class="tooltip-editions">
                     {#each groupSiblings.filter((s) => s.values[hoverIndex] > 0) as sib}
-                        <span class="ed-pill" style="--pc: {sib.color}">
+                        <span class="ed-pill" class:on={sib.titleIdx === selectedItem.titleIdx} style="--pc: {sib.color}">
                             <span class="ed-pill-fmt">{FMT_LABEL[sib.format] ?? sib.format ?? 'edition'}</span>
                             <span class="ed-pill-val">{sib.values[hoverIndex].toLocaleString()}</span>
                         </span>
@@ -585,6 +593,15 @@
 	}
 	.ed-pill-val {
 		color: #111;
+	}
+	/* the edition/format band the cursor is actually over is filled in */
+	.ed-pill.on {
+		background: var(--pc, #333);
+		border-color: var(--pc, #333);
+	}
+	.ed-pill.on .ed-pill-fmt,
+	.ed-pill.on .ed-pill-val {
+		color: #fff;
 	}
 
 	.tooltip-total {

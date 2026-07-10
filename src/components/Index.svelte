@@ -127,20 +127,22 @@
 
 	.about {
 		max-width: 640px;
-		margin: 48px auto 0;
+		margin: 40px auto 0;
 		font-family: var(--font-sans);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-gray-100);
-		padding: 0 16px;
+		border: none;
+		background: none;
+		padding: 0;
 	}
 	.about summary {
 		cursor: pointer;
-		padding: 14px 0;
+		padding: 8px 0;
 		font-weight: 600;
 		font-size: 0.95rem;
-		color: var(--color-fg);
+		color: var(--color-fg-light);
 		list-style-position: inside;
+	}
+	.about summary:hover {
+		color: var(--color-fg);
 	}
 	.about summary:focus-visible {
 		outline: 2px solid var(--color-focus);
