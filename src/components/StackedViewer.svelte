@@ -296,23 +296,58 @@
 		await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = svgUrl; });
 		const scale = 2, padX = 28, titleH = 68, footH = 40;
 		const canvas = document.createElement("canvas");
-		canvas.width = (w + padX * 2) * scale;
-		canvas.height = (h + titleH + footH) * scale;
 		const ctx = canvas.getContext("2d");
+		// Lay out the legend (wrapped) first so we know how tall to make the canvas.
+		const LEG_FONT = '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+		const legItems = legendItems;
+		const showLegend = legItems.length >= 2;
+		const legLH = 22, legSw = 12, legGapSw = 6, legGapItem = 20;
+		const legLines = [];
+		if (showLegend) {
+			ctx.font = LEG_FONT;
+			let line = [], lineW = 0;
+			for (const it of legItems) {
+				const iw = legSw + legGapSw + ctx.measureText(it.label).width;
+				if (lineW + iw > w && line.length) { legLines.push(line); line = []; lineW = 0; }
+				line.push(it); lineW += iw + legGapItem;
+			}
+			if (line.length) legLines.push(line);
+		}
+		const legendH = showLegend ? legLines.length * legLH + 12 : 0;
+
+		canvas.width = (w + padX * 2) * scale;
+		canvas.height = (h + titleH + legendH + footH) * scale;
 		ctx.scale(scale, scale);
 		ctx.fillStyle = "#ffffff";
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 		ctx.textBaseline = "alphabetic";
 		ctx.fillStyle = "#1a1a1a";
 		ctx.font = '600 22px Georgia, "Times New Roman", serif';
-		ctx.fillText(current ? displayName(current.name) : "", padX, 34);
+		ctx.fillText(current ? (isOverview ? current.name : displayName(current.name)) : "", padX, 34);
 		ctx.fillStyle = "#666666";
 		ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-		ctx.fillText(plotTitle || (current ? `${current.total.toLocaleString()} checkouts` : ""), padX, 54);
+		ctx.fillText(plotTitle || (current ? `${abbrevCount(current.total)} checkouts` : ""), padX, 54);
 		ctx.drawImage(img, padX, titleH, w, h);
+		if (showLegend) {
+			ctx.font = LEG_FONT;
+			ctx.textBaseline = "middle";
+			let ly = titleH + h + 18;
+			for (const line of legLines) {
+				let lx = padX;
+				for (const it of line) {
+					ctx.fillStyle = it.color;
+					ctx.fillRect(lx, ly - legSw / 2, legSw, legSw);
+					ctx.fillStyle = "#333333";
+					ctx.fillText(it.label, lx + legSw + legGapSw, ly + 0.5);
+					lx += legSw + legGapSw + ctx.measureText(it.label).width + legGapItem;
+				}
+				ly += legLH;
+			}
+			ctx.textBaseline = "alphabetic";
+		}
 		ctx.fillStyle = "#999999";
 		ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-		ctx.fillText("What Is Seattle Reading?  ·  Seattle Public Library checkouts", padX, titleH + h + 24);
+		ctx.fillText("What Is Seattle Reading?  \u00b7  Seattle Public Library checkouts", padX, titleH + h + legendH + 24);
 		return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 	}
 
@@ -1038,6 +1073,27 @@
 		return capAreaLayers(areaAll);
 	});
 
+	// Legend for what's on the chart -- one swatch + label per line (line mode),
+	// per plotted work (area mode), or per format (overview). Shown on the page
+	// and drawn into the downloaded/shared image so the colors are labeled there
+	// too. (A single series needs no legend.)
+	const legendItems = $derived.by(() => {
+		if (!current) return [];
+		if (isOverview) {
+			return chartMode === "area" ? [...OVERVIEW_FORMATS].reverse().map((f) => ({ label: f.label, color: f.color })) : [];
+		}
+		if (chartMode === "line") {
+			return displaySeries.map((s) => ({ label: s.label, color: s.color }));
+		}
+		const seen = new Set(), out = [];
+		for (const s of displaySeries) {
+			if (!s.groupName || seen.has(s.groupName)) continue;
+			seen.add(s.groupName);
+			out.push({ label: s.groupName, color: s.color });
+		}
+		return out;
+	});
+
 	// ---- Year window (the YearBrush under the chart) -----------------------
 	// When the brush is narrowed, slice the month axis and every series to the
 	// window so the chart re-scales to just those years.
@@ -1153,10 +1209,10 @@
 				<LineChart months={viewMonths} series={viewSeries} mode={chartMode}/>
 			</div>
 
-			{#if isOverview && chartMode === "area"}
+			{#if legendItems.length >= 2}
 				<div class="format-legend">
-					{#each [...OVERVIEW_FORMATS].reverse() as f}
-						<span class="fmt-leg"><span class="fmt-sw" style="background:{f.color}"></span>{f.label}</span>
+					{#each legendItems as it}
+						<span class="fmt-leg"><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</span>
 					{/each}
 				</div>
 			{/if}
