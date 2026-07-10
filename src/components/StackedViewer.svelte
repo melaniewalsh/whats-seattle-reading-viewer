@@ -1532,7 +1532,7 @@
 										class="work-header"
 										role="row"
 										class:cluster={multi}
-										class:expanded={multi && isExpanded(w.key)}
+										class:expanded={isExpanded(w.key)}
 										class:work-drop={dragOverWorkKey === w.key}
 										class:hl={hlWorkKey === w.key}
 										draggable="true"
@@ -1556,31 +1556,27 @@
 										/>
 									</span>
 									<span class="tt-cell tt-work" role="cell" title={w.name}>
-										{#if multi}
-											<button
-													class="disclosure"
-													aria-expanded={isExpanded(w.key)}
-													aria-label="{isExpanded(w.key) ? 'Collapse' : 'Expand'} the {w.editions.length} editions of {w.name}"
-													onclick={() => toggleExpand(w.key)}
-											>{isExpanded(w.key) ? "▾" : "▸"}</button>
-										{:else}
-											<span class="disclosure-spacer" aria-hidden="true"></span>
-										{/if}
+										<button
+												class="disclosure"
+												aria-expanded={isExpanded(w.key)}
+												aria-label="{isExpanded(w.key) ? 'Collapse' : 'Expand'} {w.name}"
+												onclick={() => toggleExpand(w.key)}
+										>{isExpanded(w.key) ? "▾" : "▸"}</button>
 										<span class="tt-work-name">{w.name}</span>
 									</span>
-									{#if multi}
-										<button class="tt-cell tt-edition ed-summary" onclick={() => toggleExpand(w.key)}>
-											<span class="cluster-badge">{w.editions.length} editions</span>{isExpanded(w.key) ? "" : " — click to edit"}
+									<button class="tt-cell tt-edition ed-summary" onclick={() => toggleExpand(w.key)}>
+											{#if multi}
+												<span class="cluster-badge">{w.editions.length} editions</span>{isExpanded(w.key) ? "" : " — click to edit"}
+											{:else}
+												<span class="ed-single">1 edition</span>{isExpanded(w.key) ? "" : " — click for full title"}
+											{/if}
 										</button>
-									{:else}
-										<span class="tt-cell tt-edition ed-single" role="cell">single edition</span>
-									{/if}
 									<span class="tt-cell tt-format" role="cell">
 										{#each fmts as f}<span class="badge badge-{f}">{formatLabel(f)}</span>{/each}
 									</span>
 									<span class="tt-cell tt-count" role="cell">{w.total.toLocaleString()}</span>
 								</li>
-								{#if multi && isExpanded(w.key)}
+								{#if isExpanded(w.key)}
 									{#each w.editions as t (t.idx)}
 										{@render editionRow(t, false, true)}
 									{/each}
