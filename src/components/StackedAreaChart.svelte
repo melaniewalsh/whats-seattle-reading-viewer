@@ -254,8 +254,25 @@
 		return `${MONTH_NAMES[Number(parts[1]) - 1]} ${parts[0]}`;
 	}
 
+	const FMT_LABEL = { ebook: 'ebook', audiobook: 'audio', print: 'print', other: 'other' };
+
 	const tooltipLeft = $derived(
 		hoverIndex === null ? 0 : Math.min(Math.max(x(hoverIndex), 100), width - 100)
+	);
+
+	// Float the tooltip near the dot on the hovered line (rather than pinned to
+	// the top with a crosshair). Follows the point's height, flipping below it
+	// when the point sits near the top edge.
+	const tooltipTop = $derived(
+		hoverIndex === null || !selectedItem ? margin.top : y(selectedItem.top[hoverIndex])
+	);
+	const tooltipBelow = $derived(hoverIndex !== null && !!selectedItem && tooltipTop < 90);
+
+	// The big tooltip heading: the work title (in area mode) or the line's name.
+	const tooltipTitle = $derived(
+		!selectedItem ? ""
+			: (mode !== "line" && selectedItem.groupName) ? selectedItem.groupName
+			: selectedItem.label
 	);
 
 	// Get overall total for the hovered month. In area mode that's the top of
@@ -396,19 +413,8 @@
 			{/each}
 		{/if}
 
-		<!-- Hover Target Markers -->
+		<!-- Hover marker: just a dot on the hovered line (no tethering crosshair) -->
 		{#if hoverIndex !== null}
-			<line 
-				class="hover-line" 
-				x1={x(hoverIndex)} 
-				x2={x(hoverIndex)} 
-				y1={margin.top} 
-				y2={height - margin.bottom} 
-				stroke="#444"
-				stroke-width="1"
-			/>
-			
-			<!-- Highlight dot only on the selected active layer stack point -->
 			{#if selectedItem && selectedItem.values[hoverIndex] > 0}
 				<circle 
 					cx={x(hoverIndex)} 
@@ -422,27 +428,34 @@
 		{/if}
 	</svg>
 	{#if hoverIndex !== null && selectedItem}
-        <div class="tooltip" style="left: {tooltipLeft}px; top: {margin.top}px;">
-            <div class="tooltip-date">{formatMonth(months[hoverIndex])}</div>
-            
-            <div class="tooltip-items">
-                <div class="tooltip-row selected-highlight">
-                    <span class="swatch" style="background-color: {selectedItem.color}"></span>
-                    <span class="label">{selectedItem.label}</span>
-                    <span class="value">{selectedItem.values[hoverIndex]}</span>
-                </div>
+        <div class="tooltip" class:below={tooltipBelow} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
+            <div class="tt-title">
+                <span class="tt-dot" style="background-color: {selectedItem.color}"></span>
+                <span class="tt-title-text">{tooltipTitle}</span>
             </div>
+            <div class="tt-date">{formatMonth(months[hoverIndex])}</div>
 
-            {#if groupSiblings.length > 1}
-                <div class="tooltip-total" style="border-top: 1px dashed #ccc; color: {selectedItem.color};">
-                    <span>Group Total</span>
-                    <span>{groupTotal}</span>
+            {#if mode !== 'line' && groupSiblings.length > 1}
+                <!-- one "medium pill" per edition of the hovered work -->
+                <div class="tooltip-editions">
+                    {#each groupSiblings.filter((s) => s.values[hoverIndex] > 0) as sib}
+                        <span class="ed-pill" style="--pc: {sib.color}">
+                            <span class="ed-pill-fmt">{FMT_LABEL[sib.format] ?? sib.format ?? 'edition'}</span>
+                            <span class="ed-pill-val">{sib.values[hoverIndex].toLocaleString()}</span>
+                        </span>
+                    {/each}
                 </div>
+                <div class="tooltip-total accent" style="color: {selectedItem.color};">
+                    <span>Work total</span>
+                    <span>{groupTotal.toLocaleString()}</span>
+                </div>
+            {:else}
+                <div class="tt-value">{selectedItem.values[hoverIndex].toLocaleString()}<span class="tt-value-unit">checkouts</span></div>
             {/if}
 
             <div class="tooltip-total">
-                <span>Overall Month Total</span>
-                <span>{hoveredTotal}</span>
+                <span>Overall month total</span>
+                <span>{hoveredTotal.toLocaleString()}</span>
             </div>
         </div>
     {/if}
@@ -480,68 +493,117 @@
 
 	.tooltip {
 		position: absolute;
-		transform: translateX(-50%);
-		background: rgba(255, 255, 255, 0.98);
-		border: 1px solid #bbb;
-		border-radius: 4px;
-		padding: 10px 14px;
-		font-size: 12px;
+		/* float just above the dot on the line; glides as the cursor moves */
+		transform: translate(-50%, calc(-100% - 18px));
+		transition: left 0.09s ease-out, top 0.09s ease-out;
+		background: #fff;
+		border: 1px solid #e4e4e4;
+		border-radius: 12px;
+		padding: 14px 18px 15px;
+		font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+		font-size: 13px;
 		color: #333;
 		pointer-events: none;
-		box-shadow: 0 6px 16px rgba(0,0,0,0.12);
-		min-width: 165px;
-		max-width: 300px;
+		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.17);
+		min-width: 210px;
+		max-width: 330px;
 		z-index: 10;
 	}
-
-	.tooltip-date {
-		font-weight: bold;
-		border-bottom: 1px solid #eee;
-		padding-bottom: 4px;
-		margin-bottom: 6px;
-		color: #111;
+	/* when the point is near the top edge, drop the tooltip below the dot */
+	.tooltip.below {
+		transform: translate(-50%, 18px);
 	}
 
-	.tooltip-row {
+	.tt-title {
 		display: flex;
-		align-items: flex-start;
-		margin-bottom: 3px;
-		padding: 2px 0;
+		align-items: baseline;
+		gap: 8px;
+		font-family: var(--font-serif, Georgia, "Times New Roman", serif);
+		font-size: 1.2rem;
+		font-weight: 600;
+		line-height: 1.15;
+		color: #1a1a1a;
 	}
-
-	.swatch {
-		width: 10px;
-		height: 10px;
-		border-radius: 2px;
-		margin-right: 8px;
-		margin-top: 3px;
+	.tt-dot {
+		width: 11px;
+		height: 11px;
+		border-radius: 50%;
 		flex: none;
-		display: inline-block;
+		align-self: center;
 	}
-
-	.label {
-		flex-grow: 1;
-		margin-right: 16px;
-		color: #444;
-		/* show the full title on hover -- wrap instead of clipping */
+	.tt-title-text {
 		word-break: break-word;
-		line-height: 1.35;
+	}
+	.tt-date {
+		margin: 3px 0 10px 19px;
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: #9a9a9a;
+	}
+	.tt-value {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+		margin: 0 0 2px 19px;
+		font-size: 1.55rem;
+		font-weight: 700;
+		color: #1a1a1a;
+	}
+	.tt-value-unit {
+		font-size: 0.68rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: #9a9a9a;
 	}
 
-	.value {
-		font-weight: bold;
-		flex: none;
-		white-space: nowrap;
+	/* medium pills, one per edition of the hovered work (area mode) */
+	.tooltip-editions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin: 4px 0 10px;
+		max-width: 290px;
+	}
+	.ed-pill {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 6px;
+		padding: 4px 11px;
+		border-radius: 999px;
+		border: 1.5px solid var(--pc, #ccc);
+		background: #fff;
+		font-size: 12px;
+		font-weight: 600;
+		line-height: 1.4;
+	}
+	.ed-pill-fmt {
+		color: #666;
+		text-transform: capitalize;
+	}
+	.ed-pill-val {
+		color: #111;
 	}
 
 	.tooltip-total {
 		display: flex;
 		justify-content: space-between;
+		gap: 16px;
 		border-top: 1px solid #eee;
-		margin-top: 8px;
-		padding-top: 5px;
-		font-weight: bold;
-		color: #666;
+		margin-top: 10px;
+		padding-top: 8px;
+		font-size: 12px;
+		font-weight: 600;
+		color: #808080;
+	}
+	.tooltip-total.accent {
+		border-top: 1px dashed #ddd;
+		font-weight: 700;
+	}
+	.tooltip-total span:last-child {
+		color: #222;
 	}
 
 	.author-search {

@@ -17,10 +17,23 @@
 	const uid = $props.id();
 
 	let width = $state(680); // measured from the container
-	const H = 48; // sparkline height
-	const LABEL_H = 20; // room for the year labels
-	const PAD = 12; // horizontal padding so the handles never clip
-	const height = H + LABEL_H;
+	const TRACK_Y = 11; // vertical center of the slider line
+	const R = 8; // radius of the draggable dots
+	const PAD = 12; // horizontal padding so the dots never clip
+	const height = TRACK_Y * 2;
+
+	// Set the range from a typed-in year (reverts the field if it's not a year
+	// in this author's data).
+	function setYearInput(e, which) {
+		const y = String(e.target.value).trim();
+		const yi = years.findIndex((yr) => yr.year === y);
+		if (yi < 0) {
+			e.target.value = which === "lo" ? years[loYear]?.year : years[hiYear]?.year;
+			return;
+		}
+		if (which === "lo") lo = years[Math.min(yi, hiYear)].start;
+		else hi = years[Math.max(yi, loYear)].end;
+	}
 
 	// The months grouped into years: [{ year, start, end }] (month indices).
 	const years = $derived.by(() => {
@@ -47,22 +60,6 @@
 	const loYear = $derived(yearIndexOf(lo));
 	const hiYear = $derived(yearIndexOf(hi));
 	const isFiltered = $derived(months.length > 0 && (lo > 0 || hi < months.length - 1));
-
-	// The context sparkline (a hand-built area path -- no d3 needed here).
-	const vMax = $derived(Math.max(1, ...values));
-	const yOf = (v) => H - 2 - (v / vMax) * (H - 10);
-	const areaPath = $derived.by(() => {
-		if (!values.length) return "";
-		let d = `M ${xOf(0)} ${H - 2}`;
-		for (let i = 0; i < values.length; i++) d += ` L ${xOf(i)} ${yOf(values[i])}`;
-		d += ` L ${xOf(values.length - 1)} ${H - 2} Z`;
-		return d;
-	});
-
-	// Thin the year labels so they never collide (~40px per label).
-	const labelStep = $derived(
-		Math.max(1, Math.ceil(years.length / Math.max(2, Math.floor((width - PAD * 2) / 40))))
-	);
 
 	// ---- Dragging (handles snap live to whole years) -----------------------
 	let drag = $state(null); // { type: 'lo'|'hi'|'win', grabYear, loYear0, hiYear0 }
@@ -128,66 +125,35 @@
 	}
 </script>
 
-<div class="brush" bind:clientWidth={width}>
-	<div class="brush-head">
-		<span class="brush-label">Years</span>
-		<span class="brush-range">
-			{years[loYear]?.year}<span class="dash">–</span>{years[hiYear]?.year}
-		</span>
-		{#if isFiltered}
-			<button class="brush-reset" onclick={reset}>All years ×</button>
-		{/if}
-	</div>
-
-	<svg
-		viewBox="0 0 {width} {height}"
-		class:dragging={drag !== null}
-		role="application"
-		aria-label="Filter the chart to a range of years"
-		onpointerdown={onPointerDown}
-		onpointermove={onPointerMove}
-		onpointerup={onPointerUp}
-		onpointercancel={onPointerUp}
-	>
-		<defs>
-			<clipPath id="{uid}-sel">
-				<rect x={xOf(lo)} y="0" width={Math.max(xOf(hi) - xOf(lo), 0)} height={H} />
-			</clipPath>
-		</defs>
-
-		<!-- context: the full history, dimmed -->
-		<path class="area-bg" d={areaPath} />
-		<!-- the selected window, in the site accent -->
-		<path class="area-sel" d={areaPath} clip-path="url(#{uid}-sel)" />
-
-		<!-- window outline -->
-		<rect
-			class="win"
-			x={xOf(lo)}
-			y="1"
-			width={Math.max(xOf(hi) - xOf(lo), 0)}
-			height={H - 2}
-			rx="3"
+<div class="brush">
+	<div class="brush-row">
+		<input
+			class="year-input"
+			type="text"
+			inputmode="numeric"
+			aria-label="First year shown"
+			value={years[loYear]?.year ?? ""}
+			onchange={(e) => setYearInput(e, "lo")}
 		/>
 
-		<!-- baseline -->
-		<line class="base" x1={PAD} x2={width - PAD} y1={H - 2} y2={H - 2} />
+		<div class="brush-track" bind:clientWidth={width}>
+			<svg
+				viewBox="0 0 {width} {height}"
+				class:dragging={drag !== null}
+				role="application"
+				aria-label="Filter the chart to a range of years"
+				onpointerdown={onPointerDown}
+				onpointermove={onPointerMove}
+				onpointerup={onPointerUp}
+				onpointercancel={onPointerUp}
+			>
+				<!-- the full track -->
+				<line class="track" x1={PAD} x2={width - PAD} y1={TRACK_Y} y2={TRACK_Y} />
+				<!-- the selected segment, in the site accent -->
+				<line class="track-sel" x1={xOf(lo)} x2={xOf(hi)} y1={TRACK_Y} y2={TRACK_Y} />
 
-		<!-- year labels -->
-		{#each years as yr, yi}
-			{#if yi % labelStep === 0}
-				<text
-					class="yr"
-					class:in={yi >= loYear && yi <= hiYear}
-					x={xOf((yr.start + yr.end) / 2)}
-					y={H + 14}
-					text-anchor="middle">{yr.year}</text
-				>
-			{/if}
-		{/each}
-
-		<!-- handles (focusable, arrow keys move by a year) -->
-		{#each [["lo", lo, loYear], ["hi", hi, hiYear]] as [which, idx, yi] (which)}
+				<!-- the two draggable dots (focusable, arrow keys move by a year) -->
+				{#each [["lo", lo, loYear], ["hi", hi, hiYear]] as [which, idx, yi] (which)}
 			<g
 				class="handle"
 				role="slider"
@@ -199,63 +165,74 @@
 				aria-valuetext={years[yi]?.year}
 				onkeydown={(e) => onHandleKey(e, which)}
 			>
-				<line class="handle-line" x1={xOf(idx)} x2={xOf(idx)} y1="1" y2={H - 1} />
-				<rect
-					class="handle-grip"
-					x={xOf(idx) - 4}
-					y={H / 2 - 11}
-					width="8"
-					height="22"
-					rx="4"
-				/>
-				<line class="grip-tick" x1={xOf(idx)} x2={xOf(idx)} y1={H / 2 - 5} y2={H / 2 + 5} />
+				<circle class="dot" cx={xOf(idx)} cy={TRACK_Y} r={R} />
 			</g>
-		{/each}
-	</svg>
+				{/each}
+			</svg>
+		</div>
+
+		<input
+			class="year-input"
+			type="text"
+			inputmode="numeric"
+			aria-label="Last year shown"
+			value={years[hiYear]?.year ?? ""}
+			onchange={(e) => setYearInput(e, "hi")}
+		/>
+	</div>
+
+	{#if isFiltered}
+		<div class="brush-foot">
+			<button class="brush-reset" onclick={reset}>All years ×</button>
+		</div>
+	{/if}
 </div>
 
 <style>
 	.brush {
-		margin: 6px 0 16px;
+		margin: 8px 0 16px;
 	}
 
-	.brush-head {
+	/* the year inputs flank the slider line, OWID-timeline style */
+	.brush-row {
 		display: flex;
-		align-items: baseline;
-		gap: 10px;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.brush-track {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	.year-input {
+		flex: none;
+		width: 4.2em;
+		padding: 4px 6px;
 		font-family: var(--font-sans);
-		margin-bottom: 2px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		text-align: center;
+		color: var(--color-fg);
+		background: var(--color-white);
+		border: 1.5px solid var(--color-border);
+		border-radius: 8px;
+	}
+	.year-input:hover {
+		border-color: var(--color-fg-light);
+	}
+	.year-input:focus {
+		outline: none;
+		border-color: var(--color-fg);
 	}
 
-	/* "Years" label is redundant with the year axis below the slider; keep it in
-	   the DOM for screen readers but hide it visually. */
-	.brush-label {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip: rect(0 0 0 0);
-		white-space: nowrap;
-	}
-
-	/* the current range (e.g. "2018–2022") is redundant with the year labels on
-	   the slider axis, so it's hidden -- kept in the DOM for screen readers. */
-	.brush-range {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip: rect(0 0 0 0);
-		white-space: nowrap;
-	}
-
-	.brush-range .dash {
-		margin: 0 3px;
-		color: var(--color-fg-light);
+	.brush-foot {
+		display: flex;
+		justify-content: flex-end;
+		margin-top: 4px;
 	}
 
 	.brush-reset {
-		margin-left: auto;
 		background: none;
 		border: none;
 		padding: 0;
@@ -275,78 +252,48 @@
 		width: 100%;
 		height: auto;
 		overflow: visible;
-		touch-action: none; /* so dragging the handles works on phones */
-		cursor: crosshair;
+		touch-action: none; /* so dragging the dots works on phones */
+		cursor: pointer;
 	}
 
 	svg.dragging {
 		cursor: grabbing;
 	}
 
-	.area-bg {
-		fill: var(--color-gray-200);
-	}
-
-	.area-sel {
-		fill: var(--color-fg);
-		fill-opacity: 0.55;
-	}
-
-	.win {
-		fill: none;
-		stroke: var(--color-fg);
-		stroke-width: 1;
-		stroke-opacity: 0.5;
-	}
-
-	.base {
+	/* the full track: a thin gray line */
+	.track {
 		stroke: var(--color-gray-300);
-		stroke-width: 1;
+		stroke-width: 3;
+		stroke-linecap: round;
 	}
 
-	.yr {
-		font-family: var(--font-sans);
-		font-size: 11px;
-		fill: var(--color-gray-400);
-	}
-
-	.yr.in {
-		fill: var(--color-fg-light);
-		font-weight: 600;
+	/* the selected span: a thicker line in the site ink */
+	.track-sel {
+		stroke: var(--color-fg);
+		stroke-width: 3;
+		stroke-linecap: round;
 	}
 
 	.handle {
-		cursor: ew-resize;
+		cursor: grab;
 		outline: none;
 	}
 
-	.handle-line {
-		stroke: var(--color-fg);
-		stroke-width: 1;
-	}
-
-	.handle-grip {
-		fill: var(--color-white);
-		stroke: var(--color-fg);
-		stroke-width: 1.5;
-	}
-
-	.grip-tick {
-		stroke: var(--color-fg);
-		stroke-width: 1.5;
-	}
-
-	.handle:hover .handle-grip,
-	.handle:focus-visible .handle-grip {
+	/* a solid dot you slide along the line */
+	.dot {
 		fill: var(--color-fg);
-	}
-
-	.handle:hover .grip-tick,
-	.handle:focus-visible .grip-tick {
 		stroke: var(--color-white);
+		stroke-width: 2.5;
+		transition: r 0.1s ease;
 	}
 
-	.handle:focus-visible .handle-grip {
-		stroke: var(--color-fg);
+	.handle:hover .dot,
+	.handle:focus-visible .dot {
+		r: 9.5;
+	}
+
+	.handle:focus-visible .dot {
+		stroke: var(--chip-color, #6a4c93);
+		stroke-width: 3;
 	}
 </style>

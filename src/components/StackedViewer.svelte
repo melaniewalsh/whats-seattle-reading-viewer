@@ -1,6 +1,6 @@
 <script>
 	// StackedViewer.svelte
-	import { onMount } from "svelte";
+	import { onMount, tick } from "svelte";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
@@ -39,6 +39,7 @@
 	let workAssign = $state({});
 	let dragWorkKey = $state(null); // work row being dragged in the table (to merge into another)
 	let dragOverWorkKey = $state(null); // work row currently under the dragged work
+	let hlWorkKey = $state(null); // work key highlighted by hovering its pill or its table row (they're linked)
 	let autoGroupNote = $state(""); // feedback after "Group editions into works"
 	let loadError = $state(""); // message when an author fails to load
 	let loading = $state(false); // true while an author's data is being fetched
@@ -47,6 +48,27 @@
 	let editionColW = $state(240); // min width (px) of the Edition column (drag to see full titles)
 	let yearLo = $state(0); // first month index shown (set by the YearBrush)
 	let yearHi = $state(0); // last month index shown (inclusive)
+	let currentSlug = $state(null); // slug of the selected author (for shareable URLs)
+	let mobileTableOpen = $state(false); // on narrow screens the title table opens as a drawer
+	let tableCollapsed = $state(false); // on desktop the title table can be collapsed to just its header
+	let autoHidAuthorTotal = $state(false); // whether we've auto-hidden the author-total line for this author yet
+	let shareMsg = $state(""); // transient toast after copying a share link
+	let shareOpen = $state(false); // whether the share-platform popover is open
+	let chartWrap = $state(null); // ref to the chart container, for the PNG export
+	let sideEl = $state(null); // ref to the titles panel, for keeping it still when ticking
+
+	// Ticking a work grows the "on the chart" panel above the (stacked) table,
+	// which would shove the table -- and the row under the cursor -- downward.
+	// Run the change, then nudge the window scroll by however much the table
+	// moved so it stays put. (On mobile the table is a fixed drawer, so its top
+	// doesn't move and this is a no-op.)
+	async function keepTableStill(fn) {
+		const y0 = sideEl ? sideEl.getBoundingClientRect().top : 0;
+		fn();
+		await tick();
+		const dy = (sideEl ? sideEl.getBoundingClientRect().top : 0) - y0;
+		if (dy) window.scrollBy(0, dy);
+	}
 
 	// Drag a column divider in the title table to widen a column.
 	function startColResize(event, which) {
@@ -74,9 +96,13 @@
 		months = await getMonths();
 		yearHi = Math.max(months.length - 1, 0);
 		authors = await searchAuthors("", 25);
-		// Open on Kevin Kwan by default (a nice multi-edition example); fall back
-		// to the most-borrowed author if he isn't in the index.
+		// A shared link (?author=slug) wins; otherwise open on Kevin Kwan by default
+		// (a nice multi-edition example), falling back to the most-borrowed author.
+		let wantSlug = null;
+		try { wantSlug = new URLSearchParams(window.location.search).get("author"); } catch {}
 		const defaultAuthor =
+				(wantSlug && (authors.find((a) => a.slug === wantSlug)
+					|| (await searchAuthors(wantSlug.replace(/-/g, " "), 8)).find((a) => a.slug === wantSlug))) ||
 				authors.find((a) => a.slug === "kevin-kwan") ||
 				(await searchAuthors("kevin kwan", 5)).find((a) => a.slug === "kevin-kwan") ||
 				authors[0];
@@ -116,6 +142,17 @@
 	}, 120);
 	$effect(() => runSearch(query));
 
+	// When the first work is plotted on a line chart, auto-hide the busy
+	// author-total line so the added trend line stands out. Only fires once per
+	// author (tracked by autoHidAuthorTotal), so the Hide/Show toggle still wins
+	// after that.
+	$effect(() => {
+		if (chartMode === "line" && groups.length + singleIdxs.length > 0 && !autoHidAuthorTotal) {
+			showAuthorTotal = false;
+			autoHidAuthorTotal = true;
+		}
+	});
+
 	async function selectAuthor(a) {
 		// One author's drilldown (their series + every qualifying title) comes
 		// from their static JSON file (see db.js).
@@ -135,6 +172,14 @@
 			t.format = t.fmt; // the ETL stores the short field name "fmt"
 		});
 		current = data;
+		currentSlug = a.slug;
+		mobileTableOpen = false;
+		// reflect the author in the URL so the page is shareable / reloadable
+		try {
+			const url = new URL(window.location.href);
+			url.searchParams.set("author", a.slug);
+			window.history.replaceState({}, "", url);
+		} catch {}
 		// reset the controls for the new author
 		groups = [];
 		activeGroupId = null;
@@ -143,6 +188,7 @@
 		chartMode = "line";
 		isolatedKeys = [];
 		showAuthorTotal = true;
+		autoHidAuthorTotal = false;
 		autoGroupNote = "";
 		titleSort = "work";
 		workOrder = "checkouts";
@@ -153,6 +199,118 @@
 		query = "";
 		results = [];
 		loading = false;
+	}
+
+	// A shareable link (reopens the current author) plus a caption.
+	function shareTarget() {
+		let link = window.location.href;
+		try {
+			const url = new URL(window.location.href);
+			if (currentSlug) url.searchParams.set("author", currentSlug);
+			link = url.toString();
+		} catch {}
+		const text = `What Is Seattle Reading? — ${current ? displayName(current.name) : ""}`;
+		return { link, text };
+	}
+
+	// Open a platform's share dialog in a small popup window.
+	function shareTo(platform) {
+		const { link, text } = shareTarget();
+		const u = encodeURIComponent(link);
+		const t = encodeURIComponent(text);
+		const urls = {
+			facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}`,
+			twitter: `https://twitter.com/intent/tweet?url=${u}&text=${t}`,
+			bluesky: `https://bsky.app/intent/compose?text=${encodeURIComponent(text + " " + link)}`,
+			linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${u}`,
+		};
+		if (urls[platform]) window.open(urls[platform], "_blank", "noopener,noreferrer,width=600,height=540");
+		shareOpen = false;
+	}
+
+	async function copyShareLink() {
+		const { link } = shareTarget();
+		try { await navigator.clipboard.writeText(link); } catch {}
+		shareMsg = "Link copied!";
+		setTimeout(() => (shareMsg = ""), 2000);
+		shareOpen = false;
+	}
+
+	// Rasterize the chart SVG to a titled PNG (Blob), reused by download + share.
+	async function renderChartBlob() {
+		const src = chartWrap?.querySelector("svg");
+		if (!src) return null;
+		// Inline computed styles onto a clone: the SVG is painted by scoped
+		// component CSS that would be lost once it's serialized on its own.
+		const clone = src.cloneNode(true);
+		const from = src.querySelectorAll("*");
+		const to = clone.querySelectorAll("*");
+		const PROPS = ["fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "stroke-linejoin", "opacity", "font-family", "font-size", "font-weight", "text-anchor", "color"];
+		to.forEach((node, i) => {
+			const cs = getComputedStyle(from[i]);
+			node.setAttribute("style", PROPS.map((p) => `${p}:${cs.getPropertyValue(p)}`).join(";"));
+		});
+		const w = Math.round(src.clientWidth || src.viewBox.baseVal.width || 800);
+		const h = Math.round(src.clientHeight || src.viewBox.baseVal.height || 400);
+		clone.setAttribute("width", w);
+		clone.setAttribute("height", h);
+		clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+		const svgUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(clone));
+		const img = new Image();
+		await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = svgUrl; });
+		const scale = 2, padX = 28, titleH = 68, footH = 40;
+		const canvas = document.createElement("canvas");
+		canvas.width = (w + padX * 2) * scale;
+		canvas.height = (h + titleH + footH) * scale;
+		const ctx = canvas.getContext("2d");
+		ctx.scale(scale, scale);
+		ctx.fillStyle = "#ffffff";
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		ctx.textBaseline = "alphabetic";
+		ctx.fillStyle = "#1a1a1a";
+		ctx.font = '600 22px Georgia, "Times New Roman", serif';
+		ctx.fillText(current ? displayName(current.name) : "", padX, 34);
+		ctx.fillStyle = "#666666";
+		ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+		ctx.fillText(plotTitle || (current ? `${current.total.toLocaleString()} checkouts` : ""), padX, 54);
+		ctx.drawImage(img, padX, titleH, w, h);
+		ctx.fillStyle = "#999999";
+		ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+		ctx.fillText("What Is Seattle Reading?  ·  Seattle Public Library checkouts", padX, titleH + h + 24);
+		return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+	}
+
+	function saveBlob(blob, name) {
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(blob);
+		a.download = name;
+		a.click();
+		setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+	}
+
+	async function downloadChart() {
+		const blob = await renderChartBlob();
+		if (blob) saveBlob(blob, `seattle-reading-${currentSlug || "chart"}.png`);
+	}
+
+	// Share the current view AS AN IMAGE via the native share sheet (mobile and
+	// some desktop browsers). The platform-link buttons can't attach a picture --
+	// they only show the page's preview image -- so this is the way to actually
+	// post the chart itself. Falls back to saving the PNG to attach by hand.
+	async function shareImage() {
+		shareOpen = false;
+		const blob = await renderChartBlob();
+		if (!blob) return;
+		const name = `seattle-reading-${currentSlug || "chart"}.png`;
+		const file = new File([blob], name, { type: "image/png" });
+		const { link, text } = shareTarget();
+		if (navigator.canShare && navigator.canShare({ files: [file] })) {
+			try { await navigator.share({ files: [file], title: text, text: `${text}\n${link}` }); } catch {}
+			return;
+		}
+		saveBlob(blob, name);
+		shareMsg = "Image saved — attach it to your post";
+		setTimeout(() => (shareMsg = ""), 3200);
 	}
 
 	// Short label shown in a title's format badge.
@@ -260,15 +418,20 @@
 		// (otherwise "á" gets stripped to a space and the keys diverge).
 		t = t.normalize("NFD").replace(/[̀-ͯ]/g, "");
 		t = t.split(" / ")[0]; // drop "/ by Author ; illustrations by ..."
+		// Bilingual catalog records use "Original Title = English parallel title"
+		// (e.g. "Harī Pottā ... = Harry Potter and the half-blood prince"). Keep the
+		// English parallel title so foreign editions cluster with the English work.
+		if (/\s=\s/.test(t)) t = t.split(/\s=\s/).pop();
 		t = t.replace(/&/g, " and "); // "beasts & where" -> "beasts and where"
 		t = t.replace(/\([^)]*\)/g, " "); // drop "(unabridged)" etc.
+		t = t.replace(/\[[^\]]*\]/g, " "); // drop cataloging brackets: "[text ]", "[sound recording]", etc.
 		// Repeatedly strip a trailing ":"/";" segment when it's edition/format noise
 		// (series/book/volume, "the original screenplay", "read by <narrator>",
 		// illustrated/anniversary editions, "a novel", etc.) OR an "or, ..."
 		// alternative title (e.g. "Slaughterhouse-Five: or, The Children's Crusade"
 		// is the same book). Stop at the first segment that's a real distinct
 		// subtitle (e.g. "The Crimes of Grindelwald"), so those stay separate.
-		const NOISE = /(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|autobiography|poems|essays)/i;
+		const NOISE = /(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|autobiography|poems|essays|\bserie|\blivre|\btome|\blibro|\btomo|\bedicion)/i;
 		let prev;
 		do {
 			prev = t;
@@ -324,8 +487,29 @@
 		if (!opts.keepChartMode) chartMode = "line";
 		const merged = works.reduce((s, w) => s + w.idxs.length, 0);
 		autoGroupNote = works.length
-				? `Showing the top ${works.length} works (${merged} editions). Tick more works in the table, drag titles between groups, or delete a group to adjust.`
+				? `Showing the top ${works.length} works (${merged} editions). Tick more works in the table, drag titles between works, or remove a work to adjust.`
 				: "No works to show for this author.";
+	}
+
+	// Whether anything is currently plotted on top of the author-total line.
+	const hasPlotted = $derived(groups.some((g) => g.idxs.length) || singleIdxs.length > 0);
+
+	// The "Show top works" button doubles as a toggle: once works are plotted it
+	// clears them and returns to the author-only view.
+	function toggleTopWorks() {
+		if (hasPlotted) {
+			groups = [];
+			singleIdxs = [];
+			activeGroupId = null;
+			isolatedKeys = [];
+			workAssign = {};
+			expandedWorks = [];
+			autoGroupNote = "";
+			showAuthorTotal = true;
+			autoHidAuthorTotal = false;
+		} else {
+			autoGroupByWork();
+		}
 	}
 
 	// The work key an edition actually belongs to. Precedence:
@@ -441,6 +625,23 @@
 		dragGroupId = null;
 	}
 
+	// Drop an edition (dragged from the table) onto a work row: fold it into that
+	// work. If the work is a plotted group, join the group; otherwise reassign the
+	// edition's work key (pulling it out of any group first so it sticks).
+	function addEditionToWork(idx, workKey) {
+		if (idx == null || !workKey) return;
+		if (workKey.startsWith("g")) {
+			const g = groups.find((gr) => `g${gr.id}` === workKey);
+			if (g && !g.idxs.includes(idx)) {
+				releaseTitle(idx);
+				g.idxs = [...g.idxs, idx];
+			}
+		} else {
+			releaseTitle(idx);
+			workAssign = { ...workAssign, [idx]: workKey };
+		}
+	}
+
 	// Merge the dragged group's titles into the target group, then drop the
 	// now-empty source group. Keeps the target's name.
 	function mergeGroups(srcId, destId) {
@@ -546,7 +747,7 @@
 	// rest. Selected titles are always shown so a selection never "disappears".
 	// Also flag the first row of each work so the table can show the work name
 	// once and draw a divider between works (only meaningful in "by work" sort).
-	const TITLE_RENDER_CAP = 120;
+	const TITLE_RENDER_CAP = 400;
 	const visibleTitles = $derived.by(() => {
 		let rows;
 		if (filteredTitles.length <= TITLE_RENDER_CAP) {
@@ -571,7 +772,7 @@
 	// In "by work" sort, roll the (already work-sorted) editions up into one
 	// collapsible block per work: a single header row you can expand to see and
 	// edit the individual editions underneath.
-	const WORK_BLOCK_CAP = 150;
+	const WORK_BLOCK_CAP = 400;
 	const workBlocks = $derived.by(() => {
 		if (titleSort !== "work") return [];
 		// Group by work key into a Map first (guarantees exactly one block per key,
@@ -613,7 +814,7 @@
 	// count of the rest.
 	function groupLabel(g) {
 		if (g.name.trim()) return g.name.trim();
-		if (!current || !g.idxs.length) return "New group";
+		if (!current || !g.idxs.length) return "New work";
 		const firstIdx = Math.min(...g.idxs);
 		const firstTitle = current.titles[firstIdx].title;
 		const extra = g.idxs.length - 1;
@@ -656,6 +857,8 @@
 				label: t.title,
 				color,
 				values: t.series,
+				format: t.format, // ebook / audiobook / print -- shown as edition pills in the area tooltip
+				groupName: isGrouped ? groupLabel(groups[gi]) : (isSingle ? cleanTitleForDisplay(t.title) : null), // work title for the tooltip
 				isSelected: isGrouped || isSingle, // Expose this flag for sorting and tooltip logic
 				groupIndex: gi, // which group this book belongs to (-1 if none/single)
 				titleIdx: idx // original title index, for isolate filtering
@@ -832,6 +1035,8 @@
 	<!-- ===== Selected author ===== -->
 	{#if current}
 		<div class="author">
+			<div class="split" class:collapsed={tableCollapsed}>
+			<div class="split-main">
 			<h2>{displayName(current.name)}</h2>
 			<p class="meta">
 				{current.total.toLocaleString()} checkouts · {current.titles.length} titles
@@ -842,7 +1047,10 @@
 						type="button"
 						class:active={chartMode === "line"}
 						onclick={() => (chartMode = "line")}
-				>Total (line)</button>
+				>
+					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><polyline points="2,18 8,11 13,15 22,4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					Line
+				</button>
 				<button
 						type="button"
 						class:active={chartMode === "area"}
@@ -855,26 +1063,58 @@
 							}
 							chartMode = "area";
 						}}
-				>By title (stacked)</button>
+				>
+					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M2 19 L8 11 L13 15 L22 5 L22 20 L2 20 Z" fill="currentColor" opacity="0.85"/></svg>
+					Area
+				</button>
 			</div>
 
-			{#if plotTitle}
-				<p class="plot-title">{plotTitle}</p>
-			{/if}
-			<LineChart months={viewMonths} series={viewSeries} mode={chartMode}/>
+			<div class="chart-wrap" bind:this={chartWrap}>
+				{#if plotTitle}
+					<p class="plot-title">{plotTitle}</p>
+				{/if}
+				<LineChart months={viewMonths} series={viewSeries} mode={chartMode}/>
+			</div>
 
 			{#if months.length > 1}
 				<YearBrush {months} values={current.series} bind:lo={yearLo} bind:hi={yearHi} />
 			{/if}
 
+			<div class="chart-actions">
+				<button class="chart-action" onclick={downloadChart} title="Download the chart as a PNG image">
+					<span aria-hidden="true">⤓</span> Download image
+				</button>
+				<div class="share-wrap">
+					<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
+						<span aria-hidden="true">↗</span> Share
+					</button>
+					{#if shareOpen}
+						<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
+						<div class="share-menu" role="menu">
+							<button role="menuitem" class="share-item fb" onclick={() => shareTo("facebook")}><span class="share-ic" aria-hidden="true">f</span> Facebook</button>
+							<button role="menuitem" class="share-item tw" onclick={() => shareTo("twitter")}><span class="share-ic" aria-hidden="true">𝕏</span> Twitter</button>
+							<button role="menuitem" class="share-item bs" onclick={() => shareTo("bluesky")}><span class="share-ic" aria-hidden="true">🦋</span> Bluesky</button>
+							<button role="menuitem" class="share-item li" onclick={() => shareTo("linkedin")}><span class="share-ic" aria-hidden="true">in</span> LinkedIn</button>
+							<div class="share-sep"></div>
+							<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true">▦</span> Share image</button>
+							<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true">🔗</span> Copy link</button>
+						</div>
+					{/if}
+				</div>
+				<button class="chart-action edit-titles-btn" onclick={() => (mobileTableOpen = true)}>
+					<span aria-hidden="true">✎</span> Add/edit titles
+				</button>
+				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
+			</div>
+
 			<div class="groups-panel">
 				<div class="groups-header">
-					<span class="groups-label">Selection groups</span>
+					<span class="groups-label">On the chart</span>
 					<div class="groups-actions">
-						<button class="auto-group" onclick={autoGroupByWork} title="Plot the 5 most-borrowed works (their editions grouped into one line each)">
-							Show top works
+						<button class="auto-group" onclick={toggleTopWorks} title={hasPlotted ? "Clear the chart and show just the author's total line" : "Plot the 5 most-borrowed works (their editions grouped into one line each)"}>
+							{hasPlotted ? "Hide top works" : "Show top works"}
 						</button>
-						<button class="new-group" onclick={addGroup}>Make a new group</button>
+						<button class="new-group" onclick={addGroup}>Make a custom work</button>
 					</div>
 				</div>
 				{#if autoGroupNote}
@@ -899,13 +1139,19 @@
 							</li>
 						{/if}
 						{#each sortedGroups as g (g.id)}
-							<li class="group-chip-row" class:dim={isolatedKeys.length && !isIsolated(`g${g.id}`)}>
+							<li
+									class="group-chip-row"
+									class:dim={isolatedKeys.length && !isIsolated(`g${g.id}`)}
+									class:hl={hlWorkKey === `g${g.id}`}
+									onmouseenter={() => (hlWorkKey = `g${g.id}`)}
+									onmouseleave={() => (hlWorkKey === `g${g.id}` && (hlWorkKey = null))}
+							>
 								<span
 										class="group-chip"
 										class:active={g.id === activeGroupId}
 										class:drag-over={dragOverId === g.id}
 										style="--chip-color: {groupColorFor(g)}"
-										title="Drag onto another group to merge them"
+										title="Drag onto another work to merge them"
 										draggable="true"
 										ondragstart={() => (dragGroupId = g.id)}
 										ondragend={() => { dragGroupId = null; dragOverId = null; }}
@@ -923,7 +1169,7 @@
 								<button
 										class="chip-edit"
 										class:on={g.id === activeGroupId}
-										title="Edit which titles are in this group"
+										title="Edit which editions are in this work"
 										onclick={() => (activeGroupId = activeGroupId === g.id ? null : g.id)}
 								>{g.id === activeGroupId ? "Done" : "Edit"}</button>
 								<button
@@ -932,7 +1178,7 @@
 										title="Show only this (click more than one to compare)"
 										onclick={() => toggleIsolate(`g${g.id}`)}
 								>Only</button>
-								<button class="chip-remove" title="Delete group" onclick={() => removeGroup(g.id)}>×</button>
+								<button class="chip-remove" title="Remove from the chart" onclick={() => removeGroup(g.id)}>×</button>
 							</li>
 						{/each}
 						{#each singleIdxs as idx, i (idx)}
@@ -969,12 +1215,12 @@
 					<div class="editing-banner">
 						<span class="editing-text">
 							Adding titles to <strong>{groupLabel(activeGroup)}</strong> — tick titles below,
-							or drag them onto the group.
+							or drag them onto the work.
 						</span>
 						<button class="done-btn" onclick={finishGroup}>Done</button>
 					</div>
 					<div class="bundle-name">
-						<label for="group-name-input">Name this group</label>
+						<label for="group-name-input">Name this work</label>
 						<input
 								id="group-name-input"
 								type="text"
@@ -983,11 +1229,21 @@
 						/>
 					</div>
 				{:else if groups.length}
-					<p class="editing-hint">Click a group to edit it, or drag a title onto a group to add it.</p>
+					<p class="editing-hint">Click a work to edit it, or drag a title onto a work to add it.</p>
 				{/if}
 			</div>
+			</div><!-- /.split-main -->
 
-			<div class="titles">
+			<div class="split-side" class:open={mobileTableOpen} class:collapsed={tableCollapsed} bind:this={sideEl}>
+				<div class="side-mobile-head">
+					<span>Add / remove works</span>
+					<button class="side-close" onclick={() => (mobileTableOpen = false)}>Done</button>
+				</div>
+				<button class="side-desktop-head" onclick={() => (tableCollapsed = !tableCollapsed)} aria-expanded={!tableCollapsed}>
+					<span>Add/remove works by this author</span>
+					<span class="side-chevron" aria-hidden="true">{tableCollapsed ? "▸" : "▾"}</span>
+				</button>
+				<div class="titles">
 				<div class="titles-header">
 					<input
 							class="title-filter"
@@ -1020,7 +1276,7 @@
 				{/if}
 				<div class="title-table" role="table" aria-label="Titles, grouped by work" style="--work-w:{workColW}px; --edition-w:{editionColW}px">
 					<div class="tt-head" role="row">
-						<span class="tt-cell tt-plot" role="columnheader" title="Tick to plot a title on the chart">Add to plot</span>
+						<span class="tt-cell tt-plot" role="columnheader" class:editing={activeGroup} title={activeGroup ? `Tick to add editions to “${groupLabel(activeGroup)}”` : "Tick to plot a title on the chart"}>{activeGroup ? "Add to work" : ""}</span>
 						<span
 								class="tt-cell tt-work"
 								role="columnheader"
@@ -1082,7 +1338,7 @@
 											type="checkbox"
 											aria-label="Plot “{t.title}” on the chart"
 											checked={isCurrentOwner}
-											onchange={() => toggleTitle(t.idx)}
+											onchange={() => keepTableStill(() => toggleTitle(t.idx))}
 									/>
 								</span>
 								<span class="tt-cell tt-work" role="cell" title={showWork ? t.workName : ""}>
@@ -1128,12 +1384,15 @@
 										class:cluster={multi}
 										class:expanded={multi && isExpanded(w.key)}
 										class:work-drop={dragOverWorkKey === w.key}
+										class:hl={hlWorkKey === w.key}
 										draggable="true"
+										onmouseenter={() => (hlWorkKey = w.key)}
+										onmouseleave={() => (hlWorkKey === w.key && (hlWorkKey = null))}
 										ondragstart={() => (dragWorkKey = w.key)}
 										ondragend={() => { dragWorkKey = null; dragOverWorkKey = null; }}
-										ondragover={(e) => { if (dragWorkKey && dragWorkKey !== w.key) { e.preventDefault(); dragOverWorkKey = w.key; } }}
+										ondragover={(e) => { if ((dragWorkKey && dragWorkKey !== w.key) || dragIdx !== null) { e.preventDefault(); dragOverWorkKey = w.key; } }}
 										ondragleave={() => (dragOverWorkKey === w.key && (dragOverWorkKey = null))}
-										ondrop={(e) => { e.preventDefault(); if (dragWorkKey && dragWorkKey !== w.key) mergeWorks(dragWorkKey, w.key); dragWorkKey = null; dragOverWorkKey = null; }}
+										ondrop={(e) => { e.preventDefault(); if (dragWorkKey && dragWorkKey !== w.key) mergeWorks(dragWorkKey, w.key); else if (dragIdx !== null) addEditionToWork(dragIdx, w.key); dragWorkKey = null; dragOverWorkKey = null; dragIdx = null; }}
 								>
 									<span class="tt-cell tt-plot" role="cell">
 										<input
@@ -1143,7 +1402,7 @@
 												title={multi ? `Plot “${w.name}” — all ${w.editions.length} editions as one line` : `Plot “${w.name}”`}
 												checked={isWorkPlotted(w.key)}
 												indeterminate={!isWorkPlotted(w.key) && w.editions.some((e) => groupForTitle(e.idx) || isSingleSelected(e.idx))}
-												onchange={() => toggleWork(w.key)}
+												onchange={() => keepTableStill(() => toggleWork(w.key))}
 										/>
 									</span>
 									<span class="tt-cell tt-work" role="cell" title={w.name}>
@@ -1196,6 +1455,8 @@
 					</p>
 				{/if}
 			</div>
+			</div><!-- /.split-side -->
+			</div><!-- /.split -->
 		</div>
 	{:else}
 		<p class="hint">Start typing an author's name above.</p>
@@ -1286,7 +1547,236 @@
 	}
 
 	.author {
-		margin-top: 36px;
+		margin-top: 52px;
+	}
+
+	/* On desktop the titles/search table sits stacked BELOW the plot. On narrow
+	   screens the table instead opens as a bottom drawer from the top-right
+	   "Add/edit titles" button (see the mobile media query). */
+	.split {
+		display: block;
+		position: relative;
+	}
+	.split-main {
+		min-width: 0;
+	}
+	.split-side {
+		min-width: 0;
+		margin-top: 22px;
+	}
+
+	.chart-actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		margin: 12px 0 4px;
+	}
+	.chart-action {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-family: var(--font-sans);
+		font-size: 0.8rem;
+		font-weight: 600;
+		padding: 6px 12px;
+		border: 1.5px solid var(--color-border);
+		border-radius: 999px;
+		background: var(--color-white);
+		color: var(--color-fg);
+		cursor: pointer;
+		transition: background 0.12s, border-color 0.12s;
+	}
+	.chart-action:hover {
+		border-color: var(--color-fg-light);
+		background: #f7f7f7;
+	}
+	.chart-action span {
+		opacity: 0.7;
+		font-size: 0.95em;
+	}
+	.edit-titles-btn {
+		display: none; /* mobile only -- positioned top-right in the mobile media query */
+	}
+	.share-msg {
+		font-family: var(--font-sans);
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: #2e7d32;
+	}
+
+	.share-wrap {
+		position: relative;
+		display: inline-flex;
+	}
+	.share-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
+		background: none;
+		border: none;
+		cursor: default;
+	}
+	.share-menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 0;
+		z-index: 41;
+		display: flex;
+		flex-direction: column;
+		min-width: 168px;
+		padding: 5px;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+	}
+	.share-item {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 10px;
+		border: none;
+		border-radius: 7px;
+		background: none;
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--color-fg);
+		cursor: pointer;
+		text-align: left;
+	}
+	.share-item:hover {
+		background: #f2f2f2;
+	}
+	.share-ic {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		flex: none;
+		border-radius: 5px;
+		font-size: 0.75rem;
+		font-weight: 700;
+		color: #fff;
+		font-style: normal;
+	}
+	.share-item.fb .share-ic { background: #1877f2; }
+	.share-item.tw .share-ic { background: #000; }
+	.share-item.bs .share-ic { background: #0a7aff; }
+	.share-item.li .share-ic { background: #0a66c2; }
+	.share-item.img .share-ic { background: #2e7d32; }
+	.share-item.copy .share-ic { background: #666; }
+	.share-sep {
+		height: 1px;
+		margin: 4px 6px;
+		background: var(--color-border);
+	}
+
+	.side-mobile-head {
+		display: none; /* only shown as the drawer header on mobile */
+	}
+	.side-desktop-head {
+		display: none; /* only shown as the collapsible header on desktop */
+	}
+
+	/* On desktop the "Add/remove works by this author" line is a subtitle heading
+	   above the below-the-plot table, and clicking it collapses the table. */
+	@media (min-width: 861px) {
+		.side-desktop-head {
+			display: flex;
+			align-items: baseline;
+			gap: 8px;
+			width: 100%;
+			padding: 0 2px 8px;
+			margin: 2px 0 12px;
+			border: none;
+			border-bottom: 1.5px solid var(--color-border);
+			border-radius: 0;
+			background: none;
+			font-family: var(--font-serif);
+			font-weight: 600;
+			font-size: 1.2rem;
+			line-height: 1.15;
+			color: var(--color-fg);
+			cursor: pointer;
+			text-align: left;
+		}
+		.side-desktop-head:hover {
+			border-color: var(--color-fg-light);
+		}
+		.side-desktop-head:hover .side-chevron {
+			opacity: 0.9;
+		}
+		.side-chevron {
+			margin-left: auto;
+			opacity: 0.5;
+			font-size: 0.7rem;
+			align-self: center;
+		}
+		.split-side.collapsed .titles {
+			display: none;
+		}
+	}
+
+	@media (max-width: 860px) {
+		.split {
+			display: block;
+		}
+		.split-side {
+			position: fixed;
+			inset: 0;
+			z-index: 60;
+			height: 100dvh;
+			max-width: none;
+			max-height: none;
+			border-radius: 0;
+			background: var(--color-white);
+			padding: 10px 14px 48px;
+			overflow: auto;
+			transform: translateY(100%);
+			visibility: hidden;
+			transition: transform 0.25s ease, visibility 0.25s ease;
+			box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.22);
+		}
+		.split-side.open {
+			transform: translateY(0);
+			visibility: visible;
+		}
+		.side-mobile-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			position: sticky;
+			top: 0;
+			background: var(--color-white);
+			padding: 6px 0 10px;
+			margin-bottom: 8px;
+			border-bottom: 1px solid var(--color-border);
+			font-family: var(--font-sans);
+			font-weight: 700;
+			font-size: 0.95rem;
+		}
+		.side-close {
+			font-family: var(--font-sans);
+			font-weight: 700;
+			font-size: 0.85rem;
+			padding: 6px 18px;
+			border: none;
+			border-radius: 999px;
+			background: var(--color-fg);
+			color: var(--color-white);
+			cursor: pointer;
+		}
+		/* the "Add/edit titles" button floats in the top-right corner on mobile */
+		.edit-titles-btn {
+			display: inline-flex;
+			position: absolute;
+			top: 0;
+			right: 0;
+			z-index: 3;
+		}
 	}
 
 	.author h2 {
@@ -1574,6 +2064,13 @@
 		align-items: stretch;
 	}
 
+	/* linked highlight (see .work-header.hl): ring the whole pill when its work
+	   row is hovered, and vice versa */
+	.group-chip-row.hl {
+		border-radius: 999px;
+		box-shadow: 0 0 0 2px #e58a00;
+	}
+
 	.group-chip {
 		display: flex;
 		align-items: center;
@@ -1801,12 +2298,20 @@
 	}
 
 	.mode-toggle button {
-		padding: 6px 16px;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 6px 15px;
 		font-size: 0.85rem;
 		background: var(--color-white);
 		border: none;
 		color: var(--color-fg-light);
 		cursor: pointer;
+	}
+	.mode-toggle button svg {
+		flex: none;
+		width: 14px;
+		height: 14px;
 	}
 
 	.mode-toggle button + button {
@@ -1877,6 +2382,23 @@
 		overflow: auto; /* one scroll box: vertical for rows, horizontal for wide columns */
 	}
 
+	/* In the OWID-style side panel the table is narrow, so use a compact
+	   fit-to-width grid (Edition shrinks) instead of the wide resizable columns
+	   -- otherwise Format and Checkouts get pushed off the right and clipped. */
+	.split-side .tt-head,
+	.split-side .tt-row,
+	.split-side .work-header {
+		/* narrow Work column, wide Edition column so expanded edition titles
+		   show as much of their (long) titles as possible */
+		grid-template-columns: 28px minmax(54px, 0.72fr) minmax(0, 1.95fr) auto 50px;
+		gap: 7px;
+		padding: 7px 9px;
+		font-size: 0.8rem;
+	}
+	.split-side .title-table {
+		max-height: 460px;
+	}
+
 	.tt-head,
 	.tt-row,
 	.work-header {
@@ -1924,6 +2446,13 @@
 	.work-header.work-drop {
 		background: #efe7f7;
 		box-shadow: inset 0 0 0 2px #6a4c93;
+	}
+
+	/* linked highlight: hovering a work row or its "on the chart" pill lights up
+	   the other, so it's clear a pill and a work row are the same thing */
+	.work-header.hl {
+		background: #fff8e6;
+		box-shadow: inset 0 0 0 2px #e58a00;
 	}
 
 	.exclude-btn {
@@ -1985,12 +2514,13 @@
 		font-size: 0.8rem;
 		font-style: italic;
 	}
-	/* format column can show several badges for a multi-format work */
+	/* format column can show several badges for a multi-format work -- stacked
+	   vertically so the column stays narrow */
 	.work-header .tt-format {
 		display: flex;
-		gap: 4px;
-		flex-wrap: wrap;
-		justify-content: flex-end;
+		flex-direction: column;
+		gap: 3px;
+		align-items: flex-end;
 	}
 	/* indent the edition title when it's shown nested under an expanded work */
 	.tt-edition.indent {
