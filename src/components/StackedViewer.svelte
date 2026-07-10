@@ -2604,8 +2604,11 @@
 		   show as much of their (long) titles as possible; the last column is
 		   wide enough for the "Checkouts" header + comma'd values so nothing
 		   spills off the right edge. */
-		grid-template-columns: 26px minmax(50px, 0.7fr) minmax(0, 1.7fr) auto auto;
-		gap: 7px;
+		/* Checkouts gets a min-width so the value isn't crunched against Format
+		   (each row is its own grid, so an `auto` last column shrinks to just the
+		   number). A fixed min also keeps the width stable when editions expand. */
+		grid-template-columns: 26px minmax(50px, 0.7fr) minmax(0, 1.7fr) auto minmax(62px, auto);
+		gap: 9px;
 		padding: 7px 9px;
 		font-size: 0.8rem;
 	}
