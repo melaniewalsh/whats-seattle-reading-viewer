@@ -22,29 +22,38 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 PROJECT = HERE.parent
-META = PROJECT / "static" / "data" / "meta.json"
 OUT = PROJECT / "static" / "overview.json"
 
+# The overview must line up with the SAME month axis the deployed site uses,
+# which is the meta.json in the R2 bucket (the full-history build), not the
+# small local dev copy. Fetch that so overview.json covers every year.
+R2_META = "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/meta.json"
 SODA = "https://data.seattle.gov/resource/tmmm-ytt6.json"
 APP_TOKEN = "bHWsGtRFRP9x8Hl8lYivqM1hQ"
 # SPL MaterialType -> the format bucket the app uses everywhere else.
 FMT_BUCKET = {"BOOK": "print", "EBOOK": "ebook", "AUDIOBOOK": "audiobook"}
 
 
+def _get(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "spl-overview-builder/1.0"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return json.load(r)
+
+
 def load_months():
-    return json.loads(META.read_text())["months"]
+    return _get(R2_META)["months"]
 
 
 def fetch_rows():
+    # All years (the axis runs ~2006-2026), books/ebooks/audiobooks.
     params = urllib.parse.urlencode({
         "$select": "checkoutyear,checkoutmonth,materialtype,sum(checkouts) as total",
-        "$where": "checkoutyear>=2018 and checkoutyear<=2022 and materialtype in('BOOK','EBOOK','AUDIOBOOK')",
+        "$where": "materialtype in('BOOK','EBOOK','AUDIOBOOK')",
         "$group": "checkoutyear,checkoutmonth,materialtype",
-        "$limit": "5000",
+        "$limit": "50000",
         "$$app_token": APP_TOKEN,
     })
-    with urllib.request.urlopen(f"{SODA}?{params}", timeout=60) as r:
-        return json.load(r)
+    return _get(f"{SODA}?{params}")
 
 
 def main():

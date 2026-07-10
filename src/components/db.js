@@ -76,9 +76,9 @@ export async function getAllCheckouts() {
 			// Fallback: live Socrata aggregation (works before the file is built).
 			const params = new URLSearchParams({
 				'$select': 'checkoutyear,checkoutmonth,materialtype,sum(checkouts) as total',
-				'$where': "checkoutyear>=2018 and checkoutyear<=2022 and materialtype in('BOOK','EBOOK','AUDIOBOOK')",
+				'$where': "materialtype in('BOOK','EBOOK','AUDIOBOOK')",
 				'$group': 'checkoutyear,checkoutmonth,materialtype',
-				'$limit': '5000',
+				'$limit': '50000',
 				'$$app_token': SODA_APP_TOKEN
 			});
 			const res = await fetch(`${SODA_RESOURCE}?${params}`);

@@ -501,9 +501,10 @@
 
 	.tooltip {
 		position: absolute;
-		/* float just above the dot on the line; glides as the cursor moves */
+		/* float just above the dot on the line; a hair of easing so it doesn't
+		   jitter, but snappy enough not to feel bouncy */
 		transform: translate(-50%, calc(-100% - 18px));
-		transition: left 0.09s ease-out, top 0.09s ease-out;
+		transition: left 0.04s linear, top 0.04s linear;
 		background: #fff;
 		border: 1px solid #e4e4e4;
 		border-radius: 12px;
@@ -527,7 +528,7 @@
 		align-items: baseline;
 		gap: 8px;
 		font-family: var(--font-serif, Georgia, "Times New Roman", serif);
-		font-size: 1.2rem;
+		font-size: 1.05rem;
 		font-weight: 600;
 		line-height: 1.15;
 		color: #1a1a1a;
@@ -555,7 +556,7 @@
 		align-items: baseline;
 		gap: 6px;
 		margin: 0 0 2px 19px;
-		font-size: 1.55rem;
+		font-size: 1.3rem;
 		font-weight: 700;
 		color: #1a1a1a;
 	}

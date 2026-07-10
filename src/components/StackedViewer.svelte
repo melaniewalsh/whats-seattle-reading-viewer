@@ -1107,7 +1107,7 @@
 			<h2>{isOverview ? current.name : displayName(current.name)}</h2>
 			<p class="meta">
 				{#if isOverview}
-					{current.total.toLocaleString()} checkouts · books, ebooks &amp; audiobooks · 2018–2022
+					{current.total.toLocaleString()} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 				{:else}
 					{current.total.toLocaleString()} checkouts · {current.titles.length} titles
 				{/if}
