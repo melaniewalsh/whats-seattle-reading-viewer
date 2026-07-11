@@ -1087,17 +1087,17 @@
 	const legendItems = $derived.by(() => {
 		if (!current) return [];
 		if (isOverview) {
-			return chartMode === "area" ? [...OVERVIEW_FORMATS].reverse().map((f) => ({ label: f.label, color: f.color })) : [];
+			return chartMode === "area" ? [...OVERVIEW_FORMATS].reverse().map((f) => ({ label: f.label, color: f.color, key: null })) : [];
 		}
+		// Build from the full PLOTTED set (not the isolation-filtered displaySeries)
+		// so the legend stays put while isolating -- the isolated entry just lights
+		// up and the rest dim, and you can click again to bring them back.
 		if (chartMode === "line") {
-			return displaySeries.map((s) => ({ label: s.label, color: s.color }));
+			return lineParts.map((s) => ({ label: s.label, color: s.color, key: s.key }));
 		}
-		const seen = new Set(), out = [];
-		for (const s of displaySeries) {
-			if (!s.groupName || seen.has(s.groupName)) continue;
-			seen.add(s.groupName);
-			out.push({ label: s.groupName, color: s.color });
-		}
+		const out = [];
+		groups.forEach((g, gi) => { if (g.idxs.length) out.push({ label: groupLabel(g), color: groupColor(gi), key: `g${g.id}` }); });
+		singleIdxs.forEach((idx, i) => out.push({ label: cleanTitleForDisplay(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
 		return out;
 	});
 
@@ -1219,7 +1219,17 @@
 			{#if legendItems.length >= 2}
 				<div class="format-legend">
 					{#each legendItems as it}
-						<span class="fmt-leg"><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</span>
+						{#if it.key}
+							<button
+									class="fmt-leg leg-btn"
+									class:on={isIsolated(it.key)}
+									class:dim={isolatedKeys.length && !isIsolated(it.key)}
+									title="Show only this — click again to bring the others back"
+									onclick={() => toggleIsolate(it.key)}
+							><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</button>
+						{:else}
+							<span class="fmt-leg"><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</span>
+						{/if}
 					{/each}
 				</div>
 			{/if}
@@ -1770,6 +1780,27 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
+	}
+	/* clickable legend entry: click to isolate that series (like the pill's "Only") */
+	.leg-btn {
+		border: none;
+		background: none;
+		padding: 2px 4px;
+		border-radius: 6px;
+		font: inherit;
+		color: inherit;
+		cursor: pointer;
+		transition: opacity 0.12s, background 0.12s;
+	}
+	.leg-btn:hover {
+		background: var(--color-gray-100);
+	}
+	.leg-btn.dim {
+		opacity: 0.38;
+	}
+	.leg-btn.on {
+		background: var(--color-gray-100);
+		box-shadow: inset 0 0 0 1.5px var(--color-border);
 	}
 	.fmt-sw {
 		width: 12px;
