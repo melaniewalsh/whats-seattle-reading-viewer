@@ -924,6 +924,11 @@
 			singleColorOf.set(idx, TITLE_COLORS[i % TITLE_COLORS.length]);
 		});
 
+		// Each group's all-time total (summed over its editions), for the tooltip's
+		// "X% of the author's checkouts" line.
+		const groupTotals = new Map();
+		groups.forEach((g, gi) => groupTotals.set(gi, g.idxs.reduce((s, idx) => s + current.titles[idx].total, 0)));
+
 		let mapped = current.titles.map((t, idx) => {
 			const gi = groupIndexOf.has(idx) ? groupIndexOf.get(idx) : -1;
 			const isGrouped = gi !== -1;
@@ -937,6 +942,7 @@
 				values: t.series,
 				format: t.format, // ebook / audiobook / print -- shown as edition pills in the area tooltip
 				groupName: isGrouped ? groupLabel(groups[gi]) : (isSingle ? cleanTitleForDisplay(t.title) : null), // work title for the tooltip
+				workTotal: isGrouped ? groupTotals.get(gi) : (isSingle ? t.total : null), // work's all-time total, for the "% of author" line
 				isSelected: isGrouped || isSingle, // Expose this flag for sorting and tooltip logic
 				groupIndex: gi, // which group this book belongs to (-1 if none/single)
 				titleIdx: idx // original title index, for isolate filtering
@@ -1049,6 +1055,7 @@
 			values: current.formats[f.key] ?? [],
 			format: f.format,
 			groupName: f.label,
+			workTotal: (current.formats[f.key] ?? []).reduce((s, v) => s + v, 0),
 			isSelected: true,
 			groupIndex: i,
 			titleIdx: -(100 + i)
@@ -1206,7 +1213,7 @@
 				{#if plotTitle}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart months={viewMonths} series={viewSeries} mode={chartMode}/>
+				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`}/>
 			</div>
 
 			{#if legendItems.length >= 2}

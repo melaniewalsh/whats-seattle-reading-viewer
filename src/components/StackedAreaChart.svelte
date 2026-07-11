@@ -13,7 +13,9 @@
 		series: seriesProp = null,
 		slug: initialSlug = null,
 		topTitles = 8,
-		mode = 'area'
+		mode = 'area',
+		grandTotal = 0,   // the author's (or overview's) all-time total, for the share line
+		shareOf = ''      // phrase after "% of ", e.g. "J. K. Rowling's checkouts"
 	} = $props();
 
 	// Measured from the container (bind:clientWidth) so the chart fits any
@@ -283,6 +285,16 @@
 			: selectedItem.label
 	);
 
+	// The hovered work's share of the author's (or overview's) all-time checkouts.
+	const workSharePct = $derived(
+		selectedItem && grandTotal && selectedItem.workTotal ? (selectedItem.workTotal / grandTotal) * 100 : null
+	);
+	function fmtPct(p) {
+		if (p >= 9.95) return Math.round(p) + "%";
+		if (p >= 0.1) return p.toFixed(1) + "%";
+		return "<0.1%";
+	}
+
 	// Get overall total for the hovered month. In area mode that's the top of
 	// the stack; in line mode it's the aggregate ("author total") line if one is
 	// present, else the largest line value.
@@ -461,10 +473,16 @@
                 <div class="tt-value">{selectedItem.values[hoverIndex].toLocaleString()}<span class="tt-value-unit">checkouts</span></div>
             {/if}
 
-            <div class="tooltip-total">
-                <span>Overall month total</span>
-                <span>{hoveredTotal.toLocaleString()}</span>
-            </div>
+            {#if workSharePct !== null && shareOf}
+                <div class="tooltip-total">
+                    <span class="tt-share">{fmtPct(workSharePct)} of {shareOf}</span>
+                </div>
+            {:else}
+                <div class="tooltip-total">
+                    <span>Overall month total</span>
+                    <span>{hoveredTotal.toLocaleString()}</span>
+                </div>
+            {/if}
         </div>
     {/if}
 </div>
