@@ -1231,6 +1231,9 @@
 							<span class="fmt-leg"><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</span>
 						{/if}
 					{/each}
+					{#if isolatedKeys.length}
+						<button class="leg-showall" onclick={clearIsolate}>Show all</button>
+					{/if}
 				</div>
 			{/if}
 
@@ -1807,6 +1810,22 @@
 		height: 12px;
 		border-radius: 3px;
 		flex: none;
+	}
+	/* "Show all" appears in the legend while a series is isolated */
+	.leg-showall {
+		border: 1px solid var(--color-border);
+		background: var(--color-white);
+		padding: 3px 12px;
+		border-radius: 999px;
+		font-family: var(--font-sans);
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--color-fg);
+		cursor: pointer;
+	}
+	.leg-showall:hover {
+		border-color: var(--color-fg-light);
+		background: var(--color-gray-100);
 	}
 
 	.chart-action {
