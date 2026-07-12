@@ -249,9 +249,19 @@
 		return { link, text };
 	}
 
-	// Open a platform's share dialog in a small popup window.
+	// Open a platform's composer, having copied the chart image to the clipboard
+	// so it can be pasted in (share URLs can't attach an image directly). The
+	// promise-valued ClipboardItem keeps the write inside the click gesture, and
+	// window.open runs in the same tick so the popup isn't blocked.
 	function shareTo(platform) {
 		const { link, text } = shareTarget();
+		let copied = false;
+		try {
+			if (navigator.clipboard && window.ClipboardItem) {
+				navigator.clipboard.write([new ClipboardItem({ "image/png": renderChartBlob() })]).catch(() => {});
+				copied = true;
+			}
+		} catch {}
 		const u = encodeURIComponent(link);
 		const t = encodeURIComponent(text);
 		const urls = {
@@ -262,6 +272,10 @@
 		};
 		if (urls[platform]) window.open(urls[platform], "_blank", "noopener,noreferrer,width=600,height=540");
 		shareOpen = false;
+		if (copied) {
+			shareMsg = "Chart image copied — paste it (⌘/Ctrl+V) into your post";
+			setTimeout(() => (shareMsg = ""), 4500);
+		}
 	}
 
 	async function copyShareLink() {
@@ -270,6 +284,22 @@
 		shareMsg = "Link copied!";
 		setTimeout(() => (shareMsg = ""), 2000);
 		shareOpen = false;
+	}
+
+	// Copy the chart image itself to the clipboard (paste it straight into any
+	// post/doc). Falls back to downloading if the browser can't copy images.
+	async function copyImage() {
+		shareOpen = false;
+		try {
+			if (!(navigator.clipboard && window.ClipboardItem)) throw new Error("no clipboard");
+			await navigator.clipboard.write([new ClipboardItem({ "image/png": renderChartBlob() })]);
+			shareMsg = "Chart image copied to clipboard";
+		} catch {
+			const blob = await renderChartBlob();
+			if (blob) saveBlob(blob, `seattle-reading-${currentSlug || "chart"}.png`);
+			shareMsg = "Image saved (clipboard unavailable)";
+		}
+		setTimeout(() => (shareMsg = ""), 2600);
 	}
 
 	// Rasterize the chart SVG to a titled PNG (Blob), reused by download + share.
@@ -299,8 +329,10 @@
 		const ctx = canvas.getContext("2d");
 		// Lay out the legend (wrapped) first so we know how tall to make the canvas.
 		const LEG_FONT = '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-		const legItems = legendItems;
-		const showLegend = legItems.length >= 2;
+		// When lines are isolated, the exported chart draws only those — so the
+		// legend should list only those too (not every plotted title).
+		const legItems = isolatedKeys.length ? legendItems.filter((it) => it.key != null && isolatedKeys.includes(it.key)) : legendItems;
+		const showLegend = legItems.length >= 1;
 		const legLH = 22, legSw = 12, legGapSw = 6, legGapItem = 20;
 		const legLines = [];
 		if (showLegend) {
@@ -1258,6 +1290,7 @@
 							<button role="menuitem" class="share-item li" onclick={() => shareTo("linkedin")}><span class="share-ic" aria-hidden="true">in</span> LinkedIn</button>
 							<div class="share-sep"></div>
 							<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true">▦</span> Share image</button>
+							<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true">⧉</span> Copy image</button>
 							<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true">🔗</span> Copy link</button>
 						</div>
 					{/if}
@@ -1936,6 +1969,7 @@
 	.share-item.bs .share-ic { background: #0a7aff; }
 	.share-item.li .share-ic { background: #0a66c2; }
 	.share-item.img .share-ic { background: #2e7d32; }
+	.share-item.copyimg .share-ic { background: #444; }
 	.share-item.copy .share-ic { background: #666; }
 	.share-sep {
 		height: 1px;

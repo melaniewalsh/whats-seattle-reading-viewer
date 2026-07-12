@@ -1,0 +1,150 @@
+<script>
+	// GenreChart.svelte
+	// Multi-line chart of each genre's SHARE (%) of checkouts over time (monthly,
+	// same axis as the author charts). Hovering shows the nearest line's share
+	// for that month. Isolation (from the legend) hides the non-isolated lines
+	// entirely and rescales the y-axis to the ones left visible.
+	//
+	// Props:
+	//   months  : string[]                       "YYYY-MM" x-axis
+	//   series  : [{ key, name, color, values }] values aligned to `months`, in %
+	//   isolatedKeys : string[]                  when non-empty, only these stay bold
+	let { months = [], series = [], isolatedKeys = [] } = $props();
+
+	const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+	function fmtMonth(ym) {
+		if (!ym) return "";
+		const [y, m] = ym.split("-");
+		return m ? `${MONTH_NAMES[Number(m) - 1]} ${y}` : y;
+	}
+
+	let width = $state(760);
+	const height = 380;
+	const margin = { top: 12, right: 16, bottom: 28, left: 42 };
+
+	const innerW = $derived(Math.max(1, width - margin.left - margin.right));
+	const innerH = height - margin.top - margin.bottom;
+
+	const n = $derived(Math.max(months.length - 1, 1));
+	const xOf = (i) => margin.left + (i / n) * innerW;
+	const isActive = (key) => !isolatedKeys.length || isolatedKeys.includes(key);
+	// Scale the y-axis to whatever is currently visible: isolating a genre both
+	// hides the others AND zooms the axis so the lone line fills the chart.
+	const yMax = $derived(Math.max(1, ...series.filter((s) => isActive(s.key)).flatMap((s) => s.values)) * 1.08);
+	const yOf = (v) => margin.top + innerH - (v / yMax) * innerH;
+
+	const yTicks = $derived.by(() => {
+		const step = yMax > 40 ? 10 : yMax > 16 ? 5 : yMax > 8 ? 2 : yMax > 4 ? 1 : 0.5;
+		const out = [];
+		for (let v = 0; v <= yMax; v += step) out.push(v);
+		return out;
+	});
+	// one tick per January, thinned to ~one label per 60px
+	const xTicks = $derived.by(() => {
+		const jans = months.map((m, i) => ({ y: m.slice(0, 4), i })).filter((_, i) => months[i].endsWith("-01"));
+		const step = Math.max(1, Math.ceil(jans.length / Math.max(2, Math.floor(innerW / 60))));
+		return jans.filter((_, i) => i % step === 0);
+	});
+
+	const pathOf = (s) => s.values.map((v, i) => `${i ? "L" : "M"} ${xOf(i)} ${yOf(v)}`).join(" ");
+
+	let hoverI = $state(null);
+	let hoverKey = $state(null);
+	function onMove(e) {
+		const r = e.currentTarget.getBoundingClientRect();
+		const px = (e.clientX - r.left) * (width / r.width);
+		const py = (e.clientY - r.top) * (height / r.height);
+		const i = Math.round(((px - margin.left) / innerW) * n);
+		hoverI = Math.min(Math.max(i, 0), months.length - 1);
+		let best = null, bestD = Infinity;
+		for (const s of series) {
+			if (!isActive(s.key)) continue;
+			const d = Math.abs(yOf(s.values[hoverI]) - py);
+			if (d < bestD) { bestD = d; best = s; }
+		}
+		hoverKey = best ? best.key : null;
+	}
+	function onLeave() { hoverI = null; hoverKey = null; }
+
+	const hovered = $derived(hoverKey ? series.find((s) => s.key === hoverKey) : null);
+	// Pin the tooltip to the data point, then ANCHOR it away from whichever edge
+	// the point is near — extend left near the right side, right near the left,
+	// below near the top — so it never runs off or gets squished against a side.
+	const tipX = $derived(hoverI === null ? 0 : xOf(hoverI));
+	const tipY = $derived(hovered && hoverI !== null ? yOf(hovered.values[hoverI]) : margin.top);
+	const tipTX = $derived(tipX < width * 0.3 ? "8px" : tipX > width * 0.7 ? "calc(-100% - 8px)" : "-50%");
+	const tipTY = $derived(tipY < 96 ? "16px" : "calc(-100% - 16px)");
+</script>
+
+<div class="gchart" bind:clientWidth={width}>
+	<svg viewBox="0 0 {width} {height}" role="img" aria-label="Genre share over time"
+		onpointermove={onMove} onpointerleave={onLeave}>
+		{#each yTicks as t}
+			<line class="grid" class:zero={t === 0} x1={margin.left} x2={width - margin.right} y1={yOf(t)} y2={yOf(t)} />
+			<text class="ylabel" x={margin.left - 6} y={yOf(t)} dy="0.32em" text-anchor="end">{t}%</text>
+		{/each}
+		{#each xTicks as t}
+			<text class="xlabel" x={xOf(t.i)} y={height - 8} text-anchor="middle">{t.y}</text>
+		{/each}
+		{#each series as s (s.key)}
+			{#if isActive(s.key)}
+				<path class="gline" class:hot={hoverKey === s.key} d={pathOf(s)} stroke={s.color} fill="none" />
+			{/if}
+		{/each}
+		{#if hoverI !== null && hovered}
+			<circle cx={xOf(hoverI)} cy={yOf(hovered.values[hoverI])} r="4.5" fill={hovered.color} stroke="#fff" stroke-width="2" />
+		{/if}
+	</svg>
+
+	{#if hoverI !== null && hovered}
+		<div class="gtip" style="left:{tipX}px; top:{tipY}px; transform: translate({tipTX}, {tipTY});">
+			<div class="gtip-title"><span class="gtip-dot" style="background:{hovered.color}"></span>{hovered.name}</div>
+			<div class="gtip-date">{fmtMonth(months[hoverI])}</div>
+			<div class="gtip-val">{hovered.values[hoverI].toFixed(1)}<span class="gtip-unit">% of checkouts</span></div>
+			{#if hovered.terms?.length}
+				<div class="gtip-terms"><span class="gtip-lbl">Terms</span>{hovered.terms.join(", ")}{#if hovered.ficTerms?.length}<span class="gtip-fic"> + {hovered.ficTerms.join(", ")} <em>(only with a fiction tag)</em></span>{/if}</div>
+			{/if}
+			{#if hovered.examples?.length}
+				<div class="gtip-lbl gtip-lbl-ex">Top titles</div>
+				<ul class="gtip-ex">{#each hovered.examples as t}<li>{t}</li>{/each}</ul>
+			{/if}
+		</div>
+	{/if}
+</div>
+
+<style>
+	.gchart { position: relative; width: 100%; }
+	svg { display: block; width: 100%; height: auto; overflow: visible; }
+	.grid { stroke: #eee; stroke-width: 1; }
+	.grid.zero { stroke: #bbb; }
+	.ylabel, .xlabel { font-family: var(--font-sans, sans-serif); font-size: 11px; fill: #888; }
+	.gline { stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; transition: opacity 0.12s; }
+	.gline.hot { stroke-width: 3.2; opacity: 1; }
+	.gtip {
+		position: absolute;
+		transition: left 0.04s linear, top 0.04s linear;
+		background: #fff; border: 1px solid #e4e4e4; border-radius: 12px;
+		padding: 12px 16px 13px; font-family: var(--font-sans, sans-serif);
+		pointer-events: none; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.17);
+		/* width:max-content sizes the box to its content (capped by max-width) rather
+		   than to the space left of `left` — otherwise it collapses to min-width and
+		   wraps when the anchor point is near the container's right edge. */
+		width: max-content; min-width: 150px; max-width: 300px; z-index: 10;
+	}
+	.gtip-title {
+		display: flex; align-items: baseline; gap: 8px;
+		font-family: var(--font-serif, Georgia, serif); font-size: 1.05rem; font-weight: 600; color: #1a1a1a;
+	}
+	.gtip-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; align-self: center; }
+	.gtip-date { margin: 3px 0 8px 19px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #9a9a9a; }
+	.gtip-val { margin-left: 19px; font-size: 1.3rem; font-weight: 700; color: #1a1a1a; }
+	.gtip-unit { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #9a9a9a; margin-left: 4px; }
+	.gtip-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #9a9a9a; }
+	.gtip-terms { margin: 10px 0 0 19px; font-size: 12px; color: #444; line-height: 1.4; }
+	.gtip-terms .gtip-lbl { display: block; margin-bottom: 2px; }
+	.gtip-fic { color: #6a4c93; }
+	.gtip-fic em { color: #9a9a9a; font-size: 11px; }
+	.gtip-lbl-ex { display: block; margin: 10px 0 3px 19px; }
+	.gtip-ex { margin: 0 0 0 19px; padding-left: 15px; list-style: disc; }
+	.gtip-ex li { font-size: 12px; color: #333; line-height: 1.45; }
+</style>

@@ -2,8 +2,10 @@
 	import { getContext } from "svelte";
 	import { base } from "$app/paths";
 	import Viewer from "$components/StackedViewer.svelte";
+	import GenreTrends from "$components/GenreTrends.svelte";
 
 	const copy = getContext("copy");
+	let tab = $state("authors"); // "authors" | "genres"
 </script>
 
 <svelte:boundary onerror={(e) => console.error(e)}>
@@ -14,7 +16,16 @@
 			<p class="dek">{copy.dek}</p>
 		</header>
 
-		<Viewer />
+		<div class="main-tabs" role="tablist" aria-label="View">
+			<button role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
+			<button role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
+		</div>
+
+		{#if tab === "authors"}
+			<Viewer />
+		{:else}
+			<GenreTrends />
+		{/if}
 
 		<details class="about">
 			<summary>About this data &amp; how to read it</summary>
@@ -96,6 +107,36 @@
 		line-height: 1.5;
 		color: var(--color-fg-light);
 		margin: 0;
+	}
+	/* top-level view tabs: By author | By genre */
+	.main-tabs {
+		display: flex;
+		justify-content: center;
+		gap: 4px;
+		margin: 22px auto 26px;
+		padding: 4px;
+		width: fit-content;
+		background: var(--color-gray-100);
+		border-radius: 999px;
+	}
+	.main-tabs button {
+		border: none;
+		background: none;
+		padding: 8px 22px;
+		border-radius: 999px;
+		font-family: var(--font-sans);
+		font-size: 0.95rem;
+		font-weight: 600;
+		color: var(--color-fg-light);
+		cursor: pointer;
+		transition: background 0.12s, color 0.12s;
+	}
+	.main-tabs button.active {
+		background: var(--color-fg);
+		color: var(--color-white);
+	}
+	.main-tabs button:not(.active):hover {
+		color: var(--color-fg);
 	}
 	/* OurWorldinData-style source + attribution footer */
 	.chart-footer {

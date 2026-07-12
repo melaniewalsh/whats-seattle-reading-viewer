@@ -315,6 +315,7 @@
 	);
 
 
+
     // Other books that belong to the same selection group as the hovered book
     // (a stacked-area concept only; lines don't stack).
     const groupSiblings = $derived(
@@ -328,6 +329,16 @@
         hoverIndex !== null && groupSiblings.length > 0
             ? groupSiblings.reduce((sum, s) => sum + s.values[hoverIndex], 0)
             : 0
+    );
+
+    // The hovered thing's share of THAT MONTH's total checkouts. In the format
+    // overview each layer is a format, so this reads "38% of this month's
+    // checkouts are audiobook"; for a multi-edition work it's the whole work's
+    // share (all its formats), not a single edition.
+    const monthShareNum = $derived(groupSiblings.length > 1 ? groupTotal : (selectedItem ? selectedItem.values[hoverIndex] : 0));
+    const monthSharePct = $derived(
+        mode !== 'line' && hoverIndex !== null && selectedItem && hoveredTotal
+            ? (monthShareNum / hoveredTotal) * 100 : null
     );
 
     // opacity for a given area layer, given the current hover state
@@ -461,7 +472,7 @@
                     {#each groupSiblings.filter((s) => s.values[hoverIndex] > 0) as sib}
                         <span class="ed-pill" class:on={sib.titleIdx === selectedItem.titleIdx} style="--pc: {sib.color}">
                             <span class="ed-pill-fmt">{FMT_LABEL[sib.format] ?? sib.format ?? 'edition'}</span>
-                            <span class="ed-pill-val">{sib.values[hoverIndex].toLocaleString()}</span>
+                            <span class="ed-pill-val">{sib.values[hoverIndex].toLocaleString()}{groupTotal ? ` · ${Math.round((sib.values[hoverIndex] / groupTotal) * 100)}%` : ''}</span>
                         </span>
                     {/each}
                 </div>
@@ -473,7 +484,9 @@
                 <div class="tt-value">{selectedItem.values[hoverIndex].toLocaleString()}<span class="tt-value-unit">checkouts</span></div>
             {/if}
 
-            {#if workSharePct !== null && shareOf}
+            {#if monthSharePct !== null}
+                <div class="tooltip-total"><span class="tt-share" style="color: {selectedItem.color};">{fmtPct(monthSharePct)} of this month's checkouts</span></div>
+            {:else if workSharePct !== null && shareOf}
                 <div class="tooltip-total">
                     <span class="tt-share">{fmtPct(workSharePct)} of {shareOf}</span>
                 </div>
