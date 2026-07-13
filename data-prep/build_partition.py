@@ -58,19 +58,29 @@ TAXONOMY = [
     ("Mystery", ["mystery", "detective"], []),
     ("Thriller & Suspense", ["thriller", "suspense"], []),
     ("Historical Fiction", ["historical fiction"], []),
+    # "western" gated by fiction so it doesn't catch "Western Europe"/"western US".
+    ("Western", ["western stories", "westerns"], [], ["western", "cowboys"]),
     ("Mythology & Folklore", ["mythology", "folklore", "fairy tale", "legends"], []),
     ("Humor", ["humor", "humorous stories"], []),
+    # Identity-fiction categories, just above the general Literary catch-all so
+    # literary LGBTQIA+/Black fiction lands here rather than in the generic bucket.
+    ("LGBTQIA+ Fiction", [], [], ["lgbtqia"]),
+    ("African American Fiction", ["african american fiction"], []),
     # Broadened to pull literary/classic/general fiction out of "Other" (Demon
     # Copperhead, Pachinko, Pride & Prejudice are tagged just "Fiction, Literature").
     # Sits late in priority, so genre fiction (Romance/Mystery/…) claims its books
     # first; excludes keep the broad "literature" term off kids' nonfiction.
-    # "literature" removed — too broad a BISAC catch-all. Keep the specific ones.
+    # "literature" pulls the big general/literary-fiction chunk out of Other
+    # (Demon Copperhead, Pachinko, The Goldfinch are tagged just "Fiction, Literature").
+    # Accepts some nonfiction noise; excludes keep it off kids'/teen "…Literature".
     ("Literary & Classic Fiction", ["literary fiction", "domestic fiction", "psychological fiction",
-        "short stories", "classic literature", "novels"], []),
-    ("Memoir & Biography", ["biography & autobiography", "memoir", "autobiography"], []),
+        "short stories", "classic literature", "novels", "literature"],
+        ["juvenile literature", "childrens literature", "young adult literature"]),
+    ("Memoir & Biography", ["biography & autobiography", "memoir", "autobiography",
+        "autobiographies", "biographies"], []),
     ("True Crime", ["true crime"], []),
     ("Cooking & Food", ["cooking", "cookbook", "cookery"], []),
-    ("Self-Help", ["self-improvement", "self-help", "personal development"], []),
+    ("Self-Help", ["self-improvement", "self-help", "self help", "personal development", "new age"], []),
     ("Business & Economics", ["business", "economics", "finance"], []),
     ("Health & Fitness", ["health & fitness", "diet", "wellness"], []),
     ("Psychology", ["psychology"], []),
@@ -83,6 +93,10 @@ TAXONOMY = [
     ("Parenting & Family", ["parenting", "family & relationships"], []),
     ("Art & Photography", ["art history", "photography", "painting", "drawing"], []),
     ("Crafts & Hobbies", ["knitting", "crafts", "quilting", "sewing"], []),
+    ("Home & Garden", ["gardening", "home design", "interior decoration", "house & home"], []),
+    ("Computers & Technology", ["computers", "computer technology", "programming"], []),
+    ("Philosophy", ["philosophy"], []),
+    ("Drama & Performing Arts", ["drama", "plays", "theater", "performing arts"], []),
     # After Travel, so travel guidebooks stay in Travel; catches the rest of the
     # reference/study material pooling in "Other".
     ("Reference & Study", ["foreign language study", "guidebooks", "reference"], []),

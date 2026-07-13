@@ -16,13 +16,14 @@
 	// Which of the three table sections each genre belongs to.
 	const GROUPS = [
 		["Fiction", ["Comics & Graphic Novels", "Romance", "Fantasy", "Science Fiction", "Horror",
-			"Mystery", "Thriller & Suspense", "Historical Fiction", "Mythology & Folklore", "Humor",
-			"Literary & Classic Fiction", "Poetry"]],
+			"Mystery", "Thriller & Suspense", "Historical Fiction", "Western", "Mythology & Folklore",
+			"Humor", "LGBTQIA+ Fiction", "African American Fiction", "Literary & Classic Fiction", "Poetry"]],
 		["Kids & Young Adult", ["Picture Books & Early Readers", "Young Adult", "Juvenile Fiction"]],
 		["Nonfiction", ["Memoir & Biography", "True Crime", "Cooking & Food", "Self-Help",
 			"Business & Economics", "Health & Fitness", "Psychology", "Politics & Government", "History",
 			"Science & Nature", "Religion & Spirituality", "Travel", "Sports & Recreation",
-			"Parenting & Family", "Art & Photography", "Crafts & Hobbies", "Reference & Study",
+			"Parenting & Family", "Art & Photography", "Crafts & Hobbies", "Home & Garden",
+			"Computers & Technology", "Philosophy", "Drama & Performing Arts", "Reference & Study",
 			"Essays & Society"]],
 	];
 
