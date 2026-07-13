@@ -71,11 +71,13 @@ TAXONOMY = [
     # Copperhead, Pachinko, Pride & Prejudice are tagged just "Fiction, Literature").
     # Sits late in priority, so genre fiction (Romance/Mystery/…) claims its books
     # first; excludes keep the broad "literature" term off kids' nonfiction.
-    # "literature" pulls the big general/literary-fiction chunk out of Other
-    # (Demon Copperhead, Pachinko, The Goldfinch are tagged just "Fiction, Literature").
-    # Accepts some nonfiction noise; excludes keep it off kids'/teen "…Literature".
+    # Literary fiction proper + classics (Pride & Prejudice, Wuthering Heights).
     ("Literary & Classic Fiction", ["literary fiction", "domestic fiction", "psychological fiction",
-        "short stories", "classic literature", "novels", "literature"],
+        "short stories", "classic literature", "novels"], []),
+    # The broad BISAC "Literature" tag = contemporary general / book-club fiction
+    # (Demon Copperhead, Lessons in Chemistry) — NOT the same as literary fiction,
+    # so it gets its own bucket, just after the specific one claims the classics.
+    ("General Fiction", ["literature"],
         ["juvenile literature", "childrens literature", "young adult literature"]),
     ("Memoir & Biography", ["biography & autobiography", "memoir", "autobiography",
         "autobiographies", "biographies"], []),
