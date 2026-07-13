@@ -200,6 +200,14 @@ function getTitleIndex() {
  * Search titles by name (the "By title" tab). Returns {title, slug, author,
  * total} — `slug` is the author to open. Empty query -> top titles by checkouts.
  */
+// The lowest all-time checkout count present in the title index (the build
+// threshold, i.e. only titles at/above this are searchable). Read from the data
+// so the UI note stays accurate whatever the build used.
+export async function titleIndexMin() {
+	const { rows } = await getTitleIndex();
+	return rows.length ? rows[rows.length - 1][3] : 0;
+}
+
 export async function searchTitles(query, limit = 20) {
 	const { rows, lower } = await getTitleIndex();
 	const q = (query ?? '').trim().toLowerCase();

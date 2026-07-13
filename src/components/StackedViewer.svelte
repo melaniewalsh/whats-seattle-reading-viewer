@@ -5,7 +5,7 @@
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 	import Switch from "$components/ui/Switch.svelte";
-	import { getMonths, searchAuthors, searchTitles, getAuthor, getAllCheckouts } from "$components/db.js";
+	import { getMonths, searchAuthors, searchTitles, titleIndexMin, getAuthor, getAllCheckouts } from "$components/db.js";
 
 	// "author" (default): search authors. "title": reverse lookup — search a title,
 	// resolve to its author, open the author's drilldown with that work highlighted.
@@ -185,7 +185,13 @@
 
 	// A few top titles to seed the "By title" quick-picks (like the author chips).
 	let topTitles = $state([]);
-	$effect(() => { if (searchMode === "title" && !topTitles.length) searchTitles("", 8).then((t) => (topTitles = t)); });
+	let titleMin = $state(0); // min all-time checkouts a title needs to be searchable
+	$effect(() => {
+		if (searchMode === "title" && !topTitles.length) searchTitles("", 8).then((t) => (topTitles = t));
+		if (searchMode === "title" && !titleMin) titleIndexMin().then((m) => (titleMin = m));
+	});
+	// Round down to a clean figure so the note never overstates the threshold.
+	const titleMinLabel = $derived(titleMin ? (Math.floor(titleMin / 500) * 500).toLocaleString() : "");
 
 	// Reverse lookup: open a title's author, then plot the searched BOOK as one
 	// line — gathering every edition of it. The catalog splits print/ebook/audio/
@@ -1218,6 +1224,10 @@
 				<p class="no-results">No {searchMode === "title" ? "titles" : "authors"} found for “{query.trim()}”.</p>
 			{/if}
 		</div>
+
+		{#if searchMode === "title" && titleMinLabel}
+			<p class="title-note">Only well-borrowed titles are searchable — those checked out at least ~{titleMinLabel} times all-time.</p>
+		{/if}
 
 		<!-- quick-pick: most-borrowed authors, or most-borrowed titles in title mode -->
 		{#if searchMode === "title" && topTitles.length}
@@ -2605,6 +2615,12 @@
 		background: var(--chip-color, var(--color-fg-light));
 	}
 
+	.title-note {
+		font-family: var(--font-sans);
+		font-size: 0.8rem;
+		color: var(--color-fg-light);
+		margin: 6px 2px 0;
+	}
 	/* top-author quick-pick chips (under the search box) */
 	.top-authors {
 		display: flex;
