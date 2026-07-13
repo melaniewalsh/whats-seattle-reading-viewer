@@ -85,6 +85,9 @@ jobs:
           python3 data-prep/build_data.py
           echo "author files: $(find static/data/authors -type f | wc -l)"
           ls -lh static/data/meta.json static/data/search-index.json
+          # Title reverse-lookup index for the "By title" tab. High threshold so
+          # only well-borrowed titles are searchable -> the index stays small.
+          TITLE_MIN_CHECKOUTS=2000 python3 data-prep/build_title_index.py
 
       - name: Upload data files to the public R2 bucket
         env:
@@ -97,6 +100,15 @@ jobs:
           gzip -9 -c static/data/search-index.json > /tmp/search-index.json.gz
           aws s3 cp /tmp/search-index.json.gz \
             "s3://${R2_DB_BUCKET}/search-index.json" \
+            --endpoint-url "$R2_ENDPOINT_URL" \
+            --content-type application/json \
+            --content-encoding gzip \
+            --only-show-errors
+
+          # The title index, same gzipped treatment as the author index.
+          gzip -9 -c static/data/title-index.json > /tmp/title-index.json.gz
+          aws s3 cp /tmp/title-index.json.gz \
+            "s3://${R2_DB_BUCKET}/title-index.json" \
             --endpoint-url "$R2_ENDPOINT_URL" \
             --content-type application/json \
             --content-encoding gzip \
@@ -117,6 +129,7 @@ jobs:
           rclone sync static/data/ "R2:${R2_DB_BUCKET}/" \
             --transfers 128 --checkers 128 --fast-list --s3-no-check-bucket \
             --exclude "search-index.json" \
+            --exclude "title-index.json" \
             --exclude "library.sqlite3" \
             --stats 30s --stats-one-line
           echo "Uploaded meta.json + search-index.json + author files to r2://${R2_DB_BUCKET}/"

@@ -5,7 +5,11 @@
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 	import Switch from "$components/ui/Switch.svelte";
-	import { getMonths, searchAuthors, getAuthor, getAllCheckouts } from "$components/db.js";
+	import { getMonths, searchAuthors, searchTitles, getAuthor, getAllCheckouts } from "$components/db.js";
+
+	// "author" (default): search authors. "title": reverse lookup — search a title,
+	// resolve to its author, open the author's drilldown with that work highlighted.
+	let { searchMode = "author" } = $props();
 
 	// Colors for title lines.
 	const TITLE_COLORS = [
@@ -173,9 +177,45 @@
 			results = [];
 			return;
 		}
-		results = await searchAuthors(needle, 25);
+		results = searchMode === "title"
+			? await searchTitles(needle, 25)
+			: await searchAuthors(needle, 25);
 	}, 120);
 	$effect(() => runSearch(query));
+
+	// A few top titles to seed the "By title" quick-picks (like the author chips).
+	let topTitles = $state([]);
+	$effect(() => { if (searchMode === "title" && !topTitles.length) searchTitles("", 8).then((t) => (topTitles = t)); });
+
+	// Reverse lookup: open a title's author, then plot the searched BOOK as one
+	// line — gathering every edition of it. The catalog splits print/ebook/audio/
+	// series-subtitle variants into separate rows the auto-clusterer doesn't always
+	// merge, so we match on the "main" title (before any ":" or "(") and group them
+	// all ourselves rather than trusting one work cluster.
+	function mainTitle(s) {
+		return (cleanTitleForDisplay(s) || s || "").split(":")[0].replace(/\s*\(.*$/, "").trim().toLowerCase();
+	}
+	async function selectTitle(r) {
+		await selectAuthor({ slug: r.slug, name: r.author });
+		await tick();
+		if (!current) return;
+		const want = mainTitle(r.title);
+		let idxs = [];
+		current.titles.forEach((t, idx) => { if (mainTitle(t.title) === want) idxs.push(idx); });
+		if (!idxs.length) { // loose fallback if nothing matched exactly
+			current.titles.forEach((t, idx) => {
+				const c = (cleanTitleForDisplay(t.title) || "").toLowerCase();
+				if (!idxs.length && want && (c.includes(want) || want.includes(c))) idxs = [idx];
+			});
+		}
+		if (!idxs.length) return;
+		idxs.forEach((i) => releaseTitle(i));
+		const name = cleanTitleForDisplay(current.titles[idxs[0]].title) || r.title;
+		groups = [...groups, { id: ++groupIdCounter, name, idxs }];
+		hlWorkKey = `g${groupIdCounter}`;
+		await tick();
+		chartWrap?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+	}
 
 	// When the first work is plotted on a line chart, auto-hide the busy
 	// author-total line so the added trend line stands out. Only fires once per
@@ -1148,11 +1188,11 @@
 <div class="viewer">
 	{#snippet authorPicker()}
 		<div class="search">
-			<label class="sr-only" for="author-search">Search for an author</label>
+			<label class="sr-only" for="author-search">{searchMode === "title" ? "Search for a title" : "Search for an author"}</label>
 			<input
 					id="author-search"
 					type="search"
-					placeholder="Search an author — try Octavia Butler, or Mo Willems"
+					placeholder={searchMode === "title" ? "Search a title — try Braiding Sweetgrass, or Educated" : "Search an author — try Octavia Butler, or Mo Willems"}
 					bind:value={query}
 					autocomplete="off"
 			/>
@@ -1160,20 +1200,34 @@
 				<ul class="results">
 					{#each results as a}
 						<li>
-							<button onclick={() => selectAuthor(a)}>
-								<span>{displayName(a.name)}</span>
-								<span class="count">{a.total.toLocaleString()}</span>
-							</button>
+							{#if searchMode === "title"}
+								<button onclick={() => selectTitle(a)}>
+									<span class="res-title">{a.title}</span>
+									<span class="count res-author">{displayName(a.author)}</span>
+								</button>
+							{:else}
+								<button onclick={() => selectAuthor(a)}>
+									<span>{displayName(a.name)}</span>
+									<span class="count">{a.total.toLocaleString()}</span>
+								</button>
+							{/if}
 						</li>
 					{/each}
 				</ul>
 			{:else if query.trim().length >= 2}
-				<p class="no-results">No authors found for “{query.trim()}”.</p>
+				<p class="no-results">No {searchMode === "title" ? "titles" : "authors"} found for “{query.trim()}”.</p>
 			{/if}
 		</div>
 
-		<!-- quick-pick: the 10 most-borrowed authors -->
-		{#if topAuthors.length}
+		<!-- quick-pick: most-borrowed authors, or most-borrowed titles in title mode -->
+		{#if searchMode === "title" && topTitles.length}
+			<div class="top-authors">
+				<span class="quick-label">Most borrowed:</span>
+				{#each topTitles as t}
+					<button class="chip" onclick={() => selectTitle(t)}>{t.title}</button>
+				{/each}
+			</div>
+		{:else if searchMode !== "title" && topAuthors.length}
 			<div class="top-authors">
 				<span class="quick-label">Most borrowed:</span>
 				{#each topAuthors as a}

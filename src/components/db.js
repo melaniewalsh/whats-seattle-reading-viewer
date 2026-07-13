@@ -182,6 +182,37 @@ export async function searchAuthors(query, limit = 20) {
 	return out;
 }
 
+// The TITLE index for the "By title" reverse-lookup: [[title, slug, author,
+// total], ...] sorted total-DESC, only titles above a checkout threshold (so it
+// stays small). Loaded lazily on first title search. Missing file -> empty.
+let titleIndexPromise = null;
+function getTitleIndex() {
+	if (!titleIndexPromise) {
+		titleIndexPromise = fetch(`${DATA_BASE}/title-index.json`)
+			.then((r) => (r.ok ? r.json() : []))
+			.then((rows) => ({ rows, lower: rows.map((r) => r[0].toLowerCase()) }))
+			.catch(() => ({ rows: [], lower: [] }));
+	}
+	return titleIndexPromise;
+}
+
+/**
+ * Search titles by name (the "By title" tab). Returns {title, slug, author,
+ * total} — `slug` is the author to open. Empty query -> top titles by checkouts.
+ */
+export async function searchTitles(query, limit = 20) {
+	const { rows, lower } = await getTitleIndex();
+	const q = (query ?? '').trim().toLowerCase();
+	const out = [];
+	for (let i = 0; i < rows.length; i++) {
+		if (q && !lower[i].includes(q)) continue;
+		const [title, slug, author, total] = rows[i];
+		out.push({ title, slug, author, total });
+		if (out.length >= limit) break;
+	}
+	return out;
+}
+
 /**
  * Load one author's full drilldown in a single fetch: their own sparse series
  * plus every qualifying title's sparse series. Same shape the old

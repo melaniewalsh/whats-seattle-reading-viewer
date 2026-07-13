@@ -5,7 +5,7 @@
 	import GenreTrends from "$components/GenreTrends.svelte";
 
 	const copy = getContext("copy");
-	let tab = $state("authors"); // "authors" | "genres"
+	let tab = $state("authors"); // "authors" | "titles" | "genres"
 </script>
 
 <svelte:boundary onerror={(e) => console.error(e)}>
@@ -18,13 +18,14 @@
 
 		<div class="main-tabs" role="tablist" aria-label="View">
 			<button role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
+			<button role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
 			<button role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
 		</div>
 
-		{#if tab === "authors"}
-			<Viewer />
-		{:else}
+		{#if tab === "genres"}
 			<GenreTrends />
+		{:else}
+			<Viewer searchMode={tab === "titles" ? "title" : "author"} />
 		{/if}
 
 		<details class="about">
