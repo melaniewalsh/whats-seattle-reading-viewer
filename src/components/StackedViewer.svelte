@@ -200,6 +200,23 @@
 	// Round down to a clean figure so the note never overstates the threshold.
 	const titleMinLabel = $derived(titleMin ? (Math.floor(titleMin / 500) * 500).toLocaleString() : "");
 
+	// When the "By title" tab is first opened, seed it with a well-known title
+	// (Baldwin's The Fire Next Time) instead of the Seattle-wide overview, so the
+	// tab lands on a concrete example rather than a blank prompt. Load-once flag.
+	let titleDefaultLoaded = false;
+	$effect(() => {
+		if (searchMode === "title" && months.length && !titleDefaultLoaded) {
+			titleDefaultLoaded = true;
+			loadDefaultTitle();
+		}
+	});
+	async function loadDefaultTitle() {
+		try {
+			const r = (await searchTitles("the fire next time", 5))[0];
+			if (r) await selectTitle(r, { scroll: false });
+		} catch {}
+	}
+
 	// Reverse lookup: open a title's author, then plot the searched BOOK as one
 	// line — gathering every edition of it. The catalog splits print/ebook/audio/
 	// series-subtitle variants into separate rows the auto-clusterer doesn't always
@@ -208,7 +225,7 @@
 	function mainTitle(s) {
 		return (cleanTitleForDisplay(s) || s || "").split(":")[0].replace(/\s*\(.*$/, "").trim().toLowerCase();
 	}
-	async function selectTitle(r) {
+	async function selectTitle(r, { scroll = true } = {}) {
 		await selectAuthor({ slug: r.slug, name: r.author });
 		await tick();
 		if (!current) return;
@@ -227,7 +244,7 @@
 		groups = [...groups, { id: ++groupIdCounter, name, idxs }];
 		hlWorkKey = `g${groupIdCounter}`;
 		await tick();
-		chartWrap?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+		if (scroll) chartWrap?.scrollIntoView?.({ block: "start", behavior: "smooth" });
 	}
 
 	// When the first work is plotted on a line chart, auto-hide the busy
@@ -995,6 +1012,24 @@
 		return "";
 	});
 
+	// In "By title" mode the chart is about a specific book, so the heading names
+	// the TITLE (not its author) when exactly one work is plotted; with several
+	// works plotted it's a comparison, so the legend labels them and the heading
+	// stays blank. Author mode and the overview keep their own headings.
+	const headingText = $derived.by(() => {
+		if (!current) return "";
+		if (isOverview) return current.name;
+		if (searchMode === "title") {
+			const gs = groups.filter((g) => g.idxs.length);
+			const n = gs.length + singleIdxs.length;
+			if (n !== 1) return ""; // 0 or 2+ works -> no title heading
+			return gs.length
+				? groupLabel(gs[0])
+				: cleanTitleForDisplay(current.titles[singleIdxs[0]].title);
+		}
+		return displayName(current.name);
+	});
+
 	// StackedViewer.svelte
 	const chartSeries = $derived.by(() => {
 		if (!current) return [];
@@ -1276,10 +1311,14 @@
 			{#if !isOverview}
 				<button class="back-to-all" onclick={loadOverview}>‹ All Seattle checkouts</button>
 			{/if}
-			<h2>{isOverview ? current.name : displayName(current.name)}</h2>
+			{#if headingText}
+				<h2>{headingText}</h2>
+			{/if}
 			<p class="meta">
 				{#if isOverview}
 					{abbrevCount(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
+				{:else if searchMode === "title"}
+					by {displayName(current.name)}
 				{:else}
 					{abbrevCount(current.total)} checkouts · {current.titles.length} titles
 				{/if}
