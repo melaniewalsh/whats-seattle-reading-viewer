@@ -105,7 +105,7 @@
 			out.push({ key: `g:${name}`, name, color: colorOf(name), values: clip(seriesArr(g)),
 				terms: g.terms, ficTerms: g.ficTerms, examples: cleanExamples(g.examples).slice(0, 4) });
 		}
-		if (mode === "partition" && showOther) {
+		if (showOther) {
 			out.push({ key: "g:__other", name: "Other / Unclassified", color: "#b0b0b0", values: clip(data.other) });
 		}
 		return out;
@@ -413,7 +413,6 @@
 					{/if}
 				{/each}
 			{/each}
-			{#if mode === "partition"}
 				<div class="gt-row genre-row other-row" class:off={!showOther}>
 					<span class="gt-cell gt-show"><input type="checkbox" checked={showOther} onchange={() => (showOther = !showOther)} aria-label="Plot Other" /></span>
 					<button class="gt-cell gt-name" onclick={() => toggleExpand("__other")} aria-expanded={expanded.has("__other")}>
@@ -434,7 +433,6 @@
 						{/if}
 					</div>
 				{/if}
-			{/if}
 		</div>
 		<p class="gsource">Source: Seattle Public Library — Checkouts by Title (data.seattle.gov). Genre via subject-heading match; all books (print + digital, incl. audiobooks). Example titles reflect the partition (first-match) assignment.</p>
 	{/if}
