@@ -1354,7 +1354,7 @@
 										style="--chip-color: {groupColorFor(g)}"
 										title="Drag onto another work to merge them"
 										draggable="true"
-										ondragstart={() => (dragGroupId = g.id)}
+										ondragstart={(e) => { dragGroupId = g.id; try { e.dataTransfer.setData("text/plain", String(g.id)); e.dataTransfer.effectAllowed = "move"; } catch {} }}
 										ondragend={() => { dragGroupId = null; dragOverId = null; }}
 										ondragover={(e) => { e.preventDefault(); if (dragGroupId !== g.id) dragOverId = g.id; }}
 										ondragleave={() => (dragOverId === g.id && (dragOverId = null))}
@@ -1526,8 +1526,8 @@
 								class="title-row"
 								role="row"
 								class:dragging={dragIdx === t.idx}
-								draggable={groups.length > 0}
-								ondragstart={() => (dragIdx = t.idx)}
+								draggable={groups.length > 0 || titleSort === "work"}
+								ondragstart={(e) => { dragIdx = t.idx; try { e.dataTransfer.setData("text/plain", String(t.idx)); e.dataTransfer.effectAllowed = "move"; } catch {} }}
 								ondragend={() => { dragIdx = null; dragOverId = null; }}
 						>
 							<label
@@ -1591,7 +1591,7 @@
 										draggable="true"
 										onmouseenter={() => (hlWorkKey = w.key)}
 										onmouseleave={() => (hlWorkKey === w.key && (hlWorkKey = null))}
-										ondragstart={() => (dragWorkKey = w.key)}
+										ondragstart={(e) => { dragWorkKey = w.key; try { e.dataTransfer.setData("text/plain", w.key); e.dataTransfer.effectAllowed = "move"; } catch {} }}
 										ondragend={() => { dragWorkKey = null; dragOverWorkKey = null; }}
 										ondragover={(e) => { if ((dragWorkKey && dragWorkKey !== w.key) || dragIdx !== null) { e.preventDefault(); dragOverWorkKey = w.key; } }}
 										ondragleave={() => (dragOverWorkKey === w.key && (dragOverWorkKey = null))}
