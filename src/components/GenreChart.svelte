@@ -101,8 +101,8 @@
 			<div class="gtip-title"><span class="gtip-dot" style="background:{hovered.color}"></span>{hovered.name}</div>
 			<div class="gtip-date">{fmtMonth(months[hoverI])}</div>
 			<div class="gtip-val">{hovered.values[hoverI].toFixed(1)}<span class="gtip-unit">% of checkouts</span></div>
-			{#if hovered.terms?.length}
-				<div class="gtip-terms"><span class="gtip-lbl">Terms</span>{hovered.terms.join(", ")}{#if hovered.ficTerms?.length}<span class="gtip-fic"> + {hovered.ficTerms.join(", ")} <em>(only with a fiction tag)</em></span>{/if}</div>
+			{#if hovered.terms?.length || hovered.ficTerms?.length}
+				<div class="gtip-terms"><span class="gtip-lbl">Terms</span>{hovered.terms.join(", ")}{#if hovered.ficTerms?.length}<span class="gtip-fic">{hovered.terms?.length ? " + " : ""}{hovered.ficTerms.join(", ")} <em>(only with a fiction tag)</em></span>{/if}</div>
 			{/if}
 			{#if hovered.examples?.length}
 				<div class="gtip-lbl gtip-lbl-ex">Top titles</div>

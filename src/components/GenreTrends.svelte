@@ -403,7 +403,7 @@
 					</div>
 					{#if expanded.has(name)}
 						<div class="gt-detail">
-							<div class="gt-terms">Subject terms: {#each g.terms as t, i}<code>{t}</code>{i < g.terms.length - 1 ? " " : ""}{/each}{#if g.ficTerms?.length}<span class="gt-ficlbl">· only with a <strong>Fiction</strong> tag:</span> {#each g.ficTerms as t, i}<code class="fic">{t}</code>{i < g.ficTerms.length - 1 ? " " : ""}{/each}{/if}</div>
+							<div class="gt-terms">Subject terms:{#if g.terms?.length} {#each g.terms as t, i}<code>{t}</code>{i < g.terms.length - 1 ? " " : ""}{/each}{/if}{#if g.ficTerms?.length}<span class="gt-ficlbl">{g.terms?.length ? "· " : ""}only with a <strong>Fiction</strong> tag:</span> {#each g.ficTerms as t, i}<code class="fic">{t}</code>{i < g.ficTerms.length - 1 ? " " : ""}{/each}{/if}</div>
 							{#if cleanExamples(g.examples).length}
 								<span class="gt-ex-label">Most-checked-out titles</span>
 								<ol class="gt-ex-list">{#each cleanExamples(g.examples) as title}<li>{title}</li>{/each}</ol>
