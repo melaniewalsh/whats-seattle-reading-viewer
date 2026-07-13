@@ -415,9 +415,21 @@
 			{#if mode === "partition"}
 				<div class="gt-row genre-row other-row" class:off={!showOther}>
 					<span class="gt-cell gt-show"><input type="checkbox" checked={showOther} onchange={() => (showOther = !showOther)} aria-label="Plot Other" /></span>
-					<span class="gt-cell gt-name"><span class="gt-tri"></span><span class="gt-sw" style="background:#b0b0b0"></span>Other / Unclassified</span>
+					<button class="gt-cell gt-name" onclick={() => toggleExpand("__other")} aria-expanded={expanded.has("__other")}>
+						<span class="gt-tri">{expanded.has("__other") ? "▾" : "▸"}</span>
+						<span class="gt-sw" style="background:#b0b0b0"></span>Other / Unclassified
+					</button>
 					<span class="gt-cell gt-share">{overall(data.other).toFixed(1)}%</span>
 				</div>
+				{#if expanded.has("__other")}
+					<div class="gt-detail">
+						<div class="gt-terms">Books matching <em>none</em> of the {genreOrder.length} genres — the thinly-tagged tail.</div>
+						{#if cleanExamples(data.otherExamples).length}
+							<span class="gt-ex-label">Most-checked-out titles</span>
+							<ol class="gt-ex-list">{#each cleanExamples(data.otherExamples) as title}<li>{title}</li>{/each}</ol>
+						{/if}
+					</div>
+				{/if}
 			{/if}
 		</div>
 		<p class="gsource">Source: Seattle Public Library — Checkouts by Title (data.seattle.gov). Genre via subject-heading match; all books (print + digital, incl. audiobooks). Example titles reflect the partition (first-match) assignment.</p>

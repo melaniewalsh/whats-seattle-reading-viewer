@@ -237,7 +237,18 @@ def main():
         pshare = 100 * sum(part[i]) / max(1, sum(total))
         print(f"  [{i + 1:>2}/{len(TAXONOMY)}] {name:26s} overlap {oshare:4.1f}% / partition {pshare:4.1f}%", flush=True)
 
-    OUT.write_text(json.dumps({"months": months, "total": total, "genres": genres_out, "other": other},
+    # Top titles in "Other" (matching no genre) so the unclassified bucket is legible too.
+    not_any = "NOT (" + " OR ".join(f"({c})" for _, c in overlap_clauses()) + ")"
+    other_examples = []
+    for row in post(f"SELECT title, sum(checkouts) AS c WHERE {not_any} AND {BOOK} "
+                    f"AND checkoutyear >= {ex_since} GROUP BY title ORDER BY c DESC LIMIT 15"):
+        t = _clean(row.get("title"))
+        if t and t.lower() != "<unknown title>":
+            other_examples.append(t)
+    print(f"  Other: {len(other_examples)} example titles", flush=True)
+
+    OUT.write_text(json.dumps({"months": months, "total": total, "genres": genres_out,
+                               "other": other, "otherExamples": other_examples[:10]},
                               separators=(",", ":")))
     print(f"Wrote {OUT}", flush=True)
 
