@@ -68,6 +68,7 @@ try:
     import boto3
 except ImportError:  # pragma: no cover - boto3 is only needed to LIST keys now
     boto3 = None
+import unicodedata
 
 
 
@@ -408,10 +409,65 @@ def extract_date_signature(name: str):
 
 
 def normalize_title(title: str) -> str:
+    # Initialize string, convert to lowercase, and strip whitespace
     t = str(title or "").lower().strip()
-    t = re.sub(r"[^a-z0-9\s]", "", t)
-    t = re.sub(r"\s+", " ", t).strip()
+    
+    # Fold accents to plain ASCII (normalize NFD and strip combining marks)
+    t = unicodedata.normalize('NFD', t)
+    t = "".join(char for char in t if not unicodedata.combining(char))
+    
+    # Drop "/ by Author" segments
+    t = t.split('/')[0]
+    
+    # keep the English parallel title in bilingual catalog records (" = ")
+    if " = " in t:
+        t = t.split(" = ")[-1]
+        
+    # expand ampersands
+    t = t.replace("&", "and")
+    
+    # drop content inside parentheses and brackets
+    t = re.sub(r"\([^)]*\)", "", t)
+    t = re.sub(r"\[[^\]]*\]", "", t)
+    
+    # repeatedly strip trailing noise segments separated by colons or semicolons
+    noise_pattern = re.compile(
+        r"(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|"
+        r"read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|"
+        r"film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|"
+        r"mystery|story|stories|tale|tales|romance|biography|autobiography|poems|"
+        r"essays|playscript|\bscript\b|\bproduction|\bserie|\blivre|\btome|\blibro|"
+        r"\btomo|\bedicion)", 
+        re.IGNORECASE
+    )
+    or_pattern = re.compile(r"[:;]\s*or[\s,]", re.IGNORECASE)
+    
+    while True:
+        prev = t
+        # find the last segment starting with : or ;
+        match = re.search(r"[:;]\s*[^:;]*$", t)
+        if match:
+            seg = match.group(0)
+            if noise_pattern.search(seg) or or_pattern.search(seg):
+                # Replace the trailing segment with empty string
+                t = t[:match.start()]
+        if t == prev:
+            break
+
+    # drop standalone format/edition keywords
+    t = re.sub(r"\b(unabridged|abridged|audiobook|e-?book|large print|compact disc|sound recording)\b", "", t)
+    
+    # drop articles
+    t = re.sub(r"\b(the|a|an)\b", "", t)
+    
+    # remove apostrophes to merge contractions
+    t = t.replace("'", "")
+    
+    # strip all remaining non-alphanumeric characters (including spaces/hyphens)
+    t = re.sub(r"[^a-z0-9]+", "", t)
+    
     return t
+
 
 
 class UnionFind:
