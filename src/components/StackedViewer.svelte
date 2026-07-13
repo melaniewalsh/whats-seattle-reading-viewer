@@ -186,9 +186,16 @@
 	// A few top titles to seed the "By title" quick-picks (like the author chips).
 	let topTitles = $state([]);
 	let titleMin = $state(0); // min all-time checkouts a title needs to be searchable
+	// Load-once flag (plain, non-reactive): if we keyed off topTitles.length and the
+	// index is empty (e.g. not yet on R2), setting topTitles = [] would re-trigger the
+	// effect forever. Fetch exactly once when the title tab is first opened.
+	let titlePicksLoaded = false;
 	$effect(() => {
-		if (searchMode === "title" && !topTitles.length) searchTitles("", 8).then((t) => (topTitles = t));
-		if (searchMode === "title" && !titleMin) titleIndexMin().then((m) => (titleMin = m));
+		if (searchMode === "title" && !titlePicksLoaded) {
+			titlePicksLoaded = true;
+			searchTitles("", 8).then((t) => (topTitles = t));
+			titleIndexMin().then((m) => (titleMin = m));
+		}
 	});
 	// Round down to a clean figure so the note never overstates the threshold.
 	const titleMinLabel = $derived(titleMin ? (Math.floor(titleMin / 500) * 500).toLocaleString() : "");
