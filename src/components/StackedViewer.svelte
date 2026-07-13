@@ -1225,8 +1225,8 @@
 			{/if}
 		</div>
 
-		{#if searchMode === "title" && titleMinLabel}
-			<p class="title-note">Only well-borrowed titles are searchable — those checked out at least ~{titleMinLabel} times all-time.</p>
+		{#if searchMode === "title"}
+			<p class="title-note"><span class="tn-ic" aria-hidden="true">ℹ</span><span><strong>Only the most-borrowed titles are searchable here</strong>{#if titleMinLabel} — those with at least ~{titleMinLabel} all-time checkouts{/if}. To find any title, search <strong>By&nbsp;author</strong> instead.</span></p>
 		{/if}
 
 		<!-- quick-pick: most-borrowed authors, or most-borrowed titles in title mode -->
@@ -2616,10 +2616,34 @@
 	}
 
 	.title-note {
+		display: flex;
+		align-items: flex-start;
+		gap: 9px;
 		font-family: var(--font-sans);
+		font-size: 0.88rem;
+		line-height: 1.45;
+		color: var(--color-fg);
+		background: #eef4fb;
+		border: 1px solid #cfe0f3;
+		border-radius: 10px;
+		padding: 10px 14px;
+		margin: 12px 0 0;
+	}
+	.title-note strong { font-weight: 700; }
+	.tn-ic {
+		flex: none;
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		background: #3f88cc;
+		color: #fff;
 		font-size: 0.8rem;
-		color: var(--color-fg-light);
-		margin: 6px 2px 0;
+		font-weight: 700;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-style: italic;
+		font-family: Georgia, serif;
 	}
 	/* top-author quick-pick chips (under the search box) */
 	.top-authors {
