@@ -64,7 +64,8 @@ TAXONOMY = [
     ("Humor", ["humor", "humorous stories"], []),
     # Identity-fiction categories, just above the general Literary catch-all so
     # literary LGBTQIA+/Black fiction lands here rather than in the generic bucket.
-    ("LGBTQIA+ Fiction", [], [], ["lgbtqia"]),
+    ("LGBTQIA+ Fiction", [], [], ["lgbtqia", "lgbt", "gay", "lesbian", "homosexual",
+        "bisexual", "transgender", "queer"]),
     ("African American Fiction", ["african american fiction"], []),
     # Broadened to pull literary/classic/general fiction out of "Other" (Demon
     # Copperhead, Pachinko, Pride & Prejudice are tagged just "Fiction, Literature").
