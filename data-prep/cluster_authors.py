@@ -84,7 +84,7 @@ PROCESSED_FILES_CSV = PROJECT_DIR / "data-prep" / "processed_files.csv"
 # name, so cross-file merging still works exactly as before.
 AGG_CACHE = PROJECT_DIR / "data-prep" / "author_title_agg.json"
 
-load_dotenv()
+load_dotenv(dotenv_path="data-prep/access.env")
 
 """
 def clean_display(name: str) -> str:
@@ -139,7 +139,7 @@ def _mark_processed(keys):
     """
     Append newly-ingested R2 keys to PROCESSED_FILES_CSV.
 
-    Only ever called after a full successful rebuild (see main()) -- if the
+    Only ever called after a full successful rebuild. If the
     aggregation or sqlite build raises partway through, these keys are never
     written here, so the next run treats them as new again and retries them
     instead of silently leaving them out of the database forever.
@@ -251,6 +251,21 @@ def normalize(name: str) -> str:
     # matches parenthesis and whats inside
     creator = re.sub(r"\(.*?\)", "", creator)
 
+    # Handle "w/" multi-creator strings without commas like "Stan and Jan Berenstain w/ Mike Berenstain"
+    creator = re.sub(r'\s+w/\s+', ' / ', creator)
+
+    # Check for slash-space cases like "Crichton, Michael / Patterson, James" but not cases like Kaye/Kantrowitz, Melanie
+    if "/ " in creator:
+        segments = [s.strip() for s in creator.split("/") if s.strip()]
+        if len(segments) > 1:
+            # If segments contain commas, process each segment independently
+            if all("," in seg for seg in segments):
+                return " / ".join(normalize(seg) for seg in segments)
+            # If segments dont contain commas (such as after the w/ removal) process without comma validation
+            else:
+                return " / ".join(normalize(seg) for seg in segments)
+
+
     # splitting by commas
     parts = [p.strip() for p in creator.split(",") if p.strip()]
 
@@ -298,13 +313,16 @@ def normalize(name: str) -> str:
     
     # 2 upper case letters followed by period
     creator = re.sub(r"([a-zA-Z]{2})\.", r"\1", creator)
-    
+
+    # single-letter initials ("T." in "T. S. Eliot" / "T.S. Eliot" /
+    # "T.S Eliot") never match the 2-letter rule.
+    #drop the period but keep a space to get "t s"
+    creator = re.sub(r"\b([a-zA-Z])\.", r"\1 ", creator)
+
     # consecutive whitespaces
     creator = re.sub(r"\s+", " ", creator).strip()
 
     creator = re.sub(r"\bemperor of\s+\S+", "", creator)
-
-
 
     # re-attach suffix
     if suffix:
@@ -363,6 +381,11 @@ def name_tokens(name: str):
 def first_last_key(name: str):
     """(first_token, last_token) used to find same-person candidates that
     normalize() didn't already merge (e.g. missing/extra middle name)."""
+    # Multi-creator norms look like "first1 last1 / first2 last2" two people, not one, so
+    # never allow into middle name matching. Shouldnt break in cases
+    # #where Kaye/Kantrowitz, Melanie as no middle name anyway but to watch out for
+    if " / " in name:
+        return None
     tokens = name_tokens(name)
     if len(tokens) < 2:
         return None
@@ -500,12 +523,9 @@ def main():
         if not undated or not dated:
             continue
         u = undated[0]  # only one (norm, None) key can exist per norm
-        # If several *different* dated entities share this normalized name
-        # (different years -> different real people), only merge the
-        # undated spelling into whichever one it actually shares a title
-        # with -- and only the best-supported match, so a shared undated
-        # spelling can't accidentally chain two different dated people
-        # together.
+        # If several different dated entities share this normalized name
+        # only merge the undated spelling into whichever one it actually shares a title
+        # with
         best, best_overlap = None, 0
         for d in dated:
             overlap = len(entities[u]["titles"] & entities[d]["titles"])
