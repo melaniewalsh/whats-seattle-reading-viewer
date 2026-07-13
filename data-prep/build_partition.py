@@ -21,6 +21,7 @@ a time (GROUP BY checkoutmonth for monthly resolution).
 Run:  python3 data-prep/build_partition.py          # full
       python3 data-prep/build_partition.py 2024 2025 # quick test on 2 years
 """
+import collections
 import json
 import sys
 import time
@@ -240,7 +241,8 @@ def main():
         pshare = 100 * sum(part[i]) / max(1, sum(total))
         print(f"  [{i + 1:>2}/{len(TAXONOMY)}] {name:26s} overlap {oshare:4.1f}% / partition {pshare:4.1f}%", flush=True)
 
-    # Top titles in "Other" (matching no genre) so the unclassified bucket is legible too.
+    # Top titles + top subject tags in "Other" (matching no genre), so the
+    # unclassified bucket is legible: what it's made of and what's in it.
     not_any = "NOT (" + " OR ".join(f"({c})" for _, c in overlap_clauses()) + ")"
     other_examples = []
     for row in post(f"SELECT title, sum(checkouts) AS c WHERE {not_any} AND {BOOK} "
@@ -248,10 +250,22 @@ def main():
         t = _clean(row.get("title"))
         if t and t.lower() != "<unknown title>":
             other_examples.append(t)
-    print(f"  Other: {len(other_examples)} example titles", flush=True)
+    tag_yr = years[-2] if len(years) > 1 else years[-1]  # a recent FULL year
+    tagc, other_tot = collections.Counter(), 0
+    for row in post(f"SELECT subjects, sum(checkouts) AS c WHERE checkoutyear = {tag_yr} "
+                    f"AND {not_any} AND {BOOK} GROUP BY subjects ORDER BY c DESC LIMIT 3000"):
+        w = int(float(row.get("c", 0) or 0))
+        other_tot += w
+        for p in (row.get("subjects") or "").split(","):
+            p = p.strip().lower()
+            if p and not p.replace(" ", "").isdigit():
+                tagc[p] += w
+    other_tags = [[t, round(100 * c / max(1, other_tot), 1)] for t, c in tagc.most_common(12)]
+    print(f"  Other: {len(other_examples)} example titles, {len(other_tags)} tags", flush=True)
 
     OUT.write_text(json.dumps({"months": months, "total": total, "genres": genres_out,
-                               "other": other, "otherExamples": other_examples[:10]},
+                               "other": other, "otherExamples": other_examples[:10],
+                               "otherTags": other_tags},
                               separators=(",", ":")))
     print(f"Wrote {OUT}", flush=True)
 

@@ -424,7 +424,10 @@
 				</div>
 				{#if expanded.has("__other")}
 					<div class="gt-detail">
-						<div class="gt-terms">Books matching <em>none</em> of the {genreOrder.length} genres — the thinly-tagged tail.</div>
+						<div class="gt-terms">Books matching <em>none</em> of the {genreOrder.length} genres — mostly general, un-genre'd nonfiction.</div>
+						{#if data.otherTags?.length}
+							<div class="gt-terms">Top subject tags here: {#each data.otherTags as t, i}<code>{t[0]}</code><span class="gt-pct">{t[1]}%</span>{i < data.otherTags.length - 1 ? " " : ""}{/each}</div>
+						{/if}
 						{#if cleanExamples(data.otherExamples).length}
 							<span class="gt-ex-label">Most-checked-out titles</span>
 							<ol class="gt-ex-list">{#each cleanExamples(data.otherExamples) as title}<li>{title}</li>{/each}</ol>
@@ -509,6 +512,7 @@
 	.gt-terms code { background: var(--color-gray-100); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
 	.gt-terms code.fic { background: #efe9f5; color: #6a4c93; }
 	.gt-ficlbl { margin: 0 3px 0 5px; color: var(--color-fg-light); }
+	.gt-pct { margin: 0 6px 0 3px; font-size: 0.9em; color: var(--color-fg-light); }
 	.gt-ex-label { display: block; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg-light); margin-bottom: 6px; }
 	.gt-ex-list { margin: 0; padding-left: 1.4em; columns: 2; column-gap: 28px; }
 	.gt-ex-list li { font-size: 0.82rem; line-height: 1.5; break-inside: avoid; color: var(--color-fg); }
