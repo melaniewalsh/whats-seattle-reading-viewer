@@ -26,9 +26,21 @@ def clean(t):
     return re.sub(r"\s*[.,;/:]\s*$", "", t).strip()
 
 
+def norm_title(t):
+    """Key form: main title only (drop ':' subtitle and '(' qualifiers), lowercased."""
+    return clean(t).split(":")[0].split("(")[0].strip().lower()
+
+
+def norm_author(a):
+    """Order-insensitive author key so 'Rowling, J. K.' == 'J. K. Rowling'."""
+    return " ".join(sorted(re.findall(r"[a-z0-9]+", (a or "").lower())))
+
+
 def main():
     files = glob.glob(str(ROOT / "authors" / "**" / "*.json"), recursive=True)
-    agg = {}  # (titleLower, slug) -> [display, slug, author, total]
+    # Collapse a book's edition/title-string variants AND an author's split
+    # name-variant files into ONE entry, resolving to the highest-total file.
+    agg = {}  # (normTitle, normAuthor) -> {total, best:(tot, display, slug, author)}
     for f in files:
         try:
             d = json.loads(Path(f).read_text())
@@ -43,12 +55,13 @@ def main():
             disp = clean(t.get("title", ""))
             if not disp:
                 continue
-            key = (disp.lower(), slug)
-            if key in agg:
-                agg[key][3] += tot
-            else:
-                agg[key] = [disp, slug, author, tot]
-    rows = sorted(agg.values(), key=lambda r: -r[3])
+            key = (norm_title(disp), norm_author(author))
+            e = agg.setdefault(key, {"total": 0, "best": None})
+            e["total"] += tot
+            if e["best"] is None or tot > e["best"][0]:
+                e["best"] = (tot, disp, slug, author)
+    rows = [[e["best"][1], e["best"][2], e["best"][3], e["total"]] for e in agg.values()]
+    rows.sort(key=lambda r: -r[3])
     OUT.write_text(json.dumps(rows, separators=(",", ":")))
     print(f"Wrote {OUT}: {len(rows):,} titles (>= {THRESHOLD} checkouts), "
           f"{OUT.stat().st_size // 1024} KB")
