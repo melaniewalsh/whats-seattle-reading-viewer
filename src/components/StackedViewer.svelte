@@ -1976,12 +1976,13 @@
 	}
 	.st-chip {
 		padding: 3px 10px;
-		border: 1px solid var(--color-border);
+		border: 1px solid #e0d5ee;
 		border-radius: 999px;
-		background: var(--color-gray-100);
+		/* purple, matching the genre tab's subject-term chips */
+		background: #efe9f5;
 		font-size: 0.78rem;
 		line-height: 1.3;
-		color: var(--color-fg);
+		color: #6a4c93;
 		white-space: nowrap;
 	}
 
