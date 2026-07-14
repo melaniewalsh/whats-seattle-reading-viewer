@@ -1371,7 +1371,7 @@
 				{:else if searchMode === "title"}
 					by {displayName(current.name)}{#if titleCheckouts != null}{" · "}{abbrevCount(titleCheckouts)} checkouts{/if}
 				{:else}
-					{abbrevCount(current.total)} checkouts · {current.titles.length} titles
+					{abbrevCount(current.total)} checkouts · {workGroups.size.toLocaleString()} works
 				{/if}
 			</p>
 
