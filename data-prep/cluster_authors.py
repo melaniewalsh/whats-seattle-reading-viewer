@@ -559,6 +559,58 @@ class UnionFind:
             self.parent[ra] = rb
 
 
+def name_variant_remap(name_totals):
+    """Collapse author records that are the same person under different name
+    FORMS -- "Pilkey, Dav" + "dav pilkey, 1966", "Mandel, Emily St. John" +
+    "emily st john mandel, 1979" -- which the fuzzy pass can leave split (it
+    reliably clusters most spellings but systematically misses the plain
+    inverted form, splitting ~20k authors' checkouts across two records).
+
+    Groups names that share the SAME set of word tokens (case-, order-, and
+    life-date-insensitive) and maps each to the highest-total form. Refuses to
+    merge a group whose members carry conflicting BIRTH years (first 4-digit
+    year), since that marks two different people ("george michael, 1963" vs
+    "michael george, 1947") -- ~15 such groups exist and are left alone.
+
+    `name_totals` is an iterable of (name, total_checkouts). Returns a dict
+    {variant_name: representative_name}, listing only names that should move
+    (identity mappings omitted). This is a pure, deterministic rule with no I/O:
+    build_data.py imports and applies it at build time, so the logic lives here
+    with the rest of the clustering yet runs on every rebuild -- no need to
+    regenerate author_map.json to keep it current.
+    """
+    import collections
+    import re as _re
+
+    def toks(name):
+        return " ".join(sorted(
+            t for t in _re.findall(r"[a-z0-9]+", name.lower())
+            if not _re.fullmatch(r"\d{4}", t)))
+
+    def birth_year(name):
+        m = _re.findall(r"\d{4}", name)
+        return m[0] if m else None
+
+    groups = collections.defaultdict(list)
+    for name, total in name_totals:
+        key = toks(name)
+        if key:
+            groups[key].append((name, int(total or 0)))
+
+    remap = {}
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        births = {birth_year(n) for n, _ in members if birth_year(n)}
+        if len(births) > 1:
+            continue  # conflicting birth years -> likely different people
+        rep = max(members, key=lambda m: m[1])[0]
+        for name, _ in members:
+            if name != rep:
+                remap[name] = rep
+    return remap
+
+
 def main():
     start_time = perf_counter()
 

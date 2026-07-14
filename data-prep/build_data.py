@@ -110,7 +110,6 @@ HOW TO RUN
 STUDENTS: good places to extend this are marked with "TODO".
 """
 
-import collections
 import json
 import os
 import re
@@ -832,59 +831,25 @@ def sync_new_files_from_r2():
 
 
 def merge_name_variants(con):
-    """Second-pass author reconciliation, run on the post-`author_map` `clean`
-    table.
+    """Apply the second-pass author reconciliation at build time.
 
-    The author_map merges many raw spellings into one canonical name, but it
-    systematically MISSES the plain inverted form -- e.g. it makes
-    "dav pilkey, 1966" but leaves "Pilkey, Dav" as a separate author, splitting
-    ~20k authors (including many of the most-borrowed: Pilkey, Stephen King,
-    Agatha Christie, Emily St. John Mandel, ...) into two records with their
-    checkouts divided between them.
-
-    Fix: collapse canonical authors that share the SAME set of name tokens
-    (case-, order-, and life-date-insensitive), merging into the highest-total
-    form. Guard against fusing two DIFFERENT people who happen to share a name by
-    refusing to merge a group whose members carry conflicting BIRTH years (first
-    4-digit year), e.g. "george michael, 1963" vs "michael george, 1947". This
-    is a safety net that works regardless of author_map's completeness; it never
-    touches cluster_authors.py.
+    The RULE -- collapse case/order/date name-variants the fuzzy pass left split
+    ("Pilkey, Dav" + "dav pilkey, 1966"), guarded by a conflicting-birth-year
+    check -- lives in cluster_authors.name_variant_remap(), alongside the rest of
+    the author-clustering logic. Here we just feed it the post-map canonical
+    names + their checkout totals and fold the variants together in `clean`.
+    Running it every build means it never needs author_map.json regenerated to
+    stay current.
     """
-    def tokens(name):
-        return " ".join(sorted(
-            t for t in re.findall(r"[a-z0-9]+", name.lower()) if not re.fullmatch(r"\d{4}", t)))
-
-    def birth_year(name):
-        m = re.findall(r"\d{4}", name)
-        return m[0] if m else None
-
+    from cluster_authors import name_variant_remap
     rows = con.execute(
         "SELECT author, CAST(sum(checkouts) AS BIGINT) AS c FROM clean GROUP BY author"
     ).fetchall()
-    groups = collections.defaultdict(list)
-    for author, total in rows:
-        key = tokens(author)
-        if key:
-            groups[key].append((author, total))
-
-    remap = {}  # variant author -> representative (highest-total) author
-    n_groups = 0
-    for members in groups.values():
-        if len(members) < 2:
-            continue
-        births = {birth_year(a) for a, _ in members if birth_year(a)}
-        if len(births) > 1:
-            continue  # conflicting birth years -> likely different people, leave alone
-        rep = max(members, key=lambda m: m[1])[0]
-        for author, _ in members:
-            if author != rep:
-                remap[author] = rep
-        n_groups += 1
-
+    remap = name_variant_remap(rows)
     if not remap:
         print("  no author name-variant merges")
         return
-    print(f"  merging {len(remap):,} name-variants into {n_groups:,} authors "
+    print(f"  merging {len(remap):,} name-variants into {len(set(remap.values())):,} authors "
           f"(e.g. 'Pilkey, Dav' + 'dav pilkey, 1966')")
     con.execute("DROP TABLE IF EXISTS namemerge")
     con.execute("CREATE TABLE namemerge(variant VARCHAR, rep VARCHAR)")
