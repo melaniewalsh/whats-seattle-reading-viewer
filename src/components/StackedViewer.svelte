@@ -512,7 +512,7 @@
 		let n = name.trim();
 		// Drop a trailing life-dates clause the catalog appends ("Baldwin, James,
 		// 1924-1987" or "james baldwin, 1924-1987") so it isn't flipped to the front.
-		n = n.replace(/,\s*\d{4}\s*-\s*\d{0,4}\.?\s*$/, "");
+		n = n.replace(/,\s*\d{4}(?:\s*-\s*\d{0,4})?\.?\s*$/, "");
 		const comma = n.match(/^([^,]+),\s*(.+)$/);
 		if (comma) n = `${comma[2].trim()} ${comma[1].trim()}`;
 		return n.replace(/\S+/g, titleCaseWord);
