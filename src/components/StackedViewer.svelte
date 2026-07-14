@@ -1981,7 +1981,7 @@
 		border-radius: 4px;
 		background: #efe9f5;
 		color: #6a4c93;
-		font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+		font-family: var(--font-sans);
 		font-size: 0.82rem;
 		line-height: 1.5;
 		white-space: nowrap;
