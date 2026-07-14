@@ -1030,6 +1030,25 @@
 		return displayName(current.name);
 	});
 
+	// Top subject-heading terms to show under the Download/Share buttons: the
+	// author's terms in author mode, or (in "By title" mode) the plotted work's
+	// terms when exactly one work is shown. Baked into the author file by the
+	// build (annotate_subjects); data built before that just renders nothing.
+	const subjectTerms = $derived.by(() => {
+		if (!current || isOverview) return [];
+		if (searchMode === "title") {
+			const gs = groups.filter((g) => g.idxs.length);
+			if (gs.length === 1 && !singleIdxs.length) {
+				const idxs = gs[0].idxs;
+				const idx = idxs.reduce((b, i) => (current.titles[i].total > current.titles[b].total ? i : b), idxs[0]);
+				return current.titles[idx]?.subjects ?? [];
+			}
+			if (!gs.length && singleIdxs.length === 1) return current.titles[singleIdxs[0]]?.subjects ?? [];
+			return [];
+		}
+		return current.subjects ?? [];
+	});
+
 	// StackedViewer.svelte
 	const chartSeries = $derived.by(() => {
 		if (!current) return [];
@@ -1412,6 +1431,17 @@
 				{/if}
 				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 			</div>
+
+			{#if subjectTerms.length}
+				<div class="subject-terms">
+					<span class="st-label">{searchMode === "title" ? "Top subjects for this title" : "Top subjects for this author"}</span>
+					<ul class="st-chips">
+						{#each subjectTerms as term}
+							<li class="st-chip">{term}</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
 
 			<div class="picker-below">
 				{@render authorPicker()}
@@ -1899,6 +1929,41 @@
 		justify-content: flex-end; /* download / share sit at the right, OWID-style */
 		gap: 8px;
 		margin: 10px 0 4px;
+	}
+
+	/* top subject-heading terms for the current author / title, just under the
+	   download + share row */
+	.subject-terms {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 6px 8px;
+		margin: 2px 0 6px;
+		font-family: var(--font-sans);
+	}
+	.st-label {
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--color-fg-light);
+		letter-spacing: 0.01em;
+	}
+	.st-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.st-chip {
+		padding: 3px 10px;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		background: var(--color-gray-100);
+		font-size: 0.78rem;
+		line-height: 1.3;
+		color: var(--color-fg);
+		white-space: nowrap;
 	}
 
 	/* the author search + "most borrowed" chips, relocated below the chart --

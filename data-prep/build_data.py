@@ -497,6 +497,107 @@ def write_author_files(out_dir, months, record_stream, counters):
     return n_authors
 
 
+def annotate_subjects(con, out_dir, slug_by_author):
+    """Post-pass: fold each author's (and each of their titles') most-common
+    subject-heading TERMS into the already-written author JSON files.
+
+    Runs AFTER write_author_files so it never perturbs the memory-tuned author/
+    title streaming above; the caller wraps it in try/except, so if it fails the
+    core build has still produced complete (subject-less) files. Terms come from
+    the raw `subjects` field -- a comma-separated list per checkout row -- split
+    into individual terms, weighted by checkouts, with case variants folded
+    together (keeping the most-borrowed casing for display). Writes:
+      author file  ->  "subjects": [term, ...]           (top 5 for the author)
+      each title   ->  "subjects": [term, ...]           (top 5 for that title)
+    """
+    authors_dir = out_dir / "authors"
+
+    # Per-author top terms -- one small row per author, so a dict is fine to hold.
+    print("  [subjects] aggregating author terms ...")
+    author_terms = {}
+    for author, terms in con.execute(
+        """
+        WITH exploded AS (
+            SELECT author, trim(u.term) AS term, checkouts
+            FROM clean, UNNEST(string_split(coalesce(subjects, ''), ',')) AS u(term)
+            WHERE length(trim(u.term)) > 1
+        ),
+        per AS (
+            SELECT author, arg_max(term, checkouts) AS term, sum(checkouts) AS c
+            FROM exploded
+            GROUP BY author, lower(trim(term))
+        )
+        SELECT author, list_slice(list(term ORDER BY c DESC), 1, 5) AS terms
+        FROM per
+        GROUP BY author
+        """
+    ).fetchall():
+        if terms:
+            author_terms[author] = terms
+
+    # Per-(author, title) top terms, streamed ORDER BY author so we hold only one
+    # author's titles in memory at a time and patch that author's file in one go.
+    print("  [subjects] aggregating per-title terms + patching files ...")
+    cur = con.execute(
+        """
+        WITH exploded AS (
+            SELECT author, title, trim(u.term) AS term, checkouts
+            FROM clean, UNNEST(string_split(coalesce(subjects, ''), ',')) AS u(term)
+            WHERE length(trim(u.term)) > 1
+        ),
+        per AS (
+            SELECT author, title, arg_max(term, checkouts) AS term, sum(checkouts) AS c
+            FROM exploded
+            GROUP BY author, title, lower(trim(term))
+        )
+        SELECT author, title, list_slice(list(term ORDER BY c DESC), 1, 5) AS terms
+        FROM per
+        GROUP BY author, title
+        ORDER BY author
+        """
+    )
+    reader = cur.fetch_record_batch(rows_per_batch=TITLE_FETCH_CHUNK)
+
+    sentinel = object()
+    state = {"author": sentinel, "titles": {}}
+    n_patched = [0]
+
+    def flush():
+        author = state["author"]
+        state_titles = state["titles"]
+        state["titles"] = {}
+        if author is sentinel:
+            return
+        slug = slug_by_author.get(author)
+        if not slug:
+            return
+        path = authors_dir / (slug[:2] or "__") / f"{slug}.json"
+        if not path.exists():
+            return
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            return
+        aterms = author_terms.get(author)
+        if aterms:
+            data["subjects"] = aterms
+        for t in data.get("titles", []):
+            tt = state_titles.get(t["title"])
+            if tt:
+                t["subjects"] = tt
+        path.write_bytes(_dumps(data))
+        n_patched[0] += 1
+
+    for batch in reader:
+        for row in batch.to_pylist():
+            if row["author"] != state["author"]:
+                flush()
+                state["author"] = row["author"]
+            state["titles"][row["title"]] = row["terms"]
+    flush()
+    print(f"  [subjects] patched {n_patched[0]:,} author files")
+
+
 def build_sqlite(db_path, months, record_stream, counters):
     """
     Create library.sqlite3 and stream every author's series + titles into it.
@@ -818,7 +919,8 @@ def main():
             Title AS title,
             CheckoutYear * 12 + (CheckoutMonth - 1) - {lo} AS mi,
             {MATERIAL_CASE} AS fmt,
-            Checkouts AS checkouts
+            Checkouts AS checkouts,
+            Subjects AS subjects
         FROM raw
         WHERE Creator IS NOT NULL
         -- Drop placeholder "authors" the catalog uses for missing/unknown
@@ -856,7 +958,7 @@ def main():
             CREATE TABLE clean AS
             WITH base AS ({BASE_SELECT})
             SELECT COALESCE(m.canonical, b.author) AS author,
-                   b.title, b.mi, b.fmt, b.checkouts
+                   b.title, b.mi, b.fmt, b.checkouts, b.subjects
             FROM base b
             LEFT JOIN amap m ON b.author = m.raw
             """
@@ -986,6 +1088,13 @@ def main():
     n_authors = write_author_files(OUT_DIR, months, record_stream, counters)
     print(f"  {n_authors:,} authors, {counters['n_titles']:,} qualifying titles")
     print(f"  ({perf_counter() - t0:.2f}s)")
+
+    # Fold top subject-heading terms into the author files (isolated post-pass;
+    # a failure here must not sink an otherwise-complete build).
+    try:
+        annotate_subjects(con, OUT_DIR, slug_by_author)
+    except Exception as e:  # noqa: BLE001
+        print(f"  WARNING: subject annotation failed ({e}); files written without subjects")
 
     # Only mark this run's R2 files as processed once library.sqlite3 has
     # actually been rebuilt successfully. 
