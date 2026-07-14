@@ -6,7 +6,7 @@ Here's the fun part: evaluation is real research. You'll build a benchmark compa
 
 ## The Secret Weapon
 
-Normally, evaluating clustering means paying humans to create a **gold standard** — a trusted set of right answers. We get to skip that: for [a previous paper](https://doi.org/10.63744/P6qPH135jhY2), a UW team manually clustered the checkout data for all 93 authors in the *Norton Anthology of American Literature* — hand-unified author name variants (`Normalized.Creator`) and hand-reconciled works (`Normalized.Title`). That paper even says the dataset can "serve as a benchmark for future *Work*-level clustering approaches." We'll be the first to use it that way.
+Normally, evaluating clustering means paying humans to create a **gold standard** — a trusted set of right answers. We get to skip that: for [a previous paper](https://doi.org/10.63744/P6qPH135jhY2), a we manually clustered the checkout data for all 93 authors in the *Norton Anthology of American Literature* — hand-unified author name variants (`Normalized.Creator`) and hand-reconciled works (`Normalized.Title`). That paper even says the dataset can "serve as a benchmark for future *Work*-level clustering approaches." We'll be the first to use it that way.
 
 ## The Three Parts
 
