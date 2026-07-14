@@ -87,7 +87,7 @@ jobs:
           ls -lh static/data/meta.json static/data/search-index.json
           # Title reverse-lookup index for the "By title" tab. High threshold so
           # only well-borrowed titles are searchable -> the index stays small.
-          TITLE_MIN_CHECKOUTS=2000 python3 data-prep/build_title_index.py
+          TITLE_MIN_CHECKOUTS=500 python3 data-prep/build_title_index.py
 
       - name: Upload data files to the public R2 bucket
         env:
