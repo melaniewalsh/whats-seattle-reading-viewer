@@ -1037,19 +1037,35 @@
 	// author's terms in author mode, or (in "By title" mode) the plotted work's
 	// terms when exactly one work is shown. Baked into the author file by the
 	// build (annotate_subjects); data built before that just renders nothing.
+	// Stored subjects are [[term, weight], ...] (older data may be a plain [term,...]).
+	// Pool a term list into a running term->weight Map so we can combine a work's
+	// editions (a book's ebook record is often sparse/generic while its print
+	// record carries the specific headings) and re-rank the union.
+	function poolSubjects(map, list) {
+		for (const it of list ?? []) {
+			const term = Array.isArray(it) ? it[0] : it;
+			const w = Array.isArray(it) ? (it[1] || 0) : 0;
+			if (term) map.set(term, (map.get(term) || 0) + w);
+		}
+	}
+	const top5Terms = (map) => [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map((e) => e[0]);
+
 	const subjectTerms = $derived.by(() => {
 		if (!current || isOverview) return [];
 		if (searchMode === "title") {
 			const gs = groups.filter((g) => g.idxs.length);
-			if (gs.length === 1 && !singleIdxs.length) {
-				const idxs = gs[0].idxs;
-				const idx = idxs.reduce((b, i) => (current.titles[i].total > current.titles[b].total ? i : b), idxs[0]);
-				return current.titles[idx]?.subjects ?? [];
-			}
-			if (!gs.length && singleIdxs.length === 1) return current.titles[singleIdxs[0]]?.subjects ?? [];
-			return [];
+			let idxs = null;
+			if (gs.length === 1 && !singleIdxs.length) idxs = gs[0].idxs;
+			else if (!gs.length && singleIdxs.length === 1) idxs = singleIdxs;
+			if (!idxs) return [];
+			const m = new Map();
+			for (const i of idxs) poolSubjects(m, current.titles[i]?.subjects);
+			return top5Terms(m);
 		}
-		return current.subjects ?? [];
+		// author mode: already pooled across everything in the build
+		const m = new Map();
+		poolSubjects(m, current.subjects);
+		return top5Terms(m);
 	});
 
 	// StackedViewer.svelte

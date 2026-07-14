@@ -18,14 +18,16 @@
 		["Fiction", ["Comics & Graphic Novels", "Romance", "Fantasy", "Science Fiction", "Horror",
 			"Mystery", "Thriller & Suspense", "Historical Fiction", "Western", "Mythology & Folklore",
 			"Humor", "LGBTQIA+ Fiction", "African American Fiction", "Literary & Classic Fiction",
-			"General Fiction", "Poetry"]],
-		["Kids & Young Adult", ["Picture Books & Early Readers", "Young Adult", "Juvenile Fiction"]],
+			"General Fiction", "Poetry", "Fiction"]],
+		["Kids & Young Adult", ["Picture Books & Early Readers", "Young Adult", "Juvenile Fiction",
+			"Juvenile Nonfiction"]],
 		["Nonfiction", ["Memoir & Biography", "True Crime", "Cooking & Food", "Self-Help",
 			"Business & Economics", "Health & Fitness", "Psychology", "Politics & Government", "History",
 			"Science & Nature", "Religion & Spirituality", "Travel", "Sports & Recreation",
-			"Parenting & Family", "Art & Photography", "Crafts & Hobbies", "Home & Garden",
+			"Parenting & Family", "Art & Photography", "Art", "Crafts & Hobbies", "Home & Garden",
 			"Computers & Technology", "Philosophy", "Drama & Performing Arts", "Reference & Study",
-			"Essays & Society"]],
+			"Essays & Society", "Literary Criticism", "Illustrated Works", "Informational Works",
+			"Instructional & Educational Works", "Readers Publications", "Nonfiction"]],
 	];
 
 	const PALETTE = [
@@ -43,6 +45,7 @@
 	let shown = $state(new Set());  // genre names currently plotted
 	let showOther = $state(false);  // the "Other / Unclassified" partition line
 	let expanded = $state(new Set());
+	let genreFilter = $state(""); // search box: filter the table by genre name OR subject term
 	let isolatedKeys = $state([]);
 	let genreOrder = $state([]);     // stable display order (by size, for colors)
 	let genreByName = $state({});
@@ -124,6 +127,18 @@
 	const isIsolated = (k) => isolatedKeys.includes(k);
 	const showAll = () => (shown = new Set(genreOrder));
 	const hideAll = () => { shown = new Set(); isolatedKeys = []; };
+
+	// Genre-table search: match the query against the genre name OR any of its
+	// subject terms (so "vampire" finds Fantasy, "cooking" finds Cooking & Food).
+	function genreMatches(name) {
+		const q = genreFilter.trim().toLowerCase();
+		if (!q) return true;
+		if (name.toLowerCase().includes(q)) return true;
+		const g = genreByName[name];
+		if (!g) return false;
+		return (g.terms || []).some((t) => t.toLowerCase().includes(q))
+			|| (g.ficTerms || []).some((t) => t.toLowerCase().includes(q));
+	}
 
 	// --- Share / download (mirrors the "By author" tab exactly) --------------
 	const plotTitle = $derived(mode === "partition"
@@ -383,6 +398,12 @@
 		</div>
 		<p class="gtable-hint">Tick a genre to plot it (a handful are shown by default — all of them at once is a mess). Expand one to see the subject terms behind it and its most-checked-out titles.</p>
 
+		<div class="gt-search">
+			<input type="search" class="gt-search-input" bind:value={genreFilter}
+				placeholder="Search genres or subject terms — e.g. vampire, cooking, memoir" aria-label="Search genres" />
+			{#if genreFilter}<button class="gt-search-clear" onclick={() => (genreFilter = "")} aria-label="Clear search" title="Clear">×</button>{/if}
+		</div>
+
 		<div class="gtable">
 			<div class="gt-head" role="row">
 				<span class="gt-cell gt-show">Plot</span>
@@ -390,7 +411,8 @@
 				<span class="gt-cell gt-share">Share</span>
 			</div>
 			{#each GROUPS as [groupName, names] (groupName)}
-				{@const inGroup = names.filter((n) => genreByName[n]).sort((a, b) => sum(genreByName[b].partition) - sum(genreByName[a].partition))}
+				{@const inGroup = names.filter((n) => genreByName[n] && genreMatches(n)).sort((a, b) => sum(genreByName[b].partition) - sum(genreByName[a].partition))}
+				{#if inGroup.length}
 				<div class="gt-group" role="row">{groupName}</div>
 				{#each inGroup as name (name)}
 					{@const g = genreByName[name]}
@@ -412,6 +434,7 @@
 						</div>
 					{/if}
 				{/each}
+			{/if}
 			{/each}
 				<div class="gt-row genre-row other-row" class:off={!showOther}>
 					<span class="gt-cell gt-show"><input type="checkbox" checked={showOther} onchange={() => (showOther = !showOther)} aria-label="Plot Other" /></span>
@@ -489,6 +512,11 @@
 	.bulk { display: flex; gap: 6px; }
 	.bulk button { font-family: var(--font-sans); font-size: 0.72rem; border: 1px solid var(--color-border); background: var(--color-white); color: var(--color-fg-light); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
 	.gtable-hint { font-family: var(--font-sans); font-size: 0.85rem; color: var(--color-fg-light); margin: 0 0 12px; line-height: 1.45; }
+	.gt-search { position: relative; margin: 0 0 12px; }
+	.gt-search-input { width: 100%; box-sizing: border-box; padding: 9px 34px 9px 14px; font-family: var(--font-sans); font-size: 0.9rem; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-white); color: var(--color-fg); }
+	.gt-search-input:focus { outline: none; border-color: #3f88cc; box-shadow: 0 0 0 3px rgba(63,136,204,0.15); }
+	.gt-search-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border: none; background: none; font-size: 1.1rem; line-height: 1; color: var(--color-fg-light); cursor: pointer; border-radius: 50%; }
+	.gt-search-clear:hover { background: var(--color-gray-100); color: var(--color-fg); }
 
 	.gtable { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; font-family: var(--font-sans); }
 	.gt-head, .gt-row { display: grid; grid-template-columns: 48px 1fr 72px; align-items: center; gap: 10px; padding: 8px 12px; }

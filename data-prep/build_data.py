@@ -506,51 +506,64 @@ def annotate_subjects(con, out_dir, slug_by_author):
     core build has still produced complete (subject-less) files. Terms come from
     the raw `subjects` field -- a comma-separated list per checkout row -- split
     into individual terms, weighted by checkouts, with case variants folded
-    together (keeping the most-borrowed casing for display). Writes:
-      author file  ->  "subjects": [term, ...]           (top 5 for the author)
-      each title   ->  "subjects": [term, ...]           (top 5 for that title)
+    together (keeping the most-borrowed casing for display). Umbrella terms
+    (Fiction/Nonfiction/Literature/...) are dropped so specific headings surface.
+    Writes weighted pairs so the frontend can pool a work's editions + re-rank:
+      author file  ->  "subjects": [[term, checkouts], ...]   (top 8, pooled)
+      each title   ->  "subjects": [[term, checkouts], ...]   (top 10 per edition)
     """
     authors_dir = out_dir / "authors"
 
+    # Umbrella terms carry almost no information and (because ebook records tag
+    # little else) drown out the specific print headings -- e.g. The Goldfinch's
+    # ebook is just "Fiction, Literature" (37k checkouts) while its print record
+    # has "Young men, Loss, Artists, ...". Drop them so the specifics surface.
+    STOP = ("'fiction','nonfiction','non-fiction','literature','general',"
+            "'fiction general','general fiction','adult','adult fiction'")
+
     # Per-author top terms -- one small row per author, so a dict is fine to hold.
+    # Stored WITH weights ([term, checkouts]) so the frontend can pool a work's
+    # editions and re-rank; author terms are already pooled across everything.
     print("  [subjects] aggregating author terms ...")
     author_terms = {}
     for author, terms in con.execute(
-        """
+        f"""
         WITH exploded AS (
             SELECT author, trim(u.term) AS term, checkouts
             FROM clean, UNNEST(string_split(coalesce(subjects, ''), ',')) AS u(term)
             WHERE length(trim(u.term)) > 1
+              AND lower(trim(u.term)) NOT IN ({STOP})
         ),
         per AS (
             SELECT author, arg_max(term, checkouts) AS term, sum(checkouts) AS c
             FROM exploded
             GROUP BY author, lower(trim(term))
         )
-        SELECT author, list_slice(list(term ORDER BY c DESC), 1, 5) AS terms
+        SELECT author, list_slice(list({{'t': term, 'n': c}} ORDER BY c DESC), 1, 8) AS terms
         FROM per
         GROUP BY author
         """
     ).fetchall():
         if terms:
-            author_terms[author] = terms
+            author_terms[author] = [[e["t"], int(e["n"])] for e in terms]
 
     # Per-(author, title) top terms, streamed ORDER BY author so we hold only one
     # author's titles in memory at a time and patch that author's file in one go.
     print("  [subjects] aggregating per-title terms + patching files ...")
     cur = con.execute(
-        """
+        f"""
         WITH exploded AS (
             SELECT author, title, trim(u.term) AS term, checkouts
             FROM clean, UNNEST(string_split(coalesce(subjects, ''), ',')) AS u(term)
             WHERE length(trim(u.term)) > 1
+              AND lower(trim(u.term)) NOT IN ({STOP})
         ),
         per AS (
             SELECT author, title, arg_max(term, checkouts) AS term, sum(checkouts) AS c
             FROM exploded
             GROUP BY author, title, lower(trim(term))
         )
-        SELECT author, title, list_slice(list(term ORDER BY c DESC), 1, 5) AS terms
+        SELECT author, title, list_slice(list({{'t': term, 'n': c}} ORDER BY c DESC), 1, 10) AS terms
         FROM per
         GROUP BY author, title
         ORDER BY author
@@ -584,7 +597,7 @@ def annotate_subjects(con, out_dir, slug_by_author):
         for t in data.get("titles", []):
             tt = state_titles.get(t["title"])
             if tt:
-                t["subjects"] = tt
+                t["subjects"] = [[e["t"], int(e["n"])] for e in tt]
         path.write_bytes(_dumps(data))
         n_patched[0] += 1
 
