@@ -110,6 +110,7 @@ HOW TO RUN
 STUDENTS: good places to extend this are marked with "TODO".
 """
 
+import collections
 import json
 import os
 import re
@@ -830,6 +831,77 @@ def sync_new_files_from_r2():
     return downloaded
 
 
+def merge_name_variants(con):
+    """Second-pass author reconciliation, run on the post-`author_map` `clean`
+    table.
+
+    The author_map merges many raw spellings into one canonical name, but it
+    systematically MISSES the plain inverted form -- e.g. it makes
+    "dav pilkey, 1966" but leaves "Pilkey, Dav" as a separate author, splitting
+    ~20k authors (including many of the most-borrowed: Pilkey, Stephen King,
+    Agatha Christie, Emily St. John Mandel, ...) into two records with their
+    checkouts divided between them.
+
+    Fix: collapse canonical authors that share the SAME set of name tokens
+    (case-, order-, and life-date-insensitive), merging into the highest-total
+    form. Guard against fusing two DIFFERENT people who happen to share a name by
+    refusing to merge a group whose members carry conflicting BIRTH years (first
+    4-digit year), e.g. "george michael, 1963" vs "michael george, 1947". This
+    is a safety net that works regardless of author_map's completeness; it never
+    touches cluster_authors.py.
+    """
+    def tokens(name):
+        return " ".join(sorted(
+            t for t in re.findall(r"[a-z0-9]+", name.lower()) if not re.fullmatch(r"\d{4}", t)))
+
+    def birth_year(name):
+        m = re.findall(r"\d{4}", name)
+        return m[0] if m else None
+
+    rows = con.execute(
+        "SELECT author, CAST(sum(checkouts) AS BIGINT) AS c FROM clean GROUP BY author"
+    ).fetchall()
+    groups = collections.defaultdict(list)
+    for author, total in rows:
+        key = tokens(author)
+        if key:
+            groups[key].append((author, total))
+
+    remap = {}  # variant author -> representative (highest-total) author
+    n_groups = 0
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        births = {birth_year(a) for a, _ in members if birth_year(a)}
+        if len(births) > 1:
+            continue  # conflicting birth years -> likely different people, leave alone
+        rep = max(members, key=lambda m: m[1])[0]
+        for author, _ in members:
+            if author != rep:
+                remap[author] = rep
+        n_groups += 1
+
+    if not remap:
+        print("  no author name-variant merges")
+        return
+    print(f"  merging {len(remap):,} name-variants into {n_groups:,} authors "
+          f"(e.g. 'Pilkey, Dav' + 'dav pilkey, 1966')")
+    con.execute("DROP TABLE IF EXISTS namemerge")
+    con.execute("CREATE TABLE namemerge(variant VARCHAR, rep VARCHAR)")
+    con.executemany("INSERT INTO namemerge VALUES (?, ?)", list(remap.items()))
+    # Rewrite clean with variants folded into their representative. Can't
+    # CREATE-OR-REPLACE a table from a SELECT over itself, so stage then swap.
+    con.execute(
+        """
+        CREATE TABLE clean_merged AS
+        SELECT COALESCE(nm.rep, c.author) AS author, c.title, c.mi, c.fmt, c.checkouts, c.subjects
+        FROM clean c LEFT JOIN namemerge nm ON c.author = nm.variant
+        """
+    )
+    con.execute("DROP TABLE clean")
+    con.execute("ALTER TABLE clean_merged RENAME TO clean")
+
+
 def main():
     start_time = perf_counter()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -982,6 +1054,11 @@ def main():
         
         con.execute(f"CREATE TABLE clean AS {BASE_SELECT}")
     # ------------------------------------------------------------------------
+
+    # Second-pass reconciliation: fold together author records the map left split
+    # (case/order/date name-variants), so an author's checkouts aren't divided.
+    print("Merging split author name-variants ...")
+    merge_name_variants(con)
 
    # -- Reshaping -----------------------------------------------------------
     print("Aggregating author totals in SQL ...")
