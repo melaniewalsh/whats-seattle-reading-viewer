@@ -1033,6 +1033,19 @@
 		return displayName(current.name);
 	});
 
+	// In "By title" mode, the total checkouts of the single plotted title (summed
+	// over its editions). null when zero or several titles are shown -- then the
+	// title heading is blank anyway, so there's no single count to report.
+	const titleCheckouts = $derived.by(() => {
+		if (!current || isOverview || searchMode !== "title") return null;
+		const gs = groups.filter((g) => g.idxs.length);
+		let idxs = null;
+		if (gs.length === 1 && !singleIdxs.length) idxs = gs[0].idxs;
+		else if (!gs.length && singleIdxs.length === 1) idxs = singleIdxs;
+		if (!idxs) return null;
+		return idxs.reduce((s, i) => s + (current.titles[i]?.total || 0), 0);
+	});
+
 	// Top subject-heading terms to show under the Download/Share buttons: the
 	// author's terms in author mode, or (in "By title" mode) the plotted work's
 	// terms when exactly one work is shown. Baked into the author file by the
@@ -1356,7 +1369,7 @@
 				{#if isOverview}
 					{abbrevCount(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 				{:else if searchMode === "title"}
-					by {displayName(current.name)}
+					by {displayName(current.name)}{#if titleCheckouts != null}{" · "}{abbrevCount(titleCheckouts)} checkouts{/if}
 				{:else}
 					{abbrevCount(current.total)} checkouts · {current.titles.length} titles
 				{/if}
