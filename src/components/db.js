@@ -235,7 +235,8 @@ export async function getAuthor(slug) {
 		name: a.name,
 		total: a.total,
 		series: a.series,
-		titles: a.titles
+		titles: a.titles,
+		subjects: a.subjects // top subject-heading terms for the author (may be absent in older data)
 	};
 }
 

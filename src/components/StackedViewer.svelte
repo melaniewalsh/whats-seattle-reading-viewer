@@ -200,6 +200,23 @@
 	// Round down to a clean figure so the note never overstates the threshold.
 	const titleMinLabel = $derived(titleMin ? (Math.floor(titleMin / 500) * 500).toLocaleString() : "");
 
+	// When the "By title" tab is first opened, seed it with a well-known title
+	// (Baldwin's The Fire Next Time) instead of the Seattle-wide overview, so the
+	// tab lands on a concrete example rather than a blank prompt. Load-once flag.
+	let titleDefaultLoaded = false;
+	$effect(() => {
+		if (searchMode === "title" && months.length && !titleDefaultLoaded) {
+			titleDefaultLoaded = true;
+			loadDefaultTitle();
+		}
+	});
+	async function loadDefaultTitle() {
+		try {
+			const r = (await searchTitles("the fire next time", 5))[0];
+			if (r) await selectTitle(r, { scroll: false });
+		} catch {}
+	}
+
 	// Reverse lookup: open a title's author, then plot the searched BOOK as one
 	// line — gathering every edition of it. The catalog splits print/ebook/audio/
 	// series-subtitle variants into separate rows the auto-clusterer doesn't always
@@ -208,7 +225,7 @@
 	function mainTitle(s) {
 		return (cleanTitleForDisplay(s) || s || "").split(":")[0].replace(/\s*\(.*$/, "").trim().toLowerCase();
 	}
-	async function selectTitle(r) {
+	async function selectTitle(r, { scroll = true } = {}) {
 		await selectAuthor({ slug: r.slug, name: r.author });
 		await tick();
 		if (!current) return;
@@ -227,7 +244,7 @@
 		groups = [...groups, { id: ++groupIdCounter, name, idxs }];
 		hlWorkKey = `g${groupIdCounter}`;
 		await tick();
-		chartWrap?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+		if (scroll) chartWrap?.scrollIntoView?.({ block: "start", behavior: "smooth" });
 	}
 
 	// When the first work is plotted on a line chart, auto-hide the busy
@@ -493,6 +510,9 @@
 	function displayName(name) {
 		if (!name) return name;
 		let n = name.trim();
+		// Drop a trailing life-dates clause the catalog appends ("Baldwin, James,
+		// 1924-1987" or "james baldwin, 1924-1987") so it isn't flipped to the front.
+		n = n.replace(/,\s*\d{4}(?:\s*-\s*\d{0,4})?\.?\s*$/, "");
 		const comma = n.match(/^([^,]+),\s*(.+)$/);
 		if (comma) n = `${comma[2].trim()} ${comma[1].trim()}`;
 		return n.replace(/\S+/g, titleCaseWord);
@@ -995,6 +1015,59 @@
 		return "";
 	});
 
+	// In "By title" mode the chart is about a specific book, so the heading names
+	// the TITLE (not its author) when exactly one work is plotted; with several
+	// works plotted it's a comparison, so the legend labels them and the heading
+	// stays blank. Author mode and the overview keep their own headings.
+	const headingText = $derived.by(() => {
+		if (!current) return "";
+		if (isOverview) return current.name;
+		if (searchMode === "title") {
+			const gs = groups.filter((g) => g.idxs.length);
+			const n = gs.length + singleIdxs.length;
+			if (n !== 1) return ""; // 0 or 2+ works -> no title heading
+			return gs.length
+				? groupLabel(gs[0])
+				: cleanTitleForDisplay(current.titles[singleIdxs[0]].title);
+		}
+		return displayName(current.name);
+	});
+
+	// Top subject-heading terms to show under the Download/Share buttons: the
+	// author's terms in author mode, or (in "By title" mode) the plotted work's
+	// terms when exactly one work is shown. Baked into the author file by the
+	// build (annotate_subjects); data built before that just renders nothing.
+	// Stored subjects are [[term, weight], ...] (older data may be a plain [term,...]).
+	// Pool a term list into a running term->weight Map so we can combine a work's
+	// editions (a book's ebook record is often sparse/generic while its print
+	// record carries the specific headings) and re-rank the union.
+	function poolSubjects(map, list) {
+		for (const it of list ?? []) {
+			const term = Array.isArray(it) ? it[0] : it;
+			const w = Array.isArray(it) ? (it[1] || 0) : 0;
+			if (term) map.set(term, (map.get(term) || 0) + w);
+		}
+	}
+	const top5Terms = (map) => [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map((e) => e[0]);
+
+	const subjectTerms = $derived.by(() => {
+		if (!current || isOverview) return [];
+		if (searchMode === "title") {
+			const gs = groups.filter((g) => g.idxs.length);
+			let idxs = null;
+			if (gs.length === 1 && !singleIdxs.length) idxs = gs[0].idxs;
+			else if (!gs.length && singleIdxs.length === 1) idxs = singleIdxs;
+			if (!idxs) return [];
+			const m = new Map();
+			for (const i of idxs) poolSubjects(m, current.titles[i]?.subjects);
+			return top5Terms(m);
+		}
+		// author mode: already pooled across everything in the build
+		const m = new Map();
+		poolSubjects(m, current.subjects);
+		return top5Terms(m);
+	});
+
 	// StackedViewer.svelte
 	const chartSeries = $derived.by(() => {
 		if (!current) return [];
@@ -1276,10 +1349,14 @@
 			{#if !isOverview}
 				<button class="back-to-all" onclick={loadOverview}>‹ All Seattle checkouts</button>
 			{/if}
-			<h2>{isOverview ? current.name : displayName(current.name)}</h2>
+			{#if headingText}
+				<h2>{headingText}</h2>
+			{/if}
 			<p class="meta">
 				{#if isOverview}
 					{abbrevCount(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
+				{:else if searchMode === "title"}
+					by {displayName(current.name)}
 				{:else}
 					{abbrevCount(current.total)} checkouts · {current.titles.length} titles
 				{/if}
@@ -1373,6 +1450,17 @@
 				{/if}
 				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 			</div>
+
+			{#if subjectTerms.length}
+				<div class="subject-terms">
+					<span class="st-label">{searchMode === "title" ? "Top subjects for this title" : "Top subjects for this author"}</span>
+					<ul class="st-chips">
+						{#each subjectTerms as term}
+							<li><code class="st-chip">{term}</code></li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
 
 			<div class="picker-below">
 				{@render authorPicker()}
@@ -1860,6 +1948,43 @@
 		justify-content: flex-end; /* download / share sit at the right, OWID-style */
 		gap: 8px;
 		margin: 10px 0 4px;
+	}
+
+	/* top subject-heading terms for the current author / title, just under the
+	   download + share row */
+	.subject-terms {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 6px 8px;
+		margin: 2px 0 6px;
+		font-family: var(--font-sans);
+	}
+	.st-label {
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--color-fg-light);
+		letter-spacing: 0.01em;
+	}
+	.st-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.st-chip {
+		/* inline-code look (matches the genre tab's <code> terms) rather than a
+		   rounded pill, so it doesn't read as a clickable button */
+		padding: 1px 6px;
+		border-radius: 4px;
+		background: #efe9f5;
+		color: #6a4c93;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		line-height: 1.5;
+		white-space: nowrap;
 	}
 
 	/* the author search + "most borrowed" chips, relocated below the chart --

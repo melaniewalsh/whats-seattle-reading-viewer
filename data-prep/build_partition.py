@@ -47,6 +47,8 @@ TAXONOMY = [
     # so print teen books that carry only "Juvenile fiction" (e.g. print ACOTAR) land
     # here; we can't peel those out at the record level without pooling by title.
     ("Juvenile Fiction", ["juvenile fiction"], []),
+    # Kids' nonfiction, above the broad Nonfiction umbrella so it isn't swallowed.
+    ("Juvenile Nonfiction", ["juvenile nonfiction"], []),
     ("Romance", ["romance", "romantic", "erotic"], ["romance languages"]),
     # "fantasy" always; the evocative words only when a Fiction tag is present
     # (so "magic" doesn't grab "The Magic of Tidying Up", "elf" ≠ "self-help").
@@ -106,11 +108,41 @@ TAXONOMY = [
     ("Reference & Study", ["foreign language study", "guidebooks", "reference"], []),
     ("Poetry", ["poetry", "poems"], []),
     ("Essays & Society", ["essays", "sociology", "social science"], []),
+    # ---- FAST genre/form + broad umbrellas -----------------------------------
+    # Promoted from the top tags in "Other". Placed LATE so the specific topical
+    # genres above claim their books first; these then sweep up the residual that
+    # was pooling in "Other". "=art"/"=fiction" are whole-term matches (see
+    # _one_like) so they don't false-match "Martial arts" / "Nonfiction".
+    ("Literary Criticism", ["literary criticism"], []),
+    ("Art", ["=art"], []),
+    ("Illustrated Works", ["illustrated works"], []),
+    ("Informational Works", ["informational works"], []),
+    ("Instructional & Educational Works", ["instructional and educational works"], []),
+    ("Readers Publications", ["readers publications", "readers (publications)"], []),
+    # The two broad umbrellas, LAST, so everything specific is claimed first and
+    # these split the remaining general fiction / general nonfiction out of Other.
+    ("Fiction", ["=fiction"], []),
+    ("Nonfiction", ["nonfiction", "non-fiction"], []),
 ]
 
 
+def _one_like(t):
+    """One subject match. A term prefixed with "=" matches a WHOLE comma-delimited
+    subject term (e.g. "=art" hits the "Art" heading but NOT "Martial arts" or
+    "Departments"; "=fiction" hits a bare "Fiction" tag but NOT "Nonfiction" or
+    "Historical fiction"). Whole-term matching also keeps these short words from
+    poisoning later genres' NOT clauses (a substring "fiction" would wrongly
+    exclude every "Nonfiction" book)."""
+    t = t.strip()
+    if t.startswith("="):
+        u = t[1:].upper().replace("'", "''")
+        return ("(upper(subjects) = '{u}' OR upper(subjects) like '{u},%' "
+                "OR upper(subjects) like '%, {u},%' OR upper(subjects) like '%, {u}')").format(u=u)
+    return f"upper(subjects) like '%{t.upper()}%'"
+
+
 def _like_any(terms):
-    return "(" + " OR ".join(f"upper(subjects) like '%{t.upper()}%'" for t in terms) + ")"
+    return "(" + " OR ".join(_one_like(t) for t in terms) + ")"
 
 
 # Require a real Fiction subject tag but NOT "Nonfiction" (which contains the
