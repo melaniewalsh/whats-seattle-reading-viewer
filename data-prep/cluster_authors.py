@@ -64,6 +64,7 @@ import duckdb
 from time import perf_counter
 import os
 from dotenv import load_dotenv
+from rapidfuzz import fuzz, process
 try:
     import boto3
 except ImportError:  # pragma: no cover - boto3 is only needed to LIST keys now
@@ -77,13 +78,11 @@ RAW_CSV = PROJECT_DIR / "data" / "raw" / "spl-monthly-checkouts_2005-2025.csv"
 OUT_MAP = PROJECT_DIR / "data-prep" / "author_map.json"
 PROCESSED_FILES_CSV = PROJECT_DIR / "data-prep" / "processed_files.csv"
 
-# The persisted (name, title) -> checkouts aggregate. This is what makes runs
-# iterative: instead of re-scanning every CSV (local + R2) on every run, we
-# only ever scan *new* files and fold their aggregated rows into this cache.
-# Passes 1-3 below (date-signature merge, middle-name merge) then run over
-# the cache, which already contains every title ever seen for every raw
-# name, so cross-file merging still works exactly as before.
+# The persisted (name, title) -> checkouts aggregate. 
 AGG_CACHE = PROJECT_DIR / "data-prep" / "author_title_agg.json"
+
+# Similarity floor (0-100, rapidfuzz.fuzz.ratio scale) 
+FUZZY_TITLE_THRESHOLD = 95
 
 load_dotenv(dotenv_path="data-prep/access.env")
 
@@ -408,7 +407,19 @@ def extract_date_signature(name: str):
     return "".join(matches)
 
 
-def normalize_title(title: str) -> str:
+def _period_marked_initials(name: str) -> set:
+    """Single letters in the RAW name that are unambiguously initials --
+    i.e. immediately followed by a period, like the "B." in "James B.
+    Patterson". A bare single letter with no period (rare, but could be a
+    real one-letter name) is left alone rather than assumed to be an
+    initial, since name_tokens() has already stripped periods by the time
+    we'd otherwise have to guess from token length alone."""
+    if not name:
+        return set()
+    return {m.lower() for m in re.findall(r"\b([A-Za-z])\.", name)}
+
+
+def normalize_title(title: str, author: str = None) -> str:
     # Initialize string, convert to lowercase, and strip whitespace
     t = str(title or "").lower().strip()
     
@@ -463,11 +474,73 @@ def normalize_title(title: str) -> str:
     # remove apostrophes to merge contractions
     t = t.replace("'", "")
     
-    # strip all remaining non-alphanumeric characters (including spaces/hyphens)
-    t = re.sub(r"[^a-z0-9]+", "", t)
+    # strip remaining non-alphanumeric characters but KEEP single spaces as
+    # word separators for token sort ratio
+    t = re.sub(r"[^a-z0-9]+", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+
+    # drop any tokens that are just the author's own name (e.g. a series
+    # title like "James Patterson's Alex Cross" or a catalog record that
+    # repeats "by James B. Patterson" inside the title field itself).
+    # left in, these give two DIFFERENT "James _ Patterson"s a fake shared
+    # title token ("james", "patterson").
     
+    #for a middle initial like the "B."
+    # we can tell it's an initial (not a real
+    # title word coincidentally worth one letter like ('a') because it's followed by
+    # a period in the raw name
+    if author:
+        initials = _period_marked_initials(author)
+        author_tokens = {tok for tok in name_tokens(author) if tok not in initials}
+        if author_tokens:
+            # The apostrophe strip above already turned a possessive like
+            # "Patterson's" into "pattersons", so also match a name token
+            # with a trailing "s" (word minus its own trailing "s") before
+            # dropping it, or "patterson" survives the title as "pattersons".
+            def _is_author_word(w):
+                return w in author_tokens or (w.endswith("s") and w[:-1] in author_tokens)
+            t = " ".join(w for w in t.split() if not _is_author_word(w))
+
     return t
 
+
+def fuzzy_title_matches(titles_a, titles_b, threshold=FUZZY_TITLE_THRESHOLD):
+    """Count how many titles in `titles_a` have a fuzzy match in `titles_b`
+    (both are sets of already-normalize_title()'d strings).
+
+    This replaces exact set intersection 
+    Matching is greedy one-to-one (each title in `titles_b` can only be
+    claimed once) so a single generic/repetitive title can't inflate the
+    count by matching many things at once. 
+
+    Biased toward ties go to "no match" (see `best_score = threshold - 1`
+    below, so a candidate must strictly clear the threshold).
+
+    Titles are matched to their single best available partner rather than counted
+    as a hit against every title they're similar to.
+    """
+    if not titles_a or not titles_b:
+        return 0
+
+    a_list = list(titles_a)
+    b_list = list(titles_b)
+
+    # token sort ratio penalizes out of order tokens
+    scores = process.cdist(a_list, b_list, scorer=fuzz.token_sort_ratio)
+
+    used_b = set()
+    matches = 0
+    for i in range(len(a_list)):
+        best_j, best_score = None, threshold - 1
+        for j in range(len(b_list)):
+            if j in used_b:
+                continue
+            if scores[i][j] > best_score:
+                best_j, best_score = j, scores[i][j]
+        if best_j is not None:
+            used_b.add(best_j)
+            matches += 1
+    return matches
 
 
 class UnionFind:
@@ -523,7 +596,7 @@ def main():
         d = name
         display_totals[d] = display_totals.get(d, 0) + int(total)
         if title:
-            display_titles.setdefault(d, set()).add(normalize_title(title))
+            display_titles.setdefault(d, set()).add(normalize_title(title, author=name))
 
     # Persist immediately so the next run's delta is correct even if
     # clustering below throws. This mirrors _mark_processed()'s
@@ -584,7 +657,7 @@ def main():
         # with
         best, best_overlap = None, 0
         for d in dated:
-            overlap = len(entities[u]["titles"] & entities[d]["titles"])
+            overlap = fuzzy_title_matches(entities[u]["titles"], entities[d]["titles"])
             if overlap > best_overlap:
                 best, best_overlap = d, overlap
         if best is not None:
@@ -614,7 +687,7 @@ def main():
         }
 
     #  Pass 3: catch spellings that differ only by a missing/extra 
-    # middle name/initial (e.g. "Octavia Butler" vs "Octavia E. Butler").
+    # middle name/initial like "Octavia Butler" vs "Octavia E. Butler"
     buckets = {}
     for canonical, info in stage1_info.items():
         key = first_last_key(info["norm"])
@@ -628,7 +701,7 @@ def main():
         for i in range(len(members)):
             for j in range(i + 1, len(members)):
                 a, b = members[i], members[j]
-                if stage1_info[a]["titles"] & stage1_info[b]["titles"]:
+                if fuzzy_title_matches(stage1_info[a]["titles"], stage1_info[b]["titles"]) > 0:
                     uf2.union(a, b)
 
     # Build the final canonical spelling for each component: prefer a
