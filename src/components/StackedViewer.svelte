@@ -1456,7 +1456,7 @@
 					<span class="st-label">{searchMode === "title" ? "Top subjects for this title" : "Top subjects for this author"}</span>
 					<ul class="st-chips">
 						{#each subjectTerms as term}
-							<li class="st-chip">{term}</li>
+							<li><code class="st-chip">{term}</code></li>
 						{/each}
 					</ul>
 				</div>
@@ -1975,14 +1975,15 @@
 		list-style: none;
 	}
 	.st-chip {
-		padding: 3px 10px;
-		border: 1px solid #e0d5ee;
-		border-radius: 999px;
-		/* purple, matching the genre tab's subject-term chips */
+		/* inline-code look (matches the genre tab's <code> terms) rather than a
+		   rounded pill, so it doesn't read as a clickable button */
+		padding: 1px 6px;
+		border-radius: 4px;
 		background: #efe9f5;
-		font-size: 0.78rem;
-		line-height: 1.3;
 		color: #6a4c93;
+		font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+		font-size: 0.82rem;
+		line-height: 1.5;
 		white-space: nowrap;
 	}
 
