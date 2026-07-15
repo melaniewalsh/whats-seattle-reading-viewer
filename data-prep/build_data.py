@@ -120,12 +120,16 @@ from time import perf_counter
 from concurrent.futures import ThreadPoolExecutor
 import csv
 
+from dotenv import load_dotenv
+
 try:
     import boto3
 except ImportError:  # pragma: no cover - boto3 is only needed for the R2 sync step
     boto3 = None
 
 import duckdb
+
+load_dotenv("data-prep/access.env")
 
 # ---------------------------------------------------------------------------
 # Cloudflare R2 sync -- see sync_new_files_from_r2() in main() for how this
@@ -965,7 +969,8 @@ def main():
     # Built directly from `raw` in a single materialization 
     BASE_SELECT = f"""
         SELECT
-            trim(regexp_replace(Creator, {_sql_literal(NAME_DATE_RE)}, '')) AS author,
+            -- Creator, {_sql_literal(NAME_DATE_RE)}, '')) AS author,
+            Creator AS author,
             Title AS title,
             CheckoutYear * 12 + (CheckoutMonth - 1) - {lo} AS mi,
             {MATERIAL_CASE} AS fmt,
@@ -1003,6 +1008,9 @@ def main():
         # Explicitly clear any existing view or table named 'clean' to prevent conflicts
         con.execute("DROP TABLE IF EXISTS clean")
         
+        # if a map is always found (base select author and map's raw author match),
+        # the author name used from the base select (b.author) wont make it into
+        # #the clean table and the canonical name will be used instead if it exists
         con.execute(
             f"""
             CREATE TABLE clean AS
@@ -1022,8 +1030,8 @@ def main():
 
     # Second-pass reconciliation: fold together author records the map left split
     # (case/order/date name-variants), so an author's checkouts aren't divided.
-    print("Merging split author name-variants ...")
-    merge_name_variants(con)
+    #print("Merging split author name-variants ...")
+    #merge_name_variants(con)
 
    # -- Reshaping -----------------------------------------------------------
     print("Aggregating author totals in SQL ...")
