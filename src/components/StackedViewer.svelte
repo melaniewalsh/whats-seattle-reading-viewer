@@ -305,6 +305,8 @@
 		query = "";
 		results = [];
 		loading = false;
+		// Re-apply any grouping the user saved for this author (localStorage).
+		restoreGroupings(a.slug);
 	}
 
 	// A shareable link (reopens the current author) plus a caption.
@@ -739,6 +741,72 @@
 		const updates = {};
 		srcIdxs.forEach((idx) => (updates[idx] = destKey));
 		workAssign = { ...workAssign, ...updates };
+	}
+
+	// --- Persist manual work groupings (localStorage, per author) -------------
+	// GROUPING only (not which lines are plotted). Saved as clusters of TITLE
+	// STRINGS -- not edition indices -- so the choices survive a data rebuild that
+	// reorders titles. Per-browser; a title renamed in a future rebuild is quietly
+	// dropped rather than misapplied.
+	let savedGrouping = $state(false); // this author has a saved custom grouping
+	const worksLSKey = (slug) => `spl:works:${slug}`;
+
+	// Snapshot the current grouping as clusters of title strings.
+	function currentClusters() {
+		const byKey = new Map();
+		current.titles.forEach((t, idx) => {
+			const k = effectiveKey(idx, t.title);
+			if (!byKey.has(k)) byKey.set(k, []);
+			byKey.get(k).push(t.title);
+		});
+		return [...byKey.values()];
+	}
+
+	function saveGroupings() {
+		if (!current || !currentSlug) return;
+		try {
+			localStorage.setItem(worksLSKey(currentSlug), JSON.stringify(currentClusters()));
+			savedGrouping = true;
+			autoGroupNote = "Groupings saved — they'll be restored next time you open this author (in this browser).";
+		} catch {}
+	}
+
+	// Revert to automatic clustering and forget the saved grouping for this author.
+	function clearGroupings() {
+		if (currentSlug) { try { localStorage.removeItem(worksLSKey(currentSlug)); } catch {} }
+		workAssign = {};
+		groups = [];
+		singleIdxs = [];
+		activeGroupId = null;
+		isolatedKeys = [];
+		expandedWorks = [];
+		chartMode = "line";
+		showAuthorTotal = true;
+		autoHidAuthorTotal = false;
+		savedGrouping = false;
+		autoGroupNote = "Reset to automatic grouping.";
+	}
+
+	// On opening an author, re-apply their saved grouping by forcing each saved
+	// cluster's editions to share a work key (matched by title string).
+	function restoreGroupings(slug) {
+		let clusters = null;
+		try {
+			const raw = localStorage.getItem(worksLSKey(slug));
+			if (raw) clusters = JSON.parse(raw);
+		} catch {}
+		if (!current || !Array.isArray(clusters) || !clusters.length) { savedGrouping = false; return; }
+		const idxByTitle = new Map();
+		current.titles.forEach((t, idx) => { if (!idxByTitle.has(t.title)) idxByTitle.set(t.title, idx); });
+		const assign = {};
+		clusters.forEach((titles, c) => {
+			for (const title of titles) {
+				const idx = idxByTitle.get(title);
+				if (idx != null) assign[idx] = `sv${c}`;
+			}
+		});
+		workAssign = assign;
+		savedGrouping = true;
 	}
 
 	// Map of workKey -> { idxs (all editions of the work), name }. Powers the
@@ -1666,6 +1734,11 @@
 				</div>
 				{#if titleSort === "work"}
 					<p class="table-hint">Highlighted rows are works with multiple editions. Drag one work onto another to merge them; expand a work and hit <em>exclude</em> to split an edition off.</p>
+					<div class="works-actions">
+						<button type="button" class="wa-btn" onclick={saveGroupings} title="Remember this author's grouping in your browser, so your fixes are here next time">💾 Save my groupings</button>
+						<button type="button" class="wa-btn wa-reset" onclick={clearGroupings} title="Discard custom grouping and go back to automatic clustering">↺ Reset to automatic</button>
+						{#if savedGrouping}<span class="wa-saved" role="status">✓ custom grouping saved</span>{/if}
+					</div>
 				{/if}
 				<div class="title-table" role="table" aria-label="Titles, grouped by work" style="--work-w:{workColW}px; --edition-w:{editionColW}px">
 					<div class="tt-head" role="row">
@@ -3338,6 +3411,32 @@
 		font-size: 0.8rem;
 		color: var(--color-fg-light);
 		margin: 0 2px 8px;
+	}
+	.works-actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		margin: 0 2px 10px;
+	}
+	.wa-btn {
+		font-family: var(--font-sans);
+		font-size: 0.8rem;
+		font-weight: 600;
+		padding: 5px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		background: var(--color-white);
+		color: var(--color-fg);
+		cursor: pointer;
+	}
+	.wa-btn:hover { background: var(--color-gray-100); }
+	.wa-reset { color: var(--color-fg-light); }
+	.wa-saved {
+		font-family: var(--font-sans);
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: #1f7a4d;
 	}
 	.table-hint em {
 		font-style: normal;
