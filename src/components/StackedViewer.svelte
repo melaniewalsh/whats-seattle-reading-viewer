@@ -1147,9 +1147,11 @@
 	});
 
 	// The author's own total checkouts as one bold line -- the default view.
+	// Label uses the tidied display name (the tooltip shows this), not the raw
+	// catalog form like "emily st john mandel, 1979".
 	const authorLine = $derived(
 			current
-					? {key: "author", label: current.name, color: INK, values: current.series, groupIndex: -2, isAggregate: true}
+					? {key: "author", label: isOverview ? current.name : displayName(current.name), color: INK, values: current.series, groupIndex: -2, isAggregate: true}
 					: null
 	);
 
