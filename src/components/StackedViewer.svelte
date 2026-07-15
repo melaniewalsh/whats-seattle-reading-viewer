@@ -218,24 +218,21 @@
 	}
 
 	// Reverse lookup: open a title's author, then plot the searched BOOK as one
-	// line — gathering every edition of it. The catalog splits print/ebook/audio/
-	// series-subtitle variants into separate rows the auto-clusterer doesn't always
-	// merge, so we match on the "main" title (before any ":" or "(") and group them
-	// all ourselves rather than trusting one work cluster.
-	function mainTitle(s) {
-		return (cleanTitleForDisplay(s) || s || "").split(":")[0].replace(/\s*\(.*$/, "").trim().toLowerCase();
-	}
+	// line — gathering every edition of it. We use the SAME work-clustering as the
+	// title table (normalizeWorkKey) so a title search pulls together exactly the
+	// editions shown as one work there — including alt-title forms the plain
+	// matcher missed (e.g. "Slaughterhouse-five, or, The children's crusade").
 	async function selectTitle(r, { scroll = true } = {}) {
 		await selectAuthor({ slug: r.slug, name: r.author });
 		await tick();
 		if (!current) return;
-		const want = mainTitle(r.title);
+		const want = normalizeWorkKey(r.title);
 		let idxs = [];
-		current.titles.forEach((t, idx) => { if (mainTitle(t.title) === want) idxs.push(idx); });
-		if (!idxs.length) { // loose fallback if nothing matched exactly
+		current.titles.forEach((t, idx) => { if (normalizeWorkKey(t.title) === want) idxs.push(idx); });
+		if (!idxs.length) { // loose fallback: substring match on the normalized work key
 			current.titles.forEach((t, idx) => {
-				const c = (cleanTitleForDisplay(t.title) || "").toLowerCase();
-				if (!idxs.length && want && (c.includes(want) || want.includes(c))) idxs = [idx];
+				const wk = normalizeWorkKey(t.title);
+				if (!idxs.length && want && wk && (wk.includes(want) || want.includes(wk))) idxs = [idx];
 			});
 		}
 		if (!idxs.length) return;
