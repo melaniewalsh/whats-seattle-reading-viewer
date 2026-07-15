@@ -514,6 +514,16 @@ def annotate_subjects(con, out_dir, slug_by_author):
     """
     authors_dir = out_dir / "authors"
 
+    # This runs LAST -- the memory-tuned author/title streaming (which needs the
+    # low global limit to spill instead of OOM) is already done and its big Python
+    # structures freed. The subject UNNEST is heavy, so give it much more room here
+    # (the merge pass raised the baseline enough to tip the old 3 GB limit into an
+    # OOM). Safe on the 16 GB CI runner since nothing else is running now.
+    try:
+        con.execute(f"SET memory_limit='{os.environ.get('SUBJECTS_MEMORY_LIMIT', '10GB')}'")
+    except Exception:  # noqa: BLE001
+        pass
+
     # Umbrella terms carry almost no information and (because ebook records tag
     # little else) drown out the specific print headings -- e.g. The Goldfinch's
     # ebook is just "Fiction, Literature" (37k checkouts) while its print record
