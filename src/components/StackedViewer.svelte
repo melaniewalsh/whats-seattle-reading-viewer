@@ -718,10 +718,26 @@
 	// destKey (used when a work row is dragged onto another in the table).
 	function mergeWorks(srcKey, destKey) {
 		if (!current || srcKey === destKey) return;
-		const updates = {};
+		const srcIdxs = [];
 		current.titles.forEach((t, idx) => {
-			if (effectiveKey(idx, t.title) === srcKey) updates[idx] = destKey;
+			if (effectiveKey(idx, t.title) === srcKey) srcIdxs.push(idx);
 		});
+		if (!srcIdxs.length) return;
+		// If the destination work is PLOTTED (a group), fold the source editions
+		// into that group so its LINE updates -- not just the table clustering.
+		// (workAssign alone re-clusters the table but leaves the group's series,
+		// and therefore its plotted line, unchanged.)
+		if (/^g\d+$/.test(destKey)) {
+			const g = groups.find((gr) => `g${gr.id}` === destKey);
+			if (g) {
+				srcIdxs.forEach((i) => releaseTitle(i));
+				g.idxs = [...new Set([...g.idxs, ...srcIdxs])];
+				groups = groups.filter((gr) => gr.idxs.length || gr.id === activeGroupId);
+			}
+			return;
+		}
+		const updates = {};
+		srcIdxs.forEach((idx) => (updates[idx] = destKey));
 		workAssign = { ...workAssign, ...updates };
 	}
 
@@ -813,7 +829,7 @@
 	// edition's work key (pulling it out of any group first so it sticks).
 	function addEditionToWork(idx, workKey) {
 		if (idx == null || !workKey) return;
-		if (workKey.startsWith("g")) {
+		if (/^g\d+$/.test(workKey)) {  // a plotted group key "g<id>" (not a work key like "greatgatsby")
 			const g = groups.find((gr) => `g${gr.id}` === workKey);
 			if (g && !g.idxs.includes(idx)) {
 				releaseTitle(idx);
