@@ -221,7 +221,7 @@ TITLE_FETCH_CHUNK = 200_000
 # Only keep a title in an author's drill-down list if it was checked out at
 # least this many times (ever). Trims the long tail; the author's total and
 # trend line still count every checkout. Set to 0 to keep everything.
-MIN_TITLE_CHECKOUTS = 50
+MIN_TITLE_CHECKOUTS = 25
 
 # Pattern that strips a trailing ", 1966-" / ", 1945 July 28-" from a name.
 NAME_DATE_RE = r",\s*[0-9]{4}.*$"
@@ -231,6 +231,7 @@ MATERIAL_CASE = """
 CASE upper(MaterialType)
     WHEN 'EBOOK' THEN 'ebook'
     WHEN 'AUDIOBOOK' THEN 'audiobook'
+    WHEN 'LARGEPRINT' THEN 'largeprint'
     WHEN 'BOOK' THEN 'print'
     WHEN 'REGPRINT' THEN 'print'
     WHEN 'COMIC' THEN 'print'
@@ -1002,7 +1003,10 @@ def main():
         -- charted, and it's the #1 entry by total. These aren't real authors.
         AND upper(trim(Creator)) NOT IN ('NA', 'N/A', 'UNKNOWN', 'VARIOUS', 'ANONYMOUS')
         AND trim(regexp_replace(Creator, {_sql_literal(NAME_DATE_RE)}, '')) != ''
-        AND MaterialType != 'SOUNDDISC'
+        -- Keep only book formats: print, large print, ebook, audiobook. Drops
+        -- music CDs (SOUNDDISC), songs, video/DVD, maps, etc. (upper() so the
+        -- mixed-case 'Ebook'/'Audiobook' spellings are kept too).
+        AND upper(MaterialType) IN ('EBOOK', 'AUDIOBOOK', 'BOOK', 'REGPRINT', 'COMIC', 'LARGEPRINT')
         AND CheckoutYear BETWEEN 2005 AND 2030
     """
 

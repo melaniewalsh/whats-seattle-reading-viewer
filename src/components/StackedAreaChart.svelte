@@ -264,7 +264,7 @@
 		return `${MONTH_NAMES[Number(parts[1]) - 1]} ${parts[0]}`;
 	}
 
-	const FMT_LABEL = { ebook: 'ebook', audiobook: 'audio', print: 'print', other: 'other' };
+	const FMT_LABEL = { ebook: 'ebook', audiobook: 'audio', print: 'print', largeprint: 'large print', other: 'other' };
 
 	const tooltipLeft = $derived(
 		hoverIndex === null ? 0 : Math.min(Math.max(x(hoverIndex), 100), width - 100)

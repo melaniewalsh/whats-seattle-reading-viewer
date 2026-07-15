@@ -45,7 +45,7 @@
 				<p>
 					<strong>Caveats.</strong> Author and title names come straight from library catalog
 					records, which are inconsistently formatted and occasionally merged or misspelled.
-					Titles borrowed fewer than 50 times are left out of an author's per-title breakdown
+					Titles borrowed fewer than 25 times are left out of an author's per-title breakdown
 					(their total still counts them). Read the trends as indicative, not exact.
 				</p>
 			</div>

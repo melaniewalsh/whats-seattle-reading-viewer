@@ -521,7 +521,7 @@
 
 	// Short label shown in a title's format badge.
 	function formatLabel(f) {
-		return {ebook: "ebook", audiobook: "audio", print: "print", other: "other"}[f] || f;
+		return {ebook: "ebook", audiobook: "audio", print: "print", largeprint: "large print", other: "other"}[f] || f;
 	}
 
 	// The catalog stores author names inconsistently -- often all-lowercase
@@ -3426,6 +3426,11 @@
 	.badge-print {
 		background: #eaf6ee;
 		color: #1f7a4d;
+	}
+
+	.badge-largeprint {
+		background: #e6f4f1;
+		color: #0b7285;
 	}
 
 	.badge-other {
