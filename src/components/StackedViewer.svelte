@@ -689,15 +689,17 @@
 	// clears them and returns to the author-only view.
 	function toggleTopWorks() {
 		if (hasPlotted) {
+			// Clear the chart back to just the author's total line. KEEP the user's
+			// work grouping (workAssign) -- that lives in the table, not the chart,
+			// so clearing the graph shouldn't discard it.
 			groups = [];
 			singleIdxs = [];
 			activeGroupId = null;
 			isolatedKeys = [];
-			workAssign = {};
-			expandedWorks = [];
 			autoGroupNote = "";
 			showAuthorTotal = true;
 			autoHidAuthorTotal = false;
+			chartMode = "line";
 		} else {
 			autoGroupByWork({ keepChartMode: true });
 			chartMode = "area"; // show the works stacked as an area chart
@@ -1577,8 +1579,8 @@
 				<div class="groups-header">
 					<span class="groups-label">On the chart</span>
 					<div class="groups-actions">
-						<button class="auto-group" onclick={toggleTopWorks} title={hasPlotted ? "Clear the chart and show just the author's total line" : "Plot the 5 most-borrowed works (their editions grouped into one line each)"}>
-							{hasPlotted ? "Hide top works" : "Show top works"}
+						<button class="auto-group" onclick={toggleTopWorks} title={hasPlotted ? "Clear the chart back to just the author's total line (keeps your work grouping)" : "Plot the 5 most-borrowed works (their editions grouped into one line each)"}>
+							{hasPlotted ? "✕ Clear chart" : "Show top works"}
 						</button>
 						<button class="new-group" onclick={addGroup}>Make a custom work</button>
 					</div>
