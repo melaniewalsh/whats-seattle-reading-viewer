@@ -606,6 +606,13 @@
 		// (e.g. "Harī Pottā ... = Harry Potter and the half-blood prince"). Keep the
 		// English parallel title so foreign editions cluster with the English work.
 		if (/\s=\s/.test(t)) t = t.split(/\s=\s/).pop();
+		// Classic alternate-title form "Main Title, or, The Alternate Title"
+		// (Slaughterhouse-Five, or, The Children's Crusade; Moby-Dick, or, The
+		// Whale) -- drop everything from ", or, " on so an edition catalogued with
+		// the alt-title clusters with plain "Slaughterhouse-Five". The SECOND comma
+		// is the tell: alt-titles write ", or, X" while lists write ", or X"
+		// ("Beg, Borrow, or Steal"), so requiring it avoids over-matching.
+		t = t.replace(/,\s+or,\s+.*$/i, "");
 		t = t.replace(/&/g, " and "); // "beasts & where" -> "beasts and where"
 		t = t.replace(/\([^)]*\)/g, " "); // drop "(unabridged)" etc.
 		t = t.replace(/\[[^\]]*\]/g, " "); // drop cataloging brackets: "[text ]", "[sound recording]", etc.
