@@ -519,8 +519,12 @@ def annotate_subjects(con, out_dir, slug_by_author):
     # structures freed. The subject UNNEST is heavy, so give it much more room here
     # (the merge pass raised the baseline enough to tip the old 3 GB limit into an
     # OOM). Safe on the 16 GB CI runner since nothing else is running now.
+    # 6GB (not more): the runner has ~16GB and Python still holds some, so a
+    # higher DuckDB limit risks an OS OOM-kill of the whole build (10GB did).
+    # 6GB is ~2x the point the pass failed at, and if it's still not enough
+    # DuckDB errors *inside* the try/except -> subjects skip, build survives.
     try:
-        con.execute(f"SET memory_limit='{os.environ.get('SUBJECTS_MEMORY_LIMIT', '10GB')}'")
+        con.execute(f"SET memory_limit='{os.environ.get('SUBJECTS_MEMORY_LIMIT', '6GB')}'")
     except Exception:  # noqa: BLE001
         pass
 
@@ -875,6 +879,10 @@ def merge_name_variants(con):
     )
     con.execute("DROP TABLE clean")
     con.execute("ALTER TABLE clean_merged RENAME TO clean")
+    # Release the memory this rewrite held so it doesn't carry into (and OOM) the
+    # later subject-terms pass -- that's what tipped subjects over the old limit.
+    con.execute("DROP TABLE IF EXISTS namemerge")
+    con.execute("CHECKPOINT")
 
 
 def main():
