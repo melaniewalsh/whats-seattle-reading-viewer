@@ -217,28 +217,53 @@
 		} catch {}
 	}
 
+	// Switching "By title" -> "By author" should drop the single-book focus and
+	// show the WHOLE author's checkouts (their total line), not the one title you
+	// happened to be looking at. (The author stays loaded; we just clear the plot.)
+	let prevSearchMode = searchMode;
+	$effect(() => {
+		const mode = searchMode;
+		if (mode !== prevSearchMode) {
+			if (prevSearchMode === "title" && mode === "author" && current && !isOverview) {
+				groups = [];
+				singleIdxs = [];
+				activeGroupId = null;
+				isolatedKeys = [];
+				showAuthorTotal = true;
+				autoHidAuthorTotal = false;
+				chartMode = "line";
+			}
+			prevSearchMode = mode;
+		}
+	});
+
 	// Reverse lookup: open a title's author, then plot the searched BOOK as one
-	// line — gathering every edition of it. The catalog splits print/ebook/audio/
-	// series-subtitle variants into separate rows the auto-clusterer doesn't always
-	// merge, so we match on the "main" title (before any ":" or "(") and group them
-	// all ourselves rather than trusting one work cluster.
-	function mainTitle(s) {
-		return (cleanTitleForDisplay(s) || s || "").split(":")[0].replace(/\s*\(.*$/, "").trim().toLowerCase();
-	}
+	// line — gathering every edition of it. We use the SAME work-clustering as the
+	// title table (normalizeWorkKey) so a title search pulls together exactly the
+	// editions shown as one work there — including alt-title forms the plain
+	// matcher missed (e.g. "Slaughterhouse-five, or, The children's crusade").
 	async function selectTitle(r, { scroll = true } = {}) {
 		await selectAuthor({ slug: r.slug, name: r.author });
 		await tick();
 		if (!current) return;
-		const want = mainTitle(r.title);
-		let idxs = [];
-		current.titles.forEach((t, idx) => { if (mainTitle(t.title) === want) idxs.push(idx); });
-		if (!idxs.length) { // loose fallback if nothing matched exactly
+		const want = normalizeWorkKey(r.title);
+		// Seed from the searched title's own edition(s)...
+		let seed = [];
+		current.titles.forEach((t, idx) => { if (normalizeWorkKey(t.title) === want) seed.push(idx); });
+		if (!seed.length) { // loose fallback: substring match on the normalized work key
 			current.titles.forEach((t, idx) => {
-				const c = (cleanTitleForDisplay(t.title) || "").toLowerCase();
-				if (!idxs.length && want && (c.includes(want) || want.includes(c))) idxs = [idx];
+				const wk = normalizeWorkKey(t.title);
+				if (!seed.length && want && wk && (wk.includes(want) || want.includes(wk))) seed = [idx];
 			});
 		}
-		if (!idxs.length) return;
+		if (!seed.length) return;
+		// ...then gather the WHOLE work the seed belongs to via effectiveKey, which
+		// respects any saved/restored custom grouping (a translation you dragged in,
+		// an edition you split out) rather than re-clustering purely by title key.
+		const workKey = effectiveKey(seed[0], current.titles[seed[0]].title);
+		let idxs = [];
+		current.titles.forEach((t, idx) => { if (effectiveKey(idx, t.title) === workKey) idxs.push(idx); });
+		if (!idxs.length) idxs = seed;
 		idxs.forEach((i) => releaseTitle(i));
 		const name = cleanTitleForDisplay(current.titles[idxs[0]].title) || r.title;
 		groups = [...groups, { id: ++groupIdCounter, name, idxs }];
@@ -689,15 +714,17 @@
 	// clears them and returns to the author-only view.
 	function toggleTopWorks() {
 		if (hasPlotted) {
+			// Clear the chart back to just the author's total line. KEEP the user's
+			// work grouping (workAssign) -- that lives in the table, not the chart,
+			// so clearing the graph shouldn't discard it.
 			groups = [];
 			singleIdxs = [];
 			activeGroupId = null;
 			isolatedKeys = [];
-			workAssign = {};
-			expandedWorks = [];
 			autoGroupNote = "";
 			showAuthorTotal = true;
 			autoHidAuthorTotal = false;
+			chartMode = "line";
 		} else {
 			autoGroupByWork({ keepChartMode: true });
 			chartMode = "area"; // show the works stacked as an area chart
@@ -1577,8 +1604,8 @@
 				<div class="groups-header">
 					<span class="groups-label">On the chart</span>
 					<div class="groups-actions">
-						<button class="auto-group" onclick={toggleTopWorks} title={hasPlotted ? "Clear the chart and show just the author's total line" : "Plot the 5 most-borrowed works (their editions grouped into one line each)"}>
-							{hasPlotted ? "Hide top works" : "Show top works"}
+						<button class="auto-group" onclick={toggleTopWorks} title={hasPlotted ? "Clear the chart back to just the author's total line (keeps your work grouping)" : "Plot the 5 most-borrowed works (their editions grouped into one line each)"}>
+							{hasPlotted ? "✕ Clear chart" : "Show top works"}
 						</button>
 						<button class="new-group" onclick={addGroup}>Make a custom work</button>
 					</div>
