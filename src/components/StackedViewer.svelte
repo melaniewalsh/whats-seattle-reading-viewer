@@ -217,6 +217,26 @@
 		} catch {}
 	}
 
+	// Switching "By title" -> "By author" should drop the single-book focus and
+	// show the WHOLE author's checkouts (their total line), not the one title you
+	// happened to be looking at. (The author stays loaded; we just clear the plot.)
+	let prevSearchMode = searchMode;
+	$effect(() => {
+		const mode = searchMode;
+		if (mode !== prevSearchMode) {
+			if (prevSearchMode === "title" && mode === "author" && current && !isOverview) {
+				groups = [];
+				singleIdxs = [];
+				activeGroupId = null;
+				isolatedKeys = [];
+				showAuthorTotal = true;
+				autoHidAuthorTotal = false;
+				chartMode = "line";
+			}
+			prevSearchMode = mode;
+		}
+	});
+
 	// Reverse lookup: open a title's author, then plot the searched BOOK as one
 	// line — gathering every edition of it. We use the SAME work-clustering as the
 	// title table (normalizeWorkKey) so a title search pulls together exactly the
