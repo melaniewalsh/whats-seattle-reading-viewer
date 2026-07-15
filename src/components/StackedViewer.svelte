@@ -247,15 +247,23 @@
 		await tick();
 		if (!current) return;
 		const want = normalizeWorkKey(r.title);
-		let idxs = [];
-		current.titles.forEach((t, idx) => { if (normalizeWorkKey(t.title) === want) idxs.push(idx); });
-		if (!idxs.length) { // loose fallback: substring match on the normalized work key
+		// Seed from the searched title's own edition(s)...
+		let seed = [];
+		current.titles.forEach((t, idx) => { if (normalizeWorkKey(t.title) === want) seed.push(idx); });
+		if (!seed.length) { // loose fallback: substring match on the normalized work key
 			current.titles.forEach((t, idx) => {
 				const wk = normalizeWorkKey(t.title);
-				if (!idxs.length && want && wk && (wk.includes(want) || want.includes(wk))) idxs = [idx];
+				if (!seed.length && want && wk && (wk.includes(want) || want.includes(wk))) seed = [idx];
 			});
 		}
-		if (!idxs.length) return;
+		if (!seed.length) return;
+		// ...then gather the WHOLE work the seed belongs to via effectiveKey, which
+		// respects any saved/restored custom grouping (a translation you dragged in,
+		// an edition you split out) rather than re-clustering purely by title key.
+		const workKey = effectiveKey(seed[0], current.titles[seed[0]].title);
+		let idxs = [];
+		current.titles.forEach((t, idx) => { if (effectiveKey(idx, t.title) === workKey) idxs.push(idx); });
+		if (!idxs.length) idxs = seed;
 		idxs.forEach((i) => releaseTitle(i));
 		const name = cleanTitleForDisplay(current.titles[idxs[0]].title) || r.title;
 		groups = [...groups, { id: ++groupIdCounter, name, idxs }];
