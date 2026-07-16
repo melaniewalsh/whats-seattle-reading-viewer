@@ -415,10 +415,10 @@ def token_set_key(name: str):
     front, first/last swapped, etc.) normalizes to a different word order
     and first_last_key's positional (tokens[0], tokens[-1]) check won't match
     it to the correctly-ordered spelling of the same person. Sorting the
-    tokens ignores position entirely and catches these. Still gated by
+    tokens ignores position entirely and catches these. Requires
     fuzzy_title_matches() before union, same as first_last_key, so two
-    different people who happen to share every name token (rare, but
-    possible for common surnames) aren't merged on this alone."""
+    different people who happen to share every name token 
+    aren't merged on this alone."""
     if " / " in name:
         return None
     tokens = name_tokens(name)
