@@ -269,9 +269,18 @@ def normalize(name: str) -> str:
     # splitting by commas
     parts = [p.strip() for p in creator.split(",") if p.strip()]
 
-    # drop pure life-date segments (e.g. "1850-1910", "1975-") so a trailing
-    # date isn't mistaken for a middle name below
-    date_part_pattern = r"^\d{4}-?\d{0,4}\.?$"
+    # Drop life-date segments so months/days/years don't leak into the name and
+    # get scrambled by the reorder below.
+    #
+    # BUG THIS FIXES: the old pattern (r"^\d{4}-?\d{0,4}\.?$") only matched
+    # PURELY-numeric dates like "1850-1910" / "1975-". But the catalog also uses
+    # a "year month day" form, e.g. "Davis, Jim, 1945 July 28-". There the "1945
+    # July 28-" segment wasn't recognized as a date, so "July 28" was treated as a
+    # name part and the reorder produced the canonical "july 28 davis jim" (Jim
+    # Davis showed up on the site as "July 28 Davis Jim", and likewise for Mark
+    # Stewart, Jane Hamilton, etc.). Matching any segment that STARTS with a
+    # 4-digit year catches every form: "1945 July 28-", "1850-1910", "1975-".
+    date_part_pattern = r"^\d{4}\b"
     parts = [p for p in parts if not re.match(date_part_pattern, p)]
 
     # extract suffix first so it doesn't break in cases like L. E. Modesitt, Jr.
