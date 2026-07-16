@@ -1,0 +1,55 @@
+name: Regenerate author map (fast, no site rebuild)
+
+# Runs cluster_authors.py ALONE and commits the fresh data-prep/author_map.json
+# back to the repo. This is the fast path (~6 min: the runner reads R2 in-region)
+# for iterating on clustering logic WITHOUT the ~1h full site rebuild.
+#
+# It only updates the committed map. To push the new clustering to the LIVE site,
+# run "Build full database and upload to R2" afterward (it regenerates the map
+# again and rebuilds the per-author JSON on R2).
+#
+# TRIGGER: manual only.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # push the regenerated author_map.json back to the repo
+
+env:
+  R2_ENDPOINT_URL: https://dd55a988a4598a3425259692fe6f7ba1.r2.cloudflarestorage.com
+
+jobs:
+  regenerate-map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # numpy is required by rapidfuzz.process.cdist in the fuzzy-matching step.
+      - run: pip install duckdb boto3 orjson pyarrow python-dotenv rapidfuzz numpy
+
+      - name: Regenerate author clusters
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          # Unlike the full build, do NOT swallow failures here -- if clustering
+          # breaks we want this job to fail loudly rather than commit a stale map.
+          python3 data-prep/cluster_authors.py
+          echo "author_map.json: $(wc -c < data-prep/author_map.json) bytes"
+
+      - name: Commit regenerated author_map.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data-prep/author_map.json
+          if git diff --cached --quiet; then
+            echo "author_map.json unchanged -- nothing to commit"
+          else
+            git commit -m "CI: regenerate author_map.json (map-only)"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
