@@ -46,7 +46,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install duckdb boto3 orjson pyarrow python-dotenv rapidfuzz
+      - run: pip install duckdb boto3 orjson pyarrow python-dotenv rapidfuzz numpy
 
       # Regenerate data-prep/author_map.json from the CURRENT cluster_authors.py
       # so improvements to the clustering go live without anyone running it
