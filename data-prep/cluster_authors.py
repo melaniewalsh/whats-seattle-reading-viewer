@@ -405,6 +405,28 @@ def has_middle_name(name: str) -> bool:
     return len(name_tokens(name)) > 2
 
 
+def token_set_key(name: str):
+    """Order-independent token signature, used alongside first_last_key() to
+    catch spellings whose words are the same but in a different ORDER --
+    e.g. a raw catalog string like "K. Le Guin Ursula" instead of "Ursula K.
+    Le Guin". normalize() only reorders "Last, First" forms that contain a
+    comma; a comma-less string is assumed to already be in First..Last order,
+    so a genuinely scrambled comma-less name (an initial dragged to the
+    front, first/last swapped, etc.) normalizes to a different word order
+    and first_last_key's positional (tokens[0], tokens[-1]) check won't match
+    it to the correctly-ordered spelling of the same person. Sorting the
+    tokens ignores position entirely and catches these. Still gated by
+    fuzzy_title_matches() before union, same as first_last_key, so two
+    different people who happen to share every name token (rare, but
+    possible for common surnames) aren't merged on this alone."""
+    if " / " in name:
+        return None
+    tokens = name_tokens(name)
+    if len(tokens) < 2:
+        return None
+    return tuple(sorted(tokens))
+
+
 def extract_date_signature(name: str):
     """Pull out the raw 4-digit year token(s) attached to a name, e.g.
     "1947-2006" or "2000-" (still living)."""
@@ -753,7 +775,10 @@ def main():
     for canonical, info in stage1_info.items():
         key = first_last_key(info["norm"])
         if key is not None:
-            buckets.setdefault(key, []).append(canonical)
+            buckets.setdefault(("fl", key), []).append(canonical)
+        tkey = token_set_key(info["norm"])
+        if tkey is not None:
+            buckets.setdefault(("ts", tkey), []).append(canonical)
 
     uf2 = UnionFind(stage1_info.keys())
     for members in buckets.values():
