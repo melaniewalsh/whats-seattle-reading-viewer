@@ -81,7 +81,13 @@ jobs:
             echo "author_map.json unchanged -- nothing to commit"
           else
             git commit -m "CI: regenerate author_map.json"
-            git push origin HEAD:${{ github.ref_name }}
+            # The full build runs ~1h, so other commits are likely to have
+            # landed on the branch meanwhile -- rebase (retrying) before pushing.
+            for i in 1 2 3; do
+              git pull --rebase origin ${{ github.ref_name }} \
+                && git push origin HEAD:${{ github.ref_name }} && break
+              echo "push race, retry $i" && sleep 3
+            done
           fi
 
       - name: Build per-author JSON files from R2

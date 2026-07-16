@@ -51,5 +51,11 @@ jobs:
             echo "author_map.json unchanged -- nothing to commit"
           else
             git commit -m "CI: regenerate author_map.json (map-only)"
-            git push origin HEAD:${{ github.ref_name }}
+            # Other commits may have landed on the branch while we were building,
+            # so rebase (retrying) before pushing to avoid a non-fast-forward.
+            for i in 1 2 3; do
+              git pull --rebase origin ${{ github.ref_name }} \
+                && git push origin HEAD:${{ github.ref_name }} && break
+              echo "push race, retry $i" && sleep 3
+            done
           fi
