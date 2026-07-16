@@ -24,3 +24,5 @@ data/raw/spl-monthly-checkouts_2005-2025.csv
 # dev artifacts
 __pycache__/
 .claude/
+access.env
+data-prep/access.env
