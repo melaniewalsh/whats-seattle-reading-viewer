@@ -236,7 +236,8 @@ export async function getAuthor(slug) {
 		total: a.total,
 		series: a.series,
 		titles: a.titles,
-		subjects: a.subjects // top subject-heading terms for the author (may be absent in older data)
+		subjects: a.subjects, // top subject-heading terms for the author (may be absent in older data)
+		variants: a.variants // raw catalog spellings merged into this author (absent when not clustered)
 	};
 }
 

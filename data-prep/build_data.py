@@ -438,7 +438,7 @@ def stream_author_records(record_batch_reader, author_rows, slug_by_author, meta
             yield (slug_by_author[author], author, total, series, [])
 
 
-def write_author_files(out_dir, months, record_stream, counters):
+def write_author_files(out_dir, months, record_stream, counters, variants_by_author=None):
     """Write the site's data as plain static JSON files -- one tiny file per
     author -- instead of a single SQLite database queried over HTTP range
     requests.
@@ -487,9 +487,14 @@ def write_author_files(out_dir, months, record_stream, counters):
             made_dirs.add(shard)
         # `titles` is already a list of {title,total,fmt,series} dicts, sorted
         # total-DESC by stream_author_records(); write it straight through.
-        (authors_dir / shard / f"{slug}.json").write_bytes(
-            _dumps({"name": name, "total": total, "series": series, "titles": titles})
-        )
+        payload = {"name": name, "total": total, "series": series, "titles": titles}
+        # Attach the raw catalog spellings merged into this author (only when 2+,
+        # i.e. an actual cluster worth showing) for the UI "name variants" list.
+        if variants_by_author:
+            variants = variants_by_author.get(name)
+            if variants and len(variants) > 1:
+                payload["variants"] = sorted(variants)
+        (authors_dir / shard / f"{slug}.json").write_bytes(_dumps(payload))
         search_index.append([slug, name, total])
 
     # record_stream doesn't arrive strictly total-DESC (authors WITH titles come
@@ -1019,6 +1024,14 @@ def main():
     if map_path.exists():
         author_map = json.loads(map_path.read_text(encoding="utf-8"))
 
+    # Invert the map: canonical author -> the raw catalog spellings merged into
+    # it. Surfaced in the site's "name variants" dropdown so readers can see
+    # exactly which catalog records were clustered together. Keyed by the same
+    # canonical string that becomes each author file's "name" (clean.author).
+    variants_by_author = {}
+    for raw, canonical in author_map.items():
+        variants_by_author.setdefault(canonical, []).append(raw)
+
    
    # returning to table usage since its saved on the disk now
     if author_map:
@@ -1170,7 +1183,7 @@ def main():
     record_stream = stream_author_records(
         record_batch_reader, author_rows, slug_by_author, meta_by_author, counters
     )
-    n_authors = write_author_files(OUT_DIR, months, record_stream, counters)
+    n_authors = write_author_files(OUT_DIR, months, record_stream, counters, variants_by_author)
     print(f"  {n_authors:,} authors, {counters['n_titles']:,} qualifying titles")
     print(f"  ({perf_counter() - t0:.2f}s)")
 
