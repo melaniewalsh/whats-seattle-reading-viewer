@@ -14,7 +14,7 @@ on:
     - cron: "0 12 5 * *" # 5th, 12:00 UTC (after update.yml's 06:00 data pull)
 
 permissions:
-  contents: read
+  contents: write # push the regenerated author_map.json back to the repo
 
 env:
   # The PUBLIC R2 bucket the finished DB is uploaded to (see README for the
@@ -66,6 +66,22 @@ jobs:
             echo "author_map.json in place ($(wc -c < data-prep/author_map.json) bytes)"
           else
             echo "no author_map.json -- building without author merges"
+          fi
+
+      # Commit the freshly regenerated map back to main so it stays
+      # version-controlled (and diffable) instead of only living inside this
+      # run. cluster_authors.py also writes author_title_agg.json (a scan cache)
+      # and processed_files.csv (a ledger) -- deliberately NOT committed here.
+      - name: Commit regenerated author_map.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data-prep/author_map.json
+          if git diff --cached --quiet; then
+            echo "author_map.json unchanged -- nothing to commit"
+          else
+            git commit -m "CI: regenerate author_map.json"
+            git push origin HEAD:${{ github.ref_name }}
           fi
 
       - name: Build per-author JSON files from R2
