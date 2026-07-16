@@ -178,8 +178,8 @@
 			return;
 		}
 		results = searchMode === "title"
-			? await searchTitles(needle, 25)
-			: await searchAuthors(needle, 25);
+			? await searchTitles(needle, 75)
+			: await searchAuthors(needle, 75);
 	}, 120);
 	$effect(() => runSearch(query));
 
@@ -1739,6 +1739,7 @@
 					<span class="side-chevron" aria-hidden="true">{tableCollapsed ? "▸" : "▾"}</span>
 				</button>
 				<div class="titles">
+				<p class="works-min-note">Only titles borrowed at least <strong>25 times</strong> all-time are listed here — smaller ones still count toward the author's total.</p>
 				<div class="titles-header">
 					<input
 							class="title-filter"
@@ -2992,6 +2993,14 @@
 	}
 
 	/* title list */
+	.works-min-note {
+		font-family: var(--font-sans);
+		font-size: 0.78rem;
+		line-height: 1.4;
+		color: var(--color-fg-light);
+		margin: 0 0 10px;
+	}
+
 	.titles-header {
 		display: flex;
 		flex-wrap: wrap;
