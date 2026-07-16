@@ -1522,7 +1522,8 @@
 				</details>
 			{/if}
 
-						<div class="mode-toggle" role="group" aria-label="Chart type">
+						<div class="plot-toolbar">
+					<div class="mode-toggle" role="group" aria-label="Chart type">
 				<button
 						type="button"
 						class:active={chartMode === "line"}
@@ -1549,7 +1550,13 @@
 				</button>
 			</div>
 
-						<div class="chart-wrap" bind:this={chartWrap}>
+						{#if !isOverview}
+						<button class="top-works-btn" onclick={toggleTopWorks} title={hasPlotted ? "Clear the chart back to just the author's total line (keeps your work grouping)" : "Plot the 5 most-borrowed works (their editions grouped into one line each)"}>
+							{hasPlotted ? "✕ Clear chart" : "Show top works"}
+						</button>
+						{/if}
+					</div>
+					<div class="chart-wrap" bind:this={chartWrap}>
 				{#if plotTitle}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
@@ -1631,9 +1638,6 @@
 				<div class="groups-header">
 					<span class="groups-label">On the chart</span>
 					<div class="groups-actions">
-						<button class="auto-group" onclick={toggleTopWorks} title={hasPlotted ? "Clear the chart back to just the author's total line (keeps your work grouping)" : "Plot the 5 most-borrowed works (their editions grouped into one line each)"}>
-							{hasPlotted ? "✕ Clear chart" : "Show top works"}
-						</button>
 						<button class="new-group" onclick={addGroup}>Make a custom work</button>
 					</div>
 				</div>
@@ -3022,6 +3026,36 @@
 	}
 
 	/* chart type toggle (line vs stacked area) + title sort toggle share a look */
+	/* Row above the plot: Line/Area toggle on the left, "Show top works" on the
+	   right so it's prominent instead of buried in the panel below. */
+	.plot-toolbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		flex-wrap: wrap;
+		margin: 0 0 14px;
+	}
+	.plot-toolbar .mode-toggle {
+		margin: 0;
+	}
+	.top-works-btn {
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
+		padding: 6px 14px;
+		border-radius: 999px;
+		border: 1.5px solid #6a4c93;
+		background: #6a4c93;
+		color: var(--color-white);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.top-works-btn:hover {
+		background: #593f7d;
+		border-color: #593f7d;
+	}
+
 	.mode-toggle {
 		display: inline-flex;
 		gap: 0;
