@@ -1495,6 +1495,18 @@
 				{/if}
 			</p>
 
+			{#if !isOverview && current.variants?.length}
+				<details class="name-variants">
+					<summary>{current.variants.length} catalog name variants merged into this author</summary>
+					<ul>
+						{#each current.variants as v}
+							<li>{v}</li>
+						{/each}
+					</ul>
+					<p class="nv-note">These are the raw <code>Creator</code> spellings the library catalog used. They were automatically clustered into one author — if any look like a different person, the clustering may have over-merged.</p>
+				</details>
+			{/if}
+
 						<div class="mode-toggle" role="group" aria-label="Chart type">
 				<button
 						type="button"
@@ -2428,6 +2440,45 @@
 		font-family: var(--font-sans);
 		color: var(--color-fg-light);
 		margin: 4px 0 20px;
+	}
+
+	.name-variants {
+		font-family: var(--font-sans);
+		margin: -12px 0 20px;
+		font-size: 0.85rem;
+	}
+	.name-variants summary {
+		cursor: pointer;
+		color: var(--color-fg-light);
+		list-style-position: inside;
+		width: fit-content;
+	}
+	.name-variants summary:hover {
+		color: var(--color-fg);
+	}
+	.name-variants ul {
+		margin: 8px 0 0;
+		padding: 8px 0 8px 18px;
+		max-height: 220px;
+		overflow-y: auto;
+		border-left: 2px solid var(--color-border);
+	}
+	.name-variants li {
+		font-family: var(--font-mono, monospace);
+		font-size: 0.8rem;
+		line-height: 1.5;
+		color: var(--color-fg);
+		list-style: none;
+	}
+	.name-variants .nv-note {
+		margin: 6px 0 0;
+		font-size: 0.78rem;
+		line-height: 1.45;
+		color: var(--color-fg-light);
+	}
+	.name-variants .nv-note code {
+		font-family: var(--font-mono, monospace);
+		font-size: 0.72rem;
 	}
 
 	.plot-title {

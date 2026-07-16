@@ -239,8 +239,74 @@ def save_agg_cache(display_totals, display_titles):
     AGG_CACHE.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
+# MARC relator codes show up as parentheticals like "(ilt)", "(crt)", "(cor)".
+# They mark a person's ROLE on a book (illustrator, creator, corrector...), not
+# WHICH person it is, so the same human appears under several of them -> safe to
+# strip. By contrast, occupational/biographical qualifiers like "(pastor)",
+# "(musician)", "(novelist)" are the catalog's way of telling two DIFFERENT
+# same-named people apart, so we must KEEP them or we over-merge (e.g. Garfield's
+# "Davis, Jim, 1945-" got fused with "Davis, Jim (Pastor)").
+RELATOR_CODES = {
+    "aut", "ill", "ilt", "edt", "cor", "con", "crt", "cre", "trl", "nrt",
+    "prf", "com", "drt", "ctb", "art", "aui", "aft", "ann", "cmp", "lyr",
+    "prt", "pbl", "voc", "dub", "hnr", "spk", "act", "dir", "pro", "adp",
+    "arr", "cng", "cnd", "aqt", "cll", "clr", "cwt", "ed", "trc", "cov",
+}
+
+
+# Parentheticals that describe an ENTITY TYPE or PLACE rather than telling two
+# same-named PEOPLE apart. These attach to bands, corporate names, and places
+# (e.g. "Red Hot Chili Peppers (Musical group)", "Washington (State)") and are
+# applied inconsistently across records, so KEEPING them would split one entity
+# in two. Strip them like relator codes.
+NON_PERSON_QUALIFIER_RE = re.compile(
+    r"\b(musical\s+gr[ou]up|group|band|orchestra|ensemble|choir|chorus|"
+    r"quartet|quintet|sextet|trio|duo|collective|project|"
+    r"company|corporation|corp|inc|firm|organization|association|"
+    r"state|province|county|region|kingdom|empire|republic)\b"
+)
+
+
+def _is_name_expansion(inside: str, base: str) -> bool:
+    """True when a parenthetical just spells out initials/given-names already in
+    the base name -- the library's "Lewis, C. S. (Clive Staples)" convention.
+    Every word must be an existing base word or expand one of its initials, so
+    real occupation tags like "(pastor)" or "(physician)" are NOT expansions."""
+    base_tokens = re.findall(r"[a-z]+", base.lower())
+    base_initials = {t for t in base_tokens if len(t) == 1}
+    base_words = {t for t in base_tokens if len(t) > 1}
+    words = re.findall(r"[a-z]+", inside)
+    if not words:
+        return False
+    return all(w in base_words or w[0] in base_initials for w in words)
+
+
+def _split_parens(text: str):
+    """Return (text_with_parens_removed, kept_qualifiers).
+
+    Drops MARC relator role-codes, entity/place tags, and name-expansions; keeps
+    occupational or biographical qualifiers (as lowercase strings) so callers can
+    re-attach them as person-disambiguators."""
+    base = re.sub(r"\([^)]*\)", " ", text)  # name with every parenthetical gone
+    kept = []
+
+    def repl(m):
+        inside = m.group(1).strip().lower().rstrip(".")
+        if (
+            inside
+            and inside not in RELATOR_CODES
+            and not NON_PERSON_QUALIFIER_RE.search(inside)
+            and not _is_name_expansion(inside, base)
+        ):
+            kept.append(inside)
+        return " "
+
+    stripped = re.sub(r"\(([^)]*)\)", repl, text)
+    return stripped, kept
+
+
 def normalize(name: str) -> str:
-    
+
     """A rough key for deciding two names are the same."""
     if not name:
         return ""
@@ -248,8 +314,8 @@ def normalize(name: str) -> str:
     # lowercasing, dash stripping, parenthesis creator
     creator = name.lower().strip("-").strip()
 
-    # matches parenthesis and whats inside
-    creator = re.sub(r"\(.*?\)", "", creator)
+    # Strip relator role-codes but keep real disambiguators to re-attach below.
+    creator, kept_quals = _split_parens(creator)
 
     # Handle "w/" multi-creator strings without commas like "Stan and Jan Berenstain w/ Mike Berenstain"
     creator = re.sub(r'\s+w/\s+', ' / ', creator)
@@ -337,7 +403,13 @@ def normalize(name: str) -> str:
     if suffix:
         creator = f"{creator} {suffix}"
 
-    #t_duration = time.perf_counter() - t_start   
+    # re-attach kept qualifiers so different same-named people stay distinct
+    # (e.g. "jim davis pastor" != "jim davis").
+    if kept_quals:
+        creator = f"{creator} " + " ".join(kept_quals)
+        creator = re.sub(r"\s+", " ", creator).strip()
+
+    #t_duration = time.perf_counter() - t_start
     #print(f"Time for normalize function: {t_duration:.6f} seconds")
     return creator
 
@@ -353,8 +425,8 @@ def name_tokens(name: str):
         return []
 
     s = name.lower().strip("-").strip()
-    # drop elements in parenthesis
-    s = re.sub(r"\(.*?\)", "", s) 
+    # strip relator role-codes but keep real disambiguators (re-attached below)
+    s, kept_quals = _split_parens(s)
 
     parts = [p.strip() for p in s.split(",") if p.strip()]
 
@@ -379,10 +451,13 @@ def name_tokens(name: str):
     s = re.sub(r"([a-zA-Z]{2})\.", r"\1", s)  
     #  remove periods or commas
     s = re.sub(r"[.,]", " ", s)
-    #replace consecutive whitespaces with singular 
+    # re-attach kept qualifiers so blocking keeps distinct people apart
+    if kept_quals:
+        s = s + " " + " ".join(kept_quals)
+    #replace consecutive whitespaces with singular
     s = re.sub(r"\s+", " ", s).strip()
 
-    #t_duration = time.perf_counter() - t_start   
+    #t_duration = time.perf_counter() - t_start
     #print(f"Time for name_tokens function: {t_duration:.6f} seconds")
     return [t for t in s.split(" ") if t]
 
