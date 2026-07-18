@@ -267,6 +267,40 @@ NON_PERSON_QUALIFIER_RE = re.compile(
 )
 
 
+# Professional/academic credentials that the catalog appends after a name
+# ("Emma Lauer, LCSW", "Jennifer Freed, PhD"). They're not part of the name, so a
+# trailing credential segment is dropped -- otherwise the reorder treats it as
+# the surname and produces "lcsw emma lauer". Deliberately EXCLUDES ambiguous
+# 2-letter forms (ma, ms, ba, bs, pa) that collide with real names, and only
+# strips them when they trail the name (never the first segment), so surnames
+# like "Do" / "Ma" in "Do, Anh" survive.
+CREDENTIALS = {
+    "phd", "md", "do", "dds", "dmd", "dvm", "dnp", "psyd", "edd", "dpt",
+    "pharmd", "scd", "dsc", "jd", "esq", "lcsw", "lcsw", "msw", "lmsw",
+    "lcpc", "lpc", "lmft", "lmhc", "lpcc", "mft", "rn", "aprn", "np", "crna",
+    "cnm", "cnp", "fnp", "pmhnp", "bsn", "msn", "mph", "mba", "mfa", "mpa",
+    "cpa", "cfa", "cfp", "rd", "rdn", "ldn", "otr", "slp", "ccc",
+    "faap", "facp", "facs", "faan", "faafp",
+}
+
+
+def _is_credential_part(part: str) -> bool:
+    """True when a comma segment is purely a credential like 'LCSW' / 'Ph.D.'."""
+    return re.sub(r"[.\s]", "", part.lower()) in CREDENTIALS
+
+
+def _prefold(s: str) -> str:
+    """Unify apostrophes and fold diacritics so accent/punctuation-only spelling
+    differences don't split one author. "O'Malley"=="O'Malley";
+    "Knausgård"=="Knausgaard"; "Boström"=="Bostrom". Scandinavian a-ring / o-slash
+    / ae have standard two-letter transliterations, so expand those BEFORE the
+    generic combining-mark strip (which would otherwise turn a-ring into "a")."""
+    s = s.replace("’", "'").replace("ʼ", "'").replace("`", "'")
+    s = s.replace("å", "aa").replace("ø", "o").replace("æ", "ae").replace("ß", "ss")
+    s = unicodedata.normalize("NFD", s)
+    return "".join(c for c in s if not unicodedata.combining(c))
+
+
 def _is_name_expansion(inside: str, base: str) -> bool:
     """True when a parenthetical just spells out initials/given-names already in
     the base name -- the library's "Lewis, C. S. (Clive Staples)" convention.
@@ -314,6 +348,10 @@ def normalize(name: str) -> str:
     # lowercasing, dash stripping, parenthesis creator
     creator = name.lower().strip("-").strip()
 
+    # Unify apostrophes + fold diacritics so "O'Malley"=="O'Malley" and
+    # "Knausgård"=="Knausgaard" cluster instead of splitting.
+    creator = _prefold(creator)
+
     # Strip relator role-codes but keep real disambiguators to re-attach below.
     creator, kept_quals = _split_parens(creator)
 
@@ -355,7 +393,13 @@ def normalize(name: str) -> str:
 
     # suffix pattern to match the suffix standing alone or near punctuation
     suffix_pattern = r"(?:^|\s|,|\.)(jr\.?|sr\.?|ii|iii|iv|v|vi)\b"
-    for part in parts:
+    for i, part in enumerate(parts):
+        # A TRAILING segment that is purely a credential ("Emma Lauer, LCSW",
+        # "Jennifer Freed, PhD") isn't part of the name -- drop it so it doesn't
+        # get reordered to the front as a fake surname. Never the first segment,
+        # so a real surname like "Do"/"Ma" survives.
+        if i > 0 and _is_credential_part(part):
+            continue
         if re.match(suffix_pattern, part):
             suffix = part.replace(".", "").strip() # Strip dots from suffix
         else:
@@ -425,6 +469,8 @@ def name_tokens(name: str):
         return []
 
     s = name.lower().strip("-").strip()
+    # same apostrophe/diacritic folding as normalize() so blocking keys align
+    s = _prefold(s)
     # strip relator role-codes but keep real disambiguators (re-attached below)
     s, kept_quals = _split_parens(s)
 
@@ -436,7 +482,9 @@ def name_tokens(name: str):
 
     suffix_pattern = r"(?:^|\s|,|\.)(jr\.?|sr\.?|ii|iii|iv|v|vi)\b"
     cleaned_parts = []
-    for part in parts:
+    for i, part in enumerate(parts):
+        if i > 0 and _is_credential_part(part):
+            continue
         if not re.match(suffix_pattern, part):
             cleaned_parts.append(part)
 
