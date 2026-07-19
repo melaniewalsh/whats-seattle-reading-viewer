@@ -640,6 +640,10 @@
 		t = t.replace(/,\s+or,\s+.*$/i, "");
 		t = t.replace(/&/g, " and "); // "beasts & where" -> "beasts and where"
 		t = t.replace(/\([^)]*\)/g, " "); // drop "(unabridged)" etc.
+		// Some catalog titles have an UNCLOSED paren, e.g. "The Inn at Rose Harbor
+		// (with bonus short story: Rose Harbor Series, Book 1" -- the balanced rule
+		// above misses it, so also strip a dangling "(" clause to end of string.
+		t = t.replace(/\s*\([^)]*$/, " ");
 		t = t.replace(/\[[^\]]*\]/g, " "); // drop cataloging brackets: "[text ]", "[sound recording]", etc.
 		// Repeatedly strip a trailing ":"/";" segment when it's edition/format noise
 		// (series/book/volume, "the original screenplay", "read by <narrator>",
@@ -647,7 +651,7 @@
 		// alternative title (e.g. "Slaughterhouse-Five: or, The Children's Crusade"
 		// is the same book). Stop at the first segment that's a real distinct
 		// subtitle (e.g. "The Crimes of Grindelwald"), so those stay separate.
-		const NOISE = /(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|autobiography|poems|essays|playscript|\bscript\b|\bproduction|\bserie|\blivre|\btome|\blibro|\btomo|\bedicion)/i;
+		const NOISE = /(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|autobiography|poems|essays|playscript|litrpg|gamelit|\bscript\b|\bproduction|\bserie|\blivre|\btome|\blibro|\btomo|\bedicion)/i;
 		let prev;
 		do {
 			prev = t;
