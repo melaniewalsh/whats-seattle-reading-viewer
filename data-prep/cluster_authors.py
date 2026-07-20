@@ -254,6 +254,35 @@ RELATOR_CODES = {
 }
 
 
+# Honorific prefies the cataloguer sometimes sticks in front of a name like
+# "Dr. Martin Luther King, Jr.", "Rev. Martin Luther King, Jr.", "Sir Arthur
+# Conan Doyle", "St. Augustine", "Prof. Richard Feynman". These are catalog
+# metadata, not part of the person's actual name, two records for the same
+# person, one with the prefix, one without will normalize to different strings
+# ("dr martin luther king jr" vs "martin luther king jr") and end up split
+# across two author clusters.
+#
+# Match only when the honorific is at the very start (anchored ^) AND followed
+# by whitespace, so we never accidentally strip "Dr" out of a surname like
+# "Drew" or a hyphenated name like "Saint-Saens" (those have no following
+# space). Multi-creator strings get split by the '/' handler in normalize()
+# and each segment is re-normalized, so a leading honorific on a LATER
+# segment ("Smith, John / Dr. Jane Doe") is stripped by the recursive call.
+HONORIFIC_PREFIX_RE = re.compile(
+    r"^\s*(?:dr|doctor|mr|mister|mrs|ms|miss|prof|professor|"
+    r"sir|lord|lady|rev|reverend|saint|st|hon|honourable|honorable|"
+    r"capt|captain|lt|lieutenant|col|colonel|gen|general|"
+    r"herr|frau|madame|mme|mademoiselle|mlle)\b\.?\s+",
+    re.IGNORECASE,
+)
+
+
+# SUFFIX tokens (Jr, Sr, II, III, IV, VI ...) 
+# "v" alone is intentionally EXCLUDED since a standalone token it is far
+# more likely to be a middle initial ("John V. Smith") 
+SUFFIX_TOKEN_RE = re.compile(r"^(?:jr\.?|sr\.?|ii|iii|iv|vi)$", re.IGNORECASE)
+
+
 # Parentheticals that describe an ENTITY TYPE or PLACE rather than telling two
 # same-named PEOPLE apart. These attach to bands, corporate names, and places
 # (e.g. "Red Hot Chili Peppers (Musical group)", "Washington (State)") and are
@@ -316,6 +345,15 @@ def normalize(name: str) -> str:
 
     # Strip relator role-codes but keep real disambiguators to re-attach below.
     creator, kept_quals = _split_parens(creator)
+
+    # Drop a leading honorific prefix ("Dr.", "Mr.", "Sir", "Rev.", "St.",
+    # "Prof.", ...) BEFORE any comma-split / reorder logic runs. Otherwise
+    # "Dr. Martin Luther King, Jr." normalizes to "dr martin luther king jr"
+    #Done after _split_parens so a parenthetical
+    # role-code on a LATER creator in a multi-segment string isn't disturbed,
+    # and before the '/' split so a LATER segment's leading honorific gets
+    # stripped by the recursive normalize() call below.
+    creator = HONORIFIC_PREFIX_RE.sub("", creator, count=1)
 
     # Handle "w/" multi-creator strings without commas like "Stan and Jan Berenstain w/ Mike Berenstain"
     creator = re.sub(r'\s+w/\s+', ' / ', creator)
@@ -428,6 +466,12 @@ def name_tokens(name: str):
     # strip relator role-codes but keep real disambiguators (re-attached below)
     s, kept_quals = _split_parens(s)
 
+    # Mirroring normalize(): drop a leading honorific prefix so tokenization of
+    # the raw name lines up with tokenization of the normalized name. Without this, the "dr"
+    # token survives in name_tokens("Dr. Martin Luther King, Jr.") and
+    # first_last_key() returns ('dr', 'king') instead of ('martin', 'king').
+    s = HONORIFIC_PREFIX_RE.sub("", s, count=1)
+
     parts = [p.strip() for p in s.split(",") if p.strip()]
 
     # drop pure life-date segments so they don't block the reversal below
@@ -457,9 +501,8 @@ def name_tokens(name: str):
     #replace consecutive whitespaces with singular
     s = re.sub(r"\s+", " ", s).strip()
 
-    #t_duration = time.perf_counter() - t_start
-    #print(f"Time for name_tokens function: {t_duration:.6f} seconds")
-    return [t for t in s.split(" ") if t]
+  
+    return [t for t in s.split(" ") if t and not SUFFIX_TOKEN_RE.match(t)]
 
 
 def first_last_key(name: str):
@@ -503,14 +546,34 @@ def token_set_key(name: str):
 
 
 def extract_date_signature(name: str):
-    """Pull out the raw 4-digit year token(s) attached to a name, e.g.
-    "1947-2006" or "2000-" (still living)."""
+    """Return the BIRTH year (first 4-digit year token) attached to a name,
+    or None if no year appears.
+
+    The catalog records the same person's lifespan in several inconsistent
+    forms  "Merwin, W. S. (William Stanley), 1927-" (still-living at
+    cataloguing time), "..., 1927-2019" (after death), "..., 1927-2019,"
+    (with a stray trailing comma). The previous implementation concatenated
+    EVERY \\b\\d{4}-?\\b match, so these three raw spellings of one person
+    produced THREE different date signatures ("1927", "1927-2019",
+    "1927-2019") and landed in three separate Pass-1 (norm, date_sig)
+    buckets. Pass 2 only re-merges the undated form with ONE best-matching
+    dated form on title evidence, so the other dated form was left split
+    off  "Merwin, W. S. (William Stanley), 1927-" never re-merged with
+    "Merwin, W. S. (William Stanley), 1927-2019".
+
+    Using only the birth year (first 4-digit year) collapses every
+    lifespan-format variant of one person into a single date signature.
+    This is consistent with name_variant_remap.birth_year() further down
+    in this file, which already treats the first 4-digit year as the
+    person-disambiguator and refuses to merge across conflicting birth
+    years. Different DEATH years for the same birth year are catalog
+    metadata noise (the cataloguer hadn't recorded the death yet, or
+    recorded it wrong), not a marker of two different people.
+    """
     if not name:
         return None
-    matches = re.findall(r"\b\d{4}-?\b", name)
-    if not matches:
-        return None
-    return "".join(matches)
+    m = re.search(r"\b\d{4}\b", name)
+    return m.group(0) if m else None
 
 
 def _period_marked_initials(name: str) -> set:
