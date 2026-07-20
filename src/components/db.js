@@ -156,7 +156,10 @@ function getIndex() {
 			.then((r) => r.json())
 			.then((all) => {
 				const rows = all.filter((r) => !JUNK_AUTHOR_NAMES.has(r[1]));
-				return { rows, lower: rows.map((r) => r[1].toLowerCase()) };
+				// Precompute each name's alphanumeric "words" (punctuation + dates
+				// split out) for punctuation-insensitive word matching in search.
+				const words = rows.map((r) => r[1].toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+				return { rows, words };
 			});
 	}
 	return indexPromise;
@@ -168,22 +171,30 @@ function getIndex() {
  * sensible to show before the user types. Because the index is pre-sorted
  * total-DESC, the first `limit` matches we hit are already the most-borrowed.
  */
+// True when query word `t` is a prefix of the concatenation of one-or-more
+// consecutive name words starting at a word boundary. This makes search ignore
+// punctuation and spacing: "greenberg" clears the middle initial in
+// "cathy l greenberg", "leguin" matches "le"+"guin" in "ursula k le guin", and
+// "steph" still prefix-matches "stephen" -- while "king" never matches inside
+// "hawking" (matching only ever starts at a word boundary).
+function wordSpanMatch(words, t) {
+	for (let i = 0; i < words.length; i++) {
+		let acc = '';
+		for (let k = i; k < words.length && acc.length < t.length; k++) acc += words[k];
+		if (acc.startsWith(t)) return true;
+	}
+	return false;
+}
+
 export async function searchAuthors(query, limit = 20) {
-	const { rows, lower } = await getIndex();
-	const q = (query ?? '').trim().toLowerCase();
-	// Match on each query WORD rather than the whole phrase, so "cathy greenberg"
-	// finds "Cathy L. Greenberg" (a middle initial sits between the words) and the
-	// order doesn't matter ("greenberg cathy" works too). Each word must match at
-	// a WORD BOUNDARY (\b) so "king" doesn't match inside "Hawking" -- i.e. it's a
-	// word-prefix match ("steph" still finds "Stephen"). rows are total-DESC, so
-	// the most-borrowed matches still surface first.
-	const terms = q
-		? q.split(/\s+/).map((t) => new RegExp('\\b' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-		: [];
+	const { rows, words } = await getIndex();
+	// Split the query into alphanumeric words too, so punctuation the user types
+	// ("ursula k. le guin") is ignored and word order doesn't matter.
+	const terms = (query ?? '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 
 	const out = [];
 	for (let i = 0; i < rows.length; i++) {
-		if (terms.length && !terms.every((re) => re.test(lower[i]))) continue;
+		if (terms.length && !terms.every((t) => wordSpanMatch(words[i], t))) continue;
 		const [slug, name, total] = rows[i];
 		out.push({ slug, name, total });
 		if (out.length >= limit) break;
