@@ -5,7 +5,7 @@
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 	import Switch from "$components/ui/Switch.svelte";
-	import { getMonths, searchAuthors, searchTitles, titleIndexMin, getAuthor, getAllCheckouts } from "$components/db.js";
+	import { getMonths, searchAuthors, searchTitles, searchSubjects, getSubject, titleIndexMin, getAuthor, getAllCheckouts } from "$components/db.js";
 
 	// "author" (default): search authors. "title": reverse lookup — search a title,
 	// resolve to its author, open the author's drilldown with that work highlighted.
@@ -177,9 +177,9 @@
 			results = [];
 			return;
 		}
-		results = searchMode === "title"
-			? await searchTitles(needle, 75)
-			: await searchAuthors(needle, 75);
+		if (searchMode === "title") results = await searchTitles(needle, 75);
+		else if (searchMode === "subject") results = await searchSubjects(needle, 75);
+		else results = await searchAuthors(needle, 75);
 	}, 120);
 	$effect(() => runSearch(query));
 
@@ -217,6 +217,74 @@
 		} catch {}
 	}
 
+	// ---- "By subject" mode state -----------------------------------------
+	// When the user clicks a subject result, we fetch that subject's own
+	// series plus its top-N authors' series (db.js:getSubject) and render a
+	// stacked-area chart below the search box, same idea as an author's
+	// drilldown but stacked by AUTHOR instead of by title. Clicking an
+	// author in the legend loads their own page (selectAuthor). The panel
+	// is dismissed by selecting an author, switching tabs, or closing it
+	// explicitly.
+	let subjectPanel = $state(null); // { heading, origins, total, series, authors: [{slug,name,total,series}, ...] }
+	let subjectPanelLoading = $state(false);
+	let subjectPanelError = $state("");
+	const SUBJECT_TOP_AUTHORS = 8; // how many authors get their own stacked layer; rest fold into "Other authors"
+
+	async function openSubject(s) {
+		// s = { heading, origins, total } from searchSubjects
+		subjectPanelLoading = true;
+		subjectPanelError = "";
+		subjectPanel = { heading: s.heading, origins: s.origins, total: s.total, series: [], authors: [] };
+		const data = await getSubject(s.heading).catch(() => null);
+		subjectPanelLoading = false;
+		if (!data) {
+			subjectPanelError = `Couldn't load authors for "${s.heading}".`;
+			return;
+		}
+		subjectPanel = data;
+	}
+
+	function closeSubjectPanel() {
+		subjectPanel = null;
+		subjectPanelError = "";
+		subjectPanelLoading = false;
+	}
+
+	// Turn the loaded subject into stacked layers: one per top author (already
+	// sorted DESC by db.js), plus a catch-all "Other authors" layer covering
+	// the gap between the subject's real total and the shown authors -- same
+	// pattern StackedAreaChart uses internally for an author's titles.
+	const subjectChartSeries = $derived.by(() => {
+		if (!subjectPanel || !months.length) return [];
+		const shown = subjectPanel.authors.slice(0, SUBJECT_TOP_AUTHORS);
+		const layers = shown.map((a, i) => ({
+			label: a.name,
+			slug: a.slug,
+			values: densify(a.series),
+			color: TITLE_COLORS[i % TITLE_COLORS.length],
+			groupIndex: 0
+		}));
+		const subjectTotals = densify(subjectPanel.series);
+		const otherValues = subjectTotals.map((total, i) => {
+			const shownSum = layers.reduce((sum, l) => sum + l.values[i], 0);
+			return Math.max(0, total - shownSum);
+		});
+		if (otherValues.some((v) => v > 0)) {
+			layers.push({ label: "Other authors", values: otherValues, color: "#ccc", groupIndex: -1 });
+		}
+		return layers;
+	});
+
+	// Top subjects to seed the "By subject" quick-picks (like the author chips).
+	let topSubjects = $state([]);
+	let subjectsPicksLoaded = false;
+	$effect(() => {
+		if (searchMode === "subject" && !subjectsPicksLoaded) {
+			subjectsPicksLoaded = true;
+			searchSubjects("", 8).then((s) => (topSubjects = s));
+		}
+	});
+
 	// Switching "By title" -> "By author" should drop the single-book focus and
 	// show the WHOLE author's checkouts (their total line), not the one title you
 	// happened to be looking at. (The author stays loaded; we just clear the plot.)
@@ -232,6 +300,13 @@
 				showAuthorTotal = true;
 				autoHidAuthorTotal = false;
 				chartMode = "line";
+			}
+			// Leaving subject mode: dismiss the subject panel + clear
+			// the query so the new tab starts fresh.
+			if (prevSearchMode === "subject") {
+				subjectPanel = null;
+				subjectPanelError = "";
+				subjectPanelLoading = false;
 			}
 			prevSearchMode = mode;
 		}
@@ -1168,18 +1243,37 @@
 	// author's terms in author mode, or (in "By title" mode) the plotted work's
 	// terms when exactly one work is shown. Baked into the author file by the
 	// build (annotate_subjects); data built before that just renders nothing.
-	// Stored subjects are [[term, weight], ...] (older data may be a plain [term,...]).
-	// Pool a term list into a running term->weight Map so we can combine a work's
-	// editions (a book's ebook record is often sparse/generic while its print
-	// record carries the specific headings) and re-rank the union.
+	//
+	// Stored subjects use the new clustered-subjects shape:
+	//   [[heading, weight, [origins]], ...]
+	// where `heading` is the canonical display text from subject_map.json
+	// (LCSH > LCSHAC > GenreForm > LCNAF > GSAFD > Deprecated > FAST > BISAC
+	// > Overdrive priority) and `origins` is the list of every vocabulary
+	// that attests it. Pool by canonical heading (so two raw spellings that
+	// both resolve to "Mystery fiction" merge into one chip, with weights
+	// summed and origins unioned), then re-rank by weight.
 	function poolSubjects(map, list) {
 		for (const it of list ?? []) {
-			const term = Array.isArray(it) ? it[0] : it;
-			const w = Array.isArray(it) ? (it[1] || 0) : 0;
-			if (term) map.set(term, (map.get(term) || 0) + w);
+			if (!Array.isArray(it)) continue;
+			const term = it[0];
+			if (!term) continue;
+			const w = it[1] || 0;
+			const origins = Array.isArray(it[2]) ? it[2] : [];
+			const existing = map.get(term);
+			if (existing) {
+				existing.weight += w;
+				for (const o of origins) {
+					if (!existing.origins.includes(o)) existing.origins.push(o);
+				}
+			} else {
+				map.set(term, { weight: w, origins: [...origins] });
+			}
 		}
 	}
-	const top5Terms = (map) => [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map((e) => e[0]);
+	const top5Terms = (map) => [...map.entries()]
+		.sort((a, b) => b[1].weight - a[1].weight)
+		.slice(0, 5)
+		.map(([term, info]) => ({ term, weight: info.weight, origins: info.origins }));
 
 	const subjectTerms = $derived.by(() => {
 		if (!current || isOverview) return [];
@@ -1407,11 +1501,11 @@
 <div class="viewer">
 	{#snippet authorPicker()}
 		<div class="search">
-			<label class="sr-only" for="author-search">{searchMode === "title" ? "Search for a title" : "Search for an author"}</label>
+			<label class="sr-only" for="author-search">{searchMode === "title" ? "Search for a title" : searchMode === "subject" ? "Search for a subject" : "Search for an author"}</label>
 			<input
 					id="author-search"
 					type="search"
-					placeholder={searchMode === "title" ? "Search a title — try Braiding Sweetgrass, or Educated" : "Search an author — try Octavia Butler, or Mo Willems"}
+					placeholder={searchMode === "title" ? "Search a title — try Braiding Sweetgrass, or Educated" : searchMode === "subject" ? "Search a subject — try Mystery fiction, or Graphic novels" : "Search an author — try Octavia Butler, or Mo Willems"}
 					bind:value={query}
 					autocomplete="off"
 			/>
@@ -1424,6 +1518,11 @@
 									<span class="res-title">{a.title}</span>
 									<span class="count res-author">{displayName(a.author)}</span>
 								</button>
+							{:else if searchMode === "subject"}
+								<button onclick={() => openSubject(a)}>
+									<span class="res-title">{a.heading}</span>
+									<span class="count">{a.total.toLocaleString()}</span>
+								</button>
 							{:else}
 								<button onclick={() => selectAuthor(a)}>
 									<span>{displayName(a.name)}</span>
@@ -1434,9 +1533,56 @@
 					{/each}
 				</ul>
 			{:else if query.trim().length >= 2}
-				<p class="no-results">No {searchMode === "title" ? "titles" : "authors"} found for “{query.trim()}”.</p>
+				<p class="no-results">No {searchMode === "title" ? "titles" : searchMode === "subject" ? "subjects" : "authors"} found for “{query.trim()}”.</p>
 			{/if}
 		</div>
+
+		{#if searchMode === "subject" && subjectPanel}
+			<div class="subject-panel">
+				<div class="sp-header">
+					<div class="sp-title">
+						<span class="sp-heading">{subjectPanel.heading}</span>
+						{#if subjectPanel.origins?.length}
+							<span class="sp-origins">
+								{#each subjectPanel.origins as o}
+									<code class="sp-origin" data-origin={o}>{o}</code>
+								{/each}
+							</span>
+						{/if}
+					</div>
+					<button class="sp-close" onclick={closeSubjectPanel} title="Close">×</button>
+				</div>
+				<p class="sp-total">{subjectPanel.total.toLocaleString()} checkouts · top {subjectPanel.authors.length} authors for this subject</p>
+				{#if subjectPanelLoading}
+					<p class="sp-loading">Loading chart…</p>
+				{:else if subjectPanelError}
+					<p class="sp-error">{subjectPanelError}</p>
+				{:else}
+					<LineChart
+						months={months}
+						series={subjectChartSeries}
+						mode="area"
+						grandTotal={subjectPanel.total}
+						shareOf={`"${subjectPanel.heading}" checkouts`}
+					/>
+					<ul class="sp-authors sp-legend">
+						{#each subjectChartSeries as layer}
+							<li>
+								{#if layer.slug}
+									<button onclick={() => selectAuthor({ slug: layer.slug, name: layer.label })}>
+										<span class="sp-swatch" style="background-color: {layer.color}"></span>
+										<span>{displayName(layer.label)}</span>
+									</button>
+								{:else}
+									<span class="sp-swatch" style="background-color: {layer.color}"></span>
+									<span>{layer.label}</span>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+		{/if}
 
 		{#if searchMode === "title"}
 			<p class="title-note"><span class="tn-ic" aria-hidden="true">ℹ</span><span><strong>Only the most-borrowed titles are searchable here</strong>{#if titleMinLabel} — those with at least ~{titleMinLabel} all-time checkouts{/if}. To find any title, search <strong>By&nbsp;author</strong> instead.</span></p>
@@ -1450,7 +1596,14 @@
 					<button class="chip" onclick={() => selectTitle(t)}>{t.title}</button>
 				{/each}
 			</div>
-		{:else if searchMode !== "title" && topAuthors.length}
+		{:else if searchMode === "subject" && topSubjects.length}
+			<div class="top-authors">
+				<span class="quick-label">Most borrowed subjects:</span>
+				{#each topSubjects as s}
+					<button class="chip" onclick={() => openSubject(s)}>{s.heading}</button>
+				{/each}
+			</div>
+		{:else if searchMode === "author" && topAuthors.length}
 			<div class="top-authors">
 				<span class="quick-label">Most borrowed:</span>
 				{#each topAuthors as a}
@@ -1475,7 +1628,7 @@
 	{/if}
 
 	<!-- ===== Selected author ===== -->
-	{#if current}
+	{#if current && searchMode !== "subject"}
 		<div class="author">
 			<div class="split" class:collapsed={tableCollapsed}>
 			<div class="split-main">
@@ -1600,8 +1753,19 @@
 				<div class="subject-terms">
 					<span class="st-label">{searchMode === "title" ? "Top subjects for this title" : "Top subjects for this author"}</span>
 					<ul class="st-chips">
-						{#each subjectTerms as term}
-							<li><code class="st-chip">{term}</code></li>
+						{#each subjectTerms as s}
+							<li>
+								<code class="st-chip" title={s.origins.length > 1 ? `Attested by: ${s.origins.join(', ')}` : (s.origins.length === 1 ? `Attested by: ${s.origins[0]}` : '')}>
+									<span class="st-chip-term">{s.term}</span>
+									{#if s.origins.length}
+										<span class="st-chip-origins">
+											{#each s.origins as o}
+												<span class="st-chip-origin" data-origin={o}>{o}</span>
+											{/each}
+										</span>
+									{/if}
+								</code>
+							</li>
 						{/each}
 					</ul>
 				</div>
@@ -1970,7 +2134,9 @@
 		</div>
 	{:else}
 		{@render authorPicker()}
-		<p class="hint">Search for an author to begin.</p>
+		{#if searchMode !== "subject"}
+			<p class="hint">Search for an author to begin.</p>
+		{/if}
 	{/if}
 
 	{#if hoverTip}
@@ -2127,8 +2293,13 @@
 	}
 	.st-chip {
 		/* inline-code look (matches the genre tab's <code> terms) rather than a
-		   rounded pill, so it doesn't read as a clickable button */
-		padding: 1px 6px;
+		   rounded pill, so it doesn't read as a clickable button. Laid out
+		   as inline-flex so the heading text and the origin badge sit on
+		   one baseline with a small gap between them. */
+		display: inline-flex;
+		align-items: baseline;
+		gap: 5px;
+		padding: 1px 7px 1px 6px;
 		border-radius: 4px;
 		background: #efe9f5;
 		color: #6a4c93;
@@ -2136,6 +2307,58 @@
 		font-size: 0.82rem;
 		line-height: 1.5;
 		white-space: nowrap;
+	}
+	.st-chip-term {
+		/* the canonical heading text -- the chip's reason for existing */
+	}
+	/* inline origin badge: tiny uppercase tag naming the vocabulary that
+		   vouched for the heading (LCSH, FAST, BISAC, Overdrive, ...). Sits
+		   inline at the end of the chip, separated by a faint middle-dot so
+		   it reads "Mystery fiction · LCSH". Tinted slightly darker than the
+		   chip background so it's visible but doesn't fight the heading. */
+	.st-chip-origin {
+		font-size: 0.62rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: #8a6bb1;
+		opacity: 0.9;
+	}
+	.st-chip-origins {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 4px;
+	}
+	.st-chip-origin + .st-chip-origin::before {
+		content: "·";
+		margin-right: 4px;
+		font-weight: 400;
+		opacity: 0.55;
+	}
+	/* The very first origin badge after the heading text gets a leading
+	   dot too, so it reads "Mystery fiction · LCSH · FAST" consistently. */
+	.st-chip-origins .st-chip-origin:first-child::before {
+		content: "·";
+		margin-right: 4px;
+		font-weight: 400;
+		opacity: 0.55;
+	}
+	/* Per-vocabulary accents: when the primary origin is an auxiliary
+		   vocabulary (anything outside the LCSH family), tint the badge a bit
+		   warmer so the user can tell at a glance that the heading isn't a
+		   first-class LCSH heading. LCSH-family origins keep the default
+		   purple to match the chip. */
+	.st-chip-origin[data-origin="FAST"],
+	.st-chip-origin[data-origin="BISAC"],
+	.st-chip-origin[data-origin="Overdrive"],
+	.st-chip-origin[data-origin="GSAFD"],
+	.st-chip-origin[data-origin="Deprecated"] {
+		color: #b5651d;
+	}
+	.st-chip-origin[data-origin="LCSH Subdivision"],
+	.st-chip-origin[data-origin="LCSH Subdivision Chain (3-way)"],
+	.st-chip-origin[data-origin="LCSH Subdivision Chain (4-way)"] {
+		color: #5a3d6e;
 	}
 
 	/* the author search + "most borrowed" chips, relocated below the chart --
@@ -2146,6 +2369,149 @@
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-md);
 		background: var(--color-gray-100);
+	}
+
+	/* "By subject" mode: panel that opens when you click a subject result,
+	   listing the top authors for that subject. Sits between the search
+	   box and the quick-picks so the user can pick an author without
+	   losing the subject context. */
+	.subject-panel {
+		margin: 8px 0 10px;
+		padding: 12px 14px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-bg, #fff);
+	}
+	.sp-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 10px;
+	}
+	.sp-title {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 6px 8px;
+	}
+	.sp-heading {
+		font-family: var(--font-serif, Georgia, serif);
+		font-size: 1.05rem;
+		font-weight: 600;
+		color: var(--color-fg, #1a1a1a);
+	}
+	.sp-origins {
+		display: inline-flex;
+		flex-wrap: wrap;
+		gap: 4px;
+	}
+	.sp-origin {
+		padding: 1px 6px;
+		border-radius: 4px;
+		background: #efe9f5;
+		color: #6a4c93;
+		font-family: var(--font-sans);
+		font-size: 0.65rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+	.sp-origin[data-origin="FAST"],
+	.sp-origin[data-origin="BISAC"],
+	.sp-origin[data-origin="Overdrive"],
+	.sp-origin[data-origin="GSAFD"],
+	.sp-origin[data-origin="Deprecated"] {
+		color: #b5651d;
+	}
+	.sp-origin[data-origin="LCSH Subdivision"],
+	.sp-origin[data-origin="LCSH Subdivision Chain (3-way)"],
+	.sp-origin[data-origin="LCSH Subdivision Chain (4-way)"] {
+		color: #5a3d6e;
+	}
+	.sp-close {
+		flex: none;
+		border: none;
+		background: none;
+		font-size: 1.4rem;
+		line-height: 1;
+		color: var(--color-fg-light, #888);
+		cursor: pointer;
+		padding: 0 4px;
+	}
+	.sp-close:hover {
+		color: var(--color-fg, #1a1a1a);
+	}
+	.sp-total {
+		margin: 4px 0 8px;
+		font-size: 0.8rem;
+		color: var(--color-fg-light, #888);
+	}
+	.sp-authors {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		gap: 2px;
+	}
+	.sp-authors li button {
+		display: flex;
+		justify-content: space-between;
+		gap: 8px;
+		width: 100%;
+		padding: 5px 8px;
+		background: none;
+		border: none;
+		border-radius: 4px;
+		font-size: 0.85rem;
+		text-align: left;
+		cursor: pointer;
+		color: var(--color-fg, #1a1a1a);
+	}
+	.sp-authors li button:hover {
+		background: var(--color-gray-100, #f2f2f2);
+	}
+	.sp-authors .count {
+		color: var(--color-fg-light, #888);
+		font-variant-numeric: tabular-nums;
+	}
+	.sp-legend {
+		margin-top: 10px;
+	}
+	.sp-legend li {
+		display: flex;
+		align-items: center;
+	}
+	.sp-legend li button {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		justify-content: flex-start;
+	}
+	.sp-legend li span:not(.sp-swatch) {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.sp-swatch {
+		flex: none;
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+	}
+	.sp-legend li:has(> span:not(button)) {
+		padding: 5px 8px;
+		gap: 7px;
+		font-size: 0.85rem;
+		color: var(--color-fg-light, #888);
+	}
+	.sp-loading, .sp-error {
+		font-size: 0.85rem;
+		color: var(--color-fg-light, #888);
+		margin: 6px 0;
+	}
+	.sp-error {
+		color: #b00020;
 	}
 	/* format legend for the overview "by format" area chart */
 	.format-legend {

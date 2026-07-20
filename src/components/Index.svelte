@@ -19,13 +19,14 @@
 		<div class="main-tabs" role="tablist" aria-label="View">
 			<button role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
 			<button role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
+			<button role="tab" aria-selected={tab === "subject"} class:active={tab === "subject"} onclick={() => (tab = "subject")}>By subject</button>
 			<button role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
 		</div>
 
 		{#if tab === "genres"}
 			<GenreTrends />
 		{:else}
-			<Viewer searchMode={tab === "titles" ? "title" : "author"} />
+			<Viewer searchMode={tab === "titles" ? "title" : tab === "subject" ? "subject" : "author"} />
 		{/if}
 
 		<details class="about">

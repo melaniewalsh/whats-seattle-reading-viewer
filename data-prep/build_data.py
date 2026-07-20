@@ -115,6 +115,7 @@ import os
 import re
 import shutil
 import sqlite3
+import unicodedata
 from pathlib import Path
 from time import perf_counter
 from concurrent.futures import ThreadPoolExecutor
@@ -192,6 +193,17 @@ MONTHLY_PARQUET_DIR = PROJECT_DIR / "data" / "raw" / "monthly_parquet"
 # sync_new_files_from_r2() and the end of main().
 PROCESSED_FILES_CSV = PROJECT_DIR / "data-prep" / "processed_files.csv"
 
+# Clustered-subjects authority map produced by data-prep/cluster_subjects.py.
+# Each entry is keyed by the aggressively-normalized heading text and carries
+# the canonical display `heading`, the priority `origin` (LCSH > LCSHAC >
+# GenreForm > LCNAF > GSAFD > Deprecated > FAST > BISAC > Overdrive, plus the
+# subdivision-chain reconstructions), the full `origins` list (every
+# attesting vocabulary), `uris`, and the list of [author, title] pairs that
+# attest it. annotate_subjects() reads this so the per-author / per-title
+# subjects stored in the JSON files use canonical headings + origin tags
+# instead of the raw, case-folded, comma-split SPL strings.
+SUBJECT_MAP_PATH = PROJECT_DIR / "data-prep" / "subject_map.json"
+
 # SQLite page size in bytes. Over a high-latency network, the cost is the
 # NUMBER of range requests, not bytes-per-request -- so bigger pages are better:
 # they make the B-tree shallower and pack more per page, so a lookup touches
@@ -222,6 +234,16 @@ TITLE_FETCH_CHUNK = 200_000
 # least this many times (ever). Trims the long tail; the author's total and
 # trend line still count every checkout. Set to 0 to keep everything.
 MIN_TITLE_CHECKOUTS = 25
+
+# How many authors' worth of `clean` rows annotate_subjects() explodes/sorts
+# per query. The subjects UNNEST multiplies row count by ~(terms per title),
+# so doing this for ALL authors in one query means DuckDB has to sort an
+# intermediate result that can be an order of magnitude bigger than `clean`
+# itself. Scoping each query to a slice of authors via `WHERE author = ANY(?)`
+# bounds that sort to one batch at a time -- peak memory stays flat as the
+# dataset grows, instead of scaling with total row count. Lower this if you
+# still see OOMs; raise it if batches are running fast and memory has headroom.
+SUBJECT_ANNOTATION_AUTHOR_BATCH = int(os.environ.get("SUBJECT_ANNOTATION_AUTHOR_BATCH", "2000"))
 
 # Pattern that strips a trailing ", 1966-" / ", 1945 July 28-" from a name.
 NAME_DATE_RE = r",\s*[0-9]{4}.*$"
@@ -509,130 +531,436 @@ def write_author_files(out_dir, months, record_stream, counters, variants_by_aut
 
 def annotate_subjects(con, out_dir, slug_by_author):
     """Post-pass: fold each author's (and each of their titles') most-common
-    subject-heading TERMS into the already-written author JSON files.
+    subject-heading TERMS into the already-written author JSON files, using
+    the clustered-subjects authority map (data-prep/subject_map.json produced
+    by cluster_subjects.py) to canonicalize every term.
 
     Runs AFTER write_author_files so it never perturbs the memory-tuned author/
     title streaming above; the caller wraps it in try/except, so if it fails the
-    core build has still produced complete (subject-less) files. Terms come from
-    the raw `subjects` field -- a comma-separated list per checkout row -- split
-    into individual terms, weighted by checkouts, with case variants folded
-    together (keeping the most-borrowed casing for display). Umbrella terms
-    (Fiction/Nonfiction/Literature/...) are dropped so specific headings surface.
-    Writes weighted pairs so the frontend can pool a work's editions + re-rank:
-      author file  ->  "subjects": [[term, checkouts], ...]   (top 8, pooled)
-      each title   ->  "subjects": [[term, checkouts], ...]   (top 10 per edition)
+    core build has still produced complete (subject-less) files.
+
+    Pipeline:
+      1. Load subject_map.json: {normalized_term: {heading, origin, origins, uris, titles}}
+      2. Stream (author, title, raw_term, sum(checkouts)) rows from `clean`,
+         ordered by (author, title) so we hold one author in memory at a time.
+      3. For each raw_term, apply the SAME normalization cluster_subjects.py uses
+         and look it up in subject_map. Drop unmatched terms (only canonical,
+         mapped headings reach the UI).
+      4. Pool by canonical `heading` (so two raw spellings that both resolve to
+         "Mystery fiction" merge into one entry, with weights summed and the
+         `origins` lists unioned).
+      5. Write the top N per author / per title into the already-written JSON:
+
+           author file  ->  "subjects": [[heading, weight, [origins]], ...]  (top 8)
+           each title   ->  "subjects": [[heading, weight, [origins]], ...]  (top 10)
+
+    The frontend renders the heading as the chip text and the origins list as a
+    small inline badge, so users see at a glance which vocabulary vouched for
+    each subject (LCSH, FAST, BISAC, Overdrive, ...).
     """
     authors_dir = out_dir / "authors"
 
+    # ---- 1. Load the clustered-subjects authority map ----------------------
+    if not SUBJECT_MAP_PATH.exists():
+        print(f"  [subjects] {SUBJECT_MAP_PATH.name} not found -- "
+              f"run data-prep/cluster_subjects.py first; skipping subject annotation")
+        return
+    print(f"  [subjects] loading {SUBJECT_MAP_PATH.name} ...")
+    with open(SUBJECT_MAP_PATH, encoding="utf-8") as fh:
+        smap = json.load(fh)
+    print(f"  [subjects] {len(smap):,} clustered subject entries loaded")
+
+    # ---- 2. Normalization (must match cluster_subjects.normalize exactly) --
+    # Closures so the normalization is co-located with its only caller.
+    _APOS = re.compile(r"[\'\u2019\u2018`]")
+    _NON_ALNUM = re.compile(r"[^\w\s]")
+    _MULTI_WS = re.compile(r"\s+")
+    _PLACEHOLDER = re.compile(r"\b(na|NA|N\/A|n\/a|none|unknown)\b")
+
+    def _strip_diacritics(s: str) -> str:
+        return "".join(
+            c for c in unicodedata.normalize("NFKD", s)
+            if not unicodedata.combining(c)
+        )
+
+    def _normalize_term(text: str) -> str:
+        if not text:
+            return ""
+        s = text.lower()
+        s = _strip_diacritics(s)
+        s = _APOS.sub("", s)
+        s = _NON_ALNUM.sub(" ", s)
+        s = _MULTI_WS.sub(" ", s)
+        s = _PLACEHOLDER.sub("", s)
+        return s.strip()
+
+    # ---- 3. Bump DuckDB's memory limit for the heavy UNNEST ----------------
     # This runs LAST -- the memory-tuned author/title streaming (which needs the
-    # low global limit to spill instead of OOM) is already done and its big Python
-    # structures freed. The subject UNNEST is heavy, so give it much more room here
-    # (the merge pass raised the baseline enough to tip the old 3 GB limit into an
-    # OOM). Safe on the 16 GB CI runner since nothing else is running now.
-    # 6GB (not more): the runner has ~16GB and Python still holds some, so a
-    # higher DuckDB limit risks an OS OOM-kill of the whole build (10GB did).
-    # 6GB is ~2x the point the pass failed at, and if it's still not enough
-    # DuckDB errors *inside* the try/except -> subjects skip, build survives.
+    # low global limit to spill instead of OOM) is already done and its big
+    # Python structures freed. The subject UNNEST is heavy, so give it more
+    # room here. Safe on the 16 GB CI runner since nothing else is running now.
     try:
         con.execute(f"SET memory_limit='{os.environ.get('SUBJECTS_MEMORY_LIMIT', '6GB')}'")
     except Exception:  # noqa: BLE001
         pass
 
-    # Umbrella terms carry almost no information and (because ebook records tag
-    # little else) drown out the specific print headings -- e.g. The Goldfinch's
-    # ebook is just "Fiction, Literature" (37k checkouts) while its print record
-    # has "Young men, Loss, Artists, ...". Drop them so the specifics surface.
-    STOP = ("'fiction','nonfiction','non-fiction','literature','general',"
-            "'fiction general','general fiction','adult','adult fiction'")
+    # ---- 4. Stream (author, title, term, checkouts) from `clean`, one -----
+    #         author-batch at a time --------------------------------------
+    # The UNNEST multiplies row count by roughly (subject terms per title),
+    # and it runs against every raw monthly row in `clean` -- so a single
+    # query covering ALL authors has to sort an intermediate result that can
+    # be an order of magnitude bigger than `clean` itself. THAT sort is what
+    # actually OOMs (DuckDB has to hold or spill the whole thing), not the
+    # final grouped size, which is comparatively tiny.
+    #
+    # The fix: never ask DuckDB to explode+sort more than one slice of
+    # authors at a time. A tiny TEMP TABLE of author names + an index on it
+    # lets each batch's query join down to just its own rows before the
+    # UNNEST ever runs, so the sort that follows is bounded by
+    # SUBJECT_ANNOTATION_AUTHOR_BATCH authors' worth of data -- flat peak
+    # memory regardless of how big `clean` grows.
+    con.execute("DROP TABLE IF EXISTS subject_author_batch")
+    con.execute("CREATE TEMP TABLE subject_author_batch (author VARCHAR)")
+    con.execute("CREATE INDEX subject_author_batch_idx ON subject_author_batch(author)")
 
-    # Per-author top terms -- one small row per author, so a dict is fine to hold.
-    # Stored WITH weights ([term, checkouts]) so the frontend can pool a work's
-    # editions and re-rank; author terms are already pooled across everything.
-    print("  [subjects] aggregating author terms ...")
+    all_authors = list(slug_by_author.keys())
+    batch_size = SUBJECT_ANNOTATION_AUTHOR_BATCH
+    n_batches = (len(all_authors) + batch_size - 1) // batch_size
+    print(f"  [subjects] streaming (author, title, term) rows from clean "
+          f"in {n_batches:,} batch(es) of up to {batch_size:,} authors ...")
+
+    # ---- 5. Aggregate per (author, title) AND per author ------------------
+    # author_terms[author]    = {heading: {"w": weight, "o": set(origins)}}
+    # title_subjects[(a, t)]   = [[heading, weight, [origins]], ...]  (top 10)
+    # author_subjects[author]  = [[heading, weight, [origins]], ...]  (top 8)
     author_terms = {}
-    for author, terms in con.execute(
-        f"""
-        WITH exploded AS (
-            SELECT author, trim(u.term) AS term, checkouts
-            FROM clean, UNNEST(string_split(coalesce(subjects, ''), ',')) AS u(term)
-            WHERE length(trim(u.term)) > 1
-              AND lower(trim(u.term)) NOT IN ({STOP})
-        ),
-        per AS (
-            SELECT author, arg_max(term, checkouts) AS term, sum(checkouts) AS c
-            FROM exploded
-            GROUP BY author, lower(trim(term))
-        )
-        SELECT author, list_slice(list({{'t': term, 'n': c}} ORDER BY c DESC), 1, 8) AS terms
-        FROM per
-        GROUP BY author
-        """
-    ).fetchall():
-        if terms:
-            author_terms[author] = [[e["t"], int(e["n"])] for e in terms]
+    title_subjects = {}
+    author_subjects = {}
 
-    # Per-(author, title) top terms, streamed ORDER BY author so we hold only one
-    # author's titles in memory at a time and patch that author's file in one go.
-    print("  [subjects] aggregating per-title terms + patching files ...")
-    cur = con.execute(
-        f"""
-        WITH exploded AS (
-            SELECT author, title, trim(u.term) AS term, checkouts
-            FROM clean, UNNEST(string_split(coalesce(subjects, ''), ',')) AS u(term)
-            WHERE length(trim(u.term)) > 1
-              AND lower(trim(u.term)) NOT IN ({STOP})
-        ),
-        per AS (
-            SELECT author, title, arg_max(term, checkouts) AS term, sum(checkouts) AS c
-            FROM exploded
-            GROUP BY author, title, lower(trim(term))
-        )
-        SELECT author, title, list_slice(list({{'t': term, 'n': c}} ORDER BY c DESC), 1, 10) AS terms
-        FROM per
-        GROUP BY author, title
-        ORDER BY author
-        """
-    )
-    reader = cur.fetch_record_batch(rows_per_batch=TITLE_FETCH_CHUNK)
+    TOP_PER_TITLE = 10
+    TOP_PER_AUTHOR = 8
 
-    sentinel = object()
-    state = {"author": sentinel, "titles": {}}
-    n_patched = [0]
-
-    def flush():
-        author = state["author"]
-        state_titles = state["titles"]
-        state["titles"] = {}
-        if author is sentinel:
+    def _pool(bucket, heading, weight, origins):
+        #Add `weight` to bucket[heading], so priority order is visible later on
+        if not heading:
             return
-        slug = slug_by_author.get(author)
+        entry = bucket.get(heading)
+        if entry is None:
+            bucket[heading] = {"w": weight, "o": list(origins or ())}
+        else:
+            entry["w"] += weight
+            if origins:
+                for o in origins:
+                    if o not in entry["o"]:
+                        entry["o"].append(o)
+
+    def _topn(bucket, n):
+        #Convert {heading: {w, o}} into [[heading, weight, [origins]], ...]
+        
+        items = sorted(
+            bucket.items(),
+            key=lambda kv: (-kv[1]["w"], kv[0]),
+        )[:n]
+        return [
+            [heading, info["w"], list(info["o"])]
+            for heading, info in items
+        ]
+
+    cur_author = None
+    cur_title = None
+    cur_title_bucket = {}  # heading -> {w, o} for the current (author, title)
+
+    def _flush_title():
+        nonlocal cur_title_bucket, cur_title
+        if cur_title is not None and cur_author is not None and cur_title_bucket:
+            title_subjects[(cur_author, cur_title)] = _topn(cur_title_bucket, TOP_PER_TITLE)
+        cur_title_bucket = {}
+        cur_title = None
+
+    def _flush_author():
+        nonlocal cur_author
+        if cur_author is not None:
+            # pop (not get): this author's batch is done, so drop its raw
+            # bucket once we've kept the top-N -- otherwise author_terms
+            # would hold every author's full bucket for the whole run.
+            bucket = author_terms.pop(cur_author, None)
+            if bucket:
+                author_subjects[cur_author] = _topn(bucket, TOP_PER_AUTHOR)
+        cur_author = None
+
+    # ---- 5b. Per-subject aggregation (for the subject search index) -------
+    # While we walk (author, title, term) rows, also accumulate per-subject
+    # totals + per-author weights. After the loop we'll write:
+    #   subject-index.json             -- top N subjects by total checkouts
+    #   subjects/<shard>/<slug>.json   -- per-subject top M authors
+    # subject_to_authors[heading] = {
+    #     "total": int,                # sum of checkouts across all (author, title) pairs
+    #     "origins": [str, ...],       # priority-ordered list of attesting vocabularies
+    #     "authors": {author_name: weight},  # per-author checkout totals for this subject
+    #     "series": {mi: weight},      # subject-wide sparse monthly series
+    #     "author_series": {author_name: {mi: weight}},  # per-author sparse monthly series
+    # }
+    # The `authors` dict can grow large for common subjects (e.g. "Fiction"
+    # could have 100k+ authors), but per-entry it's just {name: int} so the
+    # whole dict peaks at maybe ~10 MB -- tolerable on the 16 GB CI runner.
+    # `author_series` is the same shape one level deeper ({name: {mi: int}}):
+    # every author that touches a subject gets an entry while streaming
+    # (same as `authors` today), and we truncate to the top 50 authors per
+    # subject only when writing the files (TOP_AUTHORS_PER_SUBJECT below).
+    # Each value is a handful of {mi: int} pairs (at most one per month in
+    # the dataset), so this stays a small multiple of the existing `authors`
+    # dict's memory footprint, not a new order of magnitude.
+    subject_to_authors = {}
+    TOP_SUBJECTS_IN_INDEX = 50000
+    TOP_AUTHORS_PER_SUBJECT = 500
+
+    def _subject_slug(heading: str) -> str:
+        """Slug for a subject heading: lowercase, non-alphanumeric -> '-'.
+        Mirrors the author-slug logic so subjects shard the same way."""
+        s = heading.lower()
+        s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+        return s or "subject"
+
+    n_rows = 0
+    n_matched = 0
+    n_unmatched = 0
+    for batch_num, start in enumerate(range(0, len(all_authors), batch_size), start=1):
+        author_slice = all_authors[start:start + batch_size]
+
+        con.execute("DELETE FROM subject_author_batch")
+        con.executemany(
+            "INSERT INTO subject_author_batch VALUES (?)",
+            [(a,) for a in author_slice],
+        )
+
+        # Scoped to this batch: the join against subject_author_batch happens
+        # BEFORE the UNNEST, so DuckDB only explodes and sorts this slice's
+        # rows -- not the whole `clean` table.
+        cur = con.execute(
+            """
+            WITH scoped AS (
+                SELECT c.author, c.title, c.mi, c.subjects, c.checkouts
+                FROM clean c
+                JOIN subject_author_batch b ON c.author = b.author
+            ),
+            exploded AS (
+                SELECT author, title, mi, trim(u.term) AS term, checkouts
+                FROM scoped, UNNEST(string_split(coalesce(subjects, ''), ',')) AS u(term)
+                WHERE length(trim(u.term)) > 1
+            ),
+            per AS (
+                SELECT author, title, mi, arg_max(term, checkouts) AS term, sum(checkouts) AS c
+                FROM exploded
+                GROUP BY author, title, mi, lower(trim(term))
+            )
+            SELECT author, title, mi, term, c
+            FROM per
+            ORDER BY author, title
+            """
+        )
+        reader = cur.fetch_record_batch(rows_per_batch=TITLE_FETCH_CHUNK)
+
+        # Reset walk-state for this batch's independent ordered stream --
+        # each author appears in exactly one batch, so nothing here needs
+        # to carry over from the previous batch.
+        cur_author = None
+        cur_title = None
+        cur_title_bucket = {}
+
+        for arrow_batch in reader:
+            for row in arrow_batch.to_pylist():
+                n_rows += 1
+                author = row["author"]
+                title = row["title"]
+                mi = row["mi"]
+                term = row["term"]
+                weight = int(row["c"])
+
+                # Author transition: flush the old title (still under the old author),
+                # then the old author's bucket, then start a fresh per-author dict.
+                # Both flushes are no-ops on the very first row (cur_* are all None).
+                if author != cur_author:
+                    _flush_title()
+                    _flush_author()
+                    cur_author = author
+                    author_terms.setdefault(author, {})
+                    # Reset title state -- the `if title != cur_title` check below
+                    # then sets cur_title + opens a fresh bucket for THIS row.
+                    cur_title = None
+                    cur_title_bucket = {}
+                # Title transition (same author): flush the previous title's bucket,
+                # then open a fresh one for THIS (author, title).
+                if title != cur_title:
+                    _flush_title()
+                    cur_title = title
+                    cur_title_bucket = {}
+
+                n = _normalize_term(term)
+                if not n:
+                    continue
+                entry = smap.get(n)
+                if entry is None:
+                    n_unmatched += 1
+                    continue  # drop unmatched -- only canonical headings reach the UI
+                n_matched += 1
+                heading = entry.get("heading") or term
+                origins = entry.get("origins")
+                if not origins:
+                    single = entry.get("origin")
+                    origins = [single] if single else []
+
+                # Pool into both the current title's bucket and the author's bucket.
+                _pool(cur_title_bucket, heading, weight, origins)
+                _pool(author_terms[author], heading, weight, origins)
+
+                # Also pool into the per-subject aggregator (for the search index
+                # and the subject stacked-area chart).
+                s_entry = subject_to_authors.get(heading)
+                if s_entry is None:
+                    s_entry = {
+                        "total": 0, "origins": list(origins), "authors": {},
+                        "series": {}, "author_series": {},
+                    }
+                    subject_to_authors[heading] = s_entry
+                s_entry["total"] += weight
+                if origins:
+                    for o in origins:
+                        if o not in s_entry["origins"]:
+                            s_entry["origins"].append(o)
+                s_entry["authors"][author] = s_entry["authors"].get(author, 0) + weight
+                s_entry["series"][mi] = s_entry["series"].get(mi, 0) + weight
+                a_series = s_entry["author_series"].setdefault(author, {})
+                a_series[mi] = a_series.get(mi, 0) + weight
+
+        # End of this batch's stream: flush the last title/author, since no
+        # further row will arrive to trigger the transition check above.
+        _flush_title()
+        _flush_author()
+        print(f"  [subjects] batch {batch_num:,}/{n_batches:,} done "
+              f"({len(author_slice):,} authors, {n_rows:,} rows so far)")
+
+    con.execute("DROP TABLE IF EXISTS subject_author_batch")
+    print(f"  [subjects] processed {n_rows:,} (author, title, term) rows -- "
+          f"{n_matched:,} matched, {n_unmatched:,} dropped (no subject_map entry)")
+
+    # ---- 6. Patch each author JSON file with the new subjects -------------
+    print("  [subjects] patching author JSON files ...")
+    n_patched = 0
+    n_authors_with_subjects = 0
+    n_titles_with_subjects = 0
+    for author, slug in slug_by_author.items():
         if not slug:
-            return
+            continue
         path = authors_dir / (slug[:2] or "__") / f"{slug}.json"
         if not path.exists():
-            return
+            continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
-            return
-        aterms = author_terms.get(author)
+            continue
+
+        aterms = author_subjects.get(author)
         if aterms:
             data["subjects"] = aterms
-        for t in data.get("titles", []):
-            tt = state_titles.get(t["title"])
-            if tt:
-                t["subjects"] = [[e["t"], int(e["n"])] for e in tt]
-        path.write_bytes(_dumps(data))
-        n_patched[0] += 1
+            n_authors_with_subjects += 1
+        else:
+            # No matched subjects for this author -- drop the legacy field
+            # entirely so the UI renders nothing instead of stale raw terms.
+            data.pop("subjects", None)
 
-    for batch in reader:
-        for row in batch.to_pylist():
-            if row["author"] != state["author"]:
-                flush()
-                state["author"] = row["author"]
-            state["titles"][row["title"]] = row["terms"]
-    flush()
-    print(f"  [subjects] patched {n_patched[0]:,} author files")
+        for t in data.get("titles", []):
+            tt = title_subjects.get((author, t["title"]))
+            if tt:
+                t["subjects"] = tt
+                n_titles_with_subjects += 1
+            else:
+                t.pop("subjects", None)
+
+        path.write_bytes(_dumps(data))
+        n_patched += 1
+
+    print(f"  [subjects] patched {n_patched:,} author files "
+          f"({n_authors_with_subjects:,} authors + {n_titles_with_subjects:,} titles got subjects)")
+
+    # ---- 7. Write the subject search index + per-subject files -------------
+    # subject-index.json:  [[heading, [origins], total], ...]  top N by total
+    # subjects/<shard>/<slug>.json:
+    #   { heading, origins, total,
+    #     series: [[mi, c], ...],                       -- subject-wide sparse series
+    #     authors: [[slug, name, weight, series], ...] } -- per-author sparse series
+    #
+    # The index is small (a few hundred KB for the top 5000 subjects) and
+    # loaded once per session; per-subject files are fetched on demand when
+    # the user clicks a subject result. Authors are listed by total checkouts
+    # of that subject, DESC, capped at TOP_AUTHORS_PER_SUBJECT so files stay
+    # small (each author now carries their own sparse series alongside the
+    # weight, for the "By subject" stacked-area chart -- StackedAreaChart
+    # renders these the same way it renders an author's per-title layers).
+    # Subject headings are slugged the same way author names are (lowercase,
+    # non-alphanumeric -> '-'), and sharded by the first two slug chars --
+    # mirrors the authors/ layout.
+    print(f"  [subjects] writing subject search index ...")
+    subjects_sorted = sorted(
+        subject_to_authors.items(),
+        key=lambda kv: (-kv[1]["total"], kv[0]),
+    )[:TOP_SUBJECTS_IN_INDEX]
+
+    # Reverse map: author name -> slug, so we can include slugs in the
+    # per-subject author lists (the UI needs the slug to load an author).
+    slug_for_author = {name: slug for name, slug in slug_by_author.items() if slug}
+
+    subjects_dir = out_dir / "subjects"
+    subjects_dir.mkdir(parents=True, exist_ok=True)
+
+    index_rows = []
+    n_subject_files = 0
+    made_shards = set()
+    for heading, info in subjects_sorted:
+        origins = list(info["origins"])
+        total = int(info["total"])
+        index_rows.append([heading, origins, total])
+
+        # Per-subject file: top M authors by weight, each as [slug, name,
+        # weight, series]. Drop authors we can't resolve to a slug (e.g.
+        # names that were folded into a canonical form but never assigned a
+        # slug -- shouldn't normally happen, but be defensive).
+        top_authors = sorted(
+            info["authors"].items(),
+            key=lambda kv: (-kv[1], kv[0]),
+        )[:TOP_AUTHORS_PER_SUBJECT]
+        author_series_map = info["author_series"]
+        author_rows = []
+        for name, w in top_authors:
+            slug = slug_for_author.get(name)
+            if not slug:
+                continue
+            a_series = sorted(author_series_map.get(name, {}).items())
+            author_rows.append([slug, name, int(w), a_series])
+
+        # Subject-wide sparse series (the subject's own monthly total, same
+        # [[mi, c], ...] shape used everywhere else), for the chart's
+        # "author's total" baseline / stacking comparison.
+        subject_series = sorted(info["series"].items())
+
+        slug = _subject_slug(heading)
+        shard = slug[:2] or "__"
+        shard_dir = subjects_dir / shard
+        if shard not in made_shards:
+            shard_dir.mkdir(parents=True, exist_ok=True)
+            made_shards.add(shard)
+        payload = {
+            "heading": heading,
+            "origins": origins,
+            "total": total,
+            "series": subject_series,
+            "authors": author_rows,
+        }
+        (shard_dir / f"{slug}.json").write_bytes(_dumps(payload))
+        n_subject_files += 1
+
+    (out_dir / "subject-index.json").write_bytes(_dumps(index_rows))
+    print(f"  [subjects] wrote subject-index.json ({len(index_rows):,} subjects) "
+          f"+ {n_subject_files:,} per-subject files into {subjects_dir}")
 
 
 def build_sqlite(db_path, months, record_stream, counters):

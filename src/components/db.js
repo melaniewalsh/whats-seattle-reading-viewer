@@ -241,6 +241,80 @@ export async function getAuthor(slug) {
 	};
 }
 
+// The SUBJECT index for the "By subject" tab: [[heading, [origins], total], ...]
+// sorted total-DESC, only the top N subjects (so it stays small). Built by
+// data-prep/build_data.py from subject_map.json. Loaded lazily on first
+// subject search. Missing file -> empty (e.g. older builds predate the
+// subject index, or cluster_subjects.py hasn't been run yet).
+let subjectIndexPromise = null;
+function getSubjectIndex() {
+	if (!subjectIndexPromise) {
+		subjectIndexPromise = fetch(`${DATA_BASE}/subject-index.json`)
+			.then((r) => (r.ok ? r.json() : []))
+			.then((rows) => ({ rows, lower: rows.map((r) => r[0].toLowerCase()) }))
+			.catch(() => ({ rows: [], lower: [] }));
+	}
+	return subjectIndexPromise;
+}
+
+/**
+ * Search subjects by canonical heading (the "By subject" tab). Returns
+ * {heading, origins, total} -- empty query returns the top subjects by total
+ * checkouts, so there's always something sensible to show before the user
+ * types. Mirrors searchAuthors/searchTitles in shape.
+ */
+export async function searchSubjects(query, limit = 20) {
+	const { rows, lower } = await getSubjectIndex();
+	const q = (query ?? '').trim().toLowerCase();
+
+	const out = [];
+	for (let i = 0; i < rows.length; i++) {
+		if (q && !lower[i].includes(q)) continue;
+		const [heading, origins, total] = rows[i];
+		out.push({ heading, origins, total });
+		if (out.length >= limit) break;
+	}
+	return out;
+}
+
+// Shard for a subject heading slug -- must match _subject_slug() in
+// build_data.py (first two slug chars, '__' for empty).
+function subjectShardFor(slug) {
+	return slug.slice(0, 2) || '__';
+}
+
+/**
+ * Load one subject's own series plus its top authors' series in a single
+ * fetch. Same pattern as getAuthor: a small JSON file per subject, sharded by
+ * the first two slug chars. Returns null if not found.
+ *
+ * Shape: {
+ *   heading, origins, total,
+ *   series: [[monthIndex, count], ...],  -- subject-wide sparse series
+ *   authors: [{ slug, name, total, series }, ...]  -- top 50 by checkouts, DESC
+ * }
+ * `series` (both subject-wide and per-author) is sparse -- pass through
+ * densify() before charting, same as an author's own series/titles.
+ */
+export async function getSubject(heading) {
+	const slug = heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'subject';
+	const res = await fetch(`${DATA_BASE}/subjects/${subjectShardFor(slug)}/${slug}.json`);
+	if (!res.ok) return null;
+	const s = await res.json();
+	return {
+		heading: s.heading,
+		origins: s.origins,
+		total: s.total,
+		series: s.series ?? [], // sparse [[mi, c], ...]; absent in older builds
+		authors: (s.authors ?? []).map(([slug, name, total, series]) => ({
+			slug,
+			name,
+			total,
+			series: series ?? [] // sparse [[mi, c], ...]; absent in older builds
+		}))
+	};
+}
+
 /**
  * Unpack a sparse [[monthIndex, count], ...] series into a dense, zero-filled
  * array the length of the shared month axis -- what StackedAreaChart's `values`
