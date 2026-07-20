@@ -921,16 +921,24 @@ def main():
         if not undated or not dated:
             continue
         u = undated[0]  # only one (norm, None) key can exist per norm
-        # If several different dated entities share this normalized name
-        # only merge the undated spelling into whichever one it actually shares a title
-        # with
-        best, best_overlap = None, 0
-        for d in dated:
-            overlap = fuzzy_title_matches(entities[u]["titles"], entities[d]["titles"])
-            if overlap > best_overlap:
-                best, best_overlap = d, overlap
-        if best is not None:
-            uf.union(u, best)
+        if len(dated) == 1:
+            # Exactly one dated person carries this name, so the undated spelling
+            # is unambiguously them (the catalog just left the year off some
+            # records). Merge without needing title overlap -- otherwise "James
+            # Thurber" stays split from "Thurber, James, 1894-1961" whenever their
+            # title sets don't happen to fuzzy-match.
+            uf.union(u, dated[0])
+        else:
+            # Several DIFFERENT dated people share this normalized name, so the
+            # undated spelling is ambiguous -- only merge it into whichever one it
+            # actually shares a title with.
+            best, best_overlap = None, 0
+            for d in dated:
+                overlap = fuzzy_title_matches(entities[u]["titles"], entities[d]["titles"])
+                if overlap > best_overlap:
+                    best, best_overlap = d, overlap
+            if best is not None:
+                uf.union(u, best)
 
     components = {}
     for key in entities:
@@ -973,6 +981,13 @@ def main():
         for i in range(len(members)):
             for j in range(i + 1, len(members)):
                 a, b = members[i], members[j]
+                # Two records that both carry a birth year, and DIFFERENT ones,
+                # are different people who happen to share a name ("Bradford,
+                # Richard, 1932-" vs "1957-") -- never merge them, even on a
+                # shared title (a fuzzy title collision would otherwise fuse them).
+                da, db = stage1_info[a]["date"], stage1_info[b]["date"]
+                if da and db and da != db:
+                    continue
                 if fuzzy_title_matches(stage1_info[a]["titles"], stage1_info[b]["titles"]) > 0:
                     uf2.union(a, b)
 
