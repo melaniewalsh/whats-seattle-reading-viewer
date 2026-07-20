@@ -1,0 +1,46 @@
+name: Rebuild genres.json (Genres tab)
+
+# Runs data-prep/build_partition.py to regenerate static/genres.json (the Genres
+# tab's precomputed 30+ genre partition) and commits it back. The build only
+# queries the public Seattle open-data SODA API -- no secrets needed. ~35 min.
+#
+# TRIGGER: manual only. Run after editing the TAXONOMY in build_partition.py.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # push the regenerated genres.json back to the repo
+
+jobs:
+  build-genres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Rebuild genres.json
+        run: |
+          python3 data-prep/build_partition.py
+          echo "genres.json: $(wc -c < static/genres.json) bytes"
+
+      - name: Commit regenerated genres.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add static/genres.json
+          if git diff --cached --quiet; then
+            echo "genres.json unchanged -- nothing to commit"
+          else
+            git commit -m "CI: regenerate genres.json"
+            # Rebase (retrying) before pushing in case the branch moved meanwhile.
+            for i in 1 2 3; do
+              git pull --rebase origin ${{ github.ref_name }} \
+                && git push origin HEAD:${{ github.ref_name }} && break
+              echo "push race, retry $i" && sleep 3
+            done
+          fi
