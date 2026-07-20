@@ -171,10 +171,19 @@ function getIndex() {
 export async function searchAuthors(query, limit = 20) {
 	const { rows, lower } = await getIndex();
 	const q = (query ?? '').trim().toLowerCase();
+	// Match on each query WORD rather than the whole phrase, so "cathy greenberg"
+	// finds "Cathy L. Greenberg" (a middle initial sits between the words) and the
+	// order doesn't matter ("greenberg cathy" works too). Each word must match at
+	// a WORD BOUNDARY (\b) so "king" doesn't match inside "Hawking" -- i.e. it's a
+	// word-prefix match ("steph" still finds "Stephen"). rows are total-DESC, so
+	// the most-borrowed matches still surface first.
+	const terms = q
+		? q.split(/\s+/).map((t) => new RegExp('\\b' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+		: [];
 
 	const out = [];
 	for (let i = 0; i < rows.length; i++) {
-		if (q && !lower[i].includes(q)) continue;
+		if (terms.length && !terms.every((re) => re.test(lower[i]))) continue;
 		const [slug, name, total] = rows[i];
 		out.push({ slug, name, total });
 		if (out.length >= limit) break;
