@@ -640,6 +640,10 @@
 		t = t.replace(/,\s+or,\s+.*$/i, "");
 		t = t.replace(/&/g, " and "); // "beasts & where" -> "beasts and where"
 		t = t.replace(/\([^)]*\)/g, " "); // drop "(unabridged)" etc.
+		// Some catalog titles have an UNCLOSED paren, e.g. "The Inn at Rose Harbor
+		// (with bonus short story: Rose Harbor Series, Book 1" -- the balanced rule
+		// above misses it, so also strip a dangling "(" clause to end of string.
+		t = t.replace(/\s*\([^)]*$/, " ");
 		t = t.replace(/\[[^\]]*\]/g, " "); // drop cataloging brackets: "[text ]", "[sound recording]", etc.
 		// Repeatedly strip a trailing ":"/";" segment when it's edition/format noise
 		// (series/book/volume, "the original screenplay", "read by <narrator>",
@@ -647,7 +651,7 @@
 		// alternative title (e.g. "Slaughterhouse-Five: or, The Children's Crusade"
 		// is the same book). Stop at the first segment that's a real distinct
 		// subtitle (e.g. "The Crimes of Grindelwald"), so those stay separate.
-		const NOISE = /(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|autobiography|poems|essays|playscript|\bscript\b|\bproduction|\bserie|\blivre|\btome|\blibro|\btomo|\bedicion)/i;
+		const NOISE = /(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|autobiography|poems|essays|playscript|litrpg|gamelit|\bscript\b|\bproduction|\bserie|\blivre|\btome|\blibro|\btomo|\bedicion)/i;
 		let prev;
 		do {
 			prev = t;
@@ -1075,22 +1079,33 @@
 	// edit the individual editions underneath.
 	const WORK_BLOCK_CAP = 400;
 	const workBlocks = $derived.by(() => {
-		if (titleSort !== "work") return [];
-		// Group by work key into a Map first (guarantees exactly one block per key,
-		// regardless of row order), then sort the blocks. Grouping by consecutive
-		// rows was fragile -- editions of one work could be sorted apart and produce
-		// two blocks with the same key (a duplicate keyed-each key).
-		const byKey = new Map();
-		for (const t of filteredTitles) {
-			if (!byKey.has(t.workKey)) {
-				byKey.set(t.workKey, { key: t.workKey, name: workGroups.get(t.workKey)?.name ?? t.workName, editions: [], total: 0 });
-			}
-			const blk = byKey.get(t.workKey);
-			blk.editions.push(t);
-			blk.total += t.total;
+		if (titleSort !== "work" || !current) return [];
+		// Build blocks straight from workGroups (the WHOLE author's works) rather
+		// than from the filtered rows, so each work's edition count and total stay
+		// STATIC regardless of the filter. The filter only decides which works show
+		// and flags which editions match (highlighted) -- searching within a work
+		// must never make it look like the cluster has fewer editions/checkouts.
+		const f = titleFilter.trim().toLowerCase();
+		const blocks = [];
+		for (const [key, w] of workGroups) {
+			const nameMatch = f ? w.name.toLowerCase().includes(f) : false;
+			const editions = w.idxs.map((idx) => {
+				const t = current.titles[idx];
+				return {
+					...t,
+					idx,
+					workKey: key,
+					workName: cleanTitleForDisplay(t.title) || t.title,
+					match: f ? (nameMatch || t.title.toLowerCase().includes(f)) : false
+				};
+			});
+			const matchCount = f ? editions.filter((e) => e.match).length : 0;
+			// While filtering, show a work only if it (or an edition) matches -- but
+			// still show ALL of its editions and its full count/total.
+			if (f && !nameMatch && matchCount === 0) continue;
+			editions.sort((x, y) => y.total - x.total);
+			blocks.push({ key, name: w.name, editions, total: w.total, matchCount });
 		}
-		const blocks = [...byKey.values()];
-		for (const b of blocks) b.editions.sort((x, y) => y.total - x.total);
 		blocks.sort((a, b) =>
 				workOrder === "checkouts"
 						? b.total - a.total
@@ -1103,6 +1118,10 @@
 
 	let expandedWorks = $state([]); // work keys currently expanded in the table
 	const isExpanded = (key) => expandedWorks.includes(key);
+	// While a filter is active, auto-expand any work with a matching edition so the
+	// highlighted rows are visible without a manual click.
+	const filtering = $derived(!!titleFilter.trim());
+	const workOpen = (w) => isExpanded(w.key) || (filtering && w.matchCount > 0);
 	function toggleExpand(key) {
 		expandedWorks = isExpanded(key) ? expandedWorks.filter((k) => k !== key) : [...expandedWorks, key];
 	}
@@ -1507,7 +1526,8 @@
 				</details>
 			{/if}
 
-						<div class="mode-toggle" role="group" aria-label="Chart type">
+						<div class="plot-toolbar">
+					<div class="mode-toggle" role="group" aria-label="Chart type">
 				<button
 						type="button"
 						class:active={chartMode === "line"}
@@ -1534,7 +1554,13 @@
 				</button>
 			</div>
 
-						<div class="chart-wrap" bind:this={chartWrap}>
+						{#if !isOverview}
+						<button class="top-works-btn" onclick={toggleTopWorks} title={hasPlotted ? "Clear the chart back to just the author's total line (keeps your work grouping)" : "Plot the 5 most-borrowed works (their editions grouped into one line each)"}>
+							{hasPlotted ? "✕ Clear chart" : "Show top works"}
+						</button>
+						{/if}
+					</div>
+					<div class="chart-wrap" bind:this={chartWrap}>
 				{#if plotTitle}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
@@ -1616,9 +1642,6 @@
 				<div class="groups-header">
 					<span class="groups-label">On the chart</span>
 					<div class="groups-actions">
-						<button class="auto-group" onclick={toggleTopWorks} title={hasPlotted ? "Clear the chart back to just the author's total line (keeps your work grouping)" : "Plot the 5 most-borrowed works (their editions grouped into one line each)"}>
-							{hasPlotted ? "✕ Clear chart" : "Show top works"}
-						</button>
 						<button class="new-group" onclick={addGroup}>Make a custom work</button>
 					</div>
 				</div>
@@ -1844,6 +1867,7 @@
 									class="tt-row"
 									role="presentation"
 									class:selected={owner !== null || single}
+									class:filter-match={t.match}
 									style={ownerColor ? `--chip-color:${ownerColor}` : ""}
 							>
 								<span class="tt-cell tt-plot" role="cell">
@@ -1895,7 +1919,7 @@
 										class="work-header"
 										role="row"
 										class:cluster={multi}
-										class:expanded={isExpanded(w.key)}
+										class:expanded={workOpen(w)}
 										class:work-drop={dragOverWorkKey === w.key}
 										class:hl={hlWorkKey === w.key}
 										draggable="true"
@@ -1921,17 +1945,17 @@
 									<span class="tt-cell tt-work" role="cell" title={w.name}>
 										<button
 												class="disclosure"
-												aria-expanded={isExpanded(w.key)}
-												aria-label="{isExpanded(w.key) ? 'Collapse' : 'Expand'} {w.name}"
+												aria-expanded={workOpen(w)}
+												aria-label="{workOpen(w) ? 'Collapse' : 'Expand'} {w.name}"
 												onclick={() => toggleExpand(w.key)}
-										>{isExpanded(w.key) ? "▾" : "▸"}</button>
+										>{workOpen(w) ? "▾" : "▸"}</button>
 										<span class="tt-work-name">{w.name}</span>
 									</span>
 									<button class="tt-cell tt-edition ed-summary" onclick={() => toggleExpand(w.key)}>
 											{#if multi}
-												<span class="cluster-badge">{w.editions.length} editions</span>{isExpanded(w.key) ? "" : " — click to edit"}
+												<span class="cluster-badge" class:has-match={w.matchCount > 0}>{w.editions.length} editions</span>{#if w.matchCount > 0}<span class="match-note"> · {w.matchCount} match{w.matchCount === 1 ? "" : "es"}</span>{/if}{workOpen(w) ? "" : " — click to edit"}
 											{:else}
-												<span class="ed-single">1 edition</span>{isExpanded(w.key) ? "" : " — click for full title"}
+												<span class="ed-single">1 edition</span>{workOpen(w) ? "" : " — click for full title"}
 											{/if}
 										</button>
 									<span class="tt-cell tt-format" role="cell">
@@ -1939,7 +1963,7 @@
 									</span>
 									<span class="tt-cell tt-count" role="cell">{w.total.toLocaleString()}</span>
 								</li>
-								{#if isExpanded(w.key)}
+								{#if workOpen(w)}
 									{#each w.editions as t (t.idx)}
 										{@render editionRow(t, false, true)}
 									{/each}
@@ -3006,6 +3030,36 @@
 	}
 
 	/* chart type toggle (line vs stacked area) + title sort toggle share a look */
+	/* Row above the plot: Line/Area toggle on the left, "Show top works" on the
+	   right so it's prominent instead of buried in the panel below. */
+	.plot-toolbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		flex-wrap: wrap;
+		margin: 0 0 14px;
+	}
+	.plot-toolbar .mode-toggle {
+		margin: 0;
+	}
+	.top-works-btn {
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
+		padding: 6px 14px;
+		border-radius: 999px;
+		border: 1.5px solid #6a4c93;
+		background: #6a4c93;
+		color: var(--color-white);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.top-works-btn:hover {
+		background: #593f7d;
+		border-color: #593f7d;
+	}
+
 	.mode-toggle {
 		display: inline-flex;
 		gap: 0;
@@ -3373,6 +3427,24 @@
 		background: var(--color-gray-100);
 		font-weight: 600;
 		box-shadow: inset 3px 0 0 0 var(--chip-color, var(--color-fg));
+	}
+
+	/* Editions matching the table filter are highlighted in place -- the work
+	   still shows ALL its editions, these are just the ones you searched for. */
+	.tt-row.filter-match {
+		background: #fff3bf;
+		box-shadow: inset 3px 0 0 0 #f0b429;
+	}
+	.tt-row.filter-match:hover {
+		background: #ffec99;
+	}
+	.match-note {
+		color: #a37500;
+		font-weight: 600;
+	}
+	.cluster-badge.has-match {
+		background: #fff3bf;
+		color: #8a6100;
 	}
 
 	.tt-work {

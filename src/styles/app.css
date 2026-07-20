@@ -11,20 +11,17 @@ body {
 	background-color: #ffffff;
 }
 
-/* "Recoleta" — an elegant, gently-rounded display serif for the headline. */
-@font-face {
-	font-family: "Recoleta";
-	src: url("https://pudding.cool/assets/fonts/recoleta/recoleta.woff2") format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
-}
+/* Fonts are loaded from Google Fonts (Fraunces for the display headline, Source
+   Serif 4 for the serif, Inter for the UI sans) via a <link> in Meta.svelte.
+   These replace the old Pudding-hosted Recoleta / Tiempos / Atlas Grotesk, which
+   are licensed and not for reuse. */
 
 /* colors defined in variables.css */
 :root {
 	/* font */
-	--font-sans: "Atlas Grotesk", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
-	--font-serif: "Tiempos Text", Iowan Old Style, Times New Roman, Times, serif;
+	--font-sans: "Inter", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+	--font-serif: "Source Serif 4", Iowan Old Style, Times New Roman, Times, serif;
+	--font-display: "Fraunces", var(--font-serif);
 	--font-mono: Menlo, Consolas, Monaco, monospace;
 
 	/* z-index */

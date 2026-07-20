@@ -88,8 +88,10 @@
 		margin: 0 auto 12px;
 	}
 	.headline h1 {
-		font-family: "Recoleta", var(--font-serif);
-		font-weight: 400;
+		font-family: var(--font-display);
+		/* Fraunces is a variable font with real weights, so use a semibold weight
+		   for the display headline instead of faking it with a text-stroke. */
+		font-weight: 600;
 		font-size: clamp(2.3rem, 6vw, 3.6rem);
 		line-height: 1.08;
 		letter-spacing: -0.005em;
@@ -97,9 +99,7 @@
 		/* Slightly deeper blue than the old #6aa9dd so the big title clears WCAG
 		   large-text contrast (~3:1) on white while keeping the light-blue look. */
 		color: #3f88cc;
-		/* Recoleta only ships one weight here, so fatten the strokes a touch and
-		   add a soft drop shadow for a bit more presence. */
-		-webkit-text-stroke: 0.6px #3f88cc;
+		/* soft drop shadow for a bit more presence */
 		text-shadow: 1.5px 2px 0 rgba(53, 122, 189, 0.16);
 	}
 	.dek {

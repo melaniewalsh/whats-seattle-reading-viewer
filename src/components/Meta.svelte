@@ -2,7 +2,7 @@
 	let {
 		title = "Title TK",
 		description = "Description TK",
-		url = "https://pudding.cool",
+		url = "https://melaniewalsh.github.io/whats-seattle-reading-viewer",
 		keywords = "",
 		preloadFont = []
 	} = $props();
@@ -11,11 +11,11 @@
 <svelte:head>
 	<title>{title}</title>
 	<meta name="description" content={description} />
-	<meta name="author" content="The Pudding" />
+	<meta name="author" content="University of Washington Information School" />
 	<meta name="news_keywords" content={keywords} />
 
 	<meta property="og:title" content={title} />
-	<meta property="og:site_name" content="The Pudding" />
+	<meta property="og:site_name" content="What Is Seattle Reading?" />
 	<meta property="og:url" content={url} />
 	<meta property="og:description" content={description} />
 	<meta property="og:type" content="article" />
@@ -27,8 +27,6 @@
 	<meta property="og:image:height" content="630" />
 
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:site" content="https://pudding.cool" />
-	<meta name="twitter:creator" content="@puddingviz" />
 	<meta name="twitter:title" content={title} />
 	<meta name="twitter:description" content={description} />
 	<meta name="twitter:image:src" content="{url}/assets/social-twitter.jpg" />
@@ -36,6 +34,14 @@
 	<meta name="robots" content="max-image-preview:large" />
 
 	<link rel="canonical" href="{url}/" />
+
+	<!-- Fonts: Fraunces (display), Source Serif 4 (serif), Inter (UI sans). -->
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+	<link
+		rel="stylesheet"
+		href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:wght@400;600;700&display=swap"
+	/>
 
 	{#each preloadFont as href}
 		<link rel="preload" {href} as="font" type="font/woff2" crossorigin />
