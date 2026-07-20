@@ -49,7 +49,14 @@ TAXONOMY = [
     ("Juvenile Fiction", ["juvenile fiction"], []),
     # Kids' nonfiction, above the broad Nonfiction umbrella so it isn't swallowed.
     ("Juvenile Nonfiction", ["juvenile nonfiction"], []),
-    ("Romance", ["romance", "romantic", "erotic"], ["romance languages"]),
+    # Gate the romance terms on a Fiction tag so "Romance languages",
+    # "Romanticism", and nonfiction erotica don't count. Add the same-sex
+    # relationship LC headings (small, ~60-70% romance) to catch queer romance.
+    # Deliberately NOT "man woman relationships" -- that heading is 5.3M checkouts
+    # and only ~8% romance (it blankets literary fiction, e.g. Atonement), so it
+    # would swamp Romance with general fiction.
+    ("Romance", [], ["romance languages"],
+        ["romance", "romantic", "erotic", "man man relationships", "woman woman relationships"]),
     # "fantasy" always; the evocative words only when a Fiction tag is present
     # (so "magic" doesn't grab "The Magic of Tidying Up", "elf" ≠ "self-help").
     ("Fantasy", ["fantasy"], [], ["vampire", "fairies", "magic", "fairy", "dragon", "wizard",
