@@ -1522,9 +1522,6 @@
 		<div class="author">
 			<div class="split" class:collapsed={tableCollapsed}>
 			<div class="split-main">
-			{#if !isOverview}
-				<button class="back-to-all" onclick={loadOverview}>‹ All Seattle checkouts</button>
-			{/if}
 			{#if headingText}
 				<h2>{headingText}</h2>
 			{/if}

@@ -59,9 +59,11 @@
 				<span class="tab-group-label">Explore trends</span>
 				<div class="sticker-tabs trends" role="tablist" aria-label="Explore trends">
 					<button class="sticker-tab" role="tab" aria-selected={tab === "all"} class:active={tab === "all"} onclick={() => (tab = "all")}>All</button>
-					<button class="sticker-tab" role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
-					<button class="sticker-tab" role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
-					<button class="sticker-tab" role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
+					<div class="bys">
+						<button class="sticker-tab" role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
+						<button class="sticker-tab" role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
+						<button class="sticker-tab" role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
+					</div>
 				</div>
 			</div>
 			<div class="tab-group">
@@ -191,9 +193,25 @@
 	}
 	/* top-level view tabs: bold "sticker" buttons with a hard offset shadow */
 	.sticker-tabs {
-		display: inline-flex;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		gap: 10px;
 		flex-wrap: wrap;
+	}
+	/* the three "By ..." tabs are grouped so "All" can sit apart from them */
+	.bys {
+		display: flex;
+		gap: 10px;
+		flex-wrap: wrap;
+		justify-content: center;
+	}
+	/* On narrow screens the Explore-trends group stacks: "All" on its own line,
+	   the three "By ..." tabs centered beneath it (instead of a wonky wrap). */
+	@media (max-width: 560px) {
+		.sticker-tabs.trends {
+			flex-direction: column;
+		}
 	}
 	.sticker-tab {
 		--sh: var(--color-fg);
