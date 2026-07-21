@@ -54,9 +54,11 @@
 		<button class="wiki-trend" onclick={onTrend}>
 			<span aria-hidden="true">📈</span> See SPL trend
 		</button>
-		<a class="wiki-wiki" href={wikiHref} target="_blank" rel="noopener noreferrer"
-			>Read on Wikipedia <span aria-hidden="true">↗</span></a
-		>
+		{#if !status.loading}
+			<a class="wiki-wiki" href={wikiHref} target="_blank" rel="noopener noreferrer"
+				>{status.data ? "Read on Wikipedia" : "Search Wikipedia"} <span aria-hidden="true">↗</span></a
+			>
+		{/if}
 	</div>
 </div>
 

@@ -57,9 +57,45 @@ async function summaryByTitle(title) {
 	}
 }
 
-// Author preview: look up by display name (redirects followed).
-export function wikiSummary(query) {
-	return cached(`wiki:${(query || "").trim().toLowerCase()}`, () => summaryByTitle(query));
+// Does this summary describe a person / writer (vs a same-named place or concept)?
+function looksLikePerson(s) {
+	if (!s) return false;
+	const hay = `${s.description || ""} ${s.extract || ""}`.toLowerCase();
+	return /\b(author|writer|novelist|poet|essayist|journalist|illustrator|cartoonist|memoirist|playwright|screenwriter|editor|columnist|born)\b/.test(
+		hay,
+	);
+}
+
+// Find an author's English Wikipedia title via a name-scoped, writer-biased search.
+async function enwikiTitleForAuthor(name) {
+	const q = `intitle:"${name}" author OR writer OR novelist OR poet OR illustrator OR journalist`;
+	try {
+		const res = await fetch(
+			`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&srnamespace=0&srlimit=6&format=json&origin=*`,
+		);
+		if (!res.ok) return null;
+		const d = await res.json();
+		const bad = /\(disambiguation\)|^list of /i;
+		const hits = (d?.query?.search || []).map((h) => h.title).filter((t) => !bad.test(t));
+		return hits[0] || null;
+	} catch {
+		return null;
+	}
+}
+
+// Author preview: direct name lookup (fast path), with a writer-biased search to
+// rescue ambiguous names, always falling back to the direct result.
+export function wikiSummary(name) {
+	return cached(`wiki2:${(name || "").trim().toLowerCase()}`, async () => {
+		const direct = await summaryByTitle(name);
+		if (direct && looksLikePerson(direct)) return direct;
+		const en = await enwikiTitleForAuthor(name);
+		if (en) {
+			const s = await summaryByTitle(en);
+			if (s && looksLikePerson(s)) return s;
+		}
+		return direct;
+	});
 }
 
 // Use Wikidata to resolve a book title (+ author) to its English Wikipedia title.
