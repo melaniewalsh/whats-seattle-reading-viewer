@@ -1533,8 +1533,8 @@
 				<div class="hdr-actions">
 					{#if lookupLinks}
 						<div class="lookup-wrap">
-							<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Look this up elsewhere">
-								<span aria-hidden="true">🔎</span> Look up <span class="hdr-caret" aria-hidden="true">▾</span>
+							<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere">
+								<span aria-hidden="true">🔎</span> Learn more <span class="hdr-caret" aria-hidden="true">▾</span>
 							</button>
 							{#if lookupOpen}
 								<button class="share-backdrop" aria-label="Close" onclick={() => (lookupOpen = false)}></button>

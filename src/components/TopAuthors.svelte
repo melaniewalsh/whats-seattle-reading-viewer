@@ -325,7 +325,7 @@
 														<span class="lp-ic" aria-hidden="true">📈</span>
 														<span class="lp-tx"><strong>See Seattle's trend</strong><small>Checkouts over the years</small></span>
 													</button>
-													<div class="lookup-div"><span>Look it up elsewhere</span></div>
+													<div class="lookup-div"><span>Learn more</span></div>
 													<a href={u.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>Wikipedia <span aria-hidden="true">↗</span></a>
 													<a href={u.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>Goodreads <span aria-hidden="true">↗</span></a>
 													<a href={u.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>LibraryThing <span aria-hidden="true">↗</span></a>
@@ -501,6 +501,9 @@
 		margin: -6px 0 16px;
 		font-size: 0.82rem;
 	}
+	.ta-footnote {
+		margin: 20px 0 0;
+	}
 	.ta-note summary {
 		cursor: pointer;
 		color: var(--color-fg-light);
@@ -607,7 +610,7 @@
 		border: none;
 		background: none;
 		padding: 0 3px;
-		font-size: 0.7rem;
+		font-size: 0.9rem;
 		line-height: 1;
 		cursor: pointer;
 		color: var(--color-fg-light);
