@@ -62,6 +62,7 @@
 	let autoHidAuthorTotal = $state(false); // whether we've auto-hidden the author-total line for this author yet
 	let shareMsg = $state(""); // transient toast after copying a share link
 	let shareOpen = $state(false); // whether the share-platform popover is open
+	let lookupOpen = $state(false); // whether the "Look up" (Wikipedia/etc.) popover is open
 	let chartWrap = $state(null); // ref to the chart container, for the PNG export
 	let sideEl = $state(null); // ref to the titles panel, for keeping it still when ticking
 
@@ -1528,29 +1529,37 @@
 				{/if}
 			</p>
 
-			{#if lookupLinks}
-				<p class="lookup">
-					<span class="lookup-label">Learn more:</span>
-					<a href={lookupLinks.wikipedia} target="_blank" rel="noopener noreferrer">Wikipedia</a>
-					<span class="lookup-sep">·</span>
-					<a href={lookupLinks.goodreads} target="_blank" rel="noopener noreferrer">Goodreads</a>
-					<span class="lookup-sep">·</span>
-					<a href={lookupLinks.librarything} target="_blank" rel="noopener noreferrer">LibraryThing</a>
-					<span class="lookup-sep">·</span>
-					<a href={lookupLinks.worldcat} target="_blank" rel="noopener noreferrer">WorldCat</a>
-				</p>
-			{/if}
+			{#if lookupLinks || (!isOverview && current.variants?.length)}
+				<div class="hdr-actions">
+					{#if lookupLinks}
+						<div class="lookup-wrap">
+							<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Look this up elsewhere">
+								<span aria-hidden="true">🔎</span> Look up <span class="hdr-caret" aria-hidden="true">▾</span>
+							</button>
+							{#if lookupOpen}
+								<button class="share-backdrop" aria-label="Close" onclick={() => (lookupOpen = false)}></button>
+								<div class="lookup-menu" role="menu">
+									<a role="menuitem" href={lookupLinks.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Wikipedia <span aria-hidden="true">↗</span></a>
+									<a role="menuitem" href={lookupLinks.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Goodreads <span aria-hidden="true">↗</span></a>
+									<a role="menuitem" href={lookupLinks.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>LibraryThing <span aria-hidden="true">↗</span></a>
+									<a role="menuitem" href={lookupLinks.worldcat} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>WorldCat <span aria-hidden="true">↗</span></a>
+								</div>
+							{/if}
+						</div>
+					{/if}
 
-			{#if !isOverview && current.variants?.length}
-				<details class="name-variants">
-					<summary>{current.variants.length} catalog name variants merged into this author</summary>
-					<ul>
-						{#each current.variants as v}
-							<li>{v}</li>
-						{/each}
-					</ul>
-					<p class="nv-note">These are the raw <code>Creator</code> spellings the library catalog used. They were automatically clustered into one author — if any look like a different person, the clustering may have over-merged.</p>
-				</details>
+					{#if !isOverview && current.variants?.length}
+						<details class="name-variants">
+							<summary>{current.variants.length} name variants</summary>
+							<ul>
+								{#each current.variants as v}
+									<li>{v}</li>
+								{/each}
+							</ul>
+							<p class="nv-note">The raw <code>Creator</code> spellings the catalog used, clustered into one author — if any look like a different person, the clustering may have over-merged.</p>
+						</details>
+					{/if}
+				</div>
 			{/if}
 
 						<div class="plot-toolbar">
@@ -2492,40 +2501,108 @@
 		color: var(--color-fg-light);
 		margin: 4px 0 12px;
 	}
-	.lookup {
-		font-family: var(--font-sans);
-		font-size: 0.85rem;
-		color: var(--color-fg-light);
+	/* Compact secondary-action row under the name: "Look up" dropdown + variants. */
+	.hdr-actions {
+		display: flex;
+		align-items: flex-start;
+		flex-wrap: wrap;
+		gap: 8px 12px;
 		margin: 0 0 18px;
 	}
-	.lookup-label {
+	.hdr-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		font-family: var(--font-sans);
+		font-size: 0.8rem;
 		font-weight: 600;
+		padding: 5px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		background: var(--color-white);
+		color: var(--color-fg);
+		cursor: pointer;
+		transition: border-color 0.12s;
 	}
-	.lookup a {
+	.hdr-chip:hover {
+		border-color: var(--color-fg-light);
+	}
+	.hdr-caret {
+		font-size: 0.7rem;
+		color: var(--color-fg-light);
+	}
+	.lookup-wrap {
+		position: relative;
+		display: inline-flex;
+	}
+	.lookup-menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 0;
+		z-index: 41;
+		display: flex;
+		flex-direction: column;
+		min-width: 162px;
+		padding: 5px;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+	}
+	.lookup-menu a {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 14px;
+		padding: 8px 10px;
+		border-radius: 7px;
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
 		color: #357abd;
 		text-decoration: none;
 	}
-	.lookup a:hover {
-		text-decoration: underline;
+	.lookup-menu a:hover {
+		background: var(--color-gray-100);
 	}
-	.lookup-sep {
-		margin: 0 3px;
-		color: var(--color-border);
+	.lookup-menu a span {
+		color: var(--color-fg-light);
+		font-size: 0.75rem;
 	}
 
 	.name-variants {
 		font-family: var(--font-sans);
-		margin: -12px 0 20px;
+		margin: 0;
 		font-size: 0.85rem;
 	}
+	/* When open, take the full row so the (long) variant list isn't squeezed. */
+	.name-variants[open] {
+		flex-basis: 100%;
+	}
 	.name-variants summary {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
 		cursor: pointer;
-		color: var(--color-fg-light);
-		list-style-position: inside;
+		font-size: 0.8rem;
+		font-weight: 600;
+		padding: 5px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		background: var(--color-white);
+		color: var(--color-fg);
+		list-style: none;
 		width: fit-content;
 	}
+	.name-variants summary::-webkit-details-marker {
+		display: none;
+	}
+	.name-variants summary::before {
+		content: "ⓘ";
+		color: var(--color-fg-light);
+	}
 	.name-variants summary:hover {
-		color: var(--color-fg);
+		border-color: var(--color-fg-light);
 	}
 	.name-variants ul {
 		margin: 8px 0 0;
