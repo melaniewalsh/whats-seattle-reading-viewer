@@ -4,6 +4,7 @@
 	import { displayName } from "$utils/displayName.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
+	import { wikiWork } from "$utils/wiki.js";
 	import { compactNumber } from "$utils/format.js";
 	import WikiCard from "$components/WikiCard.svelte";
 
@@ -76,18 +77,35 @@
 	// Largest count in view — scales the in-row data bars so #1 fills the column.
 	const maxCount = $derived(rows.length ? Math.max(...rows.map((r) => r[3])) : 1);
 
-	// Book-cover thumbnails (Open Library). covers[key] = url | null (no cover) |
-	// undefined (not fetched yet). Resolved once per work, then cached.
+	// Book-cover thumbnails. Open Library first; when it has nothing, fall back to
+	// the Wikipedia/Wikidata article thumbnail (usually the book's cover). covers[key]
+	// = url | null (no cover) | undefined (not fetched yet). Cached once per work.
 	let covers = $state({});
 	const coverInflight = new Set();
+	const wikiTried = new Set();
 	const coverKey = (r) => `${r[0]}|${r[1]}`;
+	// Backup cover: the Wikipedia/Wikidata article thumbnail (usually the book's
+	// cover). Tried once per work when Open Library has nothing or its image fails
+	// to load; on a second failure we settle for the placeholder.
+	function fillFromWiki(r) {
+		const k = coverKey(r);
+		if (wikiTried.has(k)) {
+			covers = { ...covers, [k]: null };
+			return;
+		}
+		wikiTried.add(k);
+		wikiWork(r[0], displayName(r[1])).then((w) => {
+			covers = { ...covers, [k]: w?.thumbnail || null };
+		});
+	}
 	$effect(() => {
 		for (const r of rows) {
 			const k = coverKey(r);
 			if (k in covers || coverInflight.has(k)) continue;
 			coverInflight.add(k);
 			coverUrl(r[0], displayName(r[1])).then((u) => {
-				covers = { ...covers, [k]: u };
+				if (u) covers = { ...covers, [k]: u };
+				else fillFromWiki(r);
 			});
 		}
 	});
@@ -355,7 +373,7 @@
 								<div class="tw-cell">
 									<span class="tw-cover" class:has-img={!!covers[coverKey(row)]}>
 										{#if covers[coverKey(row)]}
-											<img src={covers[coverKey(row)]} alt="" loading="lazy" onerror={() => (covers[coverKey(row)] = null)} />
+											<img src={covers[coverKey(row)]} alt="" loading="lazy" onerror={() => fillFromWiki(row)} />
 										{:else}
 											<span class="tw-cover-ph" aria-hidden="true">📖</span>
 										{/if}
