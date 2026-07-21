@@ -895,6 +895,62 @@ def merge_name_variants(con):
     con.execute("CHECKPOINT")
 
 
+def build_top_authors(con, out_dir, slug_by_author, months, lo, top_n=20):
+    """Top-N clustered authors per genre per year, by checkouts of books tagged
+    with that genre (the "overlap" definition, reusing the Genres tab's term
+    lists). Powers the "Top authors" tab. Writes out_dir/top-authors.json:
+      {years:[...], genres:[...], data:{genre:{"<year>":[[slug,name,co],...],
+       "all":[...]}}}
+    Runs AFTER the author files so a failure here can't sink the main build."""
+    import sys as _sys
+    _sys.path.insert(0, str(PROJECT_DIR / "data-prep"))
+    from build_partition import overlap_clauses  # (name, sql_clause) per genre
+
+    years = sorted({int(m[:4]) for m in months})
+
+    # Pre-aggregate to (author, year, subjects) once so each genre pass filters a
+    # much smaller table instead of re-scanning every raw checkout row.
+    con.execute("DROP TABLE IF EXISTS ays")
+    con.execute(
+        f"""
+        CREATE TABLE ays AS
+        SELECT author, ((mi + {lo}) // 12) AS year, subjects,
+               CAST(sum(checkouts) AS BIGINT) AS c
+        FROM clean
+        GROUP BY author, year, subjects
+        """
+    )
+
+    # "All genres" (no subject filter) first, then every genre's overlap clause.
+    clauses = [("All genres", None)] + list(overlap_clauses())
+    genres_out, data = [], {}
+    for name, clause in clauses:
+        where = f"WHERE {clause}" if clause else ""
+        rows = con.execute(
+            f"SELECT author, year, CAST(sum(c) AS BIGINT) AS c FROM ays {where} "
+            f"GROUP BY author, year"
+        ).fetchall()
+        per_year, all_time = {}, {}
+        for author, year, c in rows:
+            per_year.setdefault(year, []).append((author, c))
+            all_time[author] = all_time.get(author, 0) + c
+
+        def topn(pairs):
+            top = sorted(pairs, key=lambda p: -p[1])[:top_n]
+            return [[slug_by_author.get(a, ""), a, c] for a, c in top]
+
+        gdata = {str(y): topn(per_year.get(y, [])) for y in years}
+        gdata["all"] = topn(list(all_time.items()))
+        data[name] = gdata
+        genres_out.append(name)
+
+    con.execute("DROP TABLE IF EXISTS ays")
+    (out_dir / "top-authors.json").write_bytes(
+        _dumps({"years": years, "genres": genres_out, "data": data})
+    )
+    print(f"  wrote top-authors.json ({len(genres_out)} genres x {len(years)} years)")
+
+
 def main():
     start_time = perf_counter()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1193,6 +1249,12 @@ def main():
         annotate_subjects(con, OUT_DIR, slug_by_author)
     except Exception as e:  # noqa: BLE001
         print(f"  WARNING: subject annotation failed ({e}); files written without subjects")
+
+    # Top authors per genre per year (isolated post-pass, same as subjects).
+    try:
+        build_top_authors(con, OUT_DIR, slug_by_author, months, lo)
+    except Exception as e:  # noqa: BLE001
+        print(f"  WARNING: top-authors build failed ({e}); Top authors tab will be empty")
 
     # Only mark this run's R2 files as processed once library.sqlite3 has
     # actually been rebuilt successfully. 

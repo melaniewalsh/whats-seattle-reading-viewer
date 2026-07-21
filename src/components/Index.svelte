@@ -1,11 +1,32 @@
 <script>
-	import { getContext } from "svelte";
+	import { getContext, onMount } from "svelte";
 	import { base } from "$app/paths";
 	import Viewer from "$components/StackedViewer.svelte";
 	import GenreTrends from "$components/GenreTrends.svelte";
+	import TopAuthors from "$components/TopAuthors.svelte";
 
 	const copy = getContext("copy");
-	let tab = $state("authors"); // "authors" | "titles" | "genres"
+	let tab = $state("authors"); // "authors" | "titles" | "genres" | "top"
+
+	// A shared ?tab= makes the Top-authors / By-genre views linkable.
+	onMount(() => {
+		try {
+			const t = new URLSearchParams(window.location.search).get("tab");
+			if (t === "top" || t === "genres" || t === "titles") tab = t;
+		} catch {}
+	});
+
+	// Clicking an author in the Top-authors table jumps to the By-author view
+	// with that author loaded (the Viewer reads ?author= when it mounts).
+	function openAuthor(slug) {
+		try {
+			const url = new URL(window.location);
+			url.searchParams.set("author", slug);
+			["tab", "genre", "year"].forEach((k) => url.searchParams.delete(k));
+			window.history.replaceState({}, "", url);
+		} catch {}
+		tab = "authors";
+	}
 </script>
 
 <svelte:boundary onerror={(e) => console.error(e)}>
@@ -20,10 +41,13 @@
 			<button role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
 			<button role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
 			<button role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
+			<button role="tab" aria-selected={tab === "top"} class:active={tab === "top"} onclick={() => (tab = "top")}>Top authors</button>
 		</div>
 
 		{#if tab === "genres"}
 			<GenreTrends />
+		{:else if tab === "top"}
+			<TopAuthors {openAuthor} />
 		{:else}
 			<Viewer searchMode={tab === "titles" ? "title" : "author"} />
 		{/if}

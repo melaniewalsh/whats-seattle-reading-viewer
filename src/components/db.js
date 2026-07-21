@@ -34,6 +34,19 @@ function shardFor(slug) {
 let monthsPromise = null;
 
 /** Shared x-axis for every chart. Fetched once and cached for the session. */
+// The "Top authors" tab dataset: top-N clustered authors per genre per year.
+// { years:[...], genres:[...], data:{ genre:{ "<year>":[[slug,name,co],...],
+//   "all":[...] } } }. Loaded lazily; missing file -> null (tab shows a notice).
+let topAuthorsPromise = null;
+export function getTopAuthors() {
+	if (!topAuthorsPromise) {
+		topAuthorsPromise = fetch(`${DATA_BASE}/top-authors.json`)
+			.then((r) => (r.ok ? r.json() : null))
+			.catch(() => null);
+	}
+	return topAuthorsPromise;
+}
+
 export async function getMonths() {
 	if (!monthsPromise) {
 		monthsPromise = fetch(`${DATA_BASE}/meta.json`)
