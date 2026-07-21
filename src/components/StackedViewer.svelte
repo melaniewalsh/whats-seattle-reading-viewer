@@ -1180,6 +1180,7 @@
 		return {
 			wikipedia: `https://en.wikipedia.org/wiki/Special:Search?search=${e}`,
 			goodreads: `https://www.goodreads.com/search?q=${e}`,
+			librarything: `https://www.librarything.com/search.php?search=${e}`,
 			worldcat: `https://search.worldcat.org/search?q=${e}`,
 		};
 	});
@@ -1533,6 +1534,8 @@
 					<a href={lookupLinks.wikipedia} target="_blank" rel="noopener noreferrer">Wikipedia</a>
 					<span class="lookup-sep">·</span>
 					<a href={lookupLinks.goodreads} target="_blank" rel="noopener noreferrer">Goodreads</a>
+					<span class="lookup-sep">·</span>
+					<a href={lookupLinks.librarything} target="_blank" rel="noopener noreferrer">LibraryThing</a>
 					<span class="lookup-sep">·</span>
 					<a href={lookupLinks.worldcat} target="_blank" rel="noopener noreferrer">WorldCat</a>
 				</p>

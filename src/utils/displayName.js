@@ -8,7 +8,9 @@ function titleCaseWord(w) {
 	// for 2-letter names ("Mo", "Bo", "St"), which the old length<=2 rule broke.
 	if (w.length === 1) return w.toUpperCase();
 	if (w === w.toLowerCase() || w === w.toUpperCase()) {
-		return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+		// Title-case, and also capitalize the letter after an apostrophe or hyphen
+		// so "o'farrell" -> "O'Farrell", "crossley-holland" -> "Crossley-Holland".
+		return w.toLowerCase().replace(/(^|[-'’])([a-z])/g, (_m, sep, c) => sep + c.toUpperCase());
 	}
 	return w;
 }
