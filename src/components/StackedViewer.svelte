@@ -6,6 +6,7 @@
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
+	import WikiCard from "$components/WikiCard.svelte";
 	import Switch from "$components/ui/Switch.svelte";
 	import { getMonths, searchAuthors, searchTitles, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle } from "$components/db.js";
 
@@ -64,6 +65,25 @@
 	let shareMsg = $state(""); // transient toast after copying a share link
 	let shareOpen = $state(false); // whether the share-platform popover is open
 	let lookupOpen = $state(false); // whether the "Look up" (Wikipedia/etc.) popover is open
+
+	// Wikipedia preview card on the heading (author or work). Desktop opens on hover
+	// with an intent delay; touch devices open on tap.
+	let wikiHover = $state(false);
+	let wikiTouch = $state(false);
+	let wikiTimer;
+	function wikiEnter() {
+		if (wikiTouch) return;
+		clearTimeout(wikiTimer);
+		wikiTimer = setTimeout(() => (wikiHover = true), 300);
+	}
+	function wikiLeave() {
+		if (wikiTouch) return;
+		clearTimeout(wikiTimer);
+		wikiHover = false;
+	}
+	function wikiActivate() {
+		if (wikiTouch) wikiHover = !wikiHover;
+	}
 	let chartWrap = $state(null); // ref to the chart container, for the PNG export
 	let sideEl = $state(null); // ref to the titles panel, for keeping it still when ticking
 
@@ -99,6 +119,9 @@
 	}
 
 	onMount(async () => {
+		try {
+			wikiTouch = window.matchMedia("(hover: none)").matches;
+		} catch {}
 		// The site queries a single SQLite database (static/data/library.sqlite3)
 		// directly over HTTP range requests via sql.js-httpvfs -- see db.js.
 		// months is the shared x-axis; the top authors seed the "Most borrowed"
@@ -152,6 +175,7 @@
 		expandedWorks = []; workOrder = "checkouts"; titleSort = "work";
 		yearLo = 0; yearHi = Math.max(months.length - 1, 0);
 		mobileTableOpen = false; tableCollapsed = false; query = ""; results = [];
+		wikiHover = false;
 		try {
 			const url = new URL(window.location.href);
 			url.searchParams.delete("author");
@@ -1518,7 +1542,26 @@
 			<div class="split" class:collapsed={tableCollapsed}>
 			<div class="split-main">
 			{#if headingText}
-				<h2>{headingText}</h2>
+				{#if isOverview}
+					<h2>{headingText}</h2>
+				{:else}
+					<div class="h2-wrap" role="presentation" onmouseenter={wikiEnter} onmouseleave={wikiLeave}>
+						<h2 class="h2-hoverable" onclick={wikiActivate}>{headingText}</h2>
+						{#if wikiHover}
+							<span class="wiki-pop">
+								<WikiCard
+										query={headingText}
+										kind={searchMode === "title" ? "work" : "author"}
+										author={searchMode === "title" ? displayName(current.name) : ""}
+										links={lookupLinks || {}}
+								/>
+							</span>
+						{/if}
+					</div>
+					{#if wikiTouch && wikiHover}
+						<button class="wiki-backdrop" aria-label="Close" onclick={() => (wikiHover = false)}></button>
+					{/if}
+				{/if}
 			{/if}
 			<p class="meta">
 				{#if isOverview}
@@ -2518,6 +2561,49 @@
 		font-size: 2rem;
 		line-height: 1.1;
 		margin: 0;
+	}
+	/* Heading carries the Wikipedia hover card (author or work). */
+	.h2-wrap {
+		position: relative;
+		display: inline-block;
+		max-width: 100%;
+	}
+	.h2-hoverable {
+		cursor: pointer;
+		text-decoration: underline dotted;
+		text-decoration-color: var(--color-border);
+		text-decoration-thickness: 1.5px;
+		text-underline-offset: 6px;
+	}
+	.h2-hoverable:hover {
+		text-decoration-color: var(--color-fg-light);
+	}
+	.wiki-pop {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		z-index: 45;
+		padding-top: 6px;
+		cursor: default;
+	}
+	.wiki-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
+		background: rgba(0, 0, 0, 0.12);
+		border: none;
+		cursor: default;
+	}
+	@media (hover: none), (max-width: 599px) {
+		.wiki-pop {
+			position: fixed;
+			top: auto;
+			left: 12px;
+			right: 12px;
+			bottom: 16px;
+			padding-top: 0;
+			z-index: 46;
+		}
 	}
 
 	.author .meta {
