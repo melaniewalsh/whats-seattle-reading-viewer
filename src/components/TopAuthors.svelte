@@ -2,6 +2,7 @@
 	import { onMount } from "svelte";
 	import { getTopAuthors, getGenreTerms } from "$components/db.js";
 	import { displayName } from "$utils/displayName.js";
+	import { lookupUrls } from "$utils/lookup.js";
 
 	// openAuthor(slug) is provided by Index.svelte: jumps to the By-author view.
 	let { openAuthor } = $props();
@@ -14,6 +15,8 @@
 	let shareMsg = $state("");
 	let shareOpen = $state(false);
 	let termsMap = $state({});
+	let lookupMode = $state(false); // "Look up" toggle: show per-row external links
+	let openLookup = $state(null); // which row's lookup popover is open (the slug)
 
 	onMount(async () => {
 		// Read shareable filters from the URL first.
@@ -280,7 +283,10 @@
 					</div>
 				{/if}
 			</div>
-			{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
+			<button class="chart-action lookup-toggle" class:on={lookupMode} onclick={() => { lookupMode = !lookupMode; openLookup = null; }} aria-pressed={lookupMode} title="Show links to look each author up on Wikipedia, Goodreads, etc.">
+					<span aria-hidden="true">🔎</span> Look up authors
+				</button>
+				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 		</div>
 
 		<p class="ta-caption">
@@ -316,6 +322,22 @@
 										>{displayName(row[1])}</button>
 								{:else}
 									{displayName(row[1])}
+								{/if}
+								{#if lookupMode}
+									{@const u = lookupUrls(displayName(row[1]))}
+									{@const key = row[0] || row[1]}
+									<span class="row-lookup">
+										<button class="row-lookup-btn" aria-haspopup="true" aria-expanded={openLookup === key} title="Look up {displayName(row[1])}" onclick={() => (openLookup = openLookup === key ? null : key)}>🔎</button>
+										{#if openLookup === key}
+											<button class="lookup-backdrop" aria-label="Close" onclick={() => (openLookup = null)}></button>
+											<div class="row-lookup-menu" role="menu">
+												<a href={u.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>Wikipedia <span aria-hidden="true">↗</span></a>
+												<a href={u.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>Goodreads <span aria-hidden="true">↗</span></a>
+												<a href={u.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>LibraryThing <span aria-hidden="true">↗</span></a>
+												<a href={u.worldcat} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>WorldCat <span aria-hidden="true">↗</span></a>
+											</div>
+										{/if}
+									</span>
 								{/if}
 							</td>
 							<td class="ta-count">{row[2].toLocaleString()}</td>
@@ -566,6 +588,71 @@
 	.ta-authorlink:hover {
 		text-decoration: underline;
 		color: #26597f;
+	}
+	.lookup-toggle.on {
+		background: #6a4c93;
+		border-color: #6a4c93;
+		color: var(--color-white);
+	}
+	.row-lookup {
+		position: relative;
+		display: inline-block;
+		margin-left: 8px;
+	}
+	.row-lookup-btn {
+		border: none;
+		background: none;
+		padding: 0 2px;
+		font-size: 0.85rem;
+		line-height: 1;
+		cursor: pointer;
+		opacity: 0.55;
+		vertical-align: middle;
+	}
+	.row-lookup-btn:hover {
+		opacity: 1;
+	}
+	.lookup-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
+		background: none;
+		border: none;
+		cursor: default;
+	}
+	.row-lookup-menu {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		z-index: 41;
+		display: flex;
+		flex-direction: column;
+		min-width: 160px;
+		padding: 5px;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+	}
+	.row-lookup-menu a {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 14px;
+		padding: 7px 10px;
+		border-radius: 7px;
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: #357abd;
+		text-decoration: none;
+	}
+	.row-lookup-menu a:hover {
+		background: var(--color-gray-100);
+	}
+	.row-lookup-menu a span {
+		color: var(--color-fg-light);
+		font-size: 0.75rem;
 	}
 	.ta-status {
 		font-family: var(--font-sans);
