@@ -19,19 +19,31 @@
 	let shareMsg = $state("");
 	let shareOpen = $state(false);
 	let termsMap = $state({});
-	// Wikipedia hover preview: which row's card is showing, with a hover-intent delay.
+	// Wikipedia preview: which row's card is showing. Desktop opens it on hover
+	// (with a small intent delay); touch devices open it on tap instead.
 	let hoverKey = $state(null);
 	let hoverTimer;
+	let isTouch = $state(false);
 	function enterName(key) {
+		if (isTouch) return;
 		clearTimeout(hoverTimer);
 		hoverTimer = setTimeout(() => (hoverKey = key), 300);
 	}
 	function leaveName() {
+		if (isTouch) return;
 		clearTimeout(hoverTimer);
 		hoverKey = null;
 	}
+	// On touch, tapping a title toggles its card; on desktop it goes to the trend.
+	function activateName(key, go) {
+		if (isTouch) hoverKey = hoverKey === key ? null : key;
+		else go();
+	}
 
 	onMount(async () => {
+		try {
+			isTouch = window.matchMedia("(hover: none)").matches;
+		} catch {}
 		try {
 			const p = new URLSearchParams(window.location.search);
 			if (p.get("genre")) genre = p.get("genre");
@@ -350,7 +362,7 @@
 									</span>
 									<span class="tw-text">
 										<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
-											<button class="tw-title tw-titlelink" onclick={() => openTitle(row[0])} title="See this title's checkout trend at Seattle Public Library">{row[0]}</button>
+											<button class="tw-title tw-titlelink" aria-haspopup="dialog" onclick={() => activateName(key, () => openTitle(row[0]))}>{row[0]}</button>
 											{#if hoverKey === key}
 												<span class="wiki-pop"><WikiCard query={row[0]} author={displayName(row[1])} kind="work" links={u} onTrend={() => openTitle(row[0])} /></span>
 											{/if}
@@ -383,6 +395,10 @@
 				<p>Counts combine <strong>print books, ebooks &amp; audiobooks</strong> — editions of a book (print, ebook, audiobook, reprints) are grouped into one work, automatically and approximately. These are raw checkouts, not holds or renewals, so read the rankings as a good sense of what's popular, not an exact or official count. Cover images are from <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>, matched by title and author, so some may be missing or show a different edition.</p>
 			</details>
 		{/if}
+	{/if}
+
+	{#if isTouch && hoverKey}
+		<button class="wiki-backdrop" aria-label="Close" onclick={() => (hoverKey = null)}></button>
 	{/if}
 </div>
 
@@ -581,17 +597,28 @@
 		display: block;
 		font-family: inherit;
 		font-size: inherit;
-		font-weight: 600;
-		color: #6a4c93;
+		font-weight: 700;
+		color: var(--color-fg);
 		background: none;
 		border: none;
 		padding: 0;
 		text-align: left;
 		cursor: pointer;
+		text-decoration: underline dotted;
+		text-decoration-color: var(--color-border);
+		text-decoration-thickness: 1.5px;
+		text-underline-offset: 3px;
 	}
 	.tw-titlelink:hover {
-		text-decoration: underline;
-		color: #4d356e;
+		text-decoration-color: var(--color-fg-light);
+	}
+	.wiki-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
+		background: none;
+		border: none;
+		cursor: default;
 	}
 	.tw-by {
 		display: inline-block;

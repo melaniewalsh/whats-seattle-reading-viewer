@@ -17,20 +17,31 @@
 	let shareMsg = $state("");
 	let shareOpen = $state(false);
 	let termsMap = $state({});
-	// Wikipedia hover preview: which row's card is showing, with a small
-	// hover-intent delay so quick mouse passes don't fire fetches.
+	// Wikipedia preview: which row's card is showing. Desktop opens it on hover
+	// (with a small intent delay); touch devices open it on tap instead.
 	let hoverKey = $state(null);
 	let hoverTimer;
+	let isTouch = $state(false);
 	function enterName(key) {
+		if (isTouch) return;
 		clearTimeout(hoverTimer);
 		hoverTimer = setTimeout(() => (hoverKey = key), 300);
 	}
 	function leaveName() {
+		if (isTouch) return;
 		clearTimeout(hoverTimer);
 		hoverKey = null;
 	}
+	// On touch, tapping a name toggles its card; on desktop it goes to the trend.
+	function activateName(key, go) {
+		if (isTouch) hoverKey = hoverKey === key ? null : key;
+		else go();
+	}
 
 	onMount(async () => {
+		try {
+			isTouch = window.matchMedia("(hover: none)").matches;
+		} catch {}
 		// Read shareable filters from the URL first.
 		try {
 			const p = new URLSearchParams(window.location.search);
@@ -331,7 +342,7 @@
 									{@const u = lookupUrls(displayName(row[1]))}
 									{@const key = row[0] || row[1]}
 									<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
-										<button class="ta-authorlink" onclick={() => openAuthor(row[0])} title="See {displayName(row[1])}'s checkout trend at Seattle Public Library">{displayName(row[1])}</button>
+										<button class="ta-authorlink" aria-haspopup="dialog" onclick={() => activateName(key, () => openAuthor(row[0]))}>{displayName(row[1])}</button>
 										{#if hoverKey === key}
 											<span class="wiki-pop"><WikiCard query={displayName(row[1])} kind="author" links={u} onTrend={() => openAuthor(row[0])} /></span>
 										{/if}
@@ -360,6 +371,10 @@
 				<p>Counts combine <strong>print books, ebooks &amp; audiobooks</strong>. These are raw checkouts — not holds or renewals — and catalog records are inconsistently formatted, so read the rankings as a good sense of what's popular, not an exact or official count.</p>
 			</details>
 		{/if}
+	{/if}
+
+	{#if isTouch && hoverKey}
+		<button class="wiki-backdrop" aria-label="Close" onclick={() => (hoverKey = null)}></button>
 	{/if}
 </div>
 
@@ -620,16 +635,27 @@
 		font-family: inherit;
 		font-size: inherit;
 		font-weight: 600;
-		color: #357abd;
+		color: var(--color-fg);
 		background: none;
 		border: none;
 		padding: 0;
 		cursor: pointer;
 		text-align: left;
+		text-decoration: underline dotted;
+		text-decoration-color: var(--color-border);
+		text-decoration-thickness: 1.5px;
+		text-underline-offset: 3px;
 	}
 	.ta-authorlink:hover {
-		text-decoration: underline;
-		color: #26597f;
+		text-decoration-color: var(--color-fg-light);
+	}
+	.wiki-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
+		background: none;
+		border: none;
+		cursor: default;
 	}
 	.name-wrap {
 		position: relative;

@@ -102,16 +102,59 @@ async function enwikiTitleFromWikidata(title, author) {
 	}
 }
 
-// Work preview: resolve via Wikidata (book/author aware), falling back to a plain
-// title lookup if Wikidata has nothing useful.
+// Pick the most book-like article title from a set of Wikipedia search hits.
+function pickWorkTitle(hits, author) {
+	const authorLower = (author || "").trim().toLowerCase();
+	const bad =
+		/\((disambiguation|film|tv series|miniseries|season|soundtrack|album|song|single|opera|play|musical|video game|band|character)\)|in popular culture$/i;
+	const good =
+		/\((novel|memoir|book|novella|short story collection|autobiography|biography|poetry collection|comics?|manga)\)/i;
+	const usable = hits.filter((t) => t.toLowerCase() !== authorLower && !bad.test(t));
+	return usable.find((t) => good.test(t)) || usable[0] || null;
+}
+
+// Resolve a book to its English Wikipedia title via a title-scoped search that
+// also requires the author — this disambiguates crowded titles ("Circe",
+// "Educated") to the actual book rather than the myth/concept page.
+async function enwikiTitleForWork(title, author) {
+	const q = `intitle:"${title}" ${author}`.trim();
+	try {
+		const res = await fetch(
+			`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&srnamespace=0&srlimit=6&format=json&origin=*`,
+		);
+		if (!res.ok) return null;
+		const d = await res.json();
+		return pickWorkTitle((d?.query?.search || []).map((h) => h.title), author);
+	} catch {
+		return null;
+	}
+}
+
+// Safety net for the last-resort plain-title lookup: only trust it if the summary
+// actually reads like this author's book (names the author, or a work keyword),
+// so "Circe" never resolves to the Greek myth, "Educated" never to education, etc.
+function looksLikeWork(s, author) {
+	if (!s) return false;
+	const hay = (s.extract || "").toLowerCase();
+	const last = (author || "").trim().split(/\s+/).pop()?.toLowerCase();
+	if (last && last.length > 2 && hay.includes(last)) return true;
+	return /\b(novel|memoir|book|novella|non-?fiction|graphic novel|poetry|short stor|anthology|autobiography|biography)\b/.test(
+		hay,
+	);
+}
+
+// Work preview: title-scoped Wikipedia search (author-aware) first, then Wikidata,
+// then a plain-title lookup guarded by looksLikeWork so we never show a same-named
+// non-book page.
 export function wikiWork(title, author) {
-	const key = `wikiwork:${(title || "").trim().toLowerCase()}|${(author || "").trim().toLowerCase()}`;
+	const key = `wikiwork2:${(title || "").trim().toLowerCase()}|${(author || "").trim().toLowerCase()}`;
 	return cached(key, async () => {
-		const en = await enwikiTitleFromWikidata(title, author);
+		const en = (await enwikiTitleForWork(title, author)) || (await enwikiTitleFromWikidata(title, author));
 		if (en) {
 			const s = await summaryByTitle(en);
 			if (s) return s;
 		}
-		return summaryByTitle(title);
+		const direct = await summaryByTitle(title);
+		return looksLikeWork(direct, author) ? direct : null;
 	});
 }
