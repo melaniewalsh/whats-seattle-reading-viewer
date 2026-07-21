@@ -78,14 +78,18 @@ TAXONOMY = [
     ("LGBTQIA+ Fiction", [], [], ["lgbtqia", "lgbt", "gay", "lesbian", "homosexual",
         "bisexual", "transgender", "queer"]),
     ("African American Fiction", ["african american fiction"], []),
-    # No single BISAC "Asian American fiction" heading exists in SPL's data, so
-    # aggregate the national-origin LC headings ("Chinese Americans Fiction",
-    # etc.). "asian americans fiction" also catches "South Asian Americans
-    # Fiction" as a substring. ~172k checkouts.
-    ("Asian American Fiction", ["asian americans fiction", "chinese americans fiction",
-        "korean americans fiction", "japanese americans fiction", "vietnamese americans fiction",
-        "filipino americans fiction", "taiwanese americans fiction", "hmong americans fiction",
-        "bengali americans fiction"], []),
+    # Not just Asian AMERICAN fiction: aggregate the US-diaspora national-origin
+    # headings ("Chinese Americans Fiction", etc.) AND the homeland/translated
+    # literatures ("Chinese fiction" 33k, "Japanese fiction" 21k, ...) plus other
+    # diaspora ("East Indians Fiction", "South Asians Fiction"). Uses only
+    # heading forms that unambiguously mean Asian (avoids the bare "asian fiction"
+    # substring, which would also match "cauc-ASIAN Fiction").
+    ("Asian Fiction", [
+        "asian americans fiction", "chinese americans fiction", "korean americans fiction",
+        "japanese americans fiction", "vietnamese americans fiction", "filipino americans fiction",
+        "taiwanese americans fiction", "hmong americans fiction", "bengali americans fiction",
+        "chinese fiction", "japanese fiction", "korean fiction", "vietnamese fiction",
+        "east indians fiction", "south asians fiction"], []),
     # Broadened to pull literary/classic/general fiction out of "Other" (Demon
     # Copperhead, Pachinko, Pride & Prejudice are tagged just "Fiction, Literature").
     # Sits late in priority, so genre fiction (Romance/Mystery/…) claims its books
