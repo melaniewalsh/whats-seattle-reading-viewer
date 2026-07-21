@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from "svelte";
 	import { getTopWorks } from "$components/db.js";
+	import { displayName } from "$utils/displayName.js";
 
 	// openAuthor(slug) / openTitle(title) are provided by Index.svelte: jump to the
 	// By-author / By-title views.
@@ -52,18 +53,6 @@
 		} catch {}
 	});
 
-	function titleCaseWord(w) {
-		if (w.length <= 2 && w === w.toLowerCase() && /[a-z]/.test(w)) return w.toUpperCase();
-		return w.charAt(0).toUpperCase() + w.slice(1);
-	}
-	function displayName(name) {
-		if (!name) return name;
-		let n = name.trim();
-		n = n.replace(/,\s*\d{4}(?:\s*-\s*\d{0,4})?\.?\s*$/, "");
-		const comma = n.match(/^([^,]+),\s*(.+)$/);
-		if (comma) n = `${comma[2].trim()} ${comma[1].trim()}`;
-		return n.replace(/\S+/g, titleCaseWord);
-	}
 
 	const yearLabel = (y) => (y === "all" ? "all time" : y);
 

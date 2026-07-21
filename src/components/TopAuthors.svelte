@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from "svelte";
 	import { getTopAuthors } from "$components/db.js";
+	import { displayName } from "$utils/displayName.js";
 
 	// openAuthor(slug) is provided by Index.svelte: jumps to the By-author view.
 	let { openAuthor } = $props();
@@ -51,24 +52,6 @@
 			window.history.replaceState({}, "", url);
 		} catch {}
 	});
-
-	// Clean a canonical name ("thurber, james, 1894" / "cathy l greenberg") into
-	// a readable "First Last" — same rules as the By-author view.
-	function titleCaseWord(w) {
-		if (w.length <= 2 && w === w.toLowerCase() && /[a-z]/.test(w)) {
-			// initials like "j" / "jr" -> uppercase
-			return w.toUpperCase();
-		}
-		return w.charAt(0).toUpperCase() + w.slice(1);
-	}
-	function displayName(name) {
-		if (!name) return name;
-		let n = name.trim();
-		n = n.replace(/,\s*\d{4}(?:\s*-\s*\d{0,4})?\.?\s*$/, "");
-		const comma = n.match(/^([^,]+),\s*(.+)$/);
-		if (comma) n = `${comma[2].trim()} ${comma[1].trim()}`;
-		return n.replace(/\S+/g, titleCaseWord);
-	}
 
 	const yearLabel = (y) => (y === "all" ? "all time" : y);
 

@@ -1,6 +1,7 @@
 <script>
 	// StackedViewer.svelte
 	import { onMount, tick } from "svelte";
+	import { displayName } from "$utils/displayName.js";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
@@ -544,27 +545,6 @@
 	// Short label shown in a title's format badge.
 	function formatLabel(f) {
 		return {ebook: "ebook", audiobook: "audio", print: "print", largeprint: "large print", other: "other"}[f] || f;
-	}
-
-	// The catalog stores author names inconsistently -- often all-lowercase
-	// ("mo willems") or "Lastname, First" ("Davis, Jim"). Tidy them for display:
-	// flip the comma form and Title-Case the words, while leaving already
-	// mixed-case names (McDonald, DeLillo) alone.
-	function titleCaseWord(w) {
-		if (w === w.toLowerCase() || w === w.toUpperCase()) {
-			return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-		}
-		return w;
-	}
-	function displayName(name) {
-		if (!name) return name;
-		let n = name.trim();
-		// Drop a trailing life-dates clause the catalog appends ("Baldwin, James,
-		// 1924-1987" or "james baldwin, 1924-1987") so it isn't flipped to the front.
-		n = n.replace(/,\s*\d{4}(?:\s*-\s*\d{0,4})?\.?\s*$/, "");
-		const comma = n.match(/^([^,]+),\s*(.+)$/);
-		if (comma) n = `${comma[2].trim()} ${comma[1].trim()}`;
-		return n.replace(/\S+/g, titleCaseWord);
 	}
 
 	// Make a new group. If titles are currently single-selected, seed the group
