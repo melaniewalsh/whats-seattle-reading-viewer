@@ -343,7 +343,7 @@
 							</td>
 							<td class="ta-count">
 								<span class="ta-bar">
-									<span class="ta-bar-fill" style="width:{Math.max((row[2] / maxCount) * 100, 1)}%"></span>
+									<span class="ta-bar-track"><span class="ta-bar-fill" style="width:{Math.max((row[2] / maxCount) * 100, 1)}%"></span></span>
 									<span class="ta-bar-num">{row[2].toLocaleString()}</span>
 								</span>
 							</td>
@@ -588,25 +588,30 @@
 		text-align: right;
 	}
 	.ta-bar {
-		position: relative;
 		display: flex;
 		align-items: center;
-		justify-content: flex-end;
+		gap: 10px;
 		min-height: 22px;
+	}
+	.ta-bar-track {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+		height: 22px;
 	}
 	.ta-bar-fill {
 		position: absolute;
 		left: 0;
-		top: 50%;
-		transform: translateY(-50%);
-		height: 22px;
+		top: 0;
+		height: 100%;
+		min-width: 2px;
 		border-radius: 3px;
 		background: rgba(53, 122, 189, 0.16);
 	}
 	.ta-bar-num {
-		position: relative;
-		z-index: 1;
-		padding: 0 8px;
+		flex: none;
+		min-width: 4.25rem;
+		text-align: right;
 	}
 	.ta-name {
 		font-weight: 600;
