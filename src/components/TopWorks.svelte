@@ -2,8 +2,9 @@
 	import { onMount } from "svelte";
 	import { getTopWorks } from "$components/db.js";
 
-	// openAuthor(slug) is provided by Index.svelte: jumps to the By-author view.
-	let { openAuthor } = $props();
+	// openAuthor(slug) / openTitle(title) are provided by Index.svelte: jump to the
+	// By-author / By-title views.
+	let { openAuthor, openTitle } = $props();
 
 	let data = $state(null);
 	let genre = $state("All genres");
@@ -307,7 +308,7 @@
 						<tr>
 							<td class="ta-rank">{i + 1}</td>
 							<td class="ta-name">
-								<span class="tw-title">{row[0]}</span>
+								<button class="tw-title tw-titlelink" onclick={() => openTitle(row[0])} title="See this title's checkout trend">{row[0]}</button>
 								{#if row[2]}
 									<button class="tw-by ta-authorlink" onclick={() => openAuthor(row[2])}>by {displayName(row[1])}</button>
 								{:else}
@@ -433,7 +434,18 @@
 	}
 	.tw-title {
 		display: block;
+		font-family: inherit;
+		font-size: inherit;
 		font-weight: 600;
+		color: var(--color-fg);
+		background: none;
+		border: none;
+		padding: 0;
+		text-align: left;
+		cursor: pointer;
+	}
+	.tw-titlelink:hover {
+		text-decoration: underline;
 	}
 	.tw-by {
 		display: inline-block;

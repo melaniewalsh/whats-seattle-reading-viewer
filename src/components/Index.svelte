@@ -7,26 +7,42 @@
 	import TopWorks from "$components/TopWorks.svelte";
 
 	const copy = getContext("copy");
-	let tab = $state("authors"); // "authors" | "titles" | "genres" | "top" | "works"
+	// "all" (library-wide overview) | "authors" | "titles" | "genres" | "top" | "works"
+	let tab = $state("all");
 
-	// A shared ?tab= makes the ranking / by-genre views linkable.
+	// A shared ?tab= / ?author= makes each view linkable.
 	onMount(() => {
 		try {
-			const t = new URLSearchParams(window.location.search).get("tab");
-			if (t === "top" || t === "works" || t === "genres" || t === "titles") tab = t;
+			const params = new URLSearchParams(window.location.search);
+			const t = params.get("tab");
+			if (["top", "works", "genres", "titles", "authors", "all"].includes(t)) tab = t;
+			else if (params.get("author")) tab = "authors";
+			else if (params.get("title")) tab = "titles";
 		} catch {}
 	});
 
-	// Clicking an author in the Top-authors table jumps to the By-author view
-	// with that author loaded (the Viewer reads ?author= when it mounts).
+	// Clicking an author (Top authors, or the "by author" on Top works) jumps to
+	// the By-author view with that author loaded (Viewer reads ?author on mount).
 	function openAuthor(slug) {
 		try {
 			const url = new URL(window.location);
 			url.searchParams.set("author", slug);
-			["tab", "genre", "year"].forEach((k) => url.searchParams.delete(k));
+			["tab", "genre", "year", "title"].forEach((k) => url.searchParams.delete(k));
 			window.history.replaceState({}, "", url);
 		} catch {}
 		tab = "authors";
+	}
+
+	// Clicking a work title on Top works opens the By-title view for that title
+	// (Viewer reads ?title on mount).
+	function openTitle(title) {
+		try {
+			const url = new URL(window.location);
+			url.searchParams.set("title", title);
+			["tab", "genre", "year", "author"].forEach((k) => url.searchParams.delete(k));
+			window.history.replaceState({}, "", url);
+		} catch {}
+		tab = "titles";
 	}
 </script>
 
@@ -42,6 +58,7 @@
 			<div class="tab-group">
 				<span class="tab-group-label">Explore trends</span>
 				<div class="sticker-tabs trends" role="tablist" aria-label="Explore trends">
+					<button class="sticker-tab" role="tab" aria-selected={tab === "all"} class:active={tab === "all"} onclick={() => (tab = "all")}>All</button>
 					<button class="sticker-tab" role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
 					<button class="sticker-tab" role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
 					<button class="sticker-tab" role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
@@ -61,9 +78,11 @@
 		{:else if tab === "top"}
 			<TopAuthors {openAuthor} />
 		{:else if tab === "works"}
-			<TopWorks {openAuthor} />
+			<TopWorks {openAuthor} {openTitle} />
+		{:else if tab === "all"}
+			<Viewer searchMode="author" landing="overview" />
 		{:else}
-			<Viewer searchMode={tab === "titles" ? "title" : "author"} />
+			<Viewer searchMode={tab === "titles" ? "title" : "author"} landing="search" />
 		{/if}
 
 		<details class="about">

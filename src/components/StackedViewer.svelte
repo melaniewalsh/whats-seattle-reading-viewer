@@ -9,7 +9,9 @@
 
 	// "author" (default): search authors. "title": reverse lookup — search a title,
 	// resolve to its author, open the author's drilldown with that work highlighted.
-	let { searchMode = "author" } = $props();
+	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
+	// (the "By author" tab -> open straight to the search box).
+	let { searchMode = "author", landing = "overview" } = $props();
 
 	// Colors for title lines.
 	const TITLE_COLORS = [
@@ -111,6 +113,13 @@
 					|| (await searchAuthors(wantSlug.replace(/-/g, " "), 8)).find((x) => x.slug === wantSlug);
 			if (a) { await selectAuthor(a); return; }
 		}
+		// "By author" (landing="search") opens straight to the search box (current
+		// stays null -> the search-first empty state renders). "All" and the
+		// By-title tab still load the overview / default title.
+		if (searchMode === "author" && landing === "search") {
+			loading = false;
+			return;
+		}
 		await loadOverview();
 	});
 
@@ -211,8 +220,12 @@
 		}
 	});
 	async function loadDefaultTitle() {
+		// ?title=<work> (e.g. from a Top-works link) opens that title; otherwise
+		// seed the tab with a well-known example.
+		let want = null;
+		try { want = new URLSearchParams(window.location.search).get("title"); } catch {}
 		try {
-			const r = (await searchTitles("the fire next time", 5))[0];
+			const r = (await searchTitles(want || "the fire next time", 5))[0];
 			if (r) await selectTitle(r, { scroll: false });
 		} catch {}
 	}
