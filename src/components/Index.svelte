@@ -37,11 +37,21 @@
 			<p class="dek">{copy.dek}</p>
 		</header>
 
-		<div class="main-tabs" role="tablist" aria-label="View">
-			<button role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
-			<button role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
-			<button role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
-			<button role="tab" aria-selected={tab === "top"} class:active={tab === "top"} onclick={() => (tab = "top")}>Top authors</button>
+		<div class="tab-groups">
+			<div class="tab-group">
+				<span class="tab-group-label">Explore</span>
+				<div class="main-tabs" role="tablist" aria-label="Explore">
+					<button role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
+					<button role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
+				</div>
+			</div>
+			<div class="tab-group">
+				<span class="tab-group-label">Browse</span>
+				<div class="main-tabs" role="tablist" aria-label="Browse">
+					<button role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
+					<button role="tab" aria-selected={tab === "top"} class:active={tab === "top"} onclick={() => (tab = "top")}>Top authors</button>
+				</div>
+			</div>
 		</div>
 
 		{#if tab === "genres"}
@@ -133,12 +143,35 @@
 		color: var(--color-fg-light);
 		margin: 0;
 	}
-	/* top-level view tabs: By author | By genre */
+	/* Two labeled groups of tabs: Explore (search a thing) | Browse (aggregates). */
+	.tab-groups {
+		display: flex;
+		justify-content: center;
+		align-items: flex-end;
+		flex-wrap: wrap;
+		gap: 10px 24px;
+		margin: 22px auto 26px;
+	}
+	.tab-group {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+	}
+	.tab-group-label {
+		font-family: var(--font-sans);
+		font-size: 0.66rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--color-fg-light);
+	}
+	/* top-level view tabs: pill group of buttons */
 	.main-tabs {
 		display: flex;
 		justify-content: center;
 		gap: 4px;
-		margin: 22px auto 26px;
+		margin: 0;
 		padding: 4px;
 		width: fit-content;
 		background: var(--color-gray-100);

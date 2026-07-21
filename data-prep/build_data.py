@@ -921,8 +921,17 @@ def build_top_authors(con, out_dir, slug_by_author, months, lo, top_n=20):
         """
     )
 
+    # Broad structural catch-all buckets from the partition taxonomy that aren't
+    # meaningful "top authors by genre" categories -- drop them from this tab so
+    # the dropdown stays to distinct, reader-facing genres (~40).
+    GENRE_EXCLUDE = {
+        "Fiction", "Nonfiction", "Art", "Illustrated Works", "Informational Works",
+        "Instructional & Educational Works", "Readers Publications",
+    }
     # "All genres" (no subject filter) first, then every genre's overlap clause.
-    clauses = [("All genres", None)] + list(overlap_clauses())
+    clauses = [("All genres", None)] + [
+        (n, c) for n, c in overlap_clauses() if n not in GENRE_EXCLUDE
+    ]
     genres_out, data = [], {}
     for name, clause in clauses:
         where = f"WHERE {clause}" if clause else ""
