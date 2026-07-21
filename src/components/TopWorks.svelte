@@ -1,6 +1,6 @@
 <script>
 	import { onMount } from "svelte";
-	import { getTopWorks } from "$components/db.js";
+	import { getTopWorks, getGenreTerms } from "$components/db.js";
 	import { displayName } from "$utils/displayName.js";
 
 	// openAuthor(slug) / openTitle(title) are provided by Index.svelte: jump to the
@@ -14,6 +14,7 @@
 	let loadError = $state("");
 	let shareMsg = $state("");
 	let shareOpen = $state(false);
+	let termsMap = $state({});
 
 	onMount(async () => {
 		try {
@@ -21,6 +22,7 @@
 			if (p.get("genre")) genre = p.get("genre");
 			if (p.get("year")) year = p.get("year");
 		} catch {}
+		getGenreTerms().then((m) => (termsMap = m));
 		const d = await getTopWorks();
 		loading = false;
 		if (!d || !d.genres) {
@@ -40,6 +42,9 @@
 		if (!g) return [];
 		return (g[year] || []).slice(0, 10);
 	});
+
+	// The catalog subject tags that define the selected genre (empty for "All genres").
+	const genreTags = $derived(genre !== "All genres" ? (termsMap[genre] || []) : []);
 
 	$effect(() => {
 		if (!data) return;
@@ -283,6 +288,10 @@
 			<p>Editions of a book (print, ebook, audiobook, reprints) are grouped into one work. These are raw <strong>checkouts</strong> — they don't include holds or renewals, and the clustering is automatic and approximate. Read the rankings as a good sense of what's popular, not an exact or official count.</p>
 		</details>
 
+		{#if genreTags.length}
+			<p class="ta-tags"><span class="ta-tags-label">Subject tags:</span> {#each genreTags as t}<code class="ta-tag">{t}</code>{/each}</p>
+		{/if}
+
 		{#if rows.length}
 			<table class="ta-table">
 				<thead>
@@ -384,6 +393,27 @@
 	}
 	.ta-note strong {
 		color: var(--color-fg);
+	}
+	.ta-tags {
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		color: var(--color-fg-light);
+		margin: -8px 0 16px;
+		line-height: 1.9;
+	}
+	.ta-tags-label {
+		font-weight: 600;
+		margin-right: 4px;
+	}
+	.ta-tag {
+		display: inline-block;
+		font-family: var(--font-mono, monospace);
+		font-size: 0.74rem;
+		background: var(--color-gray-100);
+		color: var(--color-fg);
+		border-radius: 5px;
+		padding: 2px 7px;
+		margin: 0 4px 2px 0;
 	}
 	.ta-table {
 		width: 100%;

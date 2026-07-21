@@ -59,6 +59,23 @@ export function getTopWorks() {
 	return topWorksPromise;
 }
 
+// Subject terms per genre (from genres.json, served at the Pages base — NOT R2).
+// Powers the "Subject tags" line under a selected genre in the ranking tables.
+let genreTermsPromise = null;
+export function getGenreTerms() {
+	if (!genreTermsPromise) {
+		genreTermsPromise = fetch(`${base}/genres.json`)
+			.then((r) => (r.ok ? r.json() : null))
+			.then((g) => {
+				const m = {};
+				for (const x of g?.genres || []) m[x.name] = [...(x.terms || []), ...(x.ficTerms || [])];
+				return m;
+			})
+			.catch(() => ({}));
+	}
+	return genreTermsPromise;
+}
+
 export async function getMonths() {
 	if (!monthsPromise) {
 		monthsPromise = fetch(`${DATA_BASE}/meta.json`)
