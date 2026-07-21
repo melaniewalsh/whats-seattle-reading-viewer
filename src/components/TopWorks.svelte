@@ -2,6 +2,7 @@
 	import { onMount } from "svelte";
 	import { getTopWorks, getGenreTerms } from "$components/db.js";
 	import { displayName } from "$utils/displayName.js";
+	import { coverUrl } from "$utils/covers.js";
 
 	// openAuthor(slug) / openTitle(title) are provided by Index.svelte: jump to the
 	// By-author / By-title views.
@@ -45,6 +46,22 @@
 
 	// The catalog subject tags that define the selected genre (empty for "All genres").
 	const genreTags = $derived(genre !== "All genres" ? (termsMap[genre] || []) : []);
+
+	// Book-cover thumbnails (Open Library). covers[key] = url | null (no cover) |
+	// undefined (not fetched yet). Resolved once per work, then cached.
+	let covers = $state({});
+	const coverInflight = new Set();
+	const coverKey = (r) => `${r[0]}|${r[1]}`;
+	$effect(() => {
+		for (const r of rows) {
+			const k = coverKey(r);
+			if (k in covers || coverInflight.has(k)) continue;
+			coverInflight.add(k);
+			coverUrl(r[0], displayName(r[1])).then((u) => {
+				covers = { ...covers, [k]: u };
+			});
+		}
+	});
 
 	$effect(() => {
 		if (!data) return;
@@ -285,7 +302,7 @@
 
 		<details class="ta-note">
 			<summary>Counts print books, ebooks &amp; audiobooks</summary>
-			<p>Editions of a book (print, ebook, audiobook, reprints) are grouped into one work. These are raw <strong>checkouts</strong> — they don't include holds or renewals, and the clustering is automatic and approximate. Read the rankings as a good sense of what's popular, not an exact or official count.</p>
+			<p>Editions of a book (print, ebook, audiobook, reprints) are grouped into one work. These are raw <strong>checkouts</strong> — they don't include holds or renewals, and the clustering is automatic and approximate. Read the rankings as a good sense of what's popular, not an exact or official count. Cover images are from <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>, matched by title and author, so some may be missing or show a different edition.</p>
 		</details>
 
 		{#if genreTags.length}
@@ -306,12 +323,23 @@
 						<tr>
 							<td class="ta-rank">{i + 1}</td>
 							<td class="ta-name">
-								<button class="tw-title tw-titlelink" onclick={() => openTitle(row[0])} title="See this title's checkout trend">{row[0]}</button>
-								{#if row[2]}
-									<button class="tw-by ta-authorlink" onclick={() => openAuthor(row[2])}>by {displayName(row[1])}</button>
-								{:else}
-									<span class="tw-by">by {displayName(row[1])}</span>
-								{/if}
+								<div class="tw-cell">
+									<span class="tw-cover" class:has-img={!!covers[coverKey(row)]}>
+										{#if covers[coverKey(row)]}
+											<img src={covers[coverKey(row)]} alt="" loading="lazy" />
+										{:else}
+											<span class="tw-cover-ph" aria-hidden="true">📖</span>
+										{/if}
+									</span>
+									<span class="tw-text">
+										<button class="tw-title tw-titlelink" onclick={() => openTitle(row[0])} title="See this title's checkout trend">{row[0]}</button>
+										{#if row[2]}
+											<button class="tw-by ta-authorlink" onclick={() => openAuthor(row[2])}>by {displayName(row[1])}</button>
+										{:else}
+											<span class="tw-by">by {displayName(row[1])}</span>
+										{/if}
+									</span>
+								</div>
 							</td>
 							<td class="ta-count">{row[3].toLocaleString()}</td>
 						</tr>
@@ -450,6 +478,37 @@
 	}
 	.ta-name {
 		color: var(--color-fg);
+	}
+	.tw-cell {
+		display: flex;
+		align-items: flex-start;
+		gap: 12px;
+	}
+	.tw-cover {
+		flex: none;
+		width: 34px;
+		height: 50px;
+		border-radius: 3px;
+		overflow: hidden;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: var(--color-gray-100);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+	}
+	.tw-cover img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+	.tw-cover-ph {
+		font-size: 16px;
+		opacity: 0.4;
+	}
+	.tw-text {
+		min-width: 0;
+		flex: 1;
 	}
 	.tw-title {
 		display: block;
