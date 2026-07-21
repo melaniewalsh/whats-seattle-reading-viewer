@@ -653,7 +653,7 @@
 		position: fixed;
 		inset: 0;
 		z-index: 40;
-		background: none;
+		background: rgba(0, 0, 0, 0.12);
 		border: none;
 		cursor: default;
 	}
@@ -670,6 +670,18 @@
 		z-index: 45;
 		padding-top: 6px;
 		cursor: default;
+	}
+	/* On touch / narrow screens the card is a bottom sheet, not an anchored tooltip. */
+	@media (hover: none), (max-width: 599px) {
+		.wiki-pop {
+			position: fixed;
+			top: auto;
+			left: 12px;
+			right: 12px;
+			bottom: 16px;
+			padding-top: 0;
+			z-index: 46;
+		}
 	}
 	.ta-status {
 		font-family: var(--font-sans);

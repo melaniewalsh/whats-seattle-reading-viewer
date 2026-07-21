@@ -65,12 +65,20 @@
 <style>
 	.wiki-card {
 		width: 300px;
+		max-width: 100%;
+		box-sizing: border-box;
 		padding: 13px 14px;
 		background: var(--color-white);
 		border: 1px solid var(--color-border);
 		border-radius: 12px;
 		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
 		text-align: left;
+	}
+	/* On touch / narrow screens the card fills its (bottom-sheet) container. */
+	@media (hover: none), (max-width: 599px) {
+		.wiki-card {
+			width: 100%;
+		}
 	}
 	.wiki-thumb {
 		float: right;
