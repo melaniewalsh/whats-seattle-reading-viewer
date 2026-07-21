@@ -6,6 +6,7 @@
 	import { lookupUrls } from "$utils/lookup.js";
 	import { wikiWork } from "$utils/wiki.js";
 	import { compactNumber } from "$utils/format.js";
+	import { titleCase } from "$utils/titleCase.js";
 	import WikiCard from "$components/WikiCard.svelte";
 
 	// openAuthor(slug) / openTitle(title) are provided by Index.svelte: jump to the
@@ -380,7 +381,7 @@
 									</span>
 									<span class="tw-text">
 										<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
-											<button class="tw-title tw-titlelink" aria-haspopup="dialog" onclick={() => activateName(key, () => openTitle(row[0]))}>{row[0]}</button>
+											<button class="tw-title tw-titlelink" aria-haspopup="dialog" onclick={() => activateName(key, () => openTitle(row[0]))}>{titleCase(row[0])}</button>
 											{#if hoverKey === key}
 												<span class="wiki-pop"><WikiCard query={row[0]} author={displayName(row[1])} kind="work" links={u} onTrend={() => openTitle(row[0])} /></span>
 											{/if}

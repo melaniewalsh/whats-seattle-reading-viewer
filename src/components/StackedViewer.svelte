@@ -2,6 +2,7 @@
 	// StackedViewer.svelte
 	import { onMount, tick } from "svelte";
 	import { displayName } from "$utils/displayName.js";
+	import { titleCase } from "$utils/titleCase.js";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
@@ -674,7 +675,7 @@
 		let t = (title || "").split(" / ")[0];
 		t = t.replace(/\s*:\s*.*$/, ""); // drop subtitle after the first colon
 		t = t.replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
-		return t;
+		return titleCase(t);
 	}
 
 	// Cluster the current author's titles into works and seed the groups. Only
@@ -1929,14 +1930,14 @@
 										class="tt-cell tt-edition"
 										class:indent
 										role="cell"
-										onmousemove={(e) => (hoverTip = { text: t.title, x: e.clientX, y: e.clientY })}
+										onmousemove={(e) => (hoverTip = { text: titleCase(t.title), x: e.clientX, y: e.clientY })}
 										onmouseleave={() => (hoverTip = null)}
 								>
 									{#if (owner || single) && !isCurrentOwner}
 										<span class="other-group-dot"
-											  title="In “{owner ? groupLabel(owner) : t.title}”"></span>
+											  title="In “{owner ? groupLabel(owner) : titleCase(t.title)}”"></span>
 									{/if}
-									<span class="t-name">{t.title}</span>
+									<span class="t-name">{titleCase(t.title)}</span>
 								</span>
 								<span class="tt-cell tt-format" role="cell">
 									<span class="badge badge-{t.format}">{formatLabel(t.format)}</span>

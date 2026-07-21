@@ -1,8 +1,8 @@
 {
 	"title": "What Is Seattle Reading?",
-	"description": "Search any author to explore their checkout history at the Seattle Public Library.",
+	"description": "Explore millions of Seattle Public Library checkouts — search any author or title to see when a book surged in popularity, and browse the most-borrowed authors and works by genre.",
 	"url": "https://melaniewalsh.github.io/whats-seattle-reading-viewer",
-	"keywords": "seattle public library, books, checkouts, data, authors",
-	"dek": "The Seattle Public Library logs millions of checkouts a year. Search for an author below to see when their books surged in popularity — then add individual titles to compare them.",
+	"keywords": "seattle public library, books, checkouts, data, authors, titles, genres",
+	"dek": "The Seattle Public Library logs millions of checkouts a year. Search an author or title to see when a book surged in popularity — or explore the most-borrowed authors and works by genre.",
 	"note": "Based on a sample of SPL open checkout data, 2018–2022."
 }
