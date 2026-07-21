@@ -586,6 +586,19 @@
 		font-size: 24px;
 		opacity: 0.4;
 	}
+	/* Larger covers on desktop, where there's room for them. */
+	@media (min-width: 600px) {
+		.tw-cell {
+			gap: 16px;
+		}
+		.tw-cover {
+			width: 70px;
+			height: 105px;
+		}
+		.tw-cover-ph {
+			font-size: 32px;
+		}
+	}
 	.tw-text {
 		min-width: 0;
 		flex: 1;
