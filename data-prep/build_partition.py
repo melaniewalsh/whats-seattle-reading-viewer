@@ -90,6 +90,17 @@ TAXONOMY = [
         "taiwanese americans fiction", "hmong americans fiction", "bengali americans fiction",
         "chinese fiction", "japanese fiction", "korean fiction", "vietnamese fiction",
         "east indians fiction", "south asians fiction"], []),
+    # Latino/Latin-American diaspora + homeland. No clean "Hispanic American
+    # fiction" BISAC heading; deliberately NOT "Spanish fiction" (that's
+    # literature from Spain, i.e. European, not Latino). ~30k.
+    ("Hispanic & Latino Fiction", ["mexican americans fiction", "cuban americans fiction",
+        "puerto ricans fiction", "hispanic americans fiction", "mexican fiction",
+        "latin american fiction", "spanish american fiction"], []),
+    # LC's "Indians of North America" is the (dated, contested) heading for Native
+    # American fiction; plus the broader "Indigenous peoples". ~64k.
+    ("Native American Fiction", ["indians of north america fiction", "indigenous peoples fiction"], []),
+    # Transnational (not US-specific) already. ~79k.
+    ("Jewish Fiction", ["jewish fiction", "jews fiction"], []),
     # Broadened to pull literary/classic/general fiction out of "Other" (Demon
     # Copperhead, Pachinko, Pride & Prejudice are tagged just "Fiction, Literature").
     # Sits late in priority, so genre fiction (Romance/Mystery/…) claims its books

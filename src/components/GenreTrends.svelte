@@ -330,6 +330,24 @@
 	<h2>What genres is Seattle checking out?</h2>
 	<p class="meta">Each genre's share of Seattle Public Library book checkouts, by month · matched on catalog subject headings</p>
 
+	<details class="sh-note">
+		<summary>A note on how genres — especially race and identity ones — are defined</summary>
+		<p>
+			Genres here come from <strong>Library of Congress and BISAC subject headings</strong> in the
+			library's catalog records. Those headings are applied inconsistently, are US-centric, and have
+			been widely critiqued for how they name racial, ethnic, and other identity groups — from Sanford
+			Berman's <em>Prejudices and Antipathies</em> (1971) to more recent work on “othering” in library
+			classification and the “Illegal aliens” heading controversy.
+		</p>
+		<p>
+			So categories like <em>African American</em>, <em>Asian</em>, <em>Hispanic &amp; Latino</em>,
+			<em>Native American</em>, or <em>Jewish</em> fiction reflect <strong>how books were catalogued</strong> —
+			an approximate, contested classification — not the identities of the authors. We also had to
+			<em>aggregate</em> many narrower headings (e.g. “Chinese fiction,” “Bengali Americans fiction”)
+			into one bucket, which flattens real differences. Read them as a rough lens, not an authoritative count.
+		</p>
+	</details>
+
 	{#if loadError}
 		<p class="load-error">{loadError}</p>
 	{:else if !data}
@@ -468,7 +486,12 @@
 		accent-color: var(--color-fg); background: none; flex: none; cursor: pointer; margin: 0;
 	}
 	.genres h2 { font-family: var(--font-serif); font-size: 1.9rem; margin: 0 0 4px; }
-	.meta { color: var(--color-fg-light); font-family: var(--font-sans); font-size: 0.95rem; margin: 0 0 16px; }
+	.meta { color: var(--color-fg-light); font-family: var(--font-sans); font-size: 0.95rem; margin: 0 0 10px; }
+	.sh-note { font-family: var(--font-sans); font-size: 0.85rem; margin: 0 0 18px; }
+	.sh-note summary { cursor: pointer; color: var(--color-fg-light); list-style-position: inside; width: fit-content; }
+	.sh-note summary:hover { color: var(--color-fg); }
+	.sh-note p { font-size: 0.85rem; line-height: 1.55; color: var(--color-fg-light); margin: 8px 0 0; max-width: 68ch; }
+	.sh-note strong { color: var(--color-fg); }
 	.loading, .load-error { font-family: var(--font-sans); color: var(--color-fg-light); }
 
 	.modebar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 8px; }
