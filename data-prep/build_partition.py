@@ -56,7 +56,8 @@ TAXONOMY = [
     # and only ~8% romance (it blankets literary fiction, e.g. Atonement), so it
     # would swamp Romance with general fiction.
     ("Romance", [], ["romance languages"],
-        ["romance", "romantic", "erotic", "man man relationships", "woman woman relationships"]),
+        ["romance", "romantic", "erotic", "interpersonal attraction",
+         "man man relationships", "woman woman relationships"]),
     # "fantasy" always; the evocative words only when a Fiction tag is present
     # (so "magic" doesn't grab "The Magic of Tidying Up", "elf" ≠ "self-help").
     ("Fantasy", ["fantasy"], [], ["vampire", "fairies", "magic", "fairy", "dragon", "wizard",
@@ -77,6 +78,14 @@ TAXONOMY = [
     ("LGBTQIA+ Fiction", [], [], ["lgbtqia", "lgbt", "gay", "lesbian", "homosexual",
         "bisexual", "transgender", "queer"]),
     ("African American Fiction", ["african american fiction"], []),
+    # No single BISAC "Asian American fiction" heading exists in SPL's data, so
+    # aggregate the national-origin LC headings ("Chinese Americans Fiction",
+    # etc.). "asian americans fiction" also catches "South Asian Americans
+    # Fiction" as a substring. ~172k checkouts.
+    ("Asian American Fiction", ["asian americans fiction", "chinese americans fiction",
+        "korean americans fiction", "japanese americans fiction", "vietnamese americans fiction",
+        "filipino americans fiction", "taiwanese americans fiction", "hmong americans fiction",
+        "bengali americans fiction"], []),
     # Broadened to pull literary/classic/general fiction out of "Other" (Demon
     # Copperhead, Pachinko, Pride & Prejudice are tagged just "Fiction, Literature").
     # Sits late in priority, so genre fiction (Romance/Mystery/…) claims its books
