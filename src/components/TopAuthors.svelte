@@ -3,6 +3,7 @@
 	import { getTopAuthors, getGenreTerms } from "$components/db.js";
 	import { displayName } from "$utils/displayName.js";
 	import { lookupUrls } from "$utils/lookup.js";
+	import { compactNumber } from "$utils/format.js";
 	import WikiCard from "$components/WikiCard.svelte";
 
 	// openAuthor(slug) is provided by Index.svelte: jumps to the By-author view.
@@ -16,8 +17,6 @@
 	let shareMsg = $state("");
 	let shareOpen = $state(false);
 	let termsMap = $state({});
-	let openLookup = $state(null); // which row's name popover is open (the slug)
-
 	// Wikipedia hover preview: which row's card is showing, with a small
 	// hover-intent delay so quick mouse passes don't fire fetches.
 	let hoverKey = $state(null);
@@ -334,25 +333,8 @@
 									<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
 										<button class="ta-authorlink" onclick={() => openAuthor(row[0])} title="See {displayName(row[1])}'s checkout trend at Seattle Public Library">{displayName(row[1])}</button>
 										{#if hoverKey === key}
-											<span class="wiki-pop"><WikiCard query={displayName(row[1])} kind="author" /></span>
+											<span class="wiki-pop"><WikiCard query={displayName(row[1])} kind="author" links={u} onTrend={() => openAuthor(row[0])} /></span>
 										{/if}
-										<span class="row-lookup">
-											<button class="row-lookup-btn" aria-haspopup="true" aria-expanded={openLookup === key} title="More about {displayName(row[1])}" onclick={() => (openLookup = openLookup === key ? null : key)}>▾</button>
-											{#if openLookup === key}
-												<button class="lookup-backdrop" aria-label="Close" onclick={() => (openLookup = null)}></button>
-												<div class="row-lookup-menu" role="menu">
-													<button class="lookup-primary" role="menuitem" onclick={() => { openLookup = null; openAuthor(row[0]); }}>
-														<span class="lp-ic" aria-hidden="true">📈</span>
-														<span class="lp-tx"><strong>See Seattle's trend</strong><small>Checkouts over the years</small></span>
-													</button>
-													<div class="lookup-div"><span>Learn more</span></div>
-													<a href={u.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>Wikipedia <span aria-hidden="true">↗</span></a>
-													<a href={u.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>Goodreads <span aria-hidden="true">↗</span></a>
-													<a href={u.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>LibraryThing <span aria-hidden="true">↗</span></a>
-													<a href={u.worldcat} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>WorldCat <span aria-hidden="true">↗</span></a>
-												</div>
-											{/if}
-										</span>
 									</span>
 								{:else}
 									{displayName(row[1])}
@@ -361,7 +343,7 @@
 							<td class="ta-count">
 								<span class="ta-bar">
 									<span class="ta-bar-track"><span class="ta-bar-fill" style="width:{Math.max((row[2] / maxCount) * 100, 1)}%"></span></span>
-									<span class="ta-bar-num">{row[2].toLocaleString()}</span>
+									<span class="ta-bar-num" title={row[2].toLocaleString()}>{compactNumber(row[2])}</span>
 								</span>
 							</td>
 						</tr>
@@ -662,124 +644,6 @@
 		z-index: 45;
 		padding-top: 6px;
 		cursor: default;
-	}
-	.row-lookup {
-		position: relative;
-		display: inline-block;
-	}
-	.row-lookup-btn {
-		border: none;
-		background: none;
-		padding: 0 3px;
-		font-size: 0.9rem;
-		line-height: 1;
-		cursor: pointer;
-		color: var(--color-fg-light);
-		opacity: 0.5;
-		vertical-align: middle;
-		transition: opacity 0.12s;
-	}
-	tr:hover .row-lookup-btn,
-	.row-lookup-btn:hover,
-	.row-lookup-btn[aria-expanded="true"] {
-		opacity: 1;
-	}
-	.row-lookup-btn[aria-expanded="true"] {
-		color: #6a4c93;
-	}
-	.lookup-primary {
-		display: flex;
-		align-items: center;
-		gap: 9px;
-		width: 100%;
-		padding: 8px 10px;
-		border: none;
-		border-radius: 7px;
-		background: none;
-		font-family: var(--font-sans);
-		text-align: left;
-		cursor: pointer;
-	}
-	.lookup-primary:hover {
-		background: #f1ecf7;
-	}
-	.lp-ic {
-		font-size: 1rem;
-		line-height: 1;
-	}
-	.lp-tx {
-		display: flex;
-		flex-direction: column;
-		line-height: 1.2;
-	}
-	.lp-tx strong {
-		font-size: 0.85rem;
-		font-weight: 700;
-		color: #6a4c93;
-		white-space: nowrap;
-	}
-	.lp-tx small {
-		font-size: 0.72rem;
-		color: var(--color-fg-light);
-	}
-	.lookup-div {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin: 4px 8px 2px;
-		font-size: 0.66rem;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-		color: var(--color-fg-light);
-	}
-	.lookup-div::after {
-		content: "";
-		flex: 1;
-		height: 1px;
-		background: var(--color-border);
-	}
-	.lookup-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 40;
-		background: none;
-		border: none;
-		cursor: default;
-	}
-	.row-lookup-menu {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
-		z-index: 41;
-		display: flex;
-		flex-direction: column;
-		min-width: 190px;
-		padding: 5px;
-		background: var(--color-white);
-		border: 1px solid var(--color-border);
-		border-radius: 10px;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-	}
-	.row-lookup-menu a {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 14px;
-		padding: 7px 10px;
-		border-radius: 7px;
-		font-family: var(--font-sans);
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: #357abd;
-		text-decoration: none;
-	}
-	.row-lookup-menu a:hover {
-		background: var(--color-gray-100);
-	}
-	.row-lookup-menu a span {
-		color: var(--color-fg-light);
-		font-size: 0.75rem;
 	}
 	.ta-status {
 		font-family: var(--font-sans);

@@ -1,8 +1,11 @@
 <script>
 	import { wikiSummary } from "$utils/wiki.js";
 
-	// query: the name/title to look up. kind: "author" | "work" (wording only).
-	let { query, kind = "author" } = $props();
+	// query: the name/title to look up on Wikipedia.
+	// kind:  "author" | "work" (wording only).
+	// links: { wikipedia, goodreads, librarything, worldcat } search URLs.
+	// onTrend: called when the "See SPL trend" button is clicked.
+	let { query, kind = "author", links = {}, onTrend } = $props();
 
 	let status = $state({ loading: true, data: null });
 
@@ -16,6 +19,9 @@
 			alive = false;
 		};
 	});
+
+	// Prefer the real article URL when we have it, else a Wikipedia search.
+	const wikiHref = $derived(status.data?.url || links.wikipedia || "#");
 
 	// Trim the extract to a couple of sentences so the card stays compact.
 	function trim(t) {
@@ -38,17 +44,27 @@
 			<img class="wiki-thumb" src={status.data.thumbnail} alt="" />
 		{/if}
 		<p class="wiki-extract">{trim(status.data.extract)}</p>
-		<a class="wiki-link" href={status.data.url} target="_blank" rel="noopener noreferrer"
-			>Read on Wikipedia <span aria-hidden="true">↗</span></a
-		>
 	{:else}
 		<p class="wiki-none">No Wikipedia summary found for this {kind}.</p>
 	{/if}
+
+	<div class="wiki-act">
+		<button class="wiki-trend" onclick={onTrend}>
+			<span aria-hidden="true">📈</span> See SPL trend
+		</button>
+		<div class="wiki-learn">
+			<span class="wiki-learn-lbl">Learn more</span>
+			<a href={wikiHref} target="_blank" rel="noopener noreferrer">Wikipedia <span aria-hidden="true">↗</span></a>
+			<a href={links.goodreads} target="_blank" rel="noopener noreferrer">Goodreads <span aria-hidden="true">↗</span></a>
+			<a href={links.librarything} target="_blank" rel="noopener noreferrer">LibraryThing <span aria-hidden="true">↗</span></a>
+			<a href={links.worldcat} target="_blank" rel="noopener noreferrer">WorldCat <span aria-hidden="true">↗</span></a>
+		</div>
+	</div>
 </div>
 
 <style>
 	.wiki-card {
-		width: 290px;
+		width: 300px;
 		padding: 13px 14px;
 		background: var(--color-white);
 		border: 1px solid var(--color-border);
@@ -66,32 +82,73 @@
 		margin: 2px 0 6px 12px;
 	}
 	.wiki-extract {
-		margin: 0 0 9px;
+		margin: 0 0 10px;
 		font-family: var(--font-sans);
 		font-size: 0.82rem;
 		font-weight: 400;
 		line-height: 1.45;
 		color: var(--color-fg);
 	}
-	.wiki-link {
+	.wiki-none {
+		margin: 0 0 10px;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		color: var(--color-fg-light);
+	}
+	.wiki-act {
+		clear: both;
+		border-top: 1px solid var(--color-border);
+		padding-top: 10px;
+	}
+	.wiki-trend {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		width: 100%;
+		padding: 8px 10px;
+		margin-bottom: 9px;
+		border: none;
+		border-radius: 8px;
+		background: #6a4c93;
+		color: var(--color-white);
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 700;
+		cursor: pointer;
+	}
+	.wiki-trend:hover {
+		background: #583d7d;
+	}
+	.wiki-learn {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 3px 12px;
+	}
+	.wiki-learn-lbl {
+		width: 100%;
+		margin-bottom: 3px;
+		font-family: var(--font-sans);
+		font-size: 0.64rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--color-fg-light);
+	}
+	.wiki-learn a {
 		font-family: var(--font-sans);
 		font-size: 0.8rem;
 		font-weight: 600;
 		color: #357abd;
 		text-decoration: none;
 	}
-	.wiki-link:hover {
+	.wiki-learn a:hover {
 		text-decoration: underline;
-	}
-	.wiki-none {
-		margin: 0;
-		font-family: var(--font-sans);
-		font-size: 0.82rem;
-		color: var(--color-fg-light);
 	}
 	.wiki-skel {
 		display: flex;
 		gap: 12px;
+		margin-bottom: 10px;
 	}
 	.wiki-skel-thumb {
 		flex: none;
