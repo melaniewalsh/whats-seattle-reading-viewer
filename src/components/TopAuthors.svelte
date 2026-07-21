@@ -11,6 +11,7 @@
 	let loading = $state(true);
 	let loadError = $state("");
 	let shareMsg = $state("");
+	let shareOpen = $state(false);
 
 	onMount(async () => {
 		// Read shareable filters from the URL first.
@@ -69,14 +70,37 @@
 		return n.replace(/\S+/g, titleCaseWord);
 	}
 
-	async function copyLink() {
+	// Same share menu as the chart views (StackedViewer), but link-only since a
+	// table has no image to attach.
+	function shareTarget() {
+		const link = window.location.href;
+		const who = genre === "All genres" ? "authors" : `${genre} authors`;
+		const when = year === "all" ? "" : `, ${year}`;
+		const text = `What Is Seattle Reading? — Top ${who}${when}`;
+		return { link, text };
+	}
+
+	function shareTo(platform) {
+		const { link, text } = shareTarget();
+		const u = encodeURIComponent(link);
+		const t = encodeURIComponent(text);
+		const urls = {
+			facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}`,
+			twitter: `https://twitter.com/intent/tweet?url=${u}&text=${t}`,
+			bluesky: `https://bsky.app/intent/compose?text=${encodeURIComponent(text + " " + link)}`,
+			linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${u}`,
+		};
+		if (urls[platform]) window.open(urls[platform], "_blank", "noopener,noreferrer,width=600,height=540");
+		shareOpen = false;
+	}
+
+	async function copyShareLink() {
 		try {
 			await navigator.clipboard.writeText(window.location.href);
-			shareMsg = "Link copied!";
-			setTimeout(() => (shareMsg = ""), 2000);
-		} catch {
-			shareMsg = "";
-		}
+		} catch {}
+		shareMsg = "Link copied!";
+		setTimeout(() => (shareMsg = ""), 2000);
+		shareOpen = false;
 	}
 
 	const yearLabel = (y) => (y === "all" ? "all time" : y);
@@ -106,10 +130,23 @@
 					{/each}
 				</select>
 			</label>
-			<button class="ta-share" onclick={copyLink} title="Copy a link to this exact view">
-				Share
-			</button>
-			{#if shareMsg}<span class="ta-sharemsg" role="status">{shareMsg}</span>{/if}
+			<div class="share-wrap">
+				<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this view" aria-haspopup="true" aria-expanded={shareOpen}>
+					<span aria-hidden="true">↗</span> Share
+				</button>
+				{#if shareOpen}
+					<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
+					<div class="share-menu" role="menu">
+						<button role="menuitem" class="share-item fb" onclick={() => shareTo("facebook")}><span class="share-ic" aria-hidden="true">f</span> Facebook</button>
+						<button role="menuitem" class="share-item tw" onclick={() => shareTo("twitter")}><span class="share-ic" aria-hidden="true">𝕏</span> Twitter</button>
+						<button role="menuitem" class="share-item bs" onclick={() => shareTo("bluesky")}><span class="share-ic" aria-hidden="true">🦋</span> Bluesky</button>
+						<button role="menuitem" class="share-item li" onclick={() => shareTo("linkedin")}><span class="share-ic" aria-hidden="true">in</span> LinkedIn</button>
+						<div class="share-sep"></div>
+						<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true">🔗</span> Copy link</button>
+					</div>
+				{/if}
+			</div>
+			{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 		</div>
 
 		<p class="ta-caption">
@@ -186,21 +223,93 @@
 		cursor: pointer;
 		min-width: 190px;
 	}
-	.ta-share {
+	/* Share menu ported from the chart views so it matches the plots. */
+	.share-wrap {
+		position: relative;
+		display: inline-flex;
+	}
+	.chart-action {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: 0.8rem;
 		font-weight: 600;
-		padding: 8px 16px;
+		padding: 6px 12px;
 		border: 1.5px solid var(--color-border);
 		border-radius: 999px;
 		background: var(--color-white);
 		color: var(--color-fg);
 		cursor: pointer;
+		transition: background 0.12s, border-color 0.12s;
 	}
-	.ta-share:hover {
+	.chart-action:hover {
 		border-color: var(--color-fg-light);
 	}
-	.ta-sharemsg {
+	.share-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
+		background: none;
+		border: none;
+		cursor: default;
+	}
+	.share-menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		z-index: 41;
+		display: flex;
+		flex-direction: column;
+		min-width: 168px;
+		padding: 5px;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+	}
+	.share-item {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 10px;
+		border: none;
+		border-radius: 7px;
+		background: none;
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--color-fg);
+		cursor: pointer;
+		text-align: left;
+	}
+	.share-item:hover {
+		background: var(--color-gray-100);
+	}
+	.share-ic {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		flex: none;
+		border-radius: 5px;
+		font-size: 0.75rem;
+		font-weight: 700;
+		color: #fff;
+		font-style: normal;
+	}
+	.share-item.fb .share-ic { background: #1877f2; }
+	.share-item.tw .share-ic { background: #000; }
+	.share-item.bs .share-ic { background: #0a7aff; }
+	.share-item.li .share-ic { background: #0a66c2; }
+	.share-item.copy .share-ic { background: #666; }
+	.share-sep {
+		height: 1px;
+		margin: 4px 6px;
+		background: var(--color-border);
+	}
+	.share-msg {
 		font-size: 0.8rem;
 		font-weight: 600;
 		color: #2e7d32;
