@@ -70,8 +70,8 @@
 		return n.replace(/\S+/g, titleCaseWord);
 	}
 
-	// Same share menu as the chart views (StackedViewer), but link-only since a
-	// table has no image to attach.
+	const yearLabel = (y) => (y === "all" ? "all time" : y);
+
 	function shareTarget() {
 		const link = window.location.href;
 		const who = genre === "All genres" ? "authors" : `${genre} authors`;
@@ -80,8 +80,111 @@
 		return { link, text };
 	}
 
+	// Draw the current top-10 table to a PNG so people can share the ranking as
+	// an image (the same idea as the chart views' exported image). Uses system +
+	// Georgia fonts so it renders reliably on canvas without waiting on webfonts.
+	const IMG_SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+	function ellipsize(ctx, s, maxW) {
+		if (ctx.measureText(s).width <= maxW) return s;
+		while (s.length > 1 && ctx.measureText(s + "…").width > maxW) s = s.slice(0, -1);
+		return s + "…";
+	}
+	async function renderTableBlob() {
+		const list = rows;
+		if (!list.length) return null;
+		const scale = 2, W = 640, padX = 32;
+		const titleH = 92, headH = 30, rowH = 38, footH = 44;
+		const H = titleH + headH + rowH * list.length + footH;
+		const canvas = document.createElement("canvas");
+		canvas.width = W * scale;
+		canvas.height = H * scale;
+		const ctx = canvas.getContext("2d");
+		ctx.scale(scale, scale);
+		ctx.fillStyle = "#ffffff";
+		ctx.fillRect(0, 0, W, H);
+		ctx.textBaseline = "alphabetic";
+
+		// Title + subtitle
+		const title = genre === "All genres" ? "Most-borrowed authors" : `Top ${genre} authors`;
+		ctx.fillStyle = "#1a1a1a";
+		ctx.font = '600 24px Georgia, "Times New Roman", serif';
+		ctx.fillText(ellipsize(ctx, title, W - padX * 2), padX, 46);
+		ctx.fillStyle = "#666666";
+		ctx.font = `13px ${IMG_SANS}`;
+		ctx.fillText(`Seattle Public Library · ${yearLabel(year)}`, padX, 68);
+
+		// Header row
+		const cntX = W - padX;
+		let y = titleH;
+		ctx.fillStyle = "#999999";
+		ctx.font = `700 11px ${IMG_SANS}`;
+		ctx.fillText("#", padX, y);
+		ctx.fillText("AUTHOR", padX + 40, y);
+		ctx.textAlign = "right";
+		ctx.fillText("CHECKOUTS", cntX, y);
+		ctx.textAlign = "left";
+		ctx.strokeStyle = "#dddddd";
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.moveTo(padX, y + 9);
+		ctx.lineTo(cntX, y + 9);
+		ctx.stroke();
+
+		// Rows
+		y += headH;
+		list.forEach((r, i) => {
+			const baseY = y + rowH * i;
+			const cy = baseY + 24;
+			ctx.fillStyle = "#999999";
+			ctx.font = `13px ${IMG_SANS}`;
+			ctx.fillText(String(i + 1), padX, cy);
+			ctx.textAlign = "right";
+			ctx.fillStyle = "#1a1a1a";
+			ctx.font = `15px ${IMG_SANS}`;
+			const cnt = r[2].toLocaleString();
+			ctx.fillText(cnt, cntX, cy);
+			const cntW = ctx.measureText(cnt).width;
+			ctx.textAlign = "left";
+			ctx.font = `600 15px ${IMG_SANS}`;
+			const nameMaxW = cntX - (padX + 40) - cntW - 20;
+			ctx.fillText(ellipsize(ctx, displayName(r[1]), nameMaxW), padX + 40, cy);
+			ctx.strokeStyle = "#eeeeee";
+			ctx.beginPath();
+			ctx.moveTo(padX, baseY + rowH);
+			ctx.lineTo(cntX, baseY + rowH);
+			ctx.stroke();
+		});
+
+		// Footer
+		ctx.fillStyle = "#999999";
+		ctx.font = `11px ${IMG_SANS}`;
+		ctx.fillText("What Is Seattle Reading?  ·  Seattle Public Library checkouts", padX, H - 18);
+		return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+	}
+
+	function imgName() {
+		const g = genre === "All genres" ? "top-authors" : `top-${genre.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+		return `seattle-reading-${g}-${year}.png`.replace(/-+/g, "-");
+	}
+	function saveBlob(blob, name) {
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(blob);
+		a.download = name;
+		a.click();
+		setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+	}
+
+	// Social buttons can't attach an image, so copy the table image to the
+	// clipboard (inside the click gesture) and open the composer to paste it.
 	function shareTo(platform) {
 		const { link, text } = shareTarget();
+		let copied = false;
+		try {
+			if (navigator.clipboard && window.ClipboardItem) {
+				navigator.clipboard.write([new ClipboardItem({ "image/png": renderTableBlob() })]).catch(() => {});
+				copied = true;
+			}
+		} catch {}
 		const u = encodeURIComponent(link);
 		const t = encodeURIComponent(text);
 		const urls = {
@@ -92,6 +195,48 @@
 		};
 		if (urls[platform]) window.open(urls[platform], "_blank", "noopener,noreferrer,width=600,height=540");
 		shareOpen = false;
+		if (copied) {
+			shareMsg = "Table image copied — paste it (⌘/Ctrl+V) into your post";
+			setTimeout(() => (shareMsg = ""), 4500);
+		}
+	}
+
+	async function shareImage() {
+		shareOpen = false;
+		const blob = await renderTableBlob();
+		if (!blob) return;
+		const name = imgName();
+		const file = new File([blob], name, { type: "image/png" });
+		const { link, text } = shareTarget();
+		if (navigator.canShare && navigator.canShare({ files: [file] })) {
+			try {
+				await navigator.share({ files: [file], title: text, text: `${text}\n${link}` });
+			} catch {}
+			return;
+		}
+		saveBlob(blob, name);
+		shareMsg = "Image saved — attach it to your post";
+		setTimeout(() => (shareMsg = ""), 3200);
+	}
+
+	async function copyImage() {
+		shareOpen = false;
+		try {
+			if (!(navigator.clipboard && window.ClipboardItem)) throw new Error("no clipboard");
+			await navigator.clipboard.write([new ClipboardItem({ "image/png": renderTableBlob() })]);
+			shareMsg = "Table image copied to clipboard";
+		} catch {
+			const blob = await renderTableBlob();
+			if (blob) saveBlob(blob, imgName());
+			shareMsg = "Image saved (clipboard unavailable)";
+		}
+		setTimeout(() => (shareMsg = ""), 2600);
+	}
+
+	async function downloadImage() {
+		shareOpen = false;
+		const blob = await renderTableBlob();
+		if (blob) saveBlob(blob, imgName());
 	}
 
 	async function copyShareLink() {
@@ -102,8 +247,6 @@
 		setTimeout(() => (shareMsg = ""), 2000);
 		shareOpen = false;
 	}
-
-	const yearLabel = (y) => (y === "all" ? "all time" : y);
 </script>
 
 <div class="top-authors">
@@ -142,6 +285,9 @@
 						<button role="menuitem" class="share-item bs" onclick={() => shareTo("bluesky")}><span class="share-ic" aria-hidden="true">🦋</span> Bluesky</button>
 						<button role="menuitem" class="share-item li" onclick={() => shareTo("linkedin")}><span class="share-ic" aria-hidden="true">in</span> LinkedIn</button>
 						<div class="share-sep"></div>
+						<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true">▦</span> Share image</button>
+						<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true">⧉</span> Copy image</button>
+						<button role="menuitem" class="share-item dl" onclick={downloadImage}><span class="share-ic" aria-hidden="true">⤓</span> Download image</button>
 						<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true">🔗</span> Copy link</button>
 					</div>
 				{/if}
@@ -303,6 +449,9 @@
 	.share-item.tw .share-ic { background: #000; }
 	.share-item.bs .share-ic { background: #0a7aff; }
 	.share-item.li .share-ic { background: #0a66c2; }
+	.share-item.img .share-ic { background: #2e7d32; }
+	.share-item.copyimg .share-ic { background: #444; }
+	.share-item.dl .share-ic { background: #357abd; }
 	.share-item.copy .share-ic { background: #666; }
 	.share-sep {
 		height: 1px;

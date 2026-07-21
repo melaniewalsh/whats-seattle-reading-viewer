@@ -39,8 +39,8 @@
 
 		<div class="tab-groups">
 			<div class="tab-group">
-				<span class="tab-group-label">Explore</span>
-				<div class="main-tabs" role="tablist" aria-label="Explore">
+				<span class="tab-group-label">Search</span>
+				<div class="main-tabs" role="tablist" aria-label="Search">
 					<button role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
 					<button role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
 				</div>
