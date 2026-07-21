@@ -17,7 +17,6 @@
 	let shareMsg = $state("");
 	let shareOpen = $state(false);
 	let termsMap = $state({});
-	let lookupMode = $state(false);
 	let openLookup = $state(null);
 
 	onMount(async () => {
@@ -295,10 +294,7 @@
 					</div>
 				{/if}
 			</div>
-			<button class="chart-action lookup-toggle" class:on={lookupMode} onclick={() => { lookupMode = !lookupMode; openLookup = null; }} aria-pressed={lookupMode} title="Show links to look each work up on Wikipedia, Goodreads, etc.">
-					<span aria-hidden="true">🔎</span> Look up works
-				</button>
-				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
+			{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 		</div>
 
 		<p class="ta-caption">
@@ -306,13 +302,11 @@
 			at the Seattle Public Library, {yearLabel(year)}.
 		</p>
 
-		<details class="ta-note">
-			<summary>Counts print books, ebooks &amp; audiobooks</summary>
-			<p>Editions of a book (print, ebook, audiobook, reprints) are grouped into one work. These are raw <strong>checkouts</strong> — they don't include holds or renewals, and the clustering is automatic and approximate. Read the rankings as a good sense of what's popular, not an exact or official count. Cover images are from <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>, matched by title and author, so some may be missing or show a different edition.</p>
-		</details>
-
 		{#if genreTags.length}
-			<p class="ta-tags"><span class="ta-tags-label">Subject tags:</span> {#each genreTags as t}<code class="ta-tag">{t}</code>{/each}</p>
+			<details class="ta-note">
+				<summary>Subject tags that define this genre ({genreTags.length})</summary>
+				<p class="ta-tags">{#each genreTags as t}<code class="ta-tag">{t}</code>{/each}</p>
+			</details>
 		{/if}
 
 		{#if rows.length}
@@ -326,32 +320,32 @@
 				</thead>
 				<tbody>
 					{#each rows as row, i (row[0] + row[2] + i)}
+						{@const u = lookupUrls(`${row[0]} ${displayName(row[1])}`)}
+						{@const key = row[0] + "|" + row[1]}
 						<tr>
 							<td class="ta-rank">{i + 1}</td>
 							<td class="ta-name">
 								<div class="tw-cell">
 									<span class="tw-cover" class:has-img={!!covers[coverKey(row)]}>
 										{#if covers[coverKey(row)]}
-											<img src={covers[coverKey(row)]} alt="" loading="lazy" />
+											<img src={covers[coverKey(row)]} alt="" loading="lazy" onerror={() => (covers[coverKey(row)] = null)} />
 										{:else}
 											<span class="tw-cover-ph" aria-hidden="true">📖</span>
 										{/if}
 									</span>
 									<span class="tw-text">
-										<button class="tw-title tw-titlelink" onclick={() => openTitle(row[0])} title="See this title's checkout trend">{row[0]}</button>
-										{#if row[2]}
-											<button class="tw-by ta-authorlink" onclick={() => openAuthor(row[2])}>by {displayName(row[1])}</button>
-										{:else}
-											<span class="tw-by">by {displayName(row[1])}</span>
-										{/if}
-										{#if lookupMode}
-											{@const u = lookupUrls(`${row[0]} ${displayName(row[1])}`)}
-											{@const key = row[0] + "|" + row[1]}
+										<span class="name-wrap">
+											<button class="tw-title tw-titlelink" onclick={() => openTitle(row[0])} title="See this title's checkout trend at Seattle Public Library">{row[0]}</button>
 											<span class="row-lookup">
-												<button class="row-lookup-btn" aria-haspopup="true" aria-expanded={openLookup === key} title="Look up {row[0]}" onclick={() => (openLookup = openLookup === key ? null : key)}>🔎</button>
+												<button class="row-lookup-btn" aria-haspopup="true" aria-expanded={openLookup === key} title="More about {row[0]}" onclick={() => (openLookup = openLookup === key ? null : key)}>▾</button>
 												{#if openLookup === key}
 													<button class="lookup-backdrop" aria-label="Close" onclick={() => (openLookup = null)}></button>
 													<div class="row-lookup-menu" role="menu">
+														<button class="lookup-primary" role="menuitem" onclick={() => { openLookup = null; openTitle(row[0]); }}>
+															<span class="lp-ic" aria-hidden="true">📈</span>
+															<span class="lp-tx"><strong>See Seattle's trend</strong><small>Checkouts over the years</small></span>
+														</button>
+														<div class="lookup-div"><span>Look it up elsewhere</span></div>
 														<a href={u.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>Wikipedia <span aria-hidden="true">↗</span></a>
 														<a href={u.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>Goodreads <span aria-hidden="true">↗</span></a>
 														<a href={u.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (openLookup = null)}>LibraryThing <span aria-hidden="true">↗</span></a>
@@ -359,6 +353,11 @@
 													</div>
 												{/if}
 											</span>
+										</span>
+										{#if row[2]}
+											<button class="tw-by ta-authorlink" onclick={() => openAuthor(row[2])}>by {displayName(row[1])}</button>
+										{:else}
+											<span class="tw-by">by {displayName(row[1])}</span>
 										{/if}
 									</span>
 								</div>
@@ -370,6 +369,13 @@
 			</table>
 		{:else}
 			<p class="ta-status">No works for this genre and year.</p>
+		{/if}
+
+		{#if rows.length}
+			<details class="ta-note ta-footnote">
+				<summary>Note on top work counts</summary>
+				<p>Counts combine <strong>print books, ebooks &amp; audiobooks</strong> — editions of a book (print, ebook, audiobook, reprints) are grouped into one work, automatically and approximately. These are raw checkouts, not holds or renewals, so read the rankings as a good sense of what's popular, not an exact or official count. Cover images are from <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>, matched by title and author, so some may be missing or show a different edition.</p>
+			</details>
 		{/if}
 	{/if}
 </div>
@@ -508,15 +514,15 @@
 	}
 	.tw-cover {
 		flex: none;
-		width: 34px;
-		height: 50px;
-		border-radius: 3px;
+		width: 52px;
+		height: 78px;
+		border-radius: 4px;
 		overflow: hidden;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		background: var(--color-gray-100);
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16);
 	}
 	.tw-cover img {
 		width: 100%;
@@ -525,7 +531,7 @@
 		display: block;
 	}
 	.tw-cover-ph {
-		font-size: 16px;
+		font-size: 24px;
 		opacity: 0.4;
 	}
 	.tw-text {
@@ -568,28 +574,86 @@
 		text-decoration: underline;
 		color: #26597f;
 	}
-	.lookup-toggle.on {
-		background: #6a4c93;
-		border-color: #6a4c93;
-		color: var(--color-white);
+	.name-wrap {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 2px;
 	}
 	.row-lookup {
 		position: relative;
 		display: inline-block;
-		margin-left: 6px;
 	}
 	.row-lookup-btn {
 		border: none;
 		background: none;
-		padding: 0 2px;
-		font-size: 0.82rem;
+		padding: 0 3px;
+		font-size: 0.7rem;
 		line-height: 1;
 		cursor: pointer;
-		opacity: 0.55;
+		color: var(--color-fg-light);
+		opacity: 0.5;
 		vertical-align: middle;
+		transition: opacity 0.12s;
 	}
-	.row-lookup-btn:hover {
+	tr:hover .row-lookup-btn,
+	.row-lookup-btn:hover,
+	.row-lookup-btn[aria-expanded="true"] {
 		opacity: 1;
+	}
+	.row-lookup-btn[aria-expanded="true"] {
+		color: #6a4c93;
+	}
+	.lookup-primary {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		width: 100%;
+		padding: 8px 10px;
+		border: none;
+		border-radius: 7px;
+		background: none;
+		font-family: var(--font-sans);
+		text-align: left;
+		cursor: pointer;
+	}
+	.lookup-primary:hover {
+		background: #f1ecf7;
+	}
+	.lp-ic {
+		font-size: 1rem;
+		line-height: 1;
+	}
+	.lp-tx {
+		display: flex;
+		flex-direction: column;
+		line-height: 1.2;
+	}
+	.lp-tx strong {
+		font-size: 0.85rem;
+		font-weight: 700;
+		color: #6a4c93;
+		white-space: nowrap;
+	}
+	.lp-tx small {
+		font-size: 0.72rem;
+		color: var(--color-fg-light);
+	}
+	.lookup-div {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: 4px 8px 2px;
+		font-size: 0.66rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--color-fg-light);
+	}
+	.lookup-div::after {
+		content: "";
+		flex: 1;
+		height: 1px;
+		background: var(--color-border);
 	}
 	.lookup-backdrop {
 		position: fixed;
@@ -606,7 +670,7 @@
 		z-index: 41;
 		display: flex;
 		flex-direction: column;
-		min-width: 160px;
+		min-width: 190px;
 		padding: 5px;
 		background: var(--color-white);
 		border: 1px solid var(--color-border);
