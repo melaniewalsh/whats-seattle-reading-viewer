@@ -49,6 +49,9 @@
 	// The catalog subject tags that define the selected genre (empty for "All genres").
 	const genreTags = $derived(genre !== "All genres" ? (termsMap[genre] || []) : []);
 
+	// Largest count in view — scales the in-row data bars so #1 fills the column.
+	const maxCount = $derived(rows.length ? Math.max(...rows.map((r) => r[3])) : 1);
+
 	// Book-cover thumbnails (Open Library). covers[key] = url | null (no cover) |
 	// undefined (not fetched yet). Resolved once per work, then cached.
 	let covers = $state({});
@@ -362,7 +365,12 @@
 									</span>
 								</div>
 							</td>
-							<td class="ta-count">{row[3].toLocaleString()}</td>
+							<td class="ta-count">
+								<span class="ta-bar">
+									<span class="ta-bar-fill" style="width:{Math.max((row[3] / maxCount) * 100, 1)}%"></span>
+									<span class="ta-bar-num">{row[3].toLocaleString()}</span>
+								</span>
+							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -500,12 +508,34 @@
 		font-variant-numeric: tabular-nums;
 	}
 	.ta-count {
-		text-align: right;
+		width: 33%;
+		vertical-align: middle;
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
 	th.ta-count {
 		text-align: right;
+	}
+	.ta-bar {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		min-height: 22px;
+	}
+	.ta-bar-fill {
+		position: absolute;
+		left: 0;
+		top: 50%;
+		transform: translateY(-50%);
+		height: 22px;
+		border-radius: 3px;
+		background: rgba(53, 122, 189, 0.16);
+	}
+	.ta-bar-num {
+		position: relative;
+		z-index: 1;
+		padding: 0 8px;
 	}
 	.ta-name {
 		color: var(--color-fg);
