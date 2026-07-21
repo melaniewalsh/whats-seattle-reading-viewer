@@ -288,6 +288,11 @@
 			at the Seattle Public Library, {yearLabel(year)}.
 		</p>
 
+		<details class="ta-note">
+			<summary>Counts print books, ebooks &amp; audiobooks</summary>
+			<p>Editions of a book (print, ebook, audiobook, reprints) are grouped into one work. These are raw <strong>checkouts</strong> — they don't include holds or renewals, and the clustering is automatic and approximate. Read the rankings as a good sense of what's popular, not an exact or official count.</p>
+		</details>
+
 		{#if rows.length}
 			<table class="ta-table">
 				<thead>
@@ -364,6 +369,30 @@
 		margin: 0 0 14px;
 	}
 	.ta-caption strong {
+		color: var(--color-fg);
+	}
+	.ta-note {
+		margin: -6px 0 16px;
+		font-size: 0.82rem;
+	}
+	.ta-note summary {
+		cursor: pointer;
+		color: var(--color-fg-light);
+		list-style-position: inside;
+		width: fit-content;
+	}
+	.ta-note summary:hover {
+		color: var(--color-fg);
+	}
+	.ta-note p {
+		margin: 6px 0 0;
+		padding-left: 2px;
+		font-size: 0.82rem;
+		line-height: 1.5;
+		color: var(--color-fg-light);
+		max-width: 60ch;
+	}
+	.ta-note strong {
 		color: var(--color-fg);
 	}
 	.ta-table {
