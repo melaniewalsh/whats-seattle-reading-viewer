@@ -96,9 +96,11 @@ TAXONOMY = [
     ("Hispanic & Latino Fiction", ["mexican americans fiction", "cuban americans fiction",
         "puerto ricans fiction", "hispanic americans fiction", "mexican fiction",
         "latin american fiction", "spanish american fiction"], []),
-    # LC's "Indians of North America" is the (dated, contested) heading for Native
-    # American fiction; plus the broader "Indigenous peoples". ~64k.
-    ("Native American Fiction", ["indians of north america fiction", "indigenous peoples fiction"], []),
+    # LC's "Indians of North America" is the (dated, contested) heading specific to
+    # Native American fiction. Deliberately NOT "indigenous peoples fiction" -- that
+    # is a GLOBAL heading (Aboriginal Australians, Pacific Islanders, Thai hill
+    # peoples, etc.), so it would mislabel non-North-American Indigenous fiction. ~60k.
+    ("Native American Fiction", ["indians of north america fiction"], []),
     # Transnational (not US-specific) already. ~79k.
     ("Jewish Fiction", ["jewish fiction", "jews fiction"], []),
     # Broadened to pull literary/classic/general fiction out of "Other" (Demon
