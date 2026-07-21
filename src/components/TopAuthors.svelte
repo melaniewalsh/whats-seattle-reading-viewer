@@ -3,6 +3,7 @@
 	import { getTopAuthors, getGenreTerms } from "$components/db.js";
 	import { displayName } from "$utils/displayName.js";
 	import { lookupUrls } from "$utils/lookup.js";
+	import WikiCard from "$components/WikiCard.svelte";
 
 	// openAuthor(slug) is provided by Index.svelte: jumps to the By-author view.
 	let { openAuthor } = $props();
@@ -16,6 +17,19 @@
 	let shareOpen = $state(false);
 	let termsMap = $state({});
 	let openLookup = $state(null); // which row's name popover is open (the slug)
+
+	// Wikipedia hover preview: which row's card is showing, with a small
+	// hover-intent delay so quick mouse passes don't fire fetches.
+	let hoverKey = $state(null);
+	let hoverTimer;
+	function enterName(key) {
+		clearTimeout(hoverTimer);
+		hoverTimer = setTimeout(() => (hoverKey = key), 300);
+	}
+	function leaveName() {
+		clearTimeout(hoverTimer);
+		hoverKey = null;
+	}
 
 	onMount(async () => {
 		// Read shareable filters from the URL first.
@@ -317,8 +331,11 @@
 								{#if row[0]}
 									{@const u = lookupUrls(displayName(row[1]))}
 									{@const key = row[0] || row[1]}
-									<span class="name-wrap">
+									<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
 										<button class="ta-authorlink" onclick={() => openAuthor(row[0])} title="See {displayName(row[1])}'s checkout trend at Seattle Public Library">{displayName(row[1])}</button>
+										{#if hoverKey === key}
+											<span class="wiki-pop"><WikiCard query={displayName(row[1])} kind="author" /></span>
+										{/if}
 										<span class="row-lookup">
 											<button class="row-lookup-btn" aria-haspopup="true" aria-expanded={openLookup === key} title="More about {displayName(row[1])}" onclick={() => (openLookup = openLookup === key ? null : key)}>▾</button>
 											{#if openLookup === key}
@@ -633,9 +650,18 @@
 		color: #26597f;
 	}
 	.name-wrap {
+		position: relative;
 		display: inline-flex;
 		align-items: baseline;
 		gap: 2px;
+	}
+	.wiki-pop {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		z-index: 45;
+		padding-top: 6px;
+		cursor: default;
 	}
 	.row-lookup {
 		position: relative;

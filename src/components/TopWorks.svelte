@@ -4,6 +4,7 @@
 	import { displayName } from "$utils/displayName.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
+	import WikiCard from "$components/WikiCard.svelte";
 
 	// openAuthor(slug) / openTitle(title) are provided by Index.svelte: jump to the
 	// By-author / By-title views.
@@ -18,6 +19,18 @@
 	let shareOpen = $state(false);
 	let termsMap = $state({});
 	let openLookup = $state(null);
+
+	// Wikipedia hover preview: which row's card is showing, with a hover-intent delay.
+	let hoverKey = $state(null);
+	let hoverTimer;
+	function enterName(key) {
+		clearTimeout(hoverTimer);
+		hoverTimer = setTimeout(() => (hoverKey = key), 300);
+	}
+	function leaveName() {
+		clearTimeout(hoverTimer);
+		hoverKey = null;
+	}
 
 	onMount(async () => {
 		try {
@@ -337,8 +350,11 @@
 										{/if}
 									</span>
 									<span class="tw-text">
-										<span class="name-wrap">
+										<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
 											<button class="tw-title tw-titlelink" onclick={() => openTitle(row[0])} title="See this title's checkout trend at Seattle Public Library">{row[0]}</button>
+											{#if hoverKey === key}
+												<span class="wiki-pop"><WikiCard query={row[0]} kind="work" /></span>
+											{/if}
 											<span class="row-lookup">
 												<button class="row-lookup-btn" aria-haspopup="true" aria-expanded={openLookup === key} title="More about {row[0]}" onclick={() => (openLookup = openLookup === key ? null : key)}>▾</button>
 												{#if openLookup === key}
@@ -613,9 +629,18 @@
 		color: #26597f;
 	}
 	.name-wrap {
+		position: relative;
 		display: inline-flex;
 		align-items: baseline;
 		gap: 2px;
+	}
+	.wiki-pop {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		z-index: 45;
+		padding-top: 6px;
+		cursor: default;
 	}
 	.row-lookup {
 		position: relative;
