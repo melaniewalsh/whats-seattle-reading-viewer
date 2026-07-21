@@ -437,7 +437,7 @@
 		font-family: inherit;
 		font-size: inherit;
 		font-weight: 600;
-		color: var(--color-fg);
+		color: #357abd;
 		background: none;
 		border: none;
 		padding: 0;
@@ -446,6 +446,7 @@
 	}
 	.tw-titlelink:hover {
 		text-decoration: underline;
+		color: #26597f;
 	}
 	.tw-by {
 		display: inline-block;

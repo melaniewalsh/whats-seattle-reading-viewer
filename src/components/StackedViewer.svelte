@@ -1479,10 +1479,6 @@
 			{/if}
 		</div>
 
-		<button type="button" class="surprise-btn" onclick={surpriseMe}>
-			<span aria-hidden="true">🎲</span> Surprise me — {searchMode === "title" ? "a random title" : "a random author"}
-		</button>
-
 		{#if searchMode === "title"}
 			<p class="title-note"><span class="tn-ic" aria-hidden="true">ℹ</span><span><strong>Only the most-borrowed titles are searchable here</strong>{#if titleMinLabel} — those with at least ~{titleMinLabel} all-time checkouts{/if}. To find any title, search <strong>By&nbsp;author</strong> instead.</span></p>
 		{/if}
@@ -1494,6 +1490,7 @@
 				{#each topTitles as t}
 					<button class="chip" onclick={() => selectTitle(t)}>{t.title}</button>
 				{/each}
+				<button class="chip surprise-chip" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
 			</div>
 		{:else if searchMode !== "title" && topAuthors.length}
 			<div class="top-authors">
@@ -1507,6 +1504,7 @@
 						{displayName(a.name)}
 					</button>
 				{/each}
+				<button class="chip surprise-chip" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
 			</div>
 		{/if}
 	{/snippet}
@@ -3055,24 +3053,17 @@
 		color: var(--color-white);
 	}
 
-	.surprise-btn {
+	.surprise-chip {
 		display: inline-flex;
 		align-items: center;
-		gap: 6px;
-		margin: 10px 0 0;
-		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		gap: 5px;
 		font-weight: 600;
-		padding: 7px 16px;
-		border-radius: 999px;
-		border: 1.5px solid #6a4c93;
-		background: var(--color-white);
+		border-color: #6a4c93;
 		color: #6a4c93;
-		cursor: pointer;
-		transition: background 0.12s, color 0.12s;
 	}
-	.surprise-btn:hover {
+	.surprise-chip:hover {
 		background: #6a4c93;
+		border-color: #6a4c93;
 		color: var(--color-white);
 	}
 
