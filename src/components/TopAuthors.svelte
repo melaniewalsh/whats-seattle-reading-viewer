@@ -584,7 +584,7 @@
 		white-space: nowrap;
 	}
 	th.ta-count {
-		text-align: right;
+		text-align: left;
 	}
 	.ta-bar {
 		display: flex;
@@ -610,7 +610,7 @@
 	.ta-bar-num {
 		flex: none;
 		min-width: 4.25rem;
-		text-align: right;
+		text-align: left;
 	}
 	.ta-name {
 		font-weight: 600;

@@ -352,7 +352,7 @@
 										<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
 											<button class="tw-title tw-titlelink" onclick={() => openTitle(row[0])} title="See this title's checkout trend at Seattle Public Library">{row[0]}</button>
 											{#if hoverKey === key}
-												<span class="wiki-pop"><WikiCard query={row[0]} kind="work" links={u} onTrend={() => openTitle(row[0])} /></span>
+												<span class="wiki-pop"><WikiCard query={row[0]} author={displayName(row[1])} kind="work" links={u} onTrend={() => openTitle(row[0])} /></span>
 											{/if}
 										</span>
 										{#if row[2]}
@@ -512,7 +512,7 @@
 		white-space: nowrap;
 	}
 	th.ta-count {
-		text-align: right;
+		text-align: left;
 	}
 	.ta-bar {
 		display: flex;
@@ -538,7 +538,7 @@
 	.ta-bar-num {
 		flex: none;
 		min-width: 4.25rem;
-		text-align: right;
+		text-align: left;
 	}
 	.ta-name {
 		color: var(--color-fg);

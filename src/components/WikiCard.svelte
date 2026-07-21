@@ -1,18 +1,20 @@
 <script>
-	import { wikiSummary } from "$utils/wiki.js";
+	import { wikiSummary, wikiWork } from "$utils/wiki.js";
 
-	// query: the name/title to look up on Wikipedia.
-	// kind:  "author" | "work" (wording only).
-	// links: { wikipedia, goodreads, librarything, worldcat } search URLs.
+	// query:  the name/title to look up on Wikipedia.
+	// kind:   "author" | "work". Works resolve through Wikidata (book/author aware).
+	// author: the work's author, used to disambiguate the Wikidata match.
+	// links:  { wikipedia } search URL (fallback when there's no article match).
 	// onTrend: called when the "See SPL trend" button is clicked.
-	let { query, kind = "author", links = {}, onTrend } = $props();
+	let { query, kind = "author", author = "", links = {}, onTrend } = $props();
 
 	let status = $state({ loading: true, data: null });
 
 	$effect(() => {
 		let alive = true;
 		status = { loading: true, data: null };
-		wikiSummary(query).then((d) => {
+		const p = kind === "work" ? wikiWork(query, author) : wikiSummary(query);
+		p.then((d) => {
 			if (alive) status = { loading: false, data: d };
 		});
 		return () => {
@@ -52,13 +54,9 @@
 		<button class="wiki-trend" onclick={onTrend}>
 			<span aria-hidden="true">📈</span> See SPL trend
 		</button>
-		<div class="wiki-learn">
-			<span class="wiki-learn-lbl">Learn more</span>
-			<a href={wikiHref} target="_blank" rel="noopener noreferrer">Wikipedia <span aria-hidden="true">↗</span></a>
-			<a href={links.goodreads} target="_blank" rel="noopener noreferrer">Goodreads <span aria-hidden="true">↗</span></a>
-			<a href={links.librarything} target="_blank" rel="noopener noreferrer">LibraryThing <span aria-hidden="true">↗</span></a>
-			<a href={links.worldcat} target="_blank" rel="noopener noreferrer">WorldCat <span aria-hidden="true">↗</span></a>
-		</div>
+		<a class="wiki-wiki" href={wikiHref} target="_blank" rel="noopener noreferrer"
+			>Read on Wikipedia <span aria-hidden="true">↗</span></a
+		>
 	</div>
 </div>
 
@@ -119,30 +117,15 @@
 	.wiki-trend:hover {
 		background: #583d7d;
 	}
-	.wiki-learn {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 3px 12px;
-	}
-	.wiki-learn-lbl {
-		width: 100%;
-		margin-bottom: 3px;
-		font-family: var(--font-sans);
-		font-size: 0.64rem;
-		font-weight: 700;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-		color: var(--color-fg-light);
-	}
-	.wiki-learn a {
+	.wiki-wiki {
+		display: inline-block;
 		font-family: var(--font-sans);
 		font-size: 0.8rem;
 		font-weight: 600;
 		color: #357abd;
 		text-decoration: none;
 	}
-	.wiki-learn a:hover {
+	.wiki-wiki:hover {
 		text-decoration: underline;
 	}
 	.wiki-skel {
