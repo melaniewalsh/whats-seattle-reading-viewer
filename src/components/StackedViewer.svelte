@@ -2434,27 +2434,28 @@
 		.split {
 			display: block;
 		}
+		/* By default the works table sits inline at the bottom, below the chart. */
 		.split-side {
+			margin-top: 24px;
+			padding-top: 14px;
+			border-top: 1.5px solid var(--color-border);
+		}
+		/* "Add/edit titles" pops the same table up as a full-screen drawer. */
+		.split-side.open {
 			position: fixed;
 			inset: 0;
 			z-index: 60;
 			height: 100dvh;
-			max-width: none;
-			max-height: none;
+			margin: 0;
+			border-top: none;
 			border-radius: 0;
 			background: var(--color-white);
 			padding: 10px 14px 48px;
 			overflow: auto;
-			transform: translateY(100%);
-			visibility: hidden;
-			transition: transform 0.25s ease, visibility 0.25s ease;
 			box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.22);
 		}
-		.split-side.open {
-			transform: translateY(0);
-			visibility: visible;
-		}
-		.side-mobile-head {
+		/* drawer header (with Done) only when popped up... */
+		.split-side.open .side-mobile-head {
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
@@ -2467,6 +2468,28 @@
 			font-family: var(--font-sans);
 			font-weight: 700;
 			font-size: 0.95rem;
+		}
+		/* ...inline, a plain heading (tap to collapse the table) instead. */
+		.split-side:not(.open) .side-desktop-head {
+			display: flex;
+			align-items: baseline;
+			gap: 8px;
+			width: 100%;
+			padding: 0 2px 8px;
+			margin: 0 0 10px;
+			border: none;
+			border-bottom: 1.5px solid var(--color-border);
+			background: none;
+			font-family: var(--font-serif);
+			font-weight: 600;
+			font-size: 1.15rem;
+			line-height: 1.15;
+			color: var(--color-fg);
+			cursor: pointer;
+			text-align: left;
+		}
+		.split-side:not(.open).collapsed .titles {
+			display: none;
 		}
 		.side-close {
 			font-family: var(--font-sans);
@@ -3331,6 +3354,26 @@
 	}
 	.split-side .title-table {
 		max-height: 460px;
+	}
+	/* On narrow screens give the Work title the bulk of the width so titles wrap at
+	   word boundaries instead of smushing ("read y to play outsi de"). Placed after
+	   the base grid rule so it wins on equal specificity. */
+	@media (max-width: 860px) {
+		.split-side .tt-head,
+		.split-side .tt-row,
+		.split-side .work-header {
+			grid-template-columns: 22px minmax(0, 1.7fr) minmax(0, 0.8fr) minmax(42px, auto);
+			gap: 8px;
+			padding: 7px 8px;
+		}
+		/* Format badges are secondary; drop the column on mobile to give the Work
+		   title room and keep the Edition column wide enough for its header.
+		   Extra specificity so it beats the base `.work-header .tt-format` rule. */
+		.split-side .tt-head .tt-format,
+		.split-side .tt-row .tt-format,
+		.split-side .work-header .tt-format {
+			display: none;
+		}
 	}
 
 	.tt-head,
