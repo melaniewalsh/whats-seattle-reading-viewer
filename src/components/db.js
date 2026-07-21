@@ -47,6 +47,18 @@ export function getTopAuthors() {
 	return topAuthorsPromise;
 }
 
+// The "Top works" tab dataset: top-N clustered works per genre per year.
+// { years, genres, data:{ genre:{ "<year>":[[title,author,slug,co],...], "all":[...] } } }
+let topWorksPromise = null;
+export function getTopWorks() {
+	if (!topWorksPromise) {
+		topWorksPromise = fetch(`${DATA_BASE}/top-works.json`)
+			.then((r) => (r.ok ? r.json() : null))
+			.catch(() => null);
+	}
+	return topWorksPromise;
+}
+
 export async function getMonths() {
 	if (!monthsPromise) {
 		monthsPromise = fetch(`${DATA_BASE}/meta.json`)

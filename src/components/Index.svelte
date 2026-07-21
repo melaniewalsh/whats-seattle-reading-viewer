@@ -4,15 +4,16 @@
 	import Viewer from "$components/StackedViewer.svelte";
 	import GenreTrends from "$components/GenreTrends.svelte";
 	import TopAuthors from "$components/TopAuthors.svelte";
+	import TopWorks from "$components/TopWorks.svelte";
 
 	const copy = getContext("copy");
-	let tab = $state("authors"); // "authors" | "titles" | "genres" | "top"
+	let tab = $state("authors"); // "authors" | "titles" | "genres" | "top" | "works"
 
-	// A shared ?tab= makes the Top-authors / By-genre views linkable.
+	// A shared ?tab= makes the ranking / by-genre views linkable.
 	onMount(() => {
 		try {
 			const t = new URLSearchParams(window.location.search).get("tab");
-			if (t === "top" || t === "genres" || t === "titles") tab = t;
+			if (t === "top" || t === "works" || t === "genres" || t === "titles") tab = t;
 		} catch {}
 	});
 
@@ -50,6 +51,7 @@
 				<span class="tab-group-label">Rankings</span>
 				<div class="sticker-tabs rankings" role="tablist" aria-label="Rankings">
 					<button class="sticker-tab" role="tab" aria-selected={tab === "top"} class:active={tab === "top"} onclick={() => (tab = "top")}>Top authors</button>
+					<button class="sticker-tab" role="tab" aria-selected={tab === "works"} class:active={tab === "works"} onclick={() => (tab = "works")}>Top works</button>
 				</div>
 			</div>
 		</div>
@@ -58,6 +60,8 @@
 			<GenreTrends />
 		{:else if tab === "top"}
 			<TopAuthors {openAuthor} />
+		{:else if tab === "works"}
+			<TopWorks {openAuthor} />
 		{:else}
 			<Viewer searchMode={tab === "titles" ? "title" : "author"} />
 		{/if}

@@ -960,6 +960,157 @@ def build_top_authors(con, out_dir, slug_by_author, months, lo, top_n=20):
     print(f"  wrote top-authors.json ({len(genres_out)} genres x {len(years)} years)")
 
 
+# --- work clustering (Python port of StackedViewer.svelte normalizeWorkKey) ---
+# Keep in sync with the frontend so a "work" here matches what the site groups.
+import unicodedata as _ud
+
+_WORK_NOISE = re.compile(
+    r"(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|"
+    r"read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|"
+    r"film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|"
+    r"mystery|story|stories|tale|tales|romance|biography|autobiography|poems|"
+    r"essays|playscript|litrpg|gamelit|\bscript\b|\bproduction|\bserie|\blivre|"
+    r"\btome|\blibro|\btomo|\bedicion)",
+    re.I,
+)
+_WORK_FMT = re.compile(
+    r"\b(unabridged|abridged|audiobook|e-?book|large print|compact disc|sound recording)\b",
+    re.I,
+)
+
+
+def normalize_work_key(title):
+    t = (title or "").lower()
+    t = _ud.normalize("NFD", t)
+    t = "".join(c for c in t if not _ud.combining(c))
+    t = t.split(" / ")[0]
+    if re.search(r"\s=\s", t):
+        t = re.split(r"\s=\s", t)[-1]
+    t = re.sub(r",\s+or,\s+.*$", "", t, flags=re.I)
+    t = t.replace("&", " and ")
+    t = re.sub(r"\([^)]*\)", " ", t)
+    t = re.sub(r"\s*\([^)]*$", " ", t)
+    t = re.sub(r"\[[^\]]*\]", " ", t)
+
+    def _noise_repl(m):
+        seg = m.group(0)
+        return " " if (_WORK_NOISE.search(seg) or re.search(r"[:;]\s*or[\s,]", seg, re.I)) else seg
+
+    prev = None
+    while prev != t:
+        prev = t
+        t = re.sub(r"[:;]\s*[^:;]*$", _noise_repl, t)
+    t = _WORK_FMT.sub(" ", t)
+    t = re.sub(r"\b(the|a|an)\b", " ", t)
+    t = re.sub(r"['’]", "", t)
+    t = re.sub(r"[^a-z0-9]+", "", t)
+    return t
+
+
+def clean_title_for_display(title):
+    t = (title or "").split(" / ")[0]
+    t = re.sub(r"\s*:\s*.*$", "", t)
+    t = re.sub(r"\([^)]*\)", "", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
+    """Top-N clustered WORKS per genre per year, by checkouts of genre-tagged
+    editions. Parallels build_top_authors but ranks works (editions clustered by
+    normalize_work_key) instead of authors. Writes out_dir/top-works.json:
+      {years, genres, data:{genre:{"<year>":[[title,author,slug,co],...],"all":[...]}}}"""
+    import sys as _sys
+    _sys.path.insert(0, str(PROJECT_DIR / "data-prep"))
+    from build_partition import overlap_clauses
+
+    years = sorted({int(m[:4]) for m in months})
+
+    # title -> work key, computed once over the DISTINCT titles (far fewer than
+    # the 50M checkout rows).
+    titles = [r[0] for r in con.execute("SELECT DISTINCT title FROM clean WHERE title IS NOT NULL").fetchall()]
+    con.execute("DROP TABLE IF EXISTS titlework")
+    con.execute("CREATE TABLE titlework(title VARCHAR, wk VARCHAR)")
+    con.executemany(
+        "INSERT INTO titlework VALUES (?, ?)",
+        [(t, normalize_work_key(t)) for t in titles],
+    )
+
+    # Best display title + author for each work (the highest-checkout edition).
+    con.execute("DROP TABLE IF EXISTS workmeta")
+    con.execute(
+        """
+        CREATE TABLE workmeta AS
+        WITH wt AS (
+            SELECT tw.wk AS wk, c.title AS title, CAST(sum(c.checkouts) AS BIGINT) AS co
+            FROM clean c JOIN titlework tw ON c.title = tw.title
+            WHERE tw.wk <> '' GROUP BY 1, 2),
+        wa AS (
+            SELECT tw.wk AS wk, c.author AS author, CAST(sum(c.checkouts) AS BIGINT) AS co
+            FROM clean c JOIN titlework tw ON c.title = tw.title
+            WHERE tw.wk <> '' GROUP BY 1, 2),
+        t AS (SELECT wk, arg_max(title, co) AS disp_title FROM wt GROUP BY wk),
+        a AS (SELECT wk, arg_max(author, co) AS disp_author FROM wa GROUP BY wk)
+        SELECT t.wk, t.disp_title, a.disp_author FROM t JOIN a USING (wk)
+        """
+    )
+    meta = {
+        wk: (clean_title_for_display(dt), au)
+        for wk, dt, au in con.execute("SELECT wk, disp_title, disp_author FROM workmeta").fetchall()
+    }
+
+    # Pre-aggregate (work, year, subjects) once; each genre pass filters this.
+    con.execute("DROP TABLE IF EXISTS cw")
+    con.execute(
+        f"""
+        CREATE TABLE cw AS
+        SELECT tw.wk AS wk, ((c.mi + {lo}) // 12) AS year, c.subjects AS subjects,
+               CAST(sum(c.checkouts) AS BIGINT) AS c
+        FROM clean c JOIN titlework tw ON c.title = tw.title
+        WHERE tw.wk <> ''
+        GROUP BY wk, year, subjects
+        """
+    )
+
+    GENRE_EXCLUDE = {
+        "Fiction", "Nonfiction", "Art", "Illustrated Works", "Informational Works",
+        "Instructional & Educational Works", "Readers Publications",
+    }
+    clauses = [("All genres", None)] + [
+        (n, c) for n, c in overlap_clauses() if n not in GENRE_EXCLUDE
+    ]
+    genres_out, data = [], {}
+    for name, clause in clauses:
+        where = f"WHERE {clause}" if clause else ""
+        rows = con.execute(
+            f"SELECT wk, year, CAST(sum(c) AS BIGINT) AS c FROM cw {where} GROUP BY wk, year"
+        ).fetchall()
+        per_year, all_time = {}, {}
+        for wk, year, c in rows:
+            per_year.setdefault(year, []).append((wk, c))
+            all_time[wk] = all_time.get(wk, 0) + c
+
+        def topn(pairs):
+            top = sorted(pairs, key=lambda p: -p[1])[:top_n]
+            out = []
+            for wk, c in top:
+                title, author = meta.get(wk, ("", ""))
+                out.append([title, author, slug_by_author.get(author, ""), c])
+            return out
+
+        gdata = {str(y): topn(per_year.get(y, [])) for y in years}
+        gdata["all"] = topn(list(all_time.items()))
+        data[name] = gdata
+        genres_out.append(name)
+
+    for tbl in ("cw", "workmeta", "titlework"):
+        con.execute(f"DROP TABLE IF EXISTS {tbl}")
+    (out_dir / "top-works.json").write_bytes(
+        _dumps({"years": years, "genres": genres_out, "data": data})
+    )
+    print(f"  wrote top-works.json ({len(genres_out)} genres x {len(years)} years)")
+
+
 def main():
     start_time = perf_counter()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1264,6 +1415,12 @@ def main():
         build_top_authors(con, OUT_DIR, slug_by_author, months, lo)
     except Exception as e:  # noqa: BLE001
         print(f"  WARNING: top-authors build failed ({e}); Top authors tab will be empty")
+
+    # Top works per genre per year (isolated post-pass).
+    try:
+        build_top_works(con, OUT_DIR, slug_by_author, months, lo)
+    except Exception as e:  # noqa: BLE001
+        print(f"  WARNING: top-works build failed ({e}); Top works tab will be empty")
 
     # Only mark this run's R2 files as processed once library.sqlite3 has
     # actually been rebuilt successfully. 
