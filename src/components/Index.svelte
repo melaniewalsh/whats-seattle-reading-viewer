@@ -39,17 +39,17 @@
 
 		<div class="tab-groups">
 			<div class="tab-group">
-				<span class="tab-group-label">Search</span>
-				<div class="main-tabs" role="tablist" aria-label="Search">
-					<button role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
-					<button role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
+				<span class="tab-group-label">Explore trends</span>
+				<div class="sticker-tabs trends" role="tablist" aria-label="Explore trends">
+					<button class="sticker-tab" role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
+					<button class="sticker-tab" role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
+					<button class="sticker-tab" role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
 				</div>
 			</div>
 			<div class="tab-group">
-				<span class="tab-group-label">Browse</span>
-				<div class="main-tabs" role="tablist" aria-label="Browse">
-					<button role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
-					<button role="tab" aria-selected={tab === "top"} class:active={tab === "top"} onclick={() => (tab = "top")}>Top authors</button>
+				<span class="tab-group-label">Rankings</span>
+				<div class="sticker-tabs rankings" role="tablist" aria-label="Rankings">
+					<button class="sticker-tab" role="tab" aria-selected={tab === "top"} class:active={tab === "top"} onclick={() => (tab = "top")}>Top authors</button>
 				</div>
 			</div>
 		</div>
@@ -166,35 +166,43 @@
 		letter-spacing: 0.08em;
 		color: var(--color-fg-light);
 	}
-	/* top-level view tabs: pill group of buttons */
-	.main-tabs {
-		display: flex;
-		justify-content: center;
-		gap: 4px;
-		margin: 0;
-		padding: 4px;
-		width: fit-content;
-		background: var(--color-gray-100);
-		border-radius: 999px;
+	/* top-level view tabs: bold "sticker" buttons with a hard offset shadow */
+	.sticker-tabs {
+		display: inline-flex;
+		gap: 10px;
+		flex-wrap: wrap;
 	}
-	.main-tabs button {
-		border: none;
-		background: none;
-		padding: 8px 22px;
-		border-radius: 999px;
+	.sticker-tab {
+		--sh: var(--color-fg);
 		font-family: var(--font-sans);
 		font-size: 0.95rem;
 		font-weight: 600;
-		color: var(--color-fg-light);
+		padding: 9px 16px;
+		border-radius: 8px;
+		background: var(--color-white);
+		color: var(--color-fg);
+		border: 2px solid var(--sh);
+		box-shadow: 3px 3px 0 var(--sh);
 		cursor: pointer;
-		transition: background 0.12s, color 0.12s;
+		transition: transform 0.08s ease, box-shadow 0.08s ease;
 	}
-	.main-tabs button.active {
-		background: var(--color-fg);
+	.sticker-tab:hover {
+		transform: translate(-1px, -1px);
+		box-shadow: 4px 4px 0 var(--sh);
+	}
+	.sticker-tab:active {
+		transform: translate(2px, 2px);
+		box-shadow: 1px 1px 0 var(--sh);
+	}
+	.trends .sticker-tab.active {
+		--sh: #16324f;
+		background: #357abd;
 		color: var(--color-white);
 	}
-	.main-tabs button:not(.active):hover {
-		color: var(--color-fg);
+	.rankings .sticker-tab.active {
+		--sh: #33224a;
+		background: #6a4c93;
+		color: var(--color-white);
 	}
 	/* OurWorldinData-style source + attribution footer */
 	.chart-footer {
