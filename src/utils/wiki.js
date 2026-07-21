@@ -90,18 +90,42 @@ async function authorTitleCandidates(name) {
 	}
 }
 
-// Author preview: direct name lookup (fast path), then an occupation-biased search
-// that walks candidate pages until one actually reads like a writer/illustrator —
-// so "Peter Brown" resolves to the children's illustrator, not the disambiguation.
+// Catalog names often carry a middle initial the Wikipedia title omits
+// ("Lincoln C. Peirce" vs "Lincoln Peirce"), so also try the name with lone
+// middle initials stripped.
+function nameVariants(name) {
+	const n = (name || "").trim();
+	const parts = n.split(/\s+/);
+	const variants = [n];
+	if (parts.length > 2) {
+		const stripped = parts
+			.filter((p, i) => i === 0 || i === parts.length - 1 || !/^[A-Za-z]\.?$/.test(p))
+			.join(" ");
+		if (stripped && stripped !== n) variants.push(stripped);
+	}
+	return variants;
+}
+
+// Author preview: direct name lookup across name variants (fast path), then an
+// occupation-biased search that walks candidate pages until one reads like a
+// writer/illustrator — so "Peter Brown" resolves to the children's illustrator,
+// and "Lincoln C. Peirce" to the "Lincoln Peirce" cartoonist page.
 export function wikiSummary(name) {
-	return cached(`wiki3:${(name || "").trim().toLowerCase()}`, async () => {
-		const direct = await summaryByTitle(name);
-		if (direct && looksLikePerson(direct)) return direct;
-		for (const t of (await authorTitleCandidates(name)).slice(0, 4)) {
-			const s = await summaryByTitle(t);
-			if (s && looksLikePerson(s)) return s;
+	return cached(`wiki4:${(name || "").trim().toLowerCase()}`, async () => {
+		const variants = nameVariants(name);
+		let firstDirect = null;
+		for (const v of variants) {
+			const direct = await summaryByTitle(v);
+			if (direct && looksLikePerson(direct)) return direct;
+			if (direct && !firstDirect) firstDirect = direct;
 		}
-		return direct;
+		for (const v of variants) {
+			for (const t of (await authorTitleCandidates(v)).slice(0, 4)) {
+				const s = await summaryByTitle(t);
+				if (s && looksLikePerson(s)) return s;
+			}
+		}
+		return firstDirect;
 	});
 }
 
