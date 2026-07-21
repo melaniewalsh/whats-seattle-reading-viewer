@@ -1172,6 +1172,18 @@
 		return displayName(current.name);
 	});
 
+	const lookupLinks = $derived.by(() => {
+		if (!current || isOverview) return null;
+		const q = headingText;
+		if (!q) return null;
+		const e = encodeURIComponent(q);
+		return {
+			wikipedia: `https://en.wikipedia.org/wiki/Special:Search?search=${e}`,
+			goodreads: `https://www.goodreads.com/search?q=${e}`,
+			worldcat: `https://search.worldcat.org/search?q=${e}`,
+		};
+	});
+
 	// In "By title" mode, the total checkouts of the single plotted title (summed
 	// over its editions). null when zero or several titles are shown -- then the
 	// title heading is blank anyway, so there's no single count to report.
@@ -1514,6 +1526,17 @@
 					{abbrevCount(current.total)} checkouts · {workGroups.size.toLocaleString()} works
 				{/if}
 			</p>
+
+			{#if lookupLinks}
+				<p class="lookup">
+					<span class="lookup-label">Learn more:</span>
+					<a href={lookupLinks.wikipedia} target="_blank" rel="noopener noreferrer">Wikipedia</a>
+					<span class="lookup-sep">·</span>
+					<a href={lookupLinks.goodreads} target="_blank" rel="noopener noreferrer">Goodreads</a>
+					<span class="lookup-sep">·</span>
+					<a href={lookupLinks.worldcat} target="_blank" rel="noopener noreferrer">WorldCat</a>
+				</p>
+			{/if}
 
 			{#if !isOverview && current.variants?.length}
 				<details class="name-variants">
@@ -2464,7 +2487,27 @@
 	.author .meta {
 		font-family: var(--font-sans);
 		color: var(--color-fg-light);
-		margin: 4px 0 20px;
+		margin: 4px 0 12px;
+	}
+	.lookup {
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		color: var(--color-fg-light);
+		margin: 0 0 18px;
+	}
+	.lookup-label {
+		font-weight: 600;
+	}
+	.lookup a {
+		color: #357abd;
+		text-decoration: none;
+	}
+	.lookup a:hover {
+		text-decoration: underline;
+	}
+	.lookup-sep {
+		margin: 0 3px;
+		color: var(--color-border);
 	}
 
 	.name-variants {
