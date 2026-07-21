@@ -101,6 +101,14 @@ TAXONOMY = [
     # is a GLOBAL heading (Aboriginal Australians, Pacific Islanders, Thai hill
     # peoples, etc.), so it would mislabel non-North-American Indigenous fiction. ~60k.
     ("Native American Fiction", ["indians of north america fiction"], []),
+    # Broader GLOBAL Indigenous umbrella (Aboriginal Australian, Inuit, Pacific
+    # Islander, Maori, and the pan-"Indigenous peoples" heading). Includes Indians
+    # of North America too, so it's a true umbrella -- but since it sits AFTER
+    # Native American, the partition routes North-American books to that specific
+    # category and this catches the rest.
+    ("Indigenous Fiction", ["indigenous peoples fiction", "indians of north america fiction",
+        "aboriginal australians fiction", "inuit fiction", "pacific islanders fiction",
+        "maori fiction"], []),
     # Transnational (not US-specific) already. ~79k.
     ("Jewish Fiction", ["jewish fiction", "jews fiction"], []),
     # Broadened to pull literary/classic/general fiction out of "Other" (Demon
