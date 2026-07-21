@@ -61,37 +61,44 @@ async function summaryByTitle(title) {
 function looksLikePerson(s) {
 	if (!s) return false;
 	const hay = `${s.description || ""} ${s.extract || ""}`.toLowerCase();
-	return /\b(author|writer|novelist|poet|essayist|journalist|illustrator|cartoonist|memoirist|playwright|screenwriter|editor|columnist|born)\b/.test(
+	return /\b(author|writer|novelist|poet|essayist|journalist|illustrator|cartoonist|comics|graphic novel|memoirist|playwright|screenwriter|editor|columnist|born)\b/.test(
 		hay,
 	);
 }
 
-// Find an author's English Wikipedia title via a name-scoped, writer-biased search.
-async function enwikiTitleForAuthor(name) {
-	const q = `intitle:"${name}" author OR writer OR novelist OR poet OR illustrator OR journalist`;
+// Rank an author's candidate Wikipedia titles from a name-scoped, occupation-biased
+// search: an author/illustrator-qualified page first, then other qualified pages,
+// then the bare name (which for ambiguous names is usually a disambiguation) last.
+async function authorTitleCandidates(name) {
+	const q = `intitle:"${name}" author OR writer OR novelist OR poet OR illustrator OR cartoonist OR journalist OR comics OR editor`;
 	try {
 		const res = await fetch(
-			`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&srnamespace=0&srlimit=6&format=json&origin=*`,
+			`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&srnamespace=0&srlimit=8&format=json&origin=*`,
 		);
-		if (!res.ok) return null;
+		if (!res.ok) return [];
 		const d = await res.json();
-		const bad = /\(disambiguation\)|^list of /i;
-		const hits = (d?.query?.search || []).map((h) => h.title).filter((t) => !bad.test(t));
-		return hits[0] || null;
+		const nameLower = name.trim().toLowerCase();
+		const qual =
+			/\((author|illustrator|writer|novelist|cartoonist|poet|comics|comic|editor|screenwriter|playwright|memoirist|journalist)\)/i;
+		const rank = (t) => (qual.test(t) ? 0 : t.toLowerCase() === nameLower ? 2 : 1);
+		return (d?.query?.search || [])
+			.map((h) => h.title)
+			.filter((t) => !/^list of /i.test(t))
+			.sort((a, b) => rank(a) - rank(b));
 	} catch {
-		return null;
+		return [];
 	}
 }
 
-// Author preview: direct name lookup (fast path), with a writer-biased search to
-// rescue ambiguous names, always falling back to the direct result.
+// Author preview: direct name lookup (fast path), then an occupation-biased search
+// that walks candidate pages until one actually reads like a writer/illustrator —
+// so "Peter Brown" resolves to the children's illustrator, not the disambiguation.
 export function wikiSummary(name) {
-	return cached(`wiki2:${(name || "").trim().toLowerCase()}`, async () => {
+	return cached(`wiki3:${(name || "").trim().toLowerCase()}`, async () => {
 		const direct = await summaryByTitle(name);
 		if (direct && looksLikePerson(direct)) return direct;
-		const en = await enwikiTitleForAuthor(name);
-		if (en) {
-			const s = await summaryByTitle(en);
+		for (const t of (await authorTitleCandidates(name)).slice(0, 4)) {
+			const s = await summaryByTitle(t);
 			if (s && looksLikePerson(s)) return s;
 		}
 		return direct;
