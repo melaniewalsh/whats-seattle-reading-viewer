@@ -211,6 +211,26 @@ function wordSpanMatch(words, t) {
 	return false;
 }
 
+// "Surprise me": a random author to explore. Picked from the most-borrowed
+// pool (the index is sorted total-DESC) so the result is someone with a real
+// trend to show, not a one-off catalog record.
+export async function randomAuthor() {
+	const { rows } = await getIndex();
+	if (!rows.length) return null;
+	const pool = Math.min(rows.length, 3000);
+	const r = rows[Math.floor(Math.random() * pool)];
+	return { slug: r[0], name: r[1], total: r[2] };
+}
+
+// A random title from the By-title index (already limited to well-borrowed
+// titles, so anything here is worth showing).
+export async function randomTitle() {
+	const { rows } = await getTitleIndex();
+	if (!rows.length) return null;
+	const r = rows[Math.floor(Math.random() * rows.length)];
+	return { title: r[0], slug: r[1], author: r[2], total: r[3] };
+}
+
 export async function searchAuthors(query, limit = 20) {
 	const { rows, words } = await getIndex();
 	// Split the query into alphanumeric words too, so punctuation the user types

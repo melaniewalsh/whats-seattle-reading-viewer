@@ -5,7 +5,7 @@
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 	import Switch from "$components/ui/Switch.svelte";
-	import { getMonths, searchAuthors, searchTitles, titleIndexMin, getAuthor, getAllCheckouts } from "$components/db.js";
+	import { getMonths, searchAuthors, searchTitles, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle } from "$components/db.js";
 
 	// "author" (default): search authors. "title": reverse lookup — search a title,
 	// resolve to its author, open the author's drilldown with that work highlighted.
@@ -228,6 +228,15 @@
 			const r = (await searchTitles(want || "the fire next time", 5))[0];
 			if (r) await selectTitle(r, { scroll: false });
 		} catch {}
+	}
+
+	// "Surprise me": jump to a random author (or title in title mode).
+	async function surpriseMe() {
+		query = "";
+		const pick = searchMode === "title" ? await randomTitle() : await randomAuthor();
+		if (!pick) return;
+		if (searchMode === "title") await selectTitle(pick);
+		else await selectAuthor(pick);
 	}
 
 	// Switching "By title" -> "By author" should drop the single-book focus and
@@ -1469,6 +1478,10 @@
 				<p class="no-results">No {searchMode === "title" ? "titles" : "authors"} found for “{query.trim()}”.</p>
 			{/if}
 		</div>
+
+		<button type="button" class="surprise-btn" onclick={surpriseMe}>
+			<span aria-hidden="true">🎲</span> Surprise me — {searchMode === "title" ? "a random title" : "a random author"}
+		</button>
 
 		{#if searchMode === "title"}
 			<p class="title-note"><span class="tn-ic" aria-hidden="true">ℹ</span><span><strong>Only the most-borrowed titles are searchable here</strong>{#if titleMinLabel} — those with at least ~{titleMinLabel} all-time checkouts{/if}. To find any title, search <strong>By&nbsp;author</strong> instead.</span></p>
@@ -3039,6 +3052,27 @@
 	.chip.current {
 		background: var(--color-fg);
 		border-color: var(--color-fg);
+		color: var(--color-white);
+	}
+
+	.surprise-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		margin: 10px 0 0;
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
+		padding: 7px 16px;
+		border-radius: 999px;
+		border: 1.5px solid #6a4c93;
+		background: var(--color-white);
+		color: #6a4c93;
+		cursor: pointer;
+		transition: background 0.12s, color 0.12s;
+	}
+	.surprise-btn:hover {
+		background: #6a4c93;
 		color: var(--color-white);
 	}
 
