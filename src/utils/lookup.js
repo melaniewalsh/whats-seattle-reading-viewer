@@ -4,6 +4,7 @@
 export function lookupUrls(q) {
 	const e = encodeURIComponent(q || "");
 	return {
+		spl: `https://seattle.bibliocommons.com/v2/search?query=${e}&searchType=smart`,
 		wikipedia: `https://en.wikipedia.org/wiki/Special:Search?search=${e}`,
 		goodreads: `https://www.goodreads.com/search?q=${e}`,
 		librarything: `https://www.librarything.com/search.php?search=${e}`,

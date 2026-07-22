@@ -56,6 +56,11 @@
 				<span aria-hidden="true">📈</span> See SPL trend
 			</button>
 		{/if}
+		{#if links.spl}
+			<a class="wiki-spl" href={links.spl} target="_blank" rel="noopener noreferrer"
+				>Find at Seattle Public Library <span aria-hidden="true">↗</span></a
+			>
+		{/if}
 		{#if !status.loading}
 			<a class="wiki-wiki" href={wikiHref} target="_blank" rel="noopener noreferrer"
 				>{status.data ? "Read on Wikipedia" : "Search Wikipedia"} <span aria-hidden="true">↗</span></a
@@ -136,6 +141,17 @@
 		text-decoration: none;
 	}
 	.wiki-wiki:hover {
+		text-decoration: underline;
+	}
+	.wiki-spl {
+		display: inline-block;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: #1f7a4d;
+		text-decoration: none;
+	}
+	.wiki-spl:hover {
 		text-decoration: underline;
 	}
 	.wiki-skel {

@@ -3,6 +3,7 @@
 	import { onMount, tick } from "svelte";
 	import { displayName } from "$utils/displayName.js";
 	import { titleCase } from "$utils/titleCase.js";
+	import { lookupUrls } from "$utils/lookup.js";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
@@ -1202,13 +1203,7 @@
 		if (!current || isOverview) return null;
 		const q = headingText;
 		if (!q) return null;
-		const e = encodeURIComponent(q);
-		return {
-			wikipedia: `https://en.wikipedia.org/wiki/Special:Search?search=${e}`,
-			goodreads: `https://www.goodreads.com/search?q=${e}`,
-			librarything: `https://www.librarything.com/search.php?search=${e}`,
-			worldcat: `https://search.worldcat.org/search?q=${e}`,
-		};
+		return lookupUrls(q);
 	});
 
 	// In "By title" mode, the total checkouts of the single plotted title (summed
@@ -1583,6 +1578,7 @@
 							{#if lookupOpen}
 								<button class="share-backdrop" aria-label="Close" onclick={() => (lookupOpen = false)}></button>
 								<div class="lookup-menu" role="menu">
+									<a role="menuitem" class="lm-spl" href={lookupLinks.spl} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Seattle Public Library <span aria-hidden="true">↗</span></a>
 									<a role="menuitem" href={lookupLinks.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Wikipedia <span aria-hidden="true">↗</span></a>
 									<a role="menuitem" href={lookupLinks.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Goodreads <span aria-hidden="true">↗</span></a>
 									<a role="menuitem" href={lookupLinks.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>LibraryThing <span aria-hidden="true">↗</span></a>
@@ -2674,6 +2670,9 @@
 	.lookup-menu a:hover {
 		background: var(--color-gray-100);
 	}
+	.lookup-menu a.lm-spl {
+		color: #1f7a4d;
+	}
 	.lookup-menu a span {
 		color: var(--color-fg-light);
 		font-size: 0.75rem;
@@ -3428,7 +3427,7 @@
 		/* Checkouts gets a min-width so the value isn't crunched against Format
 		   (each row is its own grid, so an `auto` last column shrinks to just the
 		   number). A fixed min also keeps the width stable when editions expand. */
-		grid-template-columns: 26px minmax(50px, 0.7fr) minmax(0, 1.7fr) auto minmax(62px, auto);
+		grid-template-columns: 26px minmax(120px, 1.1fr) minmax(0, 0.9fr) auto minmax(92px, auto);
 		gap: 9px;
 		padding: 7px 9px;
 		font-size: 0.8rem;
