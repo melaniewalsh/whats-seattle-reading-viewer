@@ -164,7 +164,7 @@
 		font-family: var(--font-sans);
 		font-size: 1.1rem;
 		line-height: 1.5;
-		color: var(--color-fg-light);
+		color: var(--color-fg);
 		margin: 0;
 	}
 	/* Two labeled groups of tabs: Explore (search a thing) | Browse (aggregates). */
