@@ -1105,10 +1105,64 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
 
     for tbl in ("cw", "workmeta", "titlework"):
         con.execute(f"DROP TABLE IF EXISTS {tbl}")
+
+    # Resolve each unique work's cover URL now (Open Library search), so the site
+    # serves covers immediately instead of searching per-visit. Baked on as a 5th
+    # column [title, author, slug, checkouts, cover|null]; the site keeps a runtime
+    # Wikipedia fallback for the ones Open Library misses (null). Best-effort: any
+    # failure just leaves 4-column rows and the site resolves covers as before.
+    try:
+        _bake_work_covers(data)
+    except Exception as e:  # pragma: no cover - network dependent
+        print(f"  WARNING: cover baking failed ({e}); site will resolve covers at runtime")
+
     (out_dir / "top-works.json").write_bytes(
         _dumps({"years": years, "genres": genres_out, "data": data})
     )
     print(f"  wrote top-works.json ({len(genres_out)} genres x {len(years)} years)")
+
+
+def _resolve_ol_cover(title, author):
+    """Open Library search -> a -M.jpg cover URL, or None. Matches the site's
+    runtime logic (utils/covers.js) so baked and fallback covers agree."""
+    import urllib.request as _u, urllib.parse as _up, json as _j
+    q = _up.urlencode({"title": title or "", "author": author or "", "limit": "1", "fields": "cover_i"})
+    try:
+        req = _u.Request(
+            f"https://openlibrary.org/search.json?{q}",
+            headers={"User-Agent": "whats-seattle-reading cover build (melwalsh@uw.edu)"},
+        )
+        with _u.urlopen(req, timeout=25) as r:
+            docs = (_j.loads(r.read()) or {}).get("docs") or []
+        cid = docs[0].get("cover_i") if docs else None
+        return f"https://covers.openlibrary.org/b/id/{cid}-M.jpg" if cid else None
+    except Exception:
+        return None
+
+
+def _bake_work_covers(data):
+    """Resolve one cover per unique (title, author) across every top-works row and
+    append it (or None) as a 5th element on each row, in place."""
+    from concurrent.futures import ThreadPoolExecutor
+    uniq = []
+    seen = set()
+    for gdata in data.values():
+        for lst in gdata.values():
+            for row in lst:
+                k = (row[0], row[1])
+                if k not in seen:
+                    seen.add(k)
+                    uniq.append(k)
+    print(f"  resolving {len(uniq)} unique work covers via Open Library...")
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        results = list(ex.map(lambda k: _resolve_ol_cover(k[0], k[1]), uniq))
+    covers = dict(zip(uniq, results))
+    hit = sum(1 for v in results if v)
+    print(f"  resolved {hit}/{len(uniq)} covers")
+    for gdata in data.values():
+        for lst in gdata.values():
+            for row in lst:
+                row.append(covers.get((row[0], row[1])))
 
 
 def main():

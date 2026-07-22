@@ -115,10 +115,20 @@
 			const k = coverKey(r);
 			if (k in covers || coverInflight.has(k)) continue;
 			coverInflight.add(k);
-			coverUrl(r[0], displayName(r[1])).then((u) => {
-				if (u) covers = { ...covers, [k]: u };
-				else fillFromWiki(r);
-			});
+			// r[4] = cover baked in at build time: a URL string, or null when Open
+			// Library had no match (skip straight to the Wikipedia fallback). Older
+			// data with no 5th column (undefined) resolves the cover at runtime.
+			const baked = r[4];
+			if (typeof baked === "string") {
+				covers = { ...covers, [k]: baked };
+			} else if (baked === null) {
+				fillFromWiki(r);
+			} else {
+				coverUrl(r[0], displayName(r[1])).then((u) => {
+					if (u) covers = { ...covers, [k]: u };
+					else fillFromWiki(r);
+				});
+			}
 		}
 	});
 
