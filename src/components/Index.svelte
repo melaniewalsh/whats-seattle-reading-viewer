@@ -10,6 +10,17 @@
 	// "all" (library-wide overview) | "authors" | "titles" | "genres" | "top" | "works"
 	let tab = $state("all");
 
+	// The Data & Methodology section is a collapsed <details>; deep links to its
+	// subheadings (#method-…, from e.g. the works table) open it and scroll to them.
+	let methodOpen = $state(false);
+	function scrollToMethod() {
+		const h = (window.location.hash || "").slice(1);
+		if (h === "data-methodology" || h.startsWith("method-")) {
+			methodOpen = true;
+			setTimeout(() => document.getElementById(h)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+		}
+	}
+
 	// A shared ?tab= / ?author= makes each view linkable.
 	onMount(() => {
 		try {
@@ -19,6 +30,9 @@
 			else if (params.get("author")) tab = "authors";
 			else if (params.get("title")) tab = "titles";
 		} catch {}
+		scrollToMethod();
+		window.addEventListener("hashchange", scrollToMethod);
+		return () => window.removeEventListener("hashchange", scrollToMethod);
 	});
 
 	// Clicking an author (Top authors, or the "by author" on Top works) jumps to
@@ -56,6 +70,9 @@
 				By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project<br />
 				from the University of Washington Information School
 			</p>
+			<p class="wip">
+				This is a work-in-progress. We would love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>!
+			</p>
 		</header>
 
 		<div class="tab-groups">
@@ -91,25 +108,44 @@
 			<Viewer searchMode={tab === "titles" ? "title" : "author"} landing="search" />
 		{/if}
 
-		<details class="about">
-			<summary>About this data &amp; how to read it</summary>
+		<details class="about" id="data-methodology" bind:open={methodOpen}>
+			<summary>Data &amp; Methodology</summary>
 			<div class="about-body">
+				<h3 id="method-checkouts">What counts as a checkout</h3>
 				<p>
 					This tool charts <strong>checkouts</strong> logged by the Seattle Public Library —
-					physical books, ebooks, and audiobooks. Each point is how many times an author's
-					titles were borrowed in that month.
+					physical books, ebooks, and audiobooks. Each point is how many times an author's or
+					work's titles were borrowed in that month. It counts checkouts, not unique readers or
+					holds, so a single popular book can be borrowed thousands of times.
 				</p>
+
+				<h3 id="method-clustering">Why is clustering by work so hard?</h3>
 				<p>
-					<strong>Works vs. editions.</strong> The same book appears many times in the catalog
-					(print, ebook, audiobook, reprints, translations). Use <em>“Show work groups”</em> to
-					cluster editions of one work into a single line. Clustering is automatic and
-					approximate — drag titles between groups to correct it.
+					A single <em>work</em> — say, one novel — appears in the catalog as many separate
+					records: print, ebook, and audiobook editions; reprints and reissues; large-print and
+					translated editions; and re-cataloged copies with slightly different title strings.
+					There's no shared identifier tying them together — the library only began recording
+					ISBNs consistently around 2021, and even those differ per edition — so we cluster by
+					<strong>normalizing and matching the title text</strong>, which is inherently fuzzy.
+					Punctuation, subtitles, series names, and inconsistent cataloging all trip it up, and
+					two genuinely different books can share a title. So clustering is automatic and
+					<strong>approximate</strong>: in the works table you can drag editions between works,
+					split one off, or merge two, and save your grouping.
 				</p>
+
+				<h3 id="method-caveats">Caveats</h3>
 				<p>
-					<strong>Caveats.</strong> Author and title names come straight from library catalog
-					records, which are inconsistently formatted and occasionally merged or misspelled.
-					Titles borrowed fewer than 25 times are left out of an author's per-title breakdown
-					(their total still counts them). Read the trends as indicative, not exact.
+					Author and title names come straight from library catalog records, which are
+					inconsistently formatted and occasionally merged or misspelled. Titles borrowed fewer
+					than 25 times are left out of an author's per-title breakdown (their total still counts
+					them). Genres are inferred from catalog subject headings, which are themselves
+					imperfect. Read the trends as indicative, not exact.
+				</p>
+
+				<h3 id="method-ack">Acknowledgements</h3>
+				<p>
+					Thanks to <strong>David Christensen</strong>, the <strong>Seattle Public Library</strong>,
+					and the <strong>HDSSI</strong> for making this project possible.
 				</p>
 			</div>
 		</details>
@@ -182,6 +218,17 @@
 		color: inherit;
 		font-weight: 600;
 		text-decoration: underline;
+	}
+	.wip {
+		font-family: var(--font-sans);
+		font-size: 0.9rem;
+		line-height: 1.5;
+		color: var(--color-fg);
+		margin: 12px 0 0;
+	}
+	.wip a {
+		color: #357abd;
+		font-weight: 600;
 	}
 	/* Two labeled groups of tabs: Explore (search a thing) | Browse (aggregates). */
 	.tab-groups {
@@ -322,5 +369,22 @@
 	}
 	.about-body p:last-child {
 		margin-bottom: 0;
+	}
+	.about-body h3 {
+		font-family: var(--font-sans);
+		font-size: 0.92rem;
+		font-weight: 700;
+		color: var(--color-fg);
+		margin: 18px 0 6px;
+		scroll-margin-top: 12px;
+	}
+	.about-body h3:first-child {
+		margin-top: 4px;
+	}
+	/* brief highlight when a deep link jumps to a subheading */
+	.about-body h3:target {
+		background: #fff3bf;
+		box-shadow: 0 0 0 4px #fff3bf;
+		border-radius: 2px;
 	}
 </style>

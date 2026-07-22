@@ -17,10 +17,9 @@
 	const GROUPS = [
 		["Fiction", ["Comics & Graphic Novels", "Romance", "Fantasy", "Science Fiction", "Horror",
 			"Mystery", "Thriller & Suspense", "Historical Fiction", "Western", "Mythology & Folklore",
-			"Humor", "Literary & Classic Fiction", "General Fiction", "Poetry", "Fiction"]],
-		["Race, ethnicity & identity", ["African American Fiction", "Asian Fiction",
+			"Humor", "LGBTQIA+ Fiction", "African American Fiction", "Asian Fiction",
 			"Hispanic & Latino Fiction", "Native American Fiction", "Indigenous Fiction",
-			"Jewish Fiction", "LGBTQIA+ Fiction"]],
+			"Jewish Fiction", "Literary & Classic Fiction", "General Fiction", "Poetry", "Fiction"]],
 		["Kids & Young Adult", ["Picture Books & Early Readers", "Young Adult", "Juvenile Fiction",
 			"Juvenile Nonfiction"]],
 		["Nonfiction", ["Memoir & Biography", "True Crime", "Cooking & Food", "Self-Help",

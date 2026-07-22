@@ -1891,7 +1891,7 @@
 					<span class="side-chevron" aria-hidden="true">{tableCollapsed ? "▸" : "▾"}</span>
 				</button>
 				<div class="titles">
-				<p class="works-min-note">Only titles borrowed at least <strong>25 times</strong> all-time are listed here — smaller ones still count toward the author's total. Highlighted rows are works with multiple editions: drag one work onto another to merge them, or expand a work and hit <em>exclude</em> to split an edition off.</p>
+				<p class="works-min-note">Only titles borrowed at least <strong>25 times</strong> all-time are listed here — smaller ones still count toward the author's total. Highlighted rows are works with multiple editions: drag one work onto another to merge them, or expand a work and hit <em>exclude</em> to split an edition off. <a class="works-why" href="#method-clustering">Why is clustering by work so hard?</a></p>
 				<div class="titles-header">
 					<input
 							class="title-filter"
@@ -3396,6 +3396,15 @@
 		font-style: normal;
 		font-weight: 600;
 		color: #c2255c;
+	}
+	.works-why {
+		color: #357abd;
+		font-weight: 600;
+		text-decoration: none;
+		white-space: nowrap;
+	}
+	.works-why:hover {
+		text-decoration: underline;
 	}
 
 	.titles-header {
