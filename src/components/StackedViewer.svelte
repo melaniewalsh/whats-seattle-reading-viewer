@@ -1597,49 +1597,45 @@
 					{/if}
 				{/if}
 			{/if}
-			<p class="meta">
-				{#if isOverview}
-					{abbrevCount(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
-				{:else if searchMode === "title"}
-					by {displayName(current.name)}{#if titleCheckouts != null}{" · "}{abbrevCount(titleCheckouts)} checkouts{/if}
-				{:else}
-					{abbrevCount(current.total)} checkouts · {workGroups.size.toLocaleString()} works
+			<div class="hdr-line">
+				<span class="meta">
+					{#if isOverview}
+						{abbrevCount(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
+					{:else if searchMode === "title"}
+						by {displayName(current.name)}{#if titleCheckouts != null}{" · "}{abbrevCount(titleCheckouts)} checkouts{/if}
+					{:else}
+						{abbrevCount(current.total)} checkouts · {workGroups.size.toLocaleString()} works
+					{/if}
+				</span>
+				{#if lookupLinks}
+					<span class="hdr-sep" aria-hidden="true">·</span>
+					<span class="lookup-wrap">
+						<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere">Learn more <span class="hdr-caret" aria-hidden="true">▾</span></button>
+						{#if lookupOpen}
+							<button class="share-backdrop" aria-label="Close" onclick={() => (lookupOpen = false)}></button>
+							<div class="lookup-menu" role="menu">
+								<a role="menuitem" class="lm-spl" href={lookupLinks.spl} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Seattle Public Library <span aria-hidden="true">↗</span></a>
+								<a role="menuitem" href={lookupLinks.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Wikipedia <span aria-hidden="true">↗</span></a>
+								<a role="menuitem" href={lookupLinks.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Goodreads <span aria-hidden="true">↗</span></a>
+								<a role="menuitem" href={lookupLinks.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>LibraryThing <span aria-hidden="true">↗</span></a>
+								<a role="menuitem" href={lookupLinks.worldcat} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>WorldCat <span aria-hidden="true">↗</span></a>
+							</div>
+						{/if}
+					</span>
 				{/if}
-			</p>
-
-			{#if lookupLinks || (!isOverview && current.variants?.length)}
-				<div class="hdr-actions">
-					{#if lookupLinks}
-						<div class="lookup-wrap">
-							<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere">
-								<span aria-hidden="true">🔎</span> Learn more <span class="hdr-caret" aria-hidden="true">▾</span>
-							</button>
-							{#if lookupOpen}
-								<button class="share-backdrop" aria-label="Close" onclick={() => (lookupOpen = false)}></button>
-								<div class="lookup-menu" role="menu">
-									<a role="menuitem" class="lm-spl" href={lookupLinks.spl} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Seattle Public Library <span aria-hidden="true">↗</span></a>
-									<a role="menuitem" href={lookupLinks.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Wikipedia <span aria-hidden="true">↗</span></a>
-									<a role="menuitem" href={lookupLinks.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Goodreads <span aria-hidden="true">↗</span></a>
-									<a role="menuitem" href={lookupLinks.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>LibraryThing <span aria-hidden="true">↗</span></a>
-									<a role="menuitem" href={lookupLinks.worldcat} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>WorldCat <span aria-hidden="true">↗</span></a>
-								</div>
-							{/if}
-						</div>
-					{/if}
-
-					{#if !isOverview && current.variants?.length}
-						<details class="name-variants">
-							<summary>{current.variants.length} name variants</summary>
-							<ul>
-								{#each current.variants as v}
-									<li>{v}</li>
-								{/each}
-							</ul>
-							<p class="nv-note">The raw <code>Creator</code> spellings the catalog used, clustered into one author — if any look like a different person, the clustering may have over-merged.</p>
-						</details>
-					{/if}
-				</div>
-			{/if}
+				{#if !isOverview && current.variants?.length}
+					<span class="hdr-sep" aria-hidden="true">·</span>
+					<details class="name-variants">
+						<summary>{current.variants.length} name variants</summary>
+						<ul>
+							{#each current.variants as v}
+								<li>{v}</li>
+							{/each}
+						</ul>
+						<p class="nv-note">The raw <code>Creator</code> spellings the catalog used, clustered into one author — if any look like a different person, the clustering may have over-merged.</p>
+					</details>
+				{/if}
+			</div>
 
 						<div class="plot-toolbar">
 					<div class="mode-toggle" role="group" aria-label="Chart type">
@@ -1869,11 +1865,11 @@
 			{#if !isOverview}
 			<div class="split-side" class:open={mobileTableOpen} class:collapsed={tableCollapsed} bind:this={sideEl}>
 				<div class="side-mobile-head">
-					<span>Add / remove works</span>
+					<span>Add/edit works</span>
 					<button class="side-close" onclick={() => (mobileTableOpen = false)}>Done</button>
 				</div>
 				<button class="side-desktop-head" onclick={() => (tableCollapsed = !tableCollapsed)} aria-expanded={!tableCollapsed}>
-					<span>Add/remove works by this author</span>
+					<span>Add/edit works by this author</span>
 					<span class="side-chevron" aria-hidden="true">{tableCollapsed ? "▸" : "▾"}</span>
 				</button>
 				<div class="titles">
@@ -2128,19 +2124,22 @@
 		position: relative;
 	}
 
+	/* A clean underline search field (no boxed gray input). */
 	.search input {
 		width: 100%;
-		padding: 14px 16px;
+		padding: 12px 2px;
 		font-family: var(--font-sans);
-		font-size: 1.05rem;
-		background: var(--color-white);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
+		font-size: 1.15rem;
+		background: none;
+		border: none;
+		border-bottom: 2px solid var(--color-border);
+		border-radius: 0;
+		outline: none; /* override the global reset's 1px box outline */
 	}
 
 	.search input:focus {
-		outline: 2px solid var(--color-focus);
-		outline-offset: 1px;
+		outline: none;
+		border-bottom-color: var(--color-fg);
 	}
 
 	.results {
@@ -2628,41 +2627,40 @@
 		}
 	}
 
-	.author .meta {
+	/* One compact subhead line: "N checkouts · M works · Learn more ▾ · variants". */
+	.hdr-line {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 3px 8px;
+		margin: 3px 0 14px;
 		font-family: var(--font-sans);
 		color: var(--color-fg-light);
-		margin: 3px 0 8px;
 	}
-	/* Compact secondary-action row under the name: "Look up" dropdown + variants. */
-	.hdr-actions {
-		display: flex;
-		align-items: center;
-		justify-content: flex-start;
-		flex-wrap: wrap;
-		gap: 6px 10px;
-		margin: 0 0 12px;
+	.hdr-line .meta {
+		font-family: var(--font-sans);
+		color: var(--color-fg-light);
+		margin: 0;
+	}
+	.hdr-sep {
+		color: var(--color-fg-light);
+		opacity: 0.55;
 	}
 	.hdr-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: inherit;
 		font-weight: 600;
-		padding: 5px 12px;
-		border: 1px solid var(--color-border);
-		border-radius: 999px;
-		background: var(--color-white);
-		color: var(--color-fg);
+		padding: 0;
+		border: none;
+		background: none;
+		color: #357abd;
 		cursor: pointer;
-		transition: border-color 0.12s;
 	}
 	.hdr-chip:hover {
-		border-color: var(--color-fg-light);
+		text-decoration: underline;
 	}
 	.hdr-caret {
 		font-size: 0.7rem;
-		color: var(--color-fg-light);
 	}
 	.lookup-wrap {
 		position: relative;
@@ -2709,36 +2707,26 @@
 	.name-variants {
 		font-family: var(--font-sans);
 		margin: 0;
-		font-size: 0.85rem;
+		font-size: inherit;
 	}
 	/* When open, take the full row so the (long) variant list isn't squeezed. */
 	.name-variants[open] {
 		flex-basis: 100%;
 	}
 	.name-variants summary {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
+		display: inline;
 		cursor: pointer;
-		font-size: 0.8rem;
+		font-size: inherit;
 		font-weight: 600;
-		padding: 5px 12px;
-		border: 1px solid var(--color-border);
-		border-radius: 999px;
-		background: var(--color-white);
-		color: var(--color-fg);
+		color: #357abd;
 		list-style: none;
 		width: fit-content;
 	}
 	.name-variants summary::-webkit-details-marker {
 		display: none;
 	}
-	.name-variants summary::before {
-		content: "ⓘ";
-		color: var(--color-fg-light);
-	}
 	.name-variants summary:hover {
-		border-color: var(--color-fg-light);
+		text-decoration: underline;
 	}
 	.name-variants ul {
 		margin: 8px 0 0;

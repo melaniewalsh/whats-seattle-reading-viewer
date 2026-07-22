@@ -129,6 +129,12 @@
 	function toggleExpand(name) {
 		const n = new Set(expanded); n.has(name) ? n.delete(name) : n.add(name); expanded = n;
 	}
+	// Clicking a genre row plots it (if not already) and toggles its detail. Use the
+	// checkbox to remove it from the chart.
+	function clickGenre(name) {
+		if (!shown.has(name)) shown = new Set(shown).add(name);
+		toggleExpand(name);
+	}
 	function toggleIsolate(k) {
 		isolatedKeys = isolatedKeys.includes(k) ? isolatedKeys.filter((x) => x !== k) : [...isolatedKeys, k];
 	}
@@ -335,27 +341,6 @@
 </script>
 
 <div class="genres">
-	<h2>What genres is Seattle checking out?</h2>
-	<p class="meta">Each genre's share of Seattle Public Library book checkouts, by month · matched on catalog subject headings</p>
-
-	<details class="sh-note">
-		<summary>A note on how genres — especially race and identity ones — are defined</summary>
-		<p>
-			Genres here come from <strong>Library of Congress and BISAC subject headings</strong> in the
-			library's catalog records. Those headings are applied inconsistently, are US-centric, and have
-			been widely critiqued for how they name racial, ethnic, and other identity groups — from Sanford
-			Berman's <em>Prejudices and Antipathies</em> (1971) to more recent work on “othering” in library
-			classification and the “Illegal aliens” heading controversy.
-		</p>
-		<p>
-			So categories like <em>African American</em>, <em>Asian</em>, <em>Hispanic &amp; Latino</em>,
-			<em>Native American</em>, or <em>Jewish</em> fiction reflect <strong>how books were catalogued</strong> —
-			an approximate, contested classification — not the identities of the authors. We also had to
-			<em>aggregate</em> many narrower headings (e.g. “Chinese fiction,” “Bengali Americans fiction”)
-			into one bucket, which flattens real differences. Read them as a rough lens, not an authoritative count.
-		</p>
-	</details>
-
 	{#if loadError}
 		<p class="load-error">{loadError}</p>
 	{:else if !data}
@@ -368,9 +353,9 @@
 			</div>
 			<p class="mode-note">
 				{#if mode === "partition"}
-					Each checkout counted <strong>once</strong>, in the first genre it matches — shares sum to 100%, so declines are real.
+					Each checkout counted <strong>once</strong>, in the first genre it matches — shares sum to 100%
 				{:else}
-					Each genre's <strong>raw</strong> share; books are multi-tagged so these overlap and mostly drift upward over time.
+					Each genre's <strong>raw</strong> share; books are multi-tagged so these overlap
 				{/if}
 			</p>
 		</div>
@@ -422,8 +407,6 @@
 				<button onclick={showAll}>Show all</button><button onclick={hideAll}>Hide all</button>
 			</div>
 		</div>
-		<p class="gtable-hint">Tick a genre to plot it (a handful are shown by default — all of them at once is a mess). Expand one to see the subject terms behind it and its most-checked-out titles.</p>
-
 		<div class="gt-search">
 			<input type="search" class="gt-search-input" bind:value={genreFilter}
 				placeholder="Search genres or subject terms — e.g. vampire, cooking, memoir" aria-label="Search genres" />
@@ -448,7 +431,7 @@
 					{@const g = genreByName[name]}
 					<div class="gt-row genre-row" role="row" class:off={!shown.has(name)}>
 						<span class="gt-cell gt-show"><input type="checkbox" checked={shown.has(name)} onchange={() => toggleShown(name)} aria-label={`Plot ${name}`} /></span>
-						<button class="gt-cell gt-name" onclick={() => toggleExpand(name)} aria-expanded={expanded.has(name)}>
+						<button class="gt-cell gt-name" onclick={() => clickGenre(name)} aria-expanded={expanded.has(name)}>
 							<span class="gt-tri">{expanded.has(name) ? "▾" : "▸"}</span>
 							<span class="gt-sw" style="background:{colorOf(name)}"></span>{name}
 						</button>
@@ -488,6 +471,25 @@
 					</div>
 				{/if}
 		</div>
+
+		<details class="sh-note">
+			<summary>A note on how genres are defined</summary>
+			<p>
+				Genres here come from <strong>Library of Congress and BISAC subject headings</strong> in the
+				library's catalog records. Those headings are applied inconsistently, are US-centric, and have
+				been widely critiqued for how they name racial, ethnic, and other identity groups — from Sanford
+				Berman's <em>Prejudices and Antipathies</em> (1971) to more recent work on “othering” in library
+				classification and the “Illegal aliens” heading controversy.
+			</p>
+			<p>
+				So categories like <em>African American</em>, <em>Asian</em>, <em>Hispanic &amp; Latino</em>,
+				<em>Native American</em>, or <em>Jewish</em> fiction reflect <strong>how books were catalogued</strong> —
+				an approximate, contested classification — not the identities of the authors. We also had to
+				<em>aggregate</em> many narrower headings (e.g. “Chinese fiction,” “Bengali Americans fiction”)
+				into one bucket, which flattens real differences. Read them as a rough lens, not an authoritative count.
+			</p>
+		</details>
+
 		<p class="gsource">Source: Seattle Public Library — Checkouts by Title (data.seattle.gov). Genre via subject-heading match; all books (print + digital, incl. audiobooks). Example titles reflect the partition (first-match) assignment.</p>
 	{/if}
 </div>
