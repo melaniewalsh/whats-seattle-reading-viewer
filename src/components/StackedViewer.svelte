@@ -574,6 +574,42 @@
 		return {ebook: "ebook", audiobook: "audio", print: "print", largeprint: "large print", other: "other"}[f] || f;
 	}
 
+	// Download the current author's (or title's) checkout data as a tidy CSV: one
+	// row per (title, month) with a nonzero count, plus the work-cluster column so
+	// merged editions are traceable. Everything is already loaded client-side.
+	function downloadData() {
+		if (!current || isOverview || !months.length || !current.titles?.length) return;
+		const author = displayName(current.name);
+		const wg = workGroups;
+		const rows = [["author", "work", "title", "format", "month", "checkouts"]];
+		current.titles.forEach((t, idx) => {
+			const work = wg.get(effectiveKey(idx, t.title))?.name || cleanTitleForDisplay(t.title) || t.title;
+			const series = t.series || [];
+			for (let i = 0; i < months.length; i++) {
+				const v = series[i] || 0;
+				if (!v) continue;
+				rows.push([author, titleCase(work), t.title, formatLabel(t.format), months[i], v]);
+			}
+		});
+		const cell = (v) => {
+			const s = String(v ?? "");
+			return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+		};
+		const csv = rows.map((r) => r.map(cell).join(",")).join("\r\n");
+		const stub =
+			(headingText || author || "spl-checkouts").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") ||
+			"spl-checkouts";
+		const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `${stub}-spl-checkouts.csv`;
+		document.body.appendChild(a);
+		a.click();
+		a.remove();
+		URL.revokeObjectURL(url);
+	}
+
 	// Make a new group. If titles are currently single-selected, seed the group
 	// with them (so "select a few, then hit New group" bundles them in one go)
 	// and clear the single selection.
@@ -1672,6 +1708,11 @@
 				<button class="chart-action" onclick={downloadChart} title="Download the chart as a PNG image">
 					<span aria-hidden="true">⤓</span> Download image
 				</button>
+				{#if !isOverview}
+					<button class="chart-action" onclick={downloadData} title="Download this checkout data as a CSV spreadsheet">
+						<span aria-hidden="true">⤓</span> Download data
+					</button>
+				{/if}
 				<div class="share-wrap">
 					<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
 						<span aria-hidden="true">↗</span> Share
