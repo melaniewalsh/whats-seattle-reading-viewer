@@ -564,7 +564,7 @@
 		height: 100%;
 		min-width: 2px;
 		border-radius: 3px;
-		background: rgba(53, 122, 189, 0.16);
+		background: #7361b6;
 	}
 	.ta-bar-num {
 		flex: none;
