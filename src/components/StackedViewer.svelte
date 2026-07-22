@@ -1705,14 +1705,14 @@
 			{/if}
 
 			<div class="chart-actions">
-				<button class="chart-action" onclick={downloadChart} title="Download the chart as a PNG image">
-					<span aria-hidden="true">⤓</span> Download image
-				</button>
 				{#if !isOverview}
 					<button class="chart-action" onclick={downloadData} title="Download this checkout data as a CSV spreadsheet">
 						<span aria-hidden="true">⤓</span> Download data
 					</button>
 				{/if}
+				<button class="chart-action" onclick={downloadChart} title="Download the chart as a PNG image">
+					<span aria-hidden="true">⤓</span> Download image
+				</button>
 				<div class="share-wrap">
 					<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
 						<span aria-hidden="true">↗</span> Share
