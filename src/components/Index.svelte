@@ -10,7 +10,7 @@
 	// Four top-level views. "search" and "rankings" carry a sub-kind toggle.
 	let tab = $state("overview"); // "overview" | "search" | "genres" | "rankings"
 	let searchKind = $state("author"); // Search tab: "author" | "title"
-	let rankKind = $state("authors"); // Rankings tab: "authors" | "works"
+	let rankKind = $state("works"); // Rankings tab: "authors" | "works"
 
 	// The Data & Methodology section is a collapsed <details>; deep links to its
 	// subheadings (#method-…, from e.g. the works table) open it and scroll to them.
@@ -32,7 +32,7 @@
 			if (t === "genres") tab = "genres";
 			else if (t === "rankings" || t === "top" || t === "works") {
 				tab = "rankings";
-				rankKind = t === "works" || kind === "works" ? "works" : "authors";
+				rankKind = t === "top" || kind === "authors" ? "authors" : "works";
 			} else if (t === "search" || t === "authors" || t === "titles") {
 				tab = "search";
 				searchKind = t === "titles" || kind === "title" ? "title" : "author";

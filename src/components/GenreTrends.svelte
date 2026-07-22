@@ -73,7 +73,11 @@
 			const order = [...d.genres].sort((a, b) => sum(b.partition) - sum(a.partition)).map((g) => g.name);
 			genreByName = by;
 			genreOrder = order;
-			shown = new Set(order.slice(0, DEFAULT_SHOWN));
+			// Plot five genres but isolate Romance: only Romance's line shows, the
+			// other four stay in the legend, greyed out (click to bring them back).
+			const romance = by["Romance"] ? "Romance" : order[0];
+			shown = new Set([romance, ...order.filter((n) => n !== romance)].slice(0, 5));
+			isolatedKeys = [`g:${romance}`];
 			lo = 0;
 			hi = d.months.length - 1;
 			data = d;

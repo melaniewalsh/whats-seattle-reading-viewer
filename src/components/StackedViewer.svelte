@@ -1882,24 +1882,6 @@
 							bind:value={titleFilter}
 							autocomplete="off"
 					/>
-					<div class="sort-toggle" role="group" aria-label="Sort titles">
-						<span class="sort-label">Sort:</span>
-						<button
-								type="button"
-								class:active={titleSort === "work"}
-								onclick={() => (titleSort = "work")}
-						>By work</button>
-						<button
-								type="button"
-								class:active={titleSort === "borrowed"}
-								onclick={() => (titleSort = "borrowed")}
-						>Most borrowed</button>
-						<button
-								type="button"
-								class:active={titleSort === "alpha"}
-								onclick={() => (titleSort = "alpha")}
-						>A–Z</button>
-					</div>
 				</div>
 				{#if titleSort === "work"}
 					<div class="works-actions">
@@ -2268,11 +2250,10 @@
 	/* the author search + "most borrowed" chips, relocated below the chart --
 	   in the same gray panel styling as the "on the chart" section below it */
 	.picker-below {
-		margin: 8px 0 14px;
-		padding: 14px 16px;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-gray-100);
+		margin: 10px 0 16px;
+		padding: 0;
+		border: none;
+		background: none;
 	}
 	/* format legend for the overview "by format" area chart */
 	.format-legend {
