@@ -175,15 +175,12 @@
 		font-family: var(--font-sans);
 		font-size: 0.9rem;
 		line-height: 1.5;
-		color: var(--color-fg-light);
+		color: var(--color-fg);
 		margin: 10px 0 0;
 	}
 	.byline a {
-		color: #357abd;
+		color: inherit;
 		font-weight: 600;
-		text-decoration: none;
-	}
-	.byline a:hover {
 		text-decoration: underline;
 	}
 	/* Two labeled groups of tabs: Explore (search a thing) | Browse (aggregates). */
