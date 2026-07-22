@@ -184,46 +184,58 @@
 		ctx.font = `13px ${IMG_SANS}`;
 		ctx.fillText(`Seattle Public Library · ${yearLabel(year)}`, padX, 68);
 
-		const cntX = W - padX;
+		// The count column is [abbreviated number][data bar], matching the on-screen table.
+		const rightX = W - padX;
+		const barTrackW = 150;
+		const barX0 = rightX - barTrackW; // bars start here, grow rightward
+		const numX = barX0 - 14; // right edge of the right-aligned number
+		const numColLeft = numX - 54; // left edge of the number label
 		let y = titleH;
 		ctx.fillStyle = "#999999";
 		ctx.font = `700 11px ${IMG_SANS}`;
+		ctx.textAlign = "left";
 		ctx.fillText("#", padX, y);
 		ctx.fillText("WORK", padX + 40, y);
-		ctx.textAlign = "right";
-		ctx.fillText("CHECKOUTS", cntX, y);
-		ctx.textAlign = "left";
+		ctx.fillText("CHECKOUTS", numColLeft, y);
 		ctx.strokeStyle = "#dddddd";
 		ctx.lineWidth = 1;
 		ctx.beginPath();
 		ctx.moveTo(padX, y + 9);
-		ctx.lineTo(cntX, y + 9);
+		ctx.lineTo(rightX, y + 9);
 		ctx.stroke();
 
 		y += headH;
+		const max = maxCount || 1;
 		list.forEach((r, i) => {
 			const baseY = y + rowH * i;
+			const lineY = baseY + 22; // the title line — count/bar align to it
 			ctx.fillStyle = "#999999";
 			ctx.font = `13px ${IMG_SANS}`;
-			ctx.fillText(String(i + 1), padX, baseY + 24);
-			ctx.textAlign = "right";
-			ctx.fillStyle = "#1a1a1a";
-			ctx.font = `15px ${IMG_SANS}`;
-			const cnt = r[3].toLocaleString();
-			ctx.fillText(cnt, cntX, baseY + 24);
-			const cntW = ctx.measureText(cnt).width;
 			ctx.textAlign = "left";
-			const nameMaxW = cntX - (padX + 40) - cntW - 20;
+			ctx.fillText(String(i + 1), padX, lineY);
+			// abbreviated count, right-aligned
+			ctx.fillStyle = "#1a1a1a";
+			ctx.font = `600 14px ${IMG_SANS}`;
+			ctx.textAlign = "right";
+			ctx.fillText(compactNumber(r[3]), numX, lineY);
+			// data bar
+			ctx.fillStyle = "#7361b6";
+			ctx.beginPath();
+			ctx.roundRect(barX0, lineY - 13, Math.max((r[3] / max) * barTrackW, 4), 16, 3);
+			ctx.fill();
+			// title + author
+			ctx.textAlign = "left";
+			const nameMaxW = numColLeft - 12 - (padX + 40);
 			ctx.fillStyle = "#1a1a1a";
 			ctx.font = `600 15px ${IMG_SANS}`;
-			ctx.fillText(ellipsize(ctx, r[0], nameMaxW), padX + 40, baseY + 22);
+			ctx.fillText(ellipsize(ctx, titleCase(r[0]), nameMaxW), padX + 40, lineY);
 			ctx.fillStyle = "#777777";
 			ctx.font = `13px ${IMG_SANS}`;
 			ctx.fillText(ellipsize(ctx, "by " + displayName(r[1]), nameMaxW), padX + 40, baseY + 39);
 			ctx.strokeStyle = "#eeeeee";
 			ctx.beginPath();
 			ctx.moveTo(padX, baseY + rowH);
-			ctx.lineTo(cntX, baseY + rowH);
+			ctx.lineTo(rightX, baseY + rowH);
 			ctx.stroke();
 		});
 
