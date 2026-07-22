@@ -53,12 +53,12 @@
 	<div class="wiki-act">
 		{#if onTrend}
 			<button class="wiki-trend" onclick={onTrend}>
-				<span aria-hidden="true">📈</span> See SPL trend
+				<span aria-hidden="true">📈</span> See checkout trend at Seattle Public Library
 			</button>
 		{/if}
 		{#if links.spl}
 			<a class="wiki-spl" href={links.spl} target="_blank" rel="noopener noreferrer"
-				>Find at Seattle Public Library <span aria-hidden="true">↗</span></a
+				>Find in the Seattle Public Library catalog <span aria-hidden="true">↗</span></a
 			>
 		{/if}
 		{#if !status.loading}

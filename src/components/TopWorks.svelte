@@ -361,7 +361,7 @@
 
 		{#if genreTags.length}
 			<details class="ta-note">
-				<summary>Subject tags that define this genre ({genreTags.length})</summary>
+				<summary>Subject tags that define this genre</summary>
 				<p class="ta-tags">{#each genreTags as t}<code class="ta-tag">{t}</code>{/each}</p>
 			</details>
 		{/if}
@@ -552,9 +552,10 @@
 		color: var(--color-fg-light);
 		font-variant-numeric: tabular-nums;
 	}
-	.ta-count {
+	td.ta-count {
 		width: 33%;
-		vertical-align: middle;
+		vertical-align: top;
+		padding-top: 12px;
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}

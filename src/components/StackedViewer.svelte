@@ -2069,7 +2069,7 @@
 									</span>
 									<button class="tt-cell tt-edition ed-summary" onclick={() => toggleExpand(w.key)}>
 											{#if multi}
-												<span class="cluster-badge" class:has-match={w.matchCount > 0}>{w.editions.length} editions</span>{#if w.matchCount > 0}<span class="match-note"> · {w.matchCount} match{w.matchCount === 1 ? "" : "es"}</span>{/if}{workOpen(w) ? "" : " — click to edit"}
+												<span class="cluster-badge" class:has-match={w.matchCount > 0}>{w.editions.length} editions</span>{#if w.matchCount > 0}<span class="match-note"> · {w.matchCount} match{w.matchCount === 1 ? "" : "es"}</span>{/if}
 											{:else}
 												<span class="ed-single">1 edition</span>{workOpen(w) ? "" : " — click for full title"}
 											{/if}

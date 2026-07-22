@@ -147,9 +147,8 @@
 		margin: 0 auto 12px;
 	}
 	.headline h1 {
-		font-family: var(--font-display);
-		/* Fraunces is a variable font with real weights, so use a semibold weight
-		   for the display headline instead of faking it with a text-stroke. */
+		/* Match the plot-title font (Source Serif 4) rather than the Fraunces display. */
+		font-family: var(--font-serif);
 		font-weight: 600;
 		font-size: clamp(2.3rem, 6vw, 3.6rem);
 		line-height: 1.08;
