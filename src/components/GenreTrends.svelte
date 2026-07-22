@@ -387,14 +387,9 @@
 				{#if shareOpen}
 					<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
 					<div class="share-menu" role="menu">
-						<button role="menuitem" class="share-item fb" onclick={() => shareTo("facebook")}><span class="share-ic" aria-hidden="true">f</span> Facebook</button>
-						<button role="menuitem" class="share-item tw" onclick={() => shareTo("twitter")}><span class="share-ic" aria-hidden="true">𝕏</span> Twitter</button>
-						<button role="menuitem" class="share-item bs" onclick={() => shareTo("bluesky")}><span class="share-ic" aria-hidden="true">🦋</span> Bluesky</button>
-						<button role="menuitem" class="share-item li" onclick={() => shareTo("linkedin")}><span class="share-ic" aria-hidden="true">in</span> LinkedIn</button>
-						<div class="share-sep"></div>
-						<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true">▦</span> Share image</button>
 						<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true">⧉</span> Copy image</button>
 						<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true">🔗</span> Copy link</button>
+						<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true">↗</span> Share via…</button>
 					</div>
 				{/if}
 			</div>

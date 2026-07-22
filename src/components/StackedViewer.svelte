@@ -2124,22 +2124,24 @@
 		position: relative;
 	}
 
-	/* A clean underline search field (no boxed gray input). */
+	/* A clean white box, like the genres search (no gray reset-outline). */
 	.search input {
 		width: 100%;
-		padding: 12px 2px;
+		box-sizing: border-box;
+		padding: 13px 16px;
 		font-family: var(--font-sans);
-		font-size: 1.15rem;
-		background: none;
-		border: none;
-		border-bottom: 2px solid var(--color-border);
-		border-radius: 0;
+		font-size: 1.1rem;
+		background: var(--color-white);
+		color: var(--color-fg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
 		outline: none; /* override the global reset's 1px box outline */
 	}
 
 	.search input:focus {
 		outline: none;
-		border-bottom-color: var(--color-fg);
+		border-color: #3f88cc;
+		box-shadow: 0 0 0 3px rgba(63, 136, 204, 0.15);
 	}
 
 	.results {
