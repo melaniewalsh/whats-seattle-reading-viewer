@@ -353,8 +353,8 @@
 							</td>
 							<td class="ta-count">
 								<span class="ta-bar">
-									<span class="ta-bar-track"><span class="ta-bar-fill" style="width:{Math.max((row[2] / maxCount) * 100, 1)}%"></span></span>
 									<span class="ta-bar-num" title={row[2].toLocaleString()}>{compactNumber(row[2])}</span>
+									<span class="ta-bar-track"><span class="ta-bar-fill" style="width:{Math.max((row[2] / maxCount) * 100, 1)}%"></span></span>
 								</span>
 							</td>
 						</tr>
@@ -624,8 +624,8 @@
 	}
 	.ta-bar-num {
 		flex: none;
-		min-width: 4.25rem;
-		text-align: left;
+		min-width: 3.75rem;
+		text-align: right;
 	}
 	.ta-name {
 		font-weight: 600;
