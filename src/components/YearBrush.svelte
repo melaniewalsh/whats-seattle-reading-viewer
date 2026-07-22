@@ -17,9 +17,9 @@
 	const uid = $props.id();
 
 	let width = $state(680); // measured from the container
-	const TRACK_Y = 11; // vertical center of the slider line
-	const R = 8; // radius of the draggable dots
-	const PAD = 12; // horizontal padding so the dots never clip
+	const TRACK_Y = 8; // vertical center of the slider line
+	const R = 6; // radius of the draggable dots
+	const PAD = 10; // horizontal padding so the dots never clip
 	const height = TRACK_Y * 2;
 
 	// Set the range from a typed-in year (reverts the field if it's not a year
@@ -207,16 +207,16 @@
 
 	.year-input {
 		flex: none;
-		width: 4.2em;
-		padding: 4px 6px;
+		width: 3.6em;
+		padding: 2px 4px;
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: 0.75rem;
 		font-weight: 600;
 		text-align: center;
-		color: var(--color-fg);
+		color: var(--color-fg-light);
 		background: var(--color-white);
-		border: 1.5px solid var(--color-border);
-		border-radius: 8px;
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
 	}
 	.year-input:hover {
 		border-color: var(--color-fg-light);
@@ -263,14 +263,14 @@
 	/* the full track: a thin gray line */
 	.track {
 		stroke: var(--color-gray-300);
-		stroke-width: 3;
+		stroke-width: 2;
 		stroke-linecap: round;
 	}
 
-	/* the selected span: a thicker line in the site ink */
+	/* the selected span: a slightly stronger muted line */
 	.track-sel {
-		stroke: var(--color-fg);
-		stroke-width: 3;
+		stroke: var(--color-fg-light);
+		stroke-width: 2;
 		stroke-linecap: round;
 	}
 
@@ -281,15 +281,15 @@
 
 	/* a solid dot you slide along the line */
 	.dot {
-		fill: var(--color-fg);
+		fill: var(--color-fg-light);
 		stroke: var(--color-white);
-		stroke-width: 2.5;
+		stroke-width: 2;
 		transition: r 0.1s ease;
 	}
 
 	.handle:hover .dot,
 	.handle:focus-visible .dot {
-		r: 9.5;
+		r: 7.5;
 	}
 
 	.handle:focus-visible .dot {

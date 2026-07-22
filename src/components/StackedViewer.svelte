@@ -61,7 +61,7 @@
 	let currentSlug = $state(null); // slug of the selected author (for shareable URLs)
 	let isOverview = $state(false); // true when showing the library-wide "all checkouts" landing view (no per-title data)
 	let mobileTableOpen = $state(false); // on narrow screens the title table opens as a drawer
-	let tableCollapsed = $state(false); // on desktop the title table can be collapsed to just its header
+	let tableCollapsed = $state(true); // the works table starts collapsed; opened via its header or "Make a custom work"
 	let autoHidAuthorTotal = $state(false); // whether we've auto-hidden the author-total line for this author yet
 	let shareMsg = $state(""); // transient toast after copying a share link
 	let shareOpen = $state(false); // whether the share-platform popover is open
@@ -175,7 +175,7 @@
 		autoHidAuthorTotal = false; autoGroupNote = ""; workAssign = {};
 		expandedWorks = []; workOrder = "checkouts"; titleSort = "work";
 		yearLo = 0; yearHi = Math.max(months.length - 1, 0);
-		mobileTableOpen = false; tableCollapsed = false; query = ""; results = [];
+		mobileTableOpen = false; tableCollapsed = true; query = ""; results = [];
 		wikiHover = false;
 		try {
 			const url = new URL(window.location.href);
@@ -618,6 +618,9 @@
 		singleIdxs = [];
 		groups = [...groups, g];
 		activeGroupId = g.id;
+		// Open the works table so there's somewhere to add editions to the new work.
+		tableCollapsed = false;
+		mobileTableOpen = true;
 		return g;
 	}
 
@@ -1720,14 +1723,9 @@
 					{#if shareOpen}
 						<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
 						<div class="share-menu" role="menu">
-							<button role="menuitem" class="share-item fb" onclick={() => shareTo("facebook")}><span class="share-ic" aria-hidden="true">f</span> Facebook</button>
-							<button role="menuitem" class="share-item tw" onclick={() => shareTo("twitter")}><span class="share-ic" aria-hidden="true">𝕏</span> Twitter</button>
-							<button role="menuitem" class="share-item bs" onclick={() => shareTo("bluesky")}><span class="share-ic" aria-hidden="true">🦋</span> Bluesky</button>
-							<button role="menuitem" class="share-item li" onclick={() => shareTo("linkedin")}><span class="share-ic" aria-hidden="true">in</span> LinkedIn</button>
-							<div class="share-sep"></div>
-							<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true">▦</span> Share image</button>
 							<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true">⧉</span> Copy image</button>
 							<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true">🔗</span> Copy link</button>
+							<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true">↗</span> Share via…</button>
 						</div>
 					{/if}
 				</div>
@@ -1817,12 +1815,6 @@
 										title="Edit which editions are in this work"
 										onclick={() => (activeGroupId = activeGroupId === g.id ? null : g.id)}
 								>{g.id === activeGroupId ? "Done" : "Edit"}</button>
-								<button
-										class="chip-only"
-										class:on={isIsolated(`g${g.id}`)}
-										title="Show only this (click more than one to compare)"
-										onclick={() => toggleIsolate(`g${g.id}`)}
-								>Only</button>
 								<button class="chip-remove" title="Remove from the chart" onclick={() => removeGroup(g.id)}>×</button>
 							</li>
 						{/each}
@@ -1834,14 +1826,8 @@
 											class="chip-name"
 											onmousemove={(e) => (hoverTip = { text: current.titles[idx].title, x: e.clientX, y: e.clientY })}
 											onmouseleave={() => (hoverTip = null)}
-									>{current.titles[idx].title}</span>
+									>{cleanTitleForDisplay(current.titles[idx].title)}</span>
 								</span>
-								<button
-										class="chip-only"
-										class:on={isIsolated(`s${idx}`)}
-										title="Show only this (click more than one to compare)"
-										onclick={() => toggleIsolate(`s${idx}`)}
-								>Only</button>
 								<button class="chip-remove" title="Remove this title" onclick={() => toggleTitle(idx)}>×</button>
 							</li>
 						{/each}
@@ -2147,7 +2133,7 @@
 		padding: 14px 16px;
 		font-family: var(--font-sans);
 		font-size: 1.05rem;
-		background: var(--color-input-bg);
+		background: var(--color-white);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-md);
 	}
@@ -2645,15 +2631,16 @@
 	.author .meta {
 		font-family: var(--font-sans);
 		color: var(--color-fg-light);
-		margin: 4px 0 12px;
+		margin: 3px 0 8px;
 	}
 	/* Compact secondary-action row under the name: "Look up" dropdown + variants. */
 	.hdr-actions {
 		display: flex;
-		align-items: flex-start;
+		align-items: center;
+		justify-content: flex-start;
 		flex-wrap: wrap;
-		gap: 8px 12px;
-		margin: 0 0 18px;
+		gap: 6px 10px;
+		margin: 0 0 12px;
 	}
 	.hdr-chip {
 		display: inline-flex;
