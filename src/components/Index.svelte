@@ -7,8 +7,10 @@
 	import TopWorks from "$components/TopWorks.svelte";
 
 	const copy = getContext("copy");
-	// "all" (library-wide overview) | "authors" | "titles" | "genres" | "top" | "works"
-	let tab = $state("all");
+	// Four top-level views. "search" and "rankings" carry a sub-kind toggle.
+	let tab = $state("overview"); // "overview" | "search" | "genres" | "rankings"
+	let searchKind = $state("author"); // Search tab: "author" | "title"
+	let rankKind = $state("authors"); // Rankings tab: "authors" | "works"
 
 	// The Data & Methodology section is a collapsed <details>; deep links to its
 	// subheadings (#method-…, from e.g. the works table) open it and scroll to them.
@@ -21,53 +23,74 @@
 		}
 	}
 
-	// A shared ?tab= / ?author= makes each view linkable.
+	// A shared ?tab= / ?author= makes each view linkable (old tab names still work).
 	onMount(() => {
 		try {
 			const params = new URLSearchParams(window.location.search);
 			const t = params.get("tab");
-			if (["top", "works", "genres", "titles", "authors", "all"].includes(t)) tab = t;
-			else if (params.get("author")) tab = "authors";
-			else if (params.get("title")) tab = "titles";
+			const kind = params.get("kind");
+			if (t === "genres") tab = "genres";
+			else if (t === "rankings" || t === "top" || t === "works") {
+				tab = "rankings";
+				rankKind = t === "works" || kind === "works" ? "works" : "authors";
+			} else if (t === "search" || t === "authors" || t === "titles") {
+				tab = "search";
+				searchKind = t === "titles" || kind === "title" ? "title" : "author";
+			} else if (params.get("title")) { tab = "search"; searchKind = "title"; }
+			else if (params.get("author")) { tab = "search"; searchKind = "author"; }
+			else if (t === "overview" || t === "all") tab = "overview";
 		} catch {}
 		scrollToMethod();
 		window.addEventListener("hashchange", scrollToMethod);
 		return () => window.removeEventListener("hashchange", scrollToMethod);
 	});
 
-	// The "All" tab resets to the library-wide overview — clear any ?author/?title
-	// so the freshly-mounted Viewer loads the all-checkouts total, not a saved link.
-	function goAll() {
+	// "Overview" resets to the library-wide total — clear any ?author/?title so the
+	// freshly-mounted Viewer loads the all-checkouts line, not a saved deep link.
+	function goOverview() {
 		try {
 			const url = new URL(window.location);
-			["author", "title", "genre", "year", "tab"].forEach((k) => url.searchParams.delete(k));
+			["author", "title", "genre", "year", "tab", "kind"].forEach((k) => url.searchParams.delete(k));
 			window.history.replaceState({}, "", url);
 		} catch {}
-		tab = "all";
+		tab = "overview";
 	}
 
-	// Clicking an author (Top authors, or the "by author" on Top works) jumps to
-	// the By-author view with that author loaded (Viewer reads ?author on mount).
+	// Switch the Search tab between author and title, clearing any loaded ?author/
+	// ?title so the fresh search box isn't hijacked by a stale deep link.
+	function setSearchKind(kind) {
+		try {
+			const url = new URL(window.location);
+			["author", "title"].forEach((k) => url.searchParams.delete(k));
+			window.history.replaceState({}, "", url);
+		} catch {}
+		searchKind = kind;
+		tab = "search";
+	}
+
+	// Clicking an author (from Rankings, or a card's "See checkout trend") opens the
+	// Search view with that author loaded (Viewer reads ?author on mount).
 	function openAuthor(slug) {
 		try {
 			const url = new URL(window.location);
 			url.searchParams.set("author", slug);
-			["tab", "genre", "year", "title"].forEach((k) => url.searchParams.delete(k));
+			["tab", "kind", "genre", "year", "title"].forEach((k) => url.searchParams.delete(k));
 			window.history.replaceState({}, "", url);
 		} catch {}
-		tab = "authors";
+		searchKind = "author";
+		tab = "search";
 	}
 
-	// Clicking a work title on Top works opens the By-title view for that title
-	// (Viewer reads ?title on mount).
+	// Clicking a work title opens the Search view for that title (reads ?title).
 	function openTitle(title) {
 		try {
 			const url = new URL(window.location);
 			url.searchParams.set("title", title);
-			["tab", "genre", "year", "author"].forEach((k) => url.searchParams.delete(k));
+			["tab", "kind", "genre", "year", "author"].forEach((k) => url.searchParams.delete(k));
 			window.history.replaceState({}, "", url);
 		} catch {}
-		tab = "titles";
+		searchKind = "title";
+		tab = "search";
 	}
 </script>
 
@@ -87,36 +110,39 @@
 		</header>
 
 		<div class="tab-groups">
-			<div class="tab-group">
-				<span class="tab-group-label">Explore trends</span>
-				<div class="sticker-tabs trends" role="tablist" aria-label="Explore trends">
-					<button class="sticker-tab" role="tab" aria-selected={tab === "all"} class:active={tab === "all"} onclick={goAll}>All</button>
-					<div class="bys">
-						<button class="sticker-tab" role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
-						<button class="sticker-tab" role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
-						<button class="sticker-tab" role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>By genre</button>
-					</div>
-				</div>
+			<div class="sticker-tabs main-tabs" role="tablist" aria-label="Views">
+				<button class="sticker-tab" role="tab" aria-selected={tab === "overview"} class:active={tab === "overview"} onclick={goOverview}>Overview</button>
+				<button class="sticker-tab" role="tab" aria-selected={tab === "search"} class:active={tab === "search"} onclick={() => (tab = "search")}>Search</button>
+				<button class="sticker-tab" role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>Genres</button>
+				<button class="sticker-tab" role="tab" aria-selected={tab === "rankings"} class:active={tab === "rankings"} onclick={() => (tab = "rankings")}>Rankings</button>
 			</div>
-			<div class="tab-group">
-				<span class="tab-group-label">Rankings</span>
-				<div class="sticker-tabs rankings" role="tablist" aria-label="Rankings">
-					<button class="sticker-tab" role="tab" aria-selected={tab === "top"} class:active={tab === "top"} onclick={() => (tab = "top")}>Top authors</button>
-					<button class="sticker-tab" role="tab" aria-selected={tab === "works"} class:active={tab === "works"} onclick={() => (tab = "works")}>Top works</button>
+			{#if tab === "search"}
+				<div class="subtabs" role="tablist" aria-label="Search by">
+					<button class="subtab" class:active={searchKind === "author"} aria-selected={searchKind === "author"} onclick={() => setSearchKind("author")}>Author</button>
+					<button class="subtab" class:active={searchKind === "title"} aria-selected={searchKind === "title"} onclick={() => setSearchKind("title")}>Title</button>
 				</div>
-			</div>
+			{:else if tab === "rankings"}
+				<div class="subtabs" role="tablist" aria-label="Ranking">
+					<button class="subtab" class:active={rankKind === "authors"} aria-selected={rankKind === "authors"} onclick={() => (rankKind = "authors")}>Authors</button>
+					<button class="subtab" class:active={rankKind === "works"} aria-selected={rankKind === "works"} onclick={() => (rankKind = "works")}>Works</button>
+				</div>
+			{/if}
 		</div>
 
 		{#if tab === "genres"}
 			<GenreTrends />
-		{:else if tab === "top"}
-			<TopAuthors {openAuthor} />
-		{:else if tab === "works"}
-			<TopWorks {openAuthor} {openTitle} />
-		{:else if tab === "all"}
+		{:else if tab === "rankings"}
+			{#if rankKind === "works"}
+				<TopWorks {openAuthor} {openTitle} />
+			{:else}
+				<TopAuthors {openAuthor} />
+			{/if}
+		{:else if tab === "overview"}
 			<Viewer searchMode="author" landing="overview" />
 		{:else}
-			<Viewer searchMode={tab === "titles" ? "title" : "author"} landing="search" />
+			{#key searchKind}
+				<Viewer searchMode={searchKind} landing="search" />
+			{/key}
 		{/if}
 
 		<details class="about" id="data-methodology" bind:open={methodOpen}>
@@ -241,28 +267,12 @@
 		color: #357abd;
 		font-weight: 600;
 	}
-	/* Two labeled groups of tabs: Explore (search a thing) | Browse (aggregates). */
+	/* One row of four view tabs, with a segmented sub-toggle under Search / Rankings. */
 	.tab-groups {
-		display: flex;
-		justify-content: center;
-		align-items: flex-end;
-		flex-wrap: wrap;
-		gap: 10px 24px;
-		margin: 22px auto 26px;
-	}
-	.tab-group {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 6px;
-	}
-	.tab-group-label {
-		font-family: var(--font-sans);
-		font-size: 0.66rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--color-fg-light);
+		margin: 22px auto 26px;
 	}
 	/* top-level view tabs: bold "sticker" buttons with a hard offset shadow */
 	.sticker-tabs {
@@ -271,20 +281,6 @@
 		justify-content: center;
 		gap: 10px;
 		flex-wrap: wrap;
-	}
-	/* the three "By ..." tabs are grouped so "All" can sit apart from them */
-	.bys {
-		display: flex;
-		gap: 10px;
-		flex-wrap: wrap;
-		justify-content: center;
-	}
-	/* On narrow screens the Explore-trends group stacks: "All" on its own line,
-	   the three "By ..." tabs centered beneath it (instead of a wonky wrap). */
-	@media (max-width: 560px) {
-		.sticker-tabs.trends {
-			flex-direction: column;
-		}
 	}
 	.sticker-tab {
 		--sh: var(--color-fg);
@@ -308,15 +304,35 @@
 		transform: translate(2px, 2px);
 		box-shadow: 1px 1px 0 var(--sh);
 	}
-	.trends .sticker-tab.active {
+	.sticker-tab.active {
 		--sh: #16324f;
 		background: #357abd;
 		color: var(--color-white);
 	}
-	.rankings .sticker-tab.active {
-		--sh: #33224a;
-		background: #6a4c93;
-		color: var(--color-white);
+	/* segmented sub-toggle (Author/Title, Authors/Works) beneath the main tabs */
+	.subtabs {
+		display: inline-flex;
+		gap: 2px;
+		margin-top: 12px;
+		padding: 3px;
+		border-radius: 999px;
+		background: var(--color-gray-100, #f0f0f0);
+	}
+	.subtab {
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
+		padding: 5px 18px;
+		border: none;
+		border-radius: 999px;
+		background: none;
+		color: var(--color-fg-light);
+		cursor: pointer;
+	}
+	.subtab.active {
+		background: var(--color-white);
+		color: var(--color-fg);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
 	}
 	/* OurWorldinData-style source + attribution footer */
 	.chart-footer {
