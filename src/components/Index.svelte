@@ -52,6 +52,9 @@
 			<img class="logo" src="{base}/favicon.png" alt="" width="88" height="88" />
 			<h1>{copy.title}</h1>
 			<p class="dek">{copy.dek}</p>
+			<p class="byline">
+				By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project from the University of Washington Information School
+			</p>
 		</header>
 
 		<div class="tab-groups">
@@ -162,10 +165,25 @@
 	}
 	.dek {
 		font-family: var(--font-sans);
-		font-size: 1.1rem;
-		line-height: 1.5;
+		font-size: 1.15rem;
+		line-height: 1.4;
 		color: var(--color-fg);
 		margin: 0;
+	}
+	.byline {
+		font-family: var(--font-sans);
+		font-size: 0.9rem;
+		line-height: 1.5;
+		color: var(--color-fg-light);
+		margin: 10px 0 0;
+	}
+	.byline a {
+		color: #357abd;
+		font-weight: 600;
+		text-decoration: none;
+	}
+	.byline a:hover {
+		text-decoration: underline;
 	}
 	/* Two labeled groups of tabs: Explore (search a thing) | Browse (aggregates). */
 	.tab-groups {
