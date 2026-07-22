@@ -21,9 +21,11 @@
 	let shareMsg = $state("");
 	let shareOpen = $state(false);
 	let termsMap = $state({});
-	// Wikipedia preview: which row's card is showing. Desktop opens it on hover
-	// (with a small intent delay); touch devices open it on tap instead.
+	// Wikipedia preview: which row's card is showing. Desktop previews it on hover
+	// (with a small intent delay); a click or tap PINS it open (so you can use its
+	// links) until you click away.
 	let hoverKey = $state(null);
+	let pinnedKey = $state(null);
 	let hoverTimer;
 	let isTouch = $state(false);
 	function enterName(key) {
@@ -36,11 +38,20 @@
 		clearTimeout(hoverTimer);
 		hoverKey = null;
 	}
-	// On touch, tapping a title toggles its card; on desktop it goes to the trend.
-	function activateName(key, go) {
-		if (isTouch) hoverKey = hoverKey === key ? null : key;
-		else go();
+	// Clicking (or tapping) a title pins its card open instead of navigating away —
+	// the card's "See SPL trend" link handles navigation.
+	function activateName(key) {
+		clearTimeout(hoverTimer);
+		hoverKey = null;
+		pinnedKey = pinnedKey === key ? null : key;
 	}
+	// Drop any open card when the filters change the list out from under it.
+	$effect(() => {
+		genre;
+		year;
+		pinnedKey = null;
+		hoverKey = null;
+	});
 
 	onMount(async () => {
 		try {
@@ -345,7 +356,7 @@
 
 		<p class="ta-caption">
 			Most-borrowed <strong>{genre === "All genres" ? "works" : `${genre} works`}</strong>
-			at the Seattle Public Library, {yearLabel(year)}.
+			at the Seattle Public Library, {yearLabel(year)}. <span class="ta-hint">Hover or tap a title for more.</span>
 		</p>
 
 		{#if genreTags.length}
@@ -381,8 +392,8 @@
 									</span>
 									<span class="tw-text">
 										<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
-											<button class="tw-title tw-titlelink" aria-haspopup="dialog" onclick={() => activateName(key, () => openTitle(row[0]))}>{titleCase(row[0])}</button>
-											{#if hoverKey === key}
+											<button class="tw-title tw-titlelink" aria-haspopup="dialog" onclick={() => activateName(key)}>{titleCase(row[0])}</button>
+											{#if hoverKey === key || pinnedKey === key}
 												<span class="wiki-pop"><WikiCard query={row[0]} author={displayName(row[1])} kind="work" links={u} onTrend={() => openTitle(row[0])} /></span>
 											{/if}
 										</span>
@@ -412,8 +423,8 @@
 		{/if}
 	{/if}
 
-	{#if isTouch && hoverKey}
-		<button class="wiki-backdrop" aria-label="Close" onclick={() => (hoverKey = null)}></button>
+	{#if pinnedKey}
+		<button class="wiki-backdrop" aria-label="Close" onclick={() => (pinnedKey = null)}></button>
 	{/if}
 </div>
 
@@ -462,6 +473,11 @@
 	}
 	.ta-caption strong {
 		color: var(--color-fg);
+	}
+	.ta-hint {
+		color: var(--color-fg-light);
+		font-style: italic;
+		opacity: 0.85;
 	}
 	.ta-note {
 		margin: -6px 0 16px;
@@ -644,9 +660,15 @@
 		position: fixed;
 		inset: 0;
 		z-index: 40;
-		background: rgba(0, 0, 0, 0.12);
+		background: none;
 		border: none;
 		cursor: default;
+	}
+	/* dim the page behind the bottom-sheet card on touch/narrow screens */
+	@media (hover: none), (max-width: 599px) {
+		.wiki-backdrop {
+			background: rgba(0, 0, 0, 0.12);
+		}
 	}
 	.tw-by {
 		display: inline-block;
