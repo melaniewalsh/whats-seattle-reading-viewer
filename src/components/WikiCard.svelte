@@ -109,30 +109,28 @@
 		clear: both;
 		border-top: 1px solid var(--color-border);
 		padding-top: 10px;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 8px;
 	}
 	.wiki-trend {
-		display: flex;
-		align-items: center;
-		gap: 7px;
-		width: 100%;
-		padding: 8px 10px;
-		margin-bottom: 9px;
 		border: none;
-		border-radius: 8px;
-		background: #6a4c93;
-		color: var(--color-white);
-		font-family: var(--font-sans);
-		font-size: 0.85rem;
-		font-weight: 700;
+		background: none;
+		padding: 0;
 		cursor: pointer;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: #6a4c93;
 	}
 	.wiki-trend:hover {
-		background: #583d7d;
+		text-decoration: underline;
 	}
 	.wiki-wiki {
 		display: inline-block;
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: 0.82rem;
 		font-weight: 600;
 		color: #357abd;
 		text-decoration: none;

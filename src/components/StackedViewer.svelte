@@ -1471,7 +1471,7 @@
 			<input
 					id="author-search"
 					type="search"
-					placeholder={searchMode === "title" ? "Search a title — try Braiding Sweetgrass, or Educated" : "Search an author — try Octavia Butler, or Mo Willems"}
+					placeholder={searchMode === "title" ? "Search a title" : "Search an author"}
 					bind:value={query}
 					autocomplete="off"
 			/>
@@ -1854,7 +1854,7 @@
 					<span class="side-chevron" aria-hidden="true">{tableCollapsed ? "▸" : "▾"}</span>
 				</button>
 				<div class="titles">
-				<p class="works-min-note">Only titles borrowed at least <strong>25 times</strong> all-time are listed here — smaller ones still count toward the author's total.</p>
+				<p class="works-min-note">Only titles borrowed at least <strong>25 times</strong> all-time are listed here — smaller ones still count toward the author's total. Highlighted rows are works with multiple editions: drag one work onto another to merge them, or expand a work and hit <em>exclude</em> to split an edition off.</p>
 				<div class="titles-header">
 					<input
 							class="title-filter"
@@ -1883,7 +1883,6 @@
 					</div>
 				</div>
 				{#if titleSort === "work"}
-					<p class="table-hint">Highlighted rows are works with multiple editions. Drag one work onto another to merge them; expand a work and hit <em>exclude</em> to split an edition off.</p>
 					<div class="works-actions">
 						<button type="button" class="wa-btn" onclick={saveGroupings} title="Remember this author's grouping in your browser, so your fixes are here next time">💾 Save my groupings</button>
 						<button type="button" class="wa-btn wa-reset" onclick={clearGroupings} title="Discard custom grouping and go back to automatic clustering">↺ Reset to automatic</button>
@@ -3352,6 +3351,11 @@
 		line-height: 1.4;
 		color: var(--color-fg-light);
 		margin: 0 0 10px;
+	}
+	.works-min-note em {
+		font-style: normal;
+		font-weight: 600;
+		color: #c2255c;
 	}
 
 	.titles-header {

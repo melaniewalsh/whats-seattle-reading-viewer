@@ -386,11 +386,7 @@
 												<span class="wiki-pop"><WikiCard query={row[0]} author={displayName(row[1])} kind="work" links={u} onTrend={() => openTitle(row[0])} /></span>
 											{/if}
 										</span>
-										{#if row[2]}
-											<button class="tw-by ta-authorlink" onclick={() => openAuthor(row[2])}>by {displayName(row[1])}</button>
-										{:else}
-											<span class="tw-by">by {displayName(row[1])}</span>
-										{/if}
+										<span class="tw-by">by {displayName(row[1])}</span>
 									</span>
 								</div>
 							</td>

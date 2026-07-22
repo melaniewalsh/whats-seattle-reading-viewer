@@ -472,7 +472,7 @@
                     {#each groupSiblings.filter((s) => s.values[hoverIndex] > 0) as sib}
                         <span class="ed-pill" class:on={sib.titleIdx === selectedItem.titleIdx} style="--pc: {sib.color}">
                             <span class="ed-pill-fmt">{FMT_LABEL[sib.format] ?? sib.format ?? 'edition'}</span>
-                            <span class="ed-pill-val">{sib.values[hoverIndex].toLocaleString()}{groupTotal ? ` · ${Math.round((sib.values[hoverIndex] / groupTotal) * 100)}%` : ''}</span>
+                            <span class="ed-pill-val">{groupTotal ? `${Math.round((sib.values[hoverIndex] / groupTotal) * 100)}%` : sib.values[hoverIndex].toLocaleString()}</span>
                         </span>
                     {/each}
                 </div>
