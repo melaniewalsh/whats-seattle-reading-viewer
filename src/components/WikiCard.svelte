@@ -53,7 +53,7 @@
 	<div class="wiki-act">
 		{#if onTrend}
 			<button class="wiki-trend" onclick={onTrend}>
-				<span aria-hidden="true">📈</span> See checkout trend at Seattle Public Library
+				See checkout trend at Seattle Public Library <span aria-hidden="true">📈 →</span>
 			</button>
 		{/if}
 		{#if links.spl}
@@ -128,6 +128,7 @@
 		font-size: 0.82rem;
 		font-weight: 600;
 		color: #6a4c93;
+		text-align: left;
 	}
 	.wiki-trend:hover {
 		text-decoration: underline;

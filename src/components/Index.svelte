@@ -35,6 +35,17 @@
 		return () => window.removeEventListener("hashchange", scrollToMethod);
 	});
 
+	// The "All" tab resets to the library-wide overview — clear any ?author/?title
+	// so the freshly-mounted Viewer loads the all-checkouts total, not a saved link.
+	function goAll() {
+		try {
+			const url = new URL(window.location);
+			["author", "title", "genre", "year", "tab"].forEach((k) => url.searchParams.delete(k));
+			window.history.replaceState({}, "", url);
+		} catch {}
+		tab = "all";
+	}
+
 	// Clicking an author (Top authors, or the "by author" on Top works) jumps to
 	// the By-author view with that author loaded (Viewer reads ?author on mount).
 	function openAuthor(slug) {
@@ -79,7 +90,7 @@
 			<div class="tab-group">
 				<span class="tab-group-label">Explore trends</span>
 				<div class="sticker-tabs trends" role="tablist" aria-label="Explore trends">
-					<button class="sticker-tab" role="tab" aria-selected={tab === "all"} class:active={tab === "all"} onclick={() => (tab = "all")}>All</button>
+					<button class="sticker-tab" role="tab" aria-selected={tab === "all"} class:active={tab === "all"} onclick={goAll}>All</button>
 					<div class="bys">
 						<button class="sticker-tab" role="tab" aria-selected={tab === "authors"} class:active={tab === "authors"} onclick={() => (tab = "authors")}>By author</button>
 						<button class="sticker-tab" role="tab" aria-selected={tab === "titles"} class:active={tab === "titles"} onclick={() => (tab = "titles")}>By title</button>
@@ -336,8 +347,8 @@
 	}
 
 	.about {
-		max-width: 640px;
-		margin: 40px auto 0;
+		max-width: none;
+		margin: 40px 0 0;
 		font-family: var(--font-sans);
 		border: none;
 		background: none;
