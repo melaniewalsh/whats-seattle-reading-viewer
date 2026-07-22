@@ -53,7 +53,8 @@
 			<h1>{copy.title}</h1>
 			<p class="dek">{copy.dek}</p>
 			<p class="byline">
-				By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project from the University of Washington Information School
+				By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project<br />
+				from the University of Washington Information School
 			</p>
 		</header>
 
