@@ -498,7 +498,6 @@
 	}
 	.ta-hint {
 		color: var(--color-fg-light);
-		font-style: italic;
 		opacity: 0.85;
 	}
 	.ta-note {

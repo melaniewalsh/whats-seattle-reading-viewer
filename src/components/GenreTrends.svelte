@@ -13,12 +13,14 @@
 	import GenreChart from "$components/GenreChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 
-	// Which of the three table sections each genre belongs to.
+	// Which table section each genre belongs to.
 	const GROUPS = [
 		["Fiction", ["Comics & Graphic Novels", "Romance", "Fantasy", "Science Fiction", "Horror",
 			"Mystery", "Thriller & Suspense", "Historical Fiction", "Western", "Mythology & Folklore",
-			"Humor", "LGBTQIA+ Fiction", "African American Fiction", "Literary & Classic Fiction",
-			"General Fiction", "Poetry", "Fiction"]],
+			"Humor", "Literary & Classic Fiction", "General Fiction", "Poetry", "Fiction"]],
+		["Race, ethnicity & identity", ["African American Fiction", "Asian Fiction",
+			"Hispanic & Latino Fiction", "Native American Fiction", "Indigenous Fiction",
+			"Jewish Fiction", "LGBTQIA+ Fiction"]],
 		["Kids & Young Adult", ["Picture Books & Early Readers", "Young Adult", "Juvenile Fiction",
 			"Juvenile Nonfiction"]],
 		["Nonfiction", ["Memoir & Biography", "True Crime", "Cooking & Food", "Self-Help",
@@ -46,6 +48,13 @@
 	let showOther = $state(false);  // the "Other / Unclassified" partition line
 	let expanded = $state(new Set());
 	let genreFilter = $state(""); // search box: filter the table by genre name OR subject term
+	// Long sections start collapsed so the table isn't a wall of rows.
+	let collapsedGroups = $state(new Set(["Kids & Young Adult", "Nonfiction"]));
+	function toggleGroup(name) {
+		const s = new Set(collapsedGroups);
+		s.has(name) ? s.delete(name) : s.add(name);
+		collapsedGroups = s;
+	}
 	let isolatedKeys = $state([]);
 	let genreOrder = $state([]);     // stable display order (by size, for colors)
 	let genreByName = $state({});
@@ -431,7 +440,11 @@
 			{#each GROUPS as [groupName, names] (groupName)}
 				{@const inGroup = names.filter((n) => genreByName[n] && genreMatches(n)).sort((a, b) => sum(genreByName[b].partition) - sum(genreByName[a].partition))}
 				{#if inGroup.length}
-				<div class="gt-group" role="row">{groupName}</div>
+				{@const isCollapsed = collapsedGroups.has(groupName) && !genreFilter}
+				<button type="button" class="gt-group" class:collapsed={isCollapsed} role="row" aria-expanded={!isCollapsed} onclick={() => toggleGroup(groupName)}>
+					<span class="gt-group-tri" aria-hidden="true">{isCollapsed ? "▸" : "▾"}</span>{groupName}<span class="gt-group-count">{inGroup.length}</span>
+				</button>
+				{#if !isCollapsed}
 				{#each inGroup as name (name)}
 					{@const g = genreByName[name]}
 					<div class="gt-row genre-row" role="row" class:off={!shown.has(name)}>
@@ -452,6 +465,7 @@
 						</div>
 					{/if}
 				{/each}
+				{/if}
 			{/if}
 			{/each}
 				<div class="gt-row genre-row other-row" class:off={!showOther}>
@@ -544,8 +558,11 @@
 	.gtable { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; font-family: var(--font-sans); }
 	.gt-head, .gt-row { display: grid; grid-template-columns: 48px 1fr 72px; align-items: center; gap: 10px; padding: 8px 12px; }
 	.gt-head { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg-light); font-weight: 700; border-bottom: 1px solid var(--color-border); }
-	.gt-group { padding: 7px 12px; background: var(--color-gray-100, #f2f2f2); border-top: 1px solid var(--color-border); font-family: var(--font-sans); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-fg); }
+	.gt-group { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 12px; background: var(--color-gray-100, #f2f2f2); border: none; border-top: 1px solid var(--color-border); font-family: var(--font-sans); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-fg); text-align: left; cursor: pointer; }
+	.gt-group:hover { background: var(--color-gray-200, #e8e8e8); }
 	.gt-group:first-of-type { border-top: none; }
+	.gt-group-tri { font-size: 0.6rem; color: var(--color-fg-light); width: 0.7em; }
+	.gt-group-count { margin-left: 4px; font-weight: 700; color: var(--color-fg-light); letter-spacing: 0; }
 	.genre-row { border-top: 1px solid var(--color-gray-100); font-size: 0.9rem; }
 	.genre-row:first-of-type { border-top: none; }
 	.genre-row.off { opacity: 0.55; }
