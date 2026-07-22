@@ -1538,7 +1538,7 @@
 			<div class="top-authors">
 				<span class="quick-label">Most borrowed:</span>
 				{#each topTitles as t}
-					<button class="chip" onclick={() => selectTitle(t)}>{t.title}</button>
+					<button class="chip" onclick={() => selectTitle(t)}>{cleanTitleForDisplay(t.title)}</button>
 				{/each}
 				<button class="chip surprise-chip" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
 			</div>
@@ -4030,6 +4030,21 @@
 
 		.author h2 {
 			font-size: 1.6rem;
+		}
+		/* Reserve the top-right corner (first line only) so a long title doesn't run
+		   under the floating "Add/edit titles" button. The .h2-hoverable heading is
+		   used only in the by-author / by-title views, i.e. exactly when that button
+		   exists — the overview heading is a plain <h2> and keeps the full width.
+		   The wrap is inline-block for the desktop hover-card anchor; on mobile the
+		   card is a fixed bottom sheet, so block is fine and lets the float work. */
+		.h2-wrap {
+			display: block;
+		}
+		.author .h2-hoverable::before {
+			content: "";
+			float: right;
+			width: 140px;
+			height: 34px;
 		}
 
 		.groups-panel {
