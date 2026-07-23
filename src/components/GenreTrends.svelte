@@ -10,6 +10,7 @@
 	// looks like everything's rising until you make it a true partition.
 	import { onMount } from "svelte";
 	import { base } from "$app/paths";
+	import { compactNumber } from "$utils/format.js";
 	import GenreChart from "$components/GenreChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 
@@ -165,6 +166,17 @@
 		if (shown.size === 1) return [...shown][0];
 		return null;
 	});
+	// Total checkouts for that single genre over the visible year window — shown as a
+	// subtitle, like the "X checkouts" line on the author/title plots.
+	const soleGenreTotal = $derived.by(() => {
+		if (!soleGenre || !data) return null;
+		const g = genreByName[soleGenre];
+		if (!g) return null;
+		return sum(seriesArr(g).slice(lo, hi + 1));
+	});
+	const yearRange = $derived(
+		viewMonths.length ? `${viewMonths[0].slice(0, 4)}–${viewMonths[viewMonths.length - 1].slice(0, 4)}` : "",
+	);
 
 	// --- Share / download (mirrors the "By author" tab exactly) --------------
 	const plotTitle = $derived(mode === "partition"
@@ -359,11 +371,13 @@
 		<p class="loading"><span class="spinner" aria-hidden="true"></span>Loading genre trends…</p>
 	{:else}
 		<div class="modebar">
-			{#if soleGenre}
-				<h2 class="genre-title">{soleGenre}</h2>
-			{/if}
+			<h2 class="genre-title">{soleGenre || "Genres"}</h2>
 			<p class="mode-note">
-				Each genre's <strong>raw</strong> share of checkouts — books are multi-tagged, so genres overlap.
+				{#if soleGenre && soleGenreTotal != null}
+					{compactNumber(soleGenreTotal)} checkouts · {yearRange} · raw share of all book checkouts
+				{:else}
+					Each genre's <strong>raw</strong> share of checkouts — books are multi-tagged, so genres overlap.
+				{/if}
 			</p>
 		</div>
 

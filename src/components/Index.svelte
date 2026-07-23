@@ -336,8 +336,8 @@
 		z-index: 50;
 		width: 100vw;
 		margin-left: calc(50% - 50vw);
-		background: #3f88cc;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.14);
+		background: #fff;
+		border-bottom: 1px solid var(--color-border);
 	}
 	.masthead-inner {
 		max-width: 1120px;
@@ -367,35 +367,38 @@
 	.mast-title {
 		font-family: var(--font-display, var(--font-serif));
 		font-weight: 700;
-		font-size: 1.15rem;
+		font-size: 1.2rem;
 		line-height: 1;
-		color: #111;
+		letter-spacing: -0.01em;
+		color: #3f88cc;
 		white-space: nowrap;
 	}
 	.mast-nav {
 		display: flex;
 		align-items: stretch;
-		gap: 2px;
+		gap: 4px;
 	}
 	.mast-link {
 		display: flex;
 		align-items: center;
 		font-family: var(--font-sans);
-		font-size: 0.95rem;
-		font-weight: 600;
-		color: #111;
+		font-size: 0.78rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.07em;
+		color: #3f88cc;
 		background: none;
 		border: none;
 		border-bottom: 2px solid transparent;
-		padding: 0 14px;
+		padding: 0 13px;
 		cursor: pointer;
 		transition: border-color 0.12s;
 	}
 	.mast-link:hover {
-		border-bottom-color: rgba(0, 0, 0, 0.35);
+		border-bottom-color: rgba(63, 136, 204, 0.4);
 	}
 	.mast-link.active {
-		border-bottom-color: rgba(0, 0, 0, 0.8);
+		border-bottom-color: #3f88cc;
 	}
 	@media (max-width: 560px) {
 		.masthead-inner {
