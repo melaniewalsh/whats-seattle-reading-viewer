@@ -171,9 +171,14 @@
 				<h2 class="sec-title">{searchKind === "title" ? "Seattle's Work Trends" : "Seattle's Author Trends"}</h2>
 				<p class="sec-sub">Look up any author or title's borrowing trend at the Seattle Public Library.</p>
 			</header>
-			<div class="subtabs" role="tablist" aria-label="Search by">
-				<button class="subtab" class:active={searchKind === "author"} aria-selected={searchKind === "author"} onclick={() => setSearchKind("author")}>Author</button>
-				<button class="subtab" class:active={searchKind === "title"} aria-selected={searchKind === "title"} onclick={() => setSearchKind("title")}>Title</button>
+			<div class="search-controls">
+				<label class="filter-field">
+					<span>Search by</span>
+					<select value={searchKind} onchange={(e) => setSearchKind(e.currentTarget.value)}>
+						<option value="author">Author</option>
+						<option value="title">Title</option>
+					</select>
+				</label>
 			</div>
 		{/if}
 
@@ -514,6 +519,34 @@
 		line-height: 1.4;
 		color: var(--color-fg-light);
 		margin: 6px 0 0;
+	}
+	/* "Search by" field — mirrors the Most Borrowed tab's Show/Genre/Year dropdowns. */
+	.search-controls {
+		margin-top: 2px;
+	}
+	.filter-field {
+		display: inline-flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 0.78rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--color-fg-light);
+	}
+	.filter-field select {
+		font-family: var(--font-sans);
+		font-size: 0.95rem;
+		font-weight: 500;
+		text-transform: none;
+		letter-spacing: 0;
+		color: var(--color-fg);
+		padding: 8px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-white);
+		cursor: pointer;
+		min-width: 180px;
 	}
 	.subtabs {
 		display: inline-flex;
