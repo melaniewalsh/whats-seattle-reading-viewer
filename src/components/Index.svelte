@@ -268,13 +268,8 @@
 				</ul>
 
 				<h3 class="about-h">Students</h3>
-				<p>We've worked with several undergraduate students at the University of Washington, primarily through the <a href="https://humanitiesdatalab.ds.lib.uw.edu/hdssi/" target="_blank" rel="noopener noreferrer">Humanities Data Science Summer Institute</a>:</p>
-				<ul class="about-list">
-					<li>Hongyuan (Tony) Dong</li>
-					<li>Em Backstrom</li>
-					<li>Karalee Harris</li>
-					<li>Daniella Maor</li>
-				</ul>
+				<p>We've worked with several undergraduate students at the University of Washington, primarily through the <a href="https://humanitiesdatalab.ds.lib.uw.edu/hdssi/" target="_blank" rel="noopener noreferrer">Humanities Data Science Summer Institute</a>: Hongyuan (Tony) Dong, Em Backstrom, Karalee Harris, and Daniella Maor.</p>
+				<p>This summer, we worked with Alexis Martin, Bob, Tiago Ramos, and Karalee Harris.</p>
 
 				<h3 class="about-h">Acknowledgments</h3>
 				<p>We are thankful to David Christensen, who spearheads the SPL's open data effort and has been a very helpful collaborator and guide.</p>
