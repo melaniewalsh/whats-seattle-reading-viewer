@@ -38,6 +38,7 @@
 				searchKind = t === "titles" || kind === "title" ? "title" : "author";
 			} else if (params.get("title")) { tab = "search"; searchKind = "title"; }
 			else if (params.get("author")) { tab = "search"; searchKind = "author"; }
+			else if (t === "about") tab = "about";
 			else if (t === "overview" || t === "all") tab = "overview";
 		} catch {}
 		scrollToMethod();
@@ -139,31 +140,21 @@
 <svelte:boundary onerror={(e) => console.error(e)}>
 	<article>
 		<div class="masthead">
-			<div class="masthead-inner">
+			<div class="masthead-top">
 				<button class="mast-home" class:here={tab === "overview"} onclick={goOverview} aria-label="{copy.title} — home">
-					<img class="mast-logo" src="{base}/favicon.png" alt="" width="34" height="34" />
+					<img class="mast-logo" src="{base}/favicon.png" alt="" width="30" height="30" />
 					<span class="mast-title">{copy.title}</span>
 				</button>
-				<nav class="mast-nav" aria-label="Sections">
-					<button class="mast-link" aria-current={tab === "search" ? "page" : undefined} class:active={tab === "search"} onclick={() => (tab = "search")}>Search</button>
-					<button class="mast-link" aria-current={tab === "genres" ? "page" : undefined} class:active={tab === "genres"} onclick={() => (tab = "genres")}>Genres</button>
-					<button class="mast-link" aria-current={tab === "rankings" ? "page" : undefined} class:active={tab === "rankings"} onclick={() => (tab = "rankings")}>Most Borrowed</button>
+				<nav class="mast-meta" aria-label="Site">
+					<button class="mast-metalink" class:active={tab === "about"} aria-current={tab === "about" ? "page" : undefined} onclick={() => (tab = "about")}>About</button>
 				</nav>
 			</div>
+			<nav class="mast-sections" aria-label="Sections">
+				<button class="pill" class:active={tab === "rankings"} aria-current={tab === "rankings" ? "page" : undefined} onclick={() => (tab = "rankings")}>Most Borrowed</button>
+				<button class="pill" class:active={tab === "search"} aria-current={tab === "search" ? "page" : undefined} onclick={() => (tab = "search")}>Search</button>
+				<button class="pill" class:active={tab === "genres"} aria-current={tab === "genres" ? "page" : undefined} onclick={() => (tab = "genres")}>Genres</button>
+			</nav>
 		</div>
-
-		{#if tab === "overview"}
-			<header class="hero">
-				<h1>{copy.title}</h1>
-				<p class="dek">{copy.dek}</p>
-				<p class="byline">
-					By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project
-				</p>
-				<p class="wip">
-					This is a work-in-progress. We would love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>!
-				</p>
-			</header>
-		{/if}
 
 		{#if tab === "search"}
 			<header class="section-masthead">
@@ -187,7 +178,7 @@
 				<TopAuthors {openAuthor} {rankKind} {setRankKind} />
 			{/if}
 		{:else if tab === "overview"}
-			<Viewer searchMode="author" landing="overview" />
+			<p class="tagline">{copy.dek}</p>
 			<nav class="hub" aria-label="Explore">
 				<button class="hub-card" onclick={() => (tab = "rankings")}>
 					<span class="hub-emoji" aria-hidden="true">📚</span>
@@ -208,6 +199,14 @@
 					<span class="hub-go">Explore →</span>
 				</button>
 			</nav>
+			<Viewer searchMode="author" landing="overview" />
+		{:else if tab === "about"}
+			<section class="about-page">
+				<h2 class="about-title">About</h2>
+				<p><strong>What Is Seattle Reading?</strong> explores millions of checkouts from the Seattle Public Library — search any author or title's borrowing trend over time, browse the most-borrowed books and authors, and see how the city's taste in genres has shifted.</p>
+				<p>By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project. This is a work-in-progress — we would love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>.</p>
+				<p class="about-more">For how the data is sourced and how works are clustered, see <a href="#data-methodology" onclick={() => (methodOpen = true)}>Data &amp; Methodology</a> below.</p>
+			</section>
 		{:else}
 			{#key searchKind}
 				<Viewer searchMode={searchKind} landing="search" {setSearchKind} />
@@ -283,66 +282,47 @@
 		margin: 0 auto;
 		padding: 0 24px 80px;
 	}
-	/* Editorial hero — a soft raised card that sets the title block off from the
-	   page, Pudding-style. */
-	.hero {
-		max-width: 780px;
-		margin: 40px auto 40px;
-		padding: 46px 48px 38px;
+	/* Overview: a single understated tagline sits above the hub cards + plot. */
+	.tagline {
+		font-family: var(--font-sans);
+		font-size: clamp(1.1rem, 2.3vw, 1.4rem);
+		line-height: 1.35;
+		color: var(--color-fg-light);
 		text-align: center;
-		background: #f6f8fb;
-		border: 1px solid #e7edf4;
-		border-radius: 22px;
-		box-shadow: 0 16px 40px rgba(31, 45, 61, 0.07), 0 2px 6px rgba(31, 45, 61, 0.04);
+		max-width: 620px;
+		margin: 34px auto 26px;
 	}
-	@media (max-width: 600px) {
-		.hero {
-			margin: 24px auto 30px;
-			padding: 30px 22px 26px;
-			border-radius: 16px;
-		}
+	/* About page — project details, moved off the landing. */
+	.about-page {
+		max-width: 680px;
+		margin: 34px auto 12px;
+		font-family: var(--font-sans);
 	}
-	.hero h1 {
+	.about-title {
 		font-family: var(--font-display, var(--font-serif));
 		font-weight: 700;
-		font-size: clamp(2.3rem, 6vw, 3.6rem);
-		line-height: 1.08;
-		letter-spacing: -0.005em;
-		margin: 0 0 16px;
+		font-size: clamp(1.7rem, 3.4vw, 2.5rem);
 		color: var(--color-fg);
+		margin: 0 0 18px;
 	}
-	.dek {
-		font-family: var(--font-sans);
-		font-size: 1.15rem;
-		line-height: 1.4;
+	.about-page p {
+		font-size: 1.05rem;
+		line-height: 1.6;
 		color: var(--color-fg);
-		margin: 0;
+		margin: 0 0 14px;
 	}
-	.byline {
-		font-family: var(--font-sans);
-		font-size: 0.9rem;
-		line-height: 1.5;
-		color: var(--color-fg);
-		margin: 10px 0 0;
-	}
-	.byline a {
-		color: inherit;
+	.about-page a {
+		color: #357abd;
 		font-weight: 600;
 		text-decoration: underline;
 	}
-	.wip {
-		font-family: var(--font-sans);
-		font-size: 0.9rem;
-		line-height: 1.5;
-		color: var(--color-fg);
-		margin: 12px 0 0;
+	.about-page .about-more {
+		font-size: 0.95rem;
+		color: var(--color-fg-light);
 	}
-	.wip a {
-		color: #357abd;
-		font-weight: 600;
-	}
-	/* Sticky masthead: brand/home on the left, section nav on the right. Breaks out
-	   to the full viewport width so it reads as a real site header. */
+	/* Pudding-style sticky masthead: a slim top strip (wordmark + About) over a
+	   centered row of little section pills. Breaks out to the full viewport width
+	   so it reads as a real site header. */
 	.masthead {
 		position: sticky;
 		top: 0;
@@ -352,18 +332,17 @@
 		background: #fff;
 		border-bottom: 1px solid var(--color-border);
 	}
-	.masthead-inner {
+	.masthead-top {
 		max-width: 1008px;
 		margin: 0 auto;
-		min-height: 54px;
+		min-height: 46px;
 		display: flex;
-		align-items: stretch;
+		align-items: center;
 		justify-content: space-between;
 		gap: 16px;
-		padding: 0 24px;
+		padding: 6px 24px 0;
 	}
 	.mast-home {
-		align-self: center;
 		display: inline-flex;
 		align-items: center;
 		gap: 9px;
@@ -374,69 +353,86 @@
 	}
 	.mast-logo {
 		display: block;
-		width: 34px;
-		height: 34px;
+		width: 30px;
+		height: 30px;
 	}
 	.mast-title {
 		font-family: var(--font-sans);
 		font-weight: 800;
-		font-size: 0.95rem;
+		font-size: 0.92rem;
 		line-height: 1;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
 		color: #3f88cc;
 		white-space: nowrap;
 	}
-	.mast-nav {
-		display: flex;
-		align-items: stretch;
-		gap: 4px;
-	}
-	.mast-link {
+	/* Top-right meta links (About, …) — small and understated. */
+	.mast-meta {
 		display: flex;
 		align-items: center;
+		gap: 14px;
+	}
+	.mast-metalink {
 		font-family: var(--font-sans);
-		font-size: 0.78rem;
+		font-size: 0.72rem;
 		font-weight: 700;
 		text-transform: uppercase;
-		letter-spacing: 0.07em;
-		color: #3f88cc;
+		letter-spacing: 0.08em;
+		color: #97a2ad;
 		background: none;
 		border: none;
-		border-bottom: 2px solid transparent;
-		padding: 0 13px;
+		padding: 4px 2px;
 		cursor: pointer;
-		transition: border-color 0.12s;
+		transition: color 0.12s;
+		outline: none;
 	}
-	.mast-link:hover {
-		border-bottom-color: rgba(63, 136, 204, 0.4);
+	.mast-metalink:hover { color: var(--color-fg); }
+	.mast-metalink.active { color: #3f88cc; }
+	.mast-metalink:focus-visible {
+		outline: 2px solid rgba(63, 136, 204, 0.5);
+		outline-offset: 2px;
+		border-radius: 4px;
 	}
-	.mast-link.active {
-		border-bottom-color: #3f88cc;
+	/* Section pills — the primary nav, a centered row of little buttons. */
+	.mast-sections {
+		display: flex;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 8px;
+		padding: 8px 24px 11px;
 	}
-	/* On phones there isn't room for the wordmark AND the three tabs without
-	   crunching — drop the title text (the logo still goes home) and let the
-	   tabs breathe. */
+	.pill {
+		font-family: var(--font-sans);
+		font-size: 0.78rem;
+		font-weight: 600;
+		letter-spacing: 0.01em;
+		color: #45566a;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		padding: 5px 16px;
+		cursor: pointer;
+		transition: background 0.12s, border-color 0.12s, color 0.12s;
+		outline: none;
+	}
+	.pill:hover {
+		border-color: #b6c2ce;
+		color: var(--color-fg);
+	}
+	.pill.active {
+		background: #3f88cc;
+		border-color: #3f88cc;
+		color: #fff;
+	}
+	.pill:focus-visible {
+		outline: 2px solid rgba(63, 136, 204, 0.5);
+		outline-offset: 2px;
+	}
 	@media (max-width: 600px) {
-		.masthead-inner {
-			padding: 0 14px;
-			gap: 8px;
-		}
-		.mast-title {
-			display: none;
-		}
-		.mast-logo {
-			width: 30px;
-			height: 30px;
-		}
-		.mast-nav {
-			gap: 2px;
-		}
-		.mast-link {
-			padding: 0 10px;
-			font-size: 0.72rem;
-			letter-spacing: 0.04em;
-		}
+		.masthead-top { padding: 6px 14px 0; }
+		.mast-title { font-size: 0.82rem; }
+		.mast-sections { padding: 7px 14px 10px; gap: 6px; }
+		.pill { padding: 5px 13px; font-size: 0.74rem; }
 	}
 
 	/* Hub cards on the Overview landing — guide into each section. */
