@@ -258,9 +258,28 @@
 		{:else if tab === "about"}
 			<section class="about-page">
 				<h2 class="about-title">About</h2>
-				<p><strong>What Is Seattle Reading?</strong> explores millions of checkouts from the Seattle Public Library — search any author or title's borrowing trend over time, browse the most-borrowed books and authors, and see how the city's taste in genres has shifted.</p>
-				<p>By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project. This is a work-in-progress — we would love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>.</p>
-				<p class="about-more">For how the data is sourced and how works are clustered, see <a href="#data-methodology" onclick={() => (methodOpen = true)}>Data &amp; Methodology</a> below.</p>
+				<p>The <strong>What's Seattle Reading?</strong> project explores contemporary reading trends with unique open data provided by the Seattle Public Library.</p>
+				<p>The project is directed by <a href="https://melaniewalsh.org/" target="_blank" rel="noopener noreferrer">Melanie Walsh</a>, Assistant Professor in the Information School and Adjunct Assistant Professor in the English Department at the University of Washington.</p>
+
+				<h3 class="about-h">Team</h3>
+				<ul class="about-list">
+					<li><a href="https://melaniewalsh.org/" target="_blank" rel="noopener noreferrer">Melanie Walsh</a> — Assistant Professor, Information School, University of Washington</li>
+					<li>Neel Gupta — PhD Student, Information School, University of Washington</li>
+				</ul>
+
+				<h3 class="about-h">Students</h3>
+				<p>We've worked with several undergraduate students at the University of Washington, primarily through the <a href="https://humanitiesdatalab.ds.lib.uw.edu/hdssi/" target="_blank" rel="noopener noreferrer">Humanities Data Science Summer Institute</a>:</p>
+				<ul class="about-list">
+					<li>Hongyuan (Tony) Dong</li>
+					<li>Em Backstrom</li>
+					<li>Karalee Harris</li>
+					<li>Daniella Maor</li>
+				</ul>
+
+				<h3 class="about-h">Acknowledgments</h3>
+				<p>We are thankful to David Christensen, who spearheads the SPL's open data effort and has been a very helpful collaborator and guide.</p>
+
+				<p class="about-more">This is a work-in-progress — we'd love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>. For how the data is sourced and how works are clustered, see <a href="#data-methodology" onclick={() => (methodOpen = true)}>Data &amp; Methodology</a> below.</p>
 			</section>
 		{:else}
 			{#key searchKind}
@@ -441,9 +460,28 @@
 		font-weight: 600;
 		text-decoration: underline;
 	}
+	.about-page .about-h {
+		font-family: var(--font-display, var(--font-serif));
+		font-size: 1.35rem;
+		font-weight: 700;
+		color: var(--color-fg);
+		margin: 26px 0 8px;
+	}
+	.about-list {
+		margin: 0 0 14px;
+		padding-left: 20px;
+	}
+	.about-list li {
+		font-size: 1.02rem;
+		line-height: 1.55;
+		margin: 0 0 5px;
+		color: var(--color-fg);
+	}
+	.about-list a { color: #357abd; font-weight: 600; text-decoration: underline; }
 	.about-page .about-more {
 		font-size: 0.95rem;
 		color: var(--color-fg-light);
+		margin-top: 22px;
 	}
 	/* Pudding-style sticky masthead: a slim top strip (wordmark + About) over a
 	   centered row of little section pills. Breaks out to the full viewport width
