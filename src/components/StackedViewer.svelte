@@ -142,11 +142,15 @@
 					|| (await searchAuthors(wantSlug.replace(/-/g, " "), 8)).find((x) => x.slug === wantSlug);
 			if (a) { await selectAuthor(a, { scroll: false }); return; }
 		}
-		// Search mode (author OR title) opens straight to the search box (current
-		// stays null -> the search-first empty state renders); a ?title link still
-		// loads that title via the effect below. Only "All" loads the overview.
+		// Search mode lands on a default example — the top author (author mode) or the
+		// default title (title mode, via the effect below) — rather than a blank box,
+		// so there's always something on the plot. The search box stays above it.
 		if (landing === "search") {
-			loading = false;
+			if (searchMode !== "title" && authors.length) {
+				await selectAuthor(authors[0], { scroll: false });
+			} else {
+				loading = false;
+			}
 			return;
 		}
 		await loadOverview();

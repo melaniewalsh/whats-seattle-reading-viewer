@@ -161,18 +161,24 @@
 
 	// When exactly one genre is on the plot (isolated, or the only one shown), name
 	// it as a serif title above the chart — matching the other views' plot titles.
-	const soleGenre = $derived.by(() => {
-		if (isolatedKeys.length === 1) return isolatedKeys[0].replace(/^g:/, "");
-		if (shown.size === 1) return [...shown][0];
-		return null;
-	});
-	// Total checkouts for that single genre over the visible year window — shown as a
-	// subtitle, like the "X checkouts" line on the author/title plots.
-	const soleGenreTotal = $derived.by(() => {
-		if (!soleGenre || !data) return null;
-		const g = genreByName[soleGenre];
-		if (!g) return null;
-		return sum(seriesArr(g).slice(lo, hi + 1));
+	// The genres currently featured on the plot: the isolated ones if any, else all shown.
+	const plotGenres = $derived(
+		isolatedKeys.length ? isolatedKeys.map((k) => k.replace(/^g:/, "")) : [...shown],
+	);
+	// Name them when there are 1–3 ("Romance + Fantasy"); otherwise just "Genres".
+	const genreTitle = $derived(
+		plotGenres.length && plotGenres.length <= 3 ? plotGenres.join(" + ") : "Genres",
+	);
+	// Combined checkouts for those genres over the visible window (only when we name them),
+	// like the "X checkouts" subtitle on the author/title plots.
+	const genreTotal = $derived.by(() => {
+		if (!data || !plotGenres.length || plotGenres.length > 3) return null;
+		let s = 0;
+		for (const name of plotGenres) {
+			const g = genreByName[name];
+			if (g) s += sum(seriesArr(g).slice(lo, hi + 1));
+		}
+		return s;
 	});
 	const yearRange = $derived(
 		viewMonths.length ? `${viewMonths[0].slice(0, 4)}–${viewMonths[viewMonths.length - 1].slice(0, 4)}` : "",
@@ -371,10 +377,10 @@
 		<p class="loading"><span class="spinner" aria-hidden="true"></span>Loading genre trends…</p>
 	{:else}
 		<div class="modebar">
-			<h2 class="genre-title">{soleGenre || "Genres"}</h2>
+			<h2 class="genre-title">{genreTitle}</h2>
 			<p class="mode-note">
-				{#if soleGenre && soleGenreTotal != null}
-					{compactNumber(soleGenreTotal)} checkouts · {yearRange} · raw share of all book checkouts
+				{#if genreTotal != null}
+					{compactNumber(genreTotal)} checkouts · {yearRange} · raw share of all book checkouts
 				{:else}
 					Each genre's <strong>raw</strong> share of checkouts — books are multi-tagged, so genres overlap.
 				{/if}
