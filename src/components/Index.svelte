@@ -283,11 +283,24 @@
 		margin: 0 auto;
 		padding: 0 24px 80px;
 	}
-	/* Editorial hero — shown on the Overview landing, below the sticky masthead. */
+	/* Editorial hero — a soft raised card that sets the title block off from the
+	   page, Pudding-style. */
 	.hero {
-		max-width: 720px;
-		margin: 36px auto 30px;
+		max-width: 780px;
+		margin: 40px auto 40px;
+		padding: 46px 48px 38px;
 		text-align: center;
+		background: #f6f8fb;
+		border: 1px solid #e7edf4;
+		border-radius: 22px;
+		box-shadow: 0 16px 40px rgba(31, 45, 61, 0.07), 0 2px 6px rgba(31, 45, 61, 0.04);
+	}
+	@media (max-width: 600px) {
+		.hero {
+			margin: 24px auto 30px;
+			padding: 30px 22px 26px;
+			border-radius: 16px;
+		}
 	}
 	.hero h1 {
 		font-family: var(--font-display, var(--font-serif));
