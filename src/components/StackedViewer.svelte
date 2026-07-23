@@ -2109,7 +2109,7 @@
 											{#if multi}
 												<span class="cluster-badge" class:has-match={w.matchCount > 0}>{w.editions.length} editions</span>{#if w.matchCount > 0}<span class="match-note"> · {w.matchCount} match{w.matchCount === 1 ? "" : "es"}</span>{/if}
 											{:else}
-												<span class="ed-single">1 edition</span>{workOpen(w) ? "" : " — click for full title"}
+												<span class="ed-single">1 edition</span>
 											{/if}
 										</button>
 									<span class="tt-cell tt-format" role="cell">

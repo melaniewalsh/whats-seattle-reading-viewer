@@ -214,6 +214,7 @@
 
 	let hoverIndex = $state(null);
 	let hoveredSeriesKey = $state(null); // Track the active book layer
+	let pointerY = $state(0); // cursor height (viewBox units), for a steady tooltip
 
 	function onMove(event) {
 		const svg = event.currentTarget.ownerSVGElement || event.currentTarget;
@@ -227,6 +228,9 @@
 		// vertical data value corresponding to cursor height
 		const py = (event.clientY - r.top) * (height / r.height);
 		const dataY = y.invert(py);
+		// Track the cursor's own height so the tooltip card glides with the mouse
+		// instead of bouncing along the spiky data line.
+		pointerY = py;
 
 		if (mode === 'line') {
 			// pick the line whose value at this month sits closest to the cursor
@@ -270,13 +274,13 @@
 		hoverIndex === null ? 0 : Math.min(Math.max(x(hoverIndex), 100), width - 100)
 	);
 
-	// Float the tooltip near the dot on the hovered line (rather than pinned to
-	// the top with a crosshair). Follows the point's height, flipping below it
-	// when the point sits near the top edge.
+	// Float the tooltip at the cursor's height (not the data point's) so it tracks
+	// the mouse smoothly instead of bouncing up and down a spiky line. The dot and
+	// dashed guide still mark the exact data point.
 	const tooltipTop = $derived(
-		hoverIndex === null || !selectedItem ? margin.top : y(selectedItem.top[hoverIndex])
+		hoverIndex === null ? margin.top : Math.min(Math.max(pointerY, margin.top), height - margin.bottom)
 	);
-	const tooltipBelow = $derived(hoverIndex !== null && !!selectedItem && tooltipTop < 90);
+	const tooltipBelow = $derived(hoverIndex !== null && tooltipTop < 90);
 
 	// The big tooltip heading: the work title (in area mode) or the line's name.
 	const tooltipTitle = $derived(
@@ -558,8 +562,9 @@
 		/* float just above the dot on the line; glide between points with a gentle
 		   ease so it tracks the cursor smoothly instead of snapping */
 		transform: translate(-50%, calc(-100% - 18px));
-		transition: left 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-			top 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+		/* glide horizontally between month positions; vertical tracks the cursor
+		   directly (no transition) so it never lags or bounces */
+		transition: left 0.12s cubic-bezier(0.22, 1, 0.36, 1);
 		background: rgba(255, 255, 255, 0.98);
 		-webkit-backdrop-filter: saturate(1.8) blur(6px);
 		backdrop-filter: saturate(1.8) blur(6px);

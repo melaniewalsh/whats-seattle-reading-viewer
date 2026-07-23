@@ -403,17 +403,28 @@
 	.mast-link.active {
 		border-bottom-color: #3f88cc;
 	}
-	@media (max-width: 560px) {
+	/* On phones there isn't room for the wordmark AND the three tabs without
+	   crunching — drop the title text (the logo still goes home) and let the
+	   tabs breathe. */
+	@media (max-width: 600px) {
 		.masthead-inner {
-			padding: 0 12px;
+			padding: 0 14px;
 			gap: 8px;
 		}
 		.mast-title {
-			font-size: 1rem;
+			display: none;
+		}
+		.mast-logo {
+			width: 30px;
+			height: 30px;
+		}
+		.mast-nav {
+			gap: 2px;
 		}
 		.mast-link {
-			padding: 0 9px;
-			font-size: 0.9rem;
+			padding: 0 10px;
+			font-size: 0.72rem;
+			letter-spacing: 0.04em;
 		}
 	}
 
