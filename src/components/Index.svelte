@@ -8,7 +8,7 @@
 
 	const copy = getContext("copy");
 	// Four top-level views. "search" and "rankings" carry a sub-kind toggle.
-	let tab = $state("overview"); // "overview" | "search" | "genres" | "rankings" | "about"
+	let tab = $state("home"); // "home" (landing hub) | "overview" (all-checkouts plot) | "search" | "genres" | "rankings" | "about"
 	let searchKind = $state("author"); // Search tab: "author" | "title"
 	let rankKind = $state("works"); // Rankings tab: "authors" | "works"
 	let menuOpen = $state(false); // the slide-out hamburger menu
@@ -47,21 +47,33 @@
 			else if (params.get("author")) { tab = "search"; searchKind = "author"; }
 			else if (t === "about") tab = "about";
 			else if (t === "overview" || t === "all") tab = "overview";
+			else if (t === "home") tab = "home";
 		} catch {}
 		scrollToMethod();
 		window.addEventListener("hashchange", scrollToMethod);
 		return () => window.removeEventListener("hashchange", scrollToMethod);
 	});
 
-	// "Overview" resets to the library-wide total — clear any ?author/?title so the
-	// freshly-mounted Viewer loads the all-checkouts line, not a saved deep link.
-	function goOverview() {
+	// Clear any deep-link params so a freshly-mounted view isn't hijacked by a
+	// stale ?author/?title/?genre.
+	function clearParams() {
 		try {
 			const url = new URL(window.location);
 			["author", "title", "genre", "year", "tab", "kind"].forEach((k) => url.searchParams.delete(k));
 			window.history.replaceState({}, "", url);
 		} catch {}
+	}
+	// The logo goes to the landing hub.
+	function goHome() {
+		clearParams();
+		tab = "home";
+		menuOpen = false;
+	}
+	// The "Overview" card / menu item goes to the library-wide checkouts plot.
+	function goOverview() {
+		clearParams();
 		tab = "overview";
+		menuOpen = false;
 	}
 
 	// Switch the Search tab between author and title, clearing any loaded ?author/
@@ -148,7 +160,7 @@
 	<article>
 		<div class="masthead">
 			<div class="masthead-top">
-				<button class="mast-home" class:here={tab === "overview"} onclick={goOverview} aria-label="{copy.title} — home">
+				<button class="mast-home" class:here={tab === "home"} onclick={goHome} aria-label="{copy.title} — home">
 					<img class="mast-logo" src="{base}/favicon.png" alt="" width="30" height="30" />
 					<span class="mast-title">{copy.title}</span>
 				</button>
@@ -170,7 +182,8 @@
 			<button class="menu-close" aria-label="Close menu" onclick={() => (menuOpen = false)}>×</button>
 			<div class="menu-group">
 				<h3 class="menu-h">Explore</h3>
-				<button class="menu-link" onclick={goOverview}>Home</button>
+				<button class="menu-link" onclick={goHome}>Home</button>
+				<button class="menu-link" onclick={goOverview}>Overview</button>
 				<button class="menu-link" onclick={() => go("rankings")}>Most Borrowed</button>
 				<button class="menu-link" onclick={() => go("search")}>Search</button>
 				<button class="menu-link" onclick={() => go("genres")}>Genres</button>
@@ -205,13 +218,39 @@
 			{:else}
 				<TopAuthors {openAuthor} {rankKind} {setRankKind} />
 			{/if}
-		{:else if tab === "overview"}
-			<p class="tagline">{copy.dek}</p>
-			<nav class="home-nav" aria-label="Sections">
-				<button class="pill" onclick={() => go("rankings")}><span class="pill-ic" aria-hidden="true">📚</span>Most Borrowed</button>
-				<button class="pill" onclick={() => go("search")}><span class="pill-ic" aria-hidden="true">🔍</span>Search</button>
-				<button class="pill" onclick={() => go("genres")}><span class="pill-ic" aria-hidden="true">📈</span>Genres</button>
+		{:else if tab === "home"}
+			<header class="hero">
+				<h1>{copy.title}</h1>
+				<p class="dek">{copy.dek}</p>
+				<p class="byline">By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project</p>
+			</header>
+			<nav class="hub" aria-label="Explore">
+				<button class="hub-card" onclick={goOverview}>
+					<span class="hub-emoji" aria-hidden="true">📊</span>
+					<span class="hub-h">Overview</span>
+					<span class="hub-d">The big picture — total checkouts across the whole library, over time and by format.</span>
+					<span class="hub-go">Explore →</span>
+				</button>
+				<button class="hub-card" onclick={() => go("rankings")}>
+					<span class="hub-emoji" aria-hidden="true">📚</span>
+					<span class="hub-h">Most Borrowed</span>
+					<span class="hub-d">The books and authors checked out most — all-time and year by year, by genre.</span>
+					<span class="hub-go">Explore →</span>
+				</button>
+				<button class="hub-card" onclick={() => go("genres")}>
+					<span class="hub-emoji" aria-hidden="true">📈</span>
+					<span class="hub-h">Genres</span>
+					<span class="hub-d">How Seattle's taste in romance, mystery, fantasy and more has shifted over the years.</span>
+					<span class="hub-go">Explore →</span>
+				</button>
+				<button class="hub-card" onclick={() => go("search")}>
+					<span class="hub-emoji" aria-hidden="true">🔍</span>
+					<span class="hub-h">Search</span>
+					<span class="hub-d">Look up any author or title and see its checkout trend at the Seattle Public Library.</span>
+					<span class="hub-go">Explore →</span>
+				</button>
 			</nav>
+		{:else if tab === "overview"}
 			<Viewer searchMode="author" landing="overview" />
 		{:else if tab === "about"}
 			<section class="about-page">
@@ -295,16 +334,73 @@
 		margin: 0 auto;
 		padding: 0 24px 80px;
 	}
-	/* Overview: a single understated tagline sits above the hub cards + plot. */
-	.tagline {
-		font-family: var(--font-sans);
-		font-size: clamp(1.1rem, 2.3vw, 1.4rem);
-		line-height: 1.35;
-		color: var(--color-fg-light);
+	/* Landing hub — title / subtitle / byline, then a grid of section cards. */
+	.hero {
+		max-width: 720px;
+		margin: 46px auto 10px;
 		text-align: center;
-		max-width: 620px;
-		margin: 34px auto 26px;
 	}
+	.hero h1 {
+		font-family: var(--font-display, var(--font-serif));
+		font-weight: 700;
+		font-size: clamp(2.3rem, 6vw, 3.6rem);
+		line-height: 1.08;
+		letter-spacing: -0.005em;
+		margin: 0 0 14px;
+		color: var(--color-fg);
+	}
+	.dek {
+		font-family: var(--font-sans);
+		font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+		line-height: 1.4;
+		color: var(--color-fg-light);
+		margin: 0;
+	}
+	.byline {
+		font-family: var(--font-sans);
+		font-size: 0.92rem;
+		color: var(--color-fg-light);
+		margin: 12px 0 0;
+	}
+	.byline a { color: #357abd; font-weight: 600; text-decoration: underline; }
+	.hub {
+		max-width: 880px;
+		margin: 36px auto 10px;
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 16px;
+	}
+	@media (max-width: 620px) {
+		.hub { grid-template-columns: 1fr; }
+	}
+	.hub-card {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 6px;
+		text-align: left;
+		padding: 22px;
+		border: 1px solid var(--color-border);
+		border-radius: 14px;
+		background: var(--color-white);
+		cursor: pointer;
+		font-family: var(--font-sans);
+		transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+	}
+	.hub-card:hover {
+		border-color: var(--color-fg-light);
+		box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+		transform: translateY(-2px);
+	}
+	.hub-emoji { font-size: 1.7rem; line-height: 1; }
+	.hub-h {
+		font-family: var(--font-display, var(--font-serif));
+		font-size: 1.4rem;
+		font-weight: 700;
+		color: var(--color-fg);
+	}
+	.hub-d { font-size: 0.92rem; line-height: 1.45; color: var(--color-fg-light); }
+	.hub-go { margin-top: 4px; font-size: 0.85rem; font-weight: 700; color: #357abd; }
 	/* About page — project details, moved off the landing. */
 	.about-page {
 		max-width: 680px;
@@ -498,55 +594,12 @@
 		text-decoration: none;
 	}
 	.menu-link:hover { color: #3f88cc; }
-	/* Section pills — shown on the HOME page only (like The Pudding's filter
-	   buttons), as the way into each section. Inner pages navigate via the
-	   hamburger menu or the home logo. */
-	.home-nav {
-		display: flex;
-		justify-content: center;
-		flex-wrap: wrap;
-		gap: 10px;
-		margin: 4px 0 32px;
-	}
-	.pill {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-family: var(--font-sans);
-		font-size: 0.78rem;
-		font-weight: 600;
-		letter-spacing: 0.01em;
-		color: #45566a;
-		background: var(--color-white);
-		border: 1px solid var(--color-border);
-		border-radius: 999px;
-		padding: 5px 15px 5px 12px;
-		cursor: pointer;
-		transition: background 0.12s, border-color 0.12s, color 0.12s;
-		outline: none;
-	}
-	.pill-ic { font-size: 0.9em; line-height: 1; }
-	.pill:hover {
-		border-color: #b6c2ce;
-		color: var(--color-fg);
-	}
-	.pill.active {
-		background: #3f88cc;
-		border-color: #3f88cc;
-		color: #fff;
-	}
-	.pill:focus-visible {
-		outline: 2px solid rgba(63, 136, 204, 0.5);
-		outline-offset: 2px;
-	}
 	@media (max-width: 600px) {
 		.masthead-top { padding: 6px 14px 0; }
 		.mast-title { font-size: 0.82rem; }
 		/* About is in the hamburger menu on phones — drop the standalone link so the
 		   wordmark has room. */
 		.mast-metalink { display: none; }
-		.home-nav { gap: 7px; margin: 2px 0 26px; }
-		.pill { padding: 5px 13px; font-size: 0.74rem; }
 	}
 
 	/* "Back to rankings" shown after you open a trend from the Rankings tab. */
