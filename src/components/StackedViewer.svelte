@@ -1668,7 +1668,7 @@
 				{#if isOverview}
 					<h2>{headingText}</h2>
 				{:else}
-					<div class="h2-wrap" role="presentation" onmouseenter={wikiEnter} onmouseleave={wikiLeave}>
+					<div class="hd-name"><div class="h2-wrap" role="presentation" onmouseenter={wikiEnter} onmouseleave={wikiLeave}>
 						<h2 class="h2-hoverable" onclick={wikiActivate}>{headingText}</h2>
 						{#if wikiHover}
 							<span class="wiki-pop">
@@ -1680,7 +1680,7 @@
 								/>
 							</span>
 						{/if}
-					</div>{#if searchMode !== "title" && current.variants?.length}<span class="name-info" tabindex="0" aria-label="{current.variants.length} name variants — hover for details"><span class="ni-icon" aria-hidden="true">i</span><span class="name-info-pop" role="tooltip"><span class="ni-head">{current.variants.length} name variants</span><ul>{#each current.variants as v}<li>{v}</li>{/each}</ul><span class="ni-note">Raw catalog spellings clustered into one author.</span></span></span>{/if}
+					</div>{#if searchMode !== "title" && current.variants?.length}<span class="name-info" tabindex="0" aria-label="{current.variants.length} name variants — hover for details"><span class="ni-icon" aria-hidden="true">i</span><span class="name-info-pop" role="tooltip"><span class="ni-head">{current.variants.length} name variants</span><ul>{#each current.variants as v}<li>{v}</li>{/each}</ul><span class="ni-note">Raw catalog spellings clustered into one author.</span></span></span>{/if}</div>
 					{#if wikiTouch && wikiHover}
 						<button class="wiki-backdrop" aria-label="Close" onclick={() => (wikiHover = false)}></button>
 					{/if}
@@ -1980,8 +1980,7 @@
 							>Work{#if titleSort === "work" && workOrder === "name"}&nbsp;↓{/if}</button>
 							<span class="col-resize" title="Drag to resize" onpointerdown={(e) => startColResize(e, "work")}></span>
 						</span>
-						<span class="tt-cell tt-edition" role="columnheader">
-							Edition
+						<span class="tt-cell tt-edition" role="columnheader" aria-label="Edition">
 							<span class="col-resize" title="Drag to widen and see full titles" onpointerdown={(e) => startColResize(e, "edition")}></span>
 						</span>
 						<span class="tt-cell tt-format" role="columnheader">Format</span>
@@ -2205,6 +2204,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
+		font-family: var(--font-sans);
 		font-size: 0.78rem;
 		font-weight: 700;
 		text-transform: uppercase;
@@ -2622,20 +2622,23 @@
 		.split {
 			display: block;
 		}
-		/* By default the works table sits inline at the bottom, below the chart. */
+		/* By default the works table sits inline at the bottom, below the chart --
+		   as one gray card, matching the desktop panel and the "On the chart" box. */
 		.split-side {
 			margin-top: 24px;
-			padding-top: 14px;
-			border-top: 1.5px solid var(--color-border);
+			background: var(--color-gray-100);
+			border: 1px solid var(--color-border);
+			border-radius: var(--radius-md);
+			padding: 4px 14px 14px;
 		}
-		/* "Add/edit titles" pops the same table up as a full-screen drawer. */
+		/* "Add/edit titles" pops the same table up as a full-screen white drawer. */
 		.split-side.open {
 			position: fixed;
 			inset: 0;
 			z-index: 60;
 			height: 100dvh;
 			margin: 0;
-			border-top: none;
+			border: none;
 			border-radius: 0;
 			background: var(--color-white);
 			padding: 10px 14px 48px;
@@ -2707,9 +2710,17 @@
 		margin: 0;
 	}
 	/* Heading carries the Wikipedia hover card (author or work). */
+	/* Keep the author name and its "i" info icon on the same line — the icon rides
+	   at the baseline of the name instead of wrapping onto a lonely next line. */
+	.hd-name {
+		display: flex;
+		align-items: baseline;
+		gap: 2px;
+	}
 	.h2-wrap {
 		position: relative;
 		display: inline-block;
+		min-width: 0;
 		max-width: 100%;
 	}
 	.h2-hoverable {
@@ -2833,16 +2844,17 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		flex: none;
 		width: 17px;
 		height: 17px;
 		margin-left: 7px;
 		border-radius: 50%;
 		border: 1.5px solid var(--color-border);
 		color: var(--color-fg-light);
-		font-family: var(--font-serif);
-		font-style: italic;
-		font-weight: 700;
-		font-size: 0.66rem;
+		font-family: var(--font-sans);
+		font-style: normal;
+		font-weight: 600;
+		font-size: 0.7rem;
 		line-height: 1;
 		cursor: help;
 		vertical-align: 0.35em;
@@ -2890,8 +2902,8 @@
 		overflow-y: auto;
 	}
 	.name-info-pop li {
-		font-family: var(--font-mono, monospace);
-		font-size: 0.8rem;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
 		line-height: 1.5;
 		color: var(--color-fg);
 	}

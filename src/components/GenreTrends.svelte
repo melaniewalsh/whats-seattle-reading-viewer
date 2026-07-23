@@ -589,7 +589,7 @@
 	.genre-caption { font-family: var(--font-sans); font-size: 0.9rem; color: var(--color-fg-light); margin: 0 0 8px; line-height: 1.4; }
 	/* "Focus genre" field — mirrors the Most Borrowed tab's filter dropdowns. */
 	.gt-controls { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
-	.gt-field { display: inline-flex; flex-direction: column; gap: 4px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg-light); min-width: 260px; }
+	.gt-field { display: inline-flex; flex-direction: column; gap: 4px; font-family: var(--font-sans); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg-light); min-width: 260px; }
 	.gt-field.grow { flex: 1; }
 	.gt-search { position: relative; }
 	.gt-search input { width: 100%; box-sizing: border-box; font-family: var(--font-sans); font-size: 0.95rem; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--color-fg); padding: 9px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white); outline: none; }

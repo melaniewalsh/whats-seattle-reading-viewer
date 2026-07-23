@@ -869,6 +869,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
+		font-family: var(--font-sans);
 		font-size: 0.78rem;
 		font-weight: 700;
 		text-transform: uppercase;

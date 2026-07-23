@@ -157,8 +157,7 @@
 				<h1>{copy.title}</h1>
 				<p class="dek">{copy.dek}</p>
 				<p class="byline">
-					By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project<br />
-					from the University of Washington Information School
+					By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project
 				</p>
 				<p class="wip">
 					This is a work-in-progress. We would love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>!
@@ -268,7 +267,7 @@
 				(2006–2026)
 			</p>
 			<p class="cf-attr">
-				What Is Seattle Reading? · University of Washington Information School
+				What Is Seattle Reading?
 				<span class="cf-sep">·</span>
 				<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a>
 			</p>
@@ -297,8 +296,7 @@
 		line-height: 1.08;
 		letter-spacing: -0.005em;
 		margin: 0 0 16px;
-		color: #3f88cc;
-		text-shadow: 1.5px 2px 0 rgba(53, 122, 189, 0.16);
+		color: var(--color-fg);
 	}
 	.dek {
 		font-family: var(--font-sans);

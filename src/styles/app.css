@@ -11,17 +11,19 @@ body {
 	background-color: #ffffff;
 }
 
-/* Fonts are loaded from Google Fonts (Fraunces for the display headline, Source
-   Serif 4 for the serif, Inter for the UI sans) via a <link> in Meta.svelte.
-   These replace the old Pudding-hosted Recoleta / Tiempos / Atlas Grotesk, which
-   are licensed and not for reuse. */
+/* Two fonts, loaded from Google Fonts via a <link> in Meta.svelte: Fraunces for
+   all serif (display headlines + small serif accents, via its optical-size axis)
+   and Inter for the UI sans. These replace the old Pudding-hosted Recoleta /
+   Tiempos / Atlas Grotesk, which are licensed and not for reuse. */
 
 /* colors defined in variables.css */
 :root {
 	/* font */
 	--font-sans: "Inter", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
-	--font-serif: "Source Serif 4", Iowan Old Style, Times New Roman, Times, serif;
-	--font-display: "Fraunces", var(--font-serif);
+	/* One serif for everything — Fraunces has an optical-size axis, so it reads well
+	   both as a big display headline and as small serif accents. */
+	--font-serif: "Fraunces", Iowan Old Style, "Times New Roman", Times, serif;
+	--font-display: var(--font-serif);
 	--font-mono: Menlo, Consolas, Monaco, monospace;
 
 	/* z-index */
