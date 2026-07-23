@@ -16,7 +16,7 @@
 	// resolve to its author, open the author's drilldown with that work highlighted.
 	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
 	// (the "By author" tab -> open straight to the search box).
-	let { searchMode = "author", landing = "overview" } = $props();
+	let { searchMode = "author", landing = "overview", setSearchKind = () => {} } = $props();
 
 	// Colors for title lines.
 	const TITLE_COLORS = [
@@ -1515,15 +1515,25 @@
 
 <div class="viewer">
 	{#snippet authorPicker()}
-		<div class="search">
-			<label class="sr-only" for="author-search">{searchMode === "title" ? "Search for a title" : "Search for an author"}</label>
-			<input
-					id="author-search"
-					type="search"
-					placeholder={searchMode === "title" ? "Search a title" : "Search an author"}
-					bind:value={query}
-					autocomplete="off"
-			/>
+		<div class="search-row">
+			<label class="ta-field">
+				<span>Search by</span>
+				<select value={searchMode} onchange={(e) => setSearchKind(e.currentTarget.value)}>
+					<option value="author">Author</option>
+					<option value="title">Title</option>
+				</select>
+			</label>
+			<label class="ta-field grow">
+				<span>Find {searchMode === "title" ? "a title" : "an author"}</span>
+				<div class="search">
+					<input
+							id="author-search"
+							type="search"
+							placeholder={searchMode === "title" ? "Search a title" : "Search an author"}
+							aria-label={searchMode === "title" ? "Search for a title" : "Search for an author"}
+							bind:value={query}
+							autocomplete="off"
+					/>
 			{#if results.length}
 				<ul class="results">
 					{#each results as a}
@@ -1542,9 +1552,11 @@
 						</li>
 					{/each}
 				</ul>
-			{:else if query.trim().length >= 2}
-				<p class="no-results">No {searchMode === "title" ? "titles" : "authors"} found for “{query.trim()}”.</p>
-			{/if}
+				{:else if query.trim().length >= 2}
+					<p class="no-results">No {searchMode === "title" ? "titles" : "authors"} found for “{query.trim()}”.</p>
+				{/if}
+				</div>
+			</label>
 		</div>
 
 		{#if searchMode === "title"}
@@ -1579,6 +1591,10 @@
 			</div>
 		{/if}
 	{/snippet}
+
+	{#if landing === "search"}
+		{@render authorPicker()}
+	{/if}
 
 	{#if loadError}
 		<p class="load-error">{loadError}</p>
@@ -1750,11 +1766,6 @@
 				</div>
 			{/if}
 
-			{#if !isOverview}
-				<div class="picker-below">
-					{@render authorPicker()}
-				</div>
-			{/if}
 
 			{#if !isOverview}
 			<div class="groups-panel">
@@ -2080,9 +2091,8 @@
 			{/if}
 			</div><!-- /.split -->
 		</div>
-	{:else}
-		{@render authorPicker()}
-		<p class="hint">Search for {searchMode === "title" ? "a title" : "an author"} to begin.</p>
+	{:else if landing === "search"}
+		<p class="hint">Search for {searchMode === "title" ? "a title" : "an author"} above to begin.</p>
 	{/if}
 
 	{#if hoverTip}
@@ -2110,21 +2120,59 @@
 		cursor: pointer;
 	}
 
+	/* Filter row mirroring the Most Borrowed tab's Show/Genre/Year fields. */
+	.search-row {
+		display: flex;
+		align-items: flex-end;
+		gap: 12px;
+		flex-wrap: wrap;
+		margin: 4px 0 12px;
+	}
+	.ta-field {
+		flex: 1;
+		min-width: 130px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 0.78rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--color-fg-light);
+	}
+	.ta-field.grow {
+		flex: 2;
+	}
+	.ta-field select {
+		width: 100%;
+		font-family: var(--font-sans);
+		font-size: 0.95rem;
+		font-weight: 500;
+		text-transform: none;
+		letter-spacing: 0;
+		color: var(--color-fg);
+		padding: 9px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-white);
+		cursor: pointer;
+		min-width: 0;
+	}
 	.search {
 		position: relative;
 	}
 
-	/* A clean white box, like the genres search (no gray reset-outline). */
+	/* A clean white box, matching the field dropdowns' height. */
 	.search input {
 		width: 100%;
 		box-sizing: border-box;
-		padding: 13px 16px;
+		padding: 9px 12px;
 		font-family: var(--font-sans);
-		font-size: 1.1rem;
+		font-size: 0.95rem;
 		background: var(--color-white);
 		color: var(--color-fg);
 		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
+		border-radius: 8px;
 		outline: none; /* override the global reset's 1px box outline */
 	}
 

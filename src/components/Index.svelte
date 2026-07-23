@@ -171,15 +171,6 @@
 				<h2 class="sec-title">{searchKind === "title" ? "Seattle's Work Trends" : "Seattle's Author Trends"}</h2>
 				<p class="sec-sub">Look up any author or title's borrowing trend at the Seattle Public Library.</p>
 			</header>
-			<div class="search-controls">
-				<label class="filter-field">
-					<span>Search by</span>
-					<select value={searchKind} onchange={(e) => setSearchKind(e.currentTarget.value)}>
-						<option value="author">Author</option>
-						<option value="title">Title</option>
-					</select>
-				</label>
-			</div>
 		{/if}
 
 		{#if rankReturn && tab === "search"}
@@ -220,7 +211,7 @@
 			</nav>
 		{:else}
 			{#key searchKind}
-				<Viewer searchMode={searchKind} landing="search" />
+				<Viewer searchMode={searchKind} landing="search" {setSearchKind} />
 			{/key}
 		{/if}
 
