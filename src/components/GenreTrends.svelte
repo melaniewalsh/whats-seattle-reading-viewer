@@ -377,15 +377,17 @@
 		<p class="loading"><span class="spinner" aria-hidden="true"></span>Loading genre trends…</p>
 	{:else}
 		<div class="modebar">
-			<h2 class="genre-title">{genreTitle}</h2>
-			<p class="mode-note">
-				{#if genreTotal != null}
-					{compactNumber(genreTotal)} checkouts · {yearRange} · raw share of all book checkouts
-				{:else}
-					Each genre's <strong>raw</strong> share of checkouts — books are multi-tagged, so genres overlap.
-				{/if}
-			</p>
+			<h2 class="genre-title">Seattle's Genre Trends</h2>
+			<p class="mode-note">Checkouts grouped by subject heading at the Seattle Public Library.</p>
 		</div>
+
+		<p class="genre-caption">
+			{#if genreTotal != null}
+				<strong>{genreTitle}</strong> · {compactNumber(genreTotal)} checkouts · {yearRange} · raw share of all book checkouts
+			{:else}
+				Each genre's raw share of checkouts over time — books are multi-tagged, so genres overlap.
+			{/if}
+		</p>
 
 		<div class="chartwrap" bind:this={chartWrap}>
 			<GenreChart months={viewMonths} {series} {isolatedKeys} />
@@ -531,9 +533,12 @@
 	.sh-note strong { color: var(--color-fg); }
 	.loading, .load-error { font-family: var(--font-sans); color: var(--color-fg-light); }
 
-	.modebar { margin: 0 0 10px; }
-	.genre-title { font-family: var(--font-display, var(--font-serif)); font-weight: 700; font-size: clamp(1.5rem, 3vw, 2rem); color: var(--color-fg); margin: 0 0 2px; line-height: 1.1; }
-	.mode-note { font-family: var(--font-sans); font-size: 0.82rem; color: var(--color-fg-light); margin: 0; line-height: 1.4; }
+	/* Section masthead — matches the Most Borrowed tab (serif title + subtitle + rule). */
+	.modebar { border-bottom: 3px solid var(--color-fg); padding-bottom: 12px; margin: 34px 0 18px; }
+	.genre-title { font-family: var(--font-display, var(--font-serif)); font-weight: 700; font-size: clamp(1.7rem, 3.4vw, 2.5rem); color: var(--color-fg); margin: 0; line-height: 1.05; }
+	.mode-note { font-family: var(--font-sans); font-size: 0.95rem; color: var(--color-fg-light); margin: 6px 0 0; line-height: 1.4; }
+	.genre-caption { font-family: var(--font-sans); font-size: 0.9rem; color: var(--color-fg-light); margin: 0 0 8px; line-height: 1.4; }
+	.genre-caption strong { color: var(--color-fg); }
 	.chartwrap { width: 100%; }
 
 	/* Share / download — identical to the "By author" tab. */

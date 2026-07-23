@@ -2093,7 +2093,7 @@
 
 <style>
 	.viewer {
-		max-width: 720px;
+		width: 100%;
 		margin: 0 auto;
 	}
 
@@ -2450,23 +2450,32 @@
 	/* On desktop the "Add/remove works by this author" line is a subtitle heading
 	   above the below-the-plot table, and clicking it collapses the table. */
 	@media (min-width: 861px) {
-		/* Gray box that matches the "On the chart" panel above, for visual unity. */
+		/* The whole works panel is one gray card (matching the "On the chart" panel);
+		   the header is a toggle inside it. */
+		.split-side {
+			background: var(--color-gray-100);
+			border: 1px solid var(--color-border);
+			border-radius: var(--radius-md);
+			padding: 4px 16px 16px;
+		}
 		.side-desktop-head {
 			display: flex;
 			align-items: center;
 			gap: 8px;
 			width: 100%;
-			padding: 14px 16px;
-			margin: 2px 0 14px;
-			border: 1px solid var(--color-border);
-			border-radius: var(--radius-md);
-			background: var(--color-gray-100);
+			padding: 12px 0;
+			margin: 0;
+			border: none;
+			background: none;
 			cursor: pointer;
 			text-align: left;
-			transition: border-color 0.12s;
 		}
-		.side-desktop-head:hover {
-			border-color: var(--color-fg-light);
+		.split-side:not(.collapsed) .side-desktop-head {
+			border-bottom: 1px solid var(--color-border);
+			margin-bottom: 12px;
+		}
+		.side-desktop-head:hover .sdh-label {
+			color: var(--color-fg);
 		}
 		.sdh-label {
 			font-family: var(--font-sans);

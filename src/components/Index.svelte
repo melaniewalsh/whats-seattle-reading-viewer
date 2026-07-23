@@ -167,6 +167,10 @@
 		{/if}
 
 		{#if tab === "search"}
+			<header class="section-masthead">
+				<h2 class="sec-title">{searchKind === "title" ? "Seattle's Work Trends" : "Seattle's Author Trends"}</h2>
+				<p class="sec-sub">Look up any author or title's borrowing trend at the Seattle Public Library.</p>
+			</header>
 			<div class="subtabs" role="tablist" aria-label="Search by">
 				<button class="subtab" class:active={searchKind === "author"} aria-selected={searchKind === "author"} onclick={() => setSearchKind("author")}>Author</button>
 				<button class="subtab" class:active={searchKind === "title"} aria-selected={searchKind === "title"} onclick={() => setSearchKind("title")}>Title</button>
@@ -277,10 +281,12 @@
 </svelte:boundary>
 
 <style>
+	/* One shared content width for every tab, so Search / Genres / Most Borrowed
+	   all line up at the same width and left edge. */
 	article {
-		max-width: 760px;
+		max-width: 1008px;
 		margin: 0 auto;
-		padding: 0 20px 80px;
+		padding: 0 24px 80px;
 	}
 	/* Editorial hero — shown on the Overview landing, below the sticky masthead. */
 	.hero {
@@ -340,14 +346,14 @@
 		border-bottom: 1px solid var(--color-border);
 	}
 	.masthead-inner {
-		max-width: 1120px;
+		max-width: 1008px;
 		margin: 0 auto;
 		min-height: 54px;
 		display: flex;
 		align-items: stretch;
 		justify-content: space-between;
 		gap: 16px;
-		padding: 0 22px;
+		padding: 0 24px;
 	}
 	.mast-home {
 		align-self: center;
@@ -365,11 +371,12 @@
 		height: 34px;
 	}
 	.mast-title {
-		font-family: var(--font-display, var(--font-serif));
-		font-weight: 700;
-		font-size: 1.2rem;
+		font-family: var(--font-sans);
+		font-weight: 800;
+		font-size: 0.95rem;
 		line-height: 1;
-		letter-spacing: -0.01em;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
 		color: #3f88cc;
 		white-space: nowrap;
 	}
@@ -488,10 +495,30 @@
 		text-underline-offset: 2px;
 	}
 	/* segmented sub-toggle (Author/Title, Authors/Works) beneath the main tabs */
+	/* Section masthead — identical to the Most Borrowed / Genres tabs. */
+	.section-masthead {
+		border-bottom: 3px solid var(--color-fg);
+		padding-bottom: 12px;
+		margin: 34px 0 16px;
+	}
+	.sec-title {
+		font-family: var(--font-display, var(--font-serif));
+		font-weight: 700;
+		font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+		line-height: 1.05;
+		color: var(--color-fg);
+		margin: 0;
+	}
+	.sec-sub {
+		font-size: 0.95rem;
+		line-height: 1.4;
+		color: var(--color-fg-light);
+		margin: 6px 0 0;
+	}
 	.subtabs {
 		display: inline-flex;
 		gap: 2px;
-		margin-top: 30px;
+		margin-top: 2px;
 		padding: 3px;
 		border-radius: 999px;
 		background: var(--color-gray-100, #f0f0f0);

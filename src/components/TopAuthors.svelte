@@ -511,17 +511,10 @@
 </div>
 
 <style>
-	/* The rankings break out wider than the page's narrow article column so the
-	   list can breathe and the methodology sits in the right margin, NYT-style. */
+	/* Fills the shared article width (same as every other tab). */
 	.top-authors {
-		position: relative;
-		left: 50%;
-		transform: translateX(-50%);
-		width: min(1040px, 94vw);
+		width: 100%;
 		font-family: var(--font-sans);
-	}
-	.top-authors.wide {
-		width: min(1160px, 94vw);
 	}
 	/* NYT-style masthead above the ranking controls. */
 	.rank-masthead {
