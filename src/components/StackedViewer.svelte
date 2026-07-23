@@ -2435,35 +2435,34 @@
 	/* On desktop the "Add/remove works by this author" line is a subtitle heading
 	   above the below-the-plot table, and clicking it collapses the table. */
 	@media (min-width: 861px) {
+		/* A clear dropdown-style toggle button (not a plain heading). */
 		.side-desktop-head {
 			display: flex;
-			align-items: baseline;
+			align-items: center;
 			gap: 8px;
 			width: 100%;
-			padding: 0 2px 8px;
+			padding: 10px 14px;
 			margin: 2px 0 12px;
-			border: none;
-			border-bottom: 1.5px solid var(--color-border);
-			border-radius: 0;
-			background: none;
-			font-family: var(--font-serif);
+			border: 1px solid var(--color-border);
+			border-radius: 8px;
+			background: var(--color-white);
+			font-family: var(--font-sans);
 			font-weight: 600;
-			font-size: 1.2rem;
-			line-height: 1.15;
+			font-size: 0.95rem;
+			line-height: 1.2;
 			color: var(--color-fg);
 			cursor: pointer;
 			text-align: left;
+			transition: background 0.12s, border-color 0.12s;
 		}
 		.side-desktop-head:hover {
 			border-color: var(--color-fg-light);
-		}
-		.side-desktop-head:hover .side-chevron {
-			opacity: 0.9;
+			background: var(--color-gray-100);
 		}
 		.side-chevron {
 			margin-left: auto;
-			opacity: 0.5;
-			font-size: 0.7rem;
+			color: var(--color-fg-light);
+			font-size: 0.85rem;
 			align-self: center;
 		}
 		.split-side.collapsed .titles {

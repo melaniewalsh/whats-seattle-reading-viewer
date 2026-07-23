@@ -145,6 +145,7 @@
 			{/key}
 		{/if}
 
+		<footer class="chart-footer">
 		<details class="about" id="data-methodology" bind:open={methodOpen}>
 			<summary>Data &amp; Methodology</summary>
 			<div class="about-body">
@@ -187,7 +188,6 @@
 			</div>
 		</details>
 
-		<footer class="chart-footer">
 			<p class="cf-source">
 				Data source:
 				<a
@@ -364,11 +364,12 @@
 
 	.about {
 		max-width: none;
-		margin: 40px 0 0;
-		font-family: var(--font-sans);
+		margin: 0 0 10px;
+		padding: 0 0 10px;
 		border: none;
+		border-bottom: 1px solid var(--color-border);
 		background: none;
-		padding: 0;
+		font-family: var(--font-sans);
 	}
 	.about summary {
 		cursor: pointer;
