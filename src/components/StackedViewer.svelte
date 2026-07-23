@@ -2032,30 +2032,46 @@
 											onchange={() => keepTableStill(() => toggleTitle(t.idx))}
 									/>
 								</span>
-								<span class="tt-cell tt-work" role="cell" title={showWork ? t.workName : ""}>
-									{#if showWork}
-										<span class="tt-work-name">{t.workName}</span>
-									{:else if indent}
+								{#if indent}
+									<!-- Edition under an expanded work: the exclude button and the
+									     edition title share one cell that spans the (otherwise empty)
+									     Work column, pulling the title far to the left. -->
+									<span
+											class="tt-cell tt-edition span-work"
+											role="cell"
+											onmousemove={(e) => (hoverTip = { text: titleCase(t.title), x: e.clientX, y: e.clientY })}
+											onmouseleave={() => (hoverTip = null)}
+									>
 										<button
 												class="exclude-btn"
 												title="Pull this edition out of the work — make it its own work"
 												onclick={() => excludeEdition(t.idx)}
 										>exclude</button>
-									{/if}
-								</span>
-								<span
-										class="tt-cell tt-edition"
-										class:indent
-										role="cell"
-										onmousemove={(e) => (hoverTip = { text: titleCase(t.title), x: e.clientX, y: e.clientY })}
-										onmouseleave={() => (hoverTip = null)}
-								>
-									{#if (owner || single) && !isCurrentOwner}
-										<span class="other-group-dot"
-											  title="In “{owner ? groupLabel(owner) : titleCase(t.title)}”"></span>
-									{/if}
-									<span class="t-name">{titleCase(t.title)}</span>
-								</span>
+										{#if (owner || single) && !isCurrentOwner}
+											<span class="other-group-dot"
+												  title="In “{owner ? groupLabel(owner) : titleCase(t.title)}”"></span>
+										{/if}
+										<span class="t-name">{titleCase(t.title)}</span>
+									</span>
+								{:else}
+									<span class="tt-cell tt-work" role="cell" title={showWork ? t.workName : ""}>
+										{#if showWork}
+											<span class="tt-work-name">{t.workName}</span>
+										{/if}
+									</span>
+									<span
+											class="tt-cell tt-edition"
+											role="cell"
+											onmousemove={(e) => (hoverTip = { text: titleCase(t.title), x: e.clientX, y: e.clientY })}
+											onmouseleave={() => (hoverTip = null)}
+									>
+										{#if (owner || single) && !isCurrentOwner}
+											<span class="other-group-dot"
+												  title="In “{owner ? groupLabel(owner) : titleCase(t.title)}”"></span>
+										{/if}
+										<span class="t-name">{titleCase(t.title)}</span>
+									</span>
+								{/if}
 								<span class="tt-cell tt-format" role="cell">
 									<span class="badge badge-{t.format}">{formatLabel(t.format)}</span>
 								</span>
@@ -3597,7 +3613,10 @@
 		/* Checkouts gets a min-width so the value isn't crunched against Format
 		   (each row is its own grid, so an `auto` last column shrinks to just the
 		   number). A fixed min also keeps the width stable when editions expand. */
-		grid-template-columns: 26px minmax(110px, 0.85fr) minmax(0, 1.5fr) auto minmax(92px, auto);
+		/* Work is capped at a fixed max (not an fr) so it never balloons on wide
+		   screens and shove the edition titles far to the right; Edition takes all
+		   the slack, keeping edition titles anchored just left of center. */
+		grid-template-columns: 26px minmax(110px, 300px) minmax(0, 1fr) auto minmax(92px, auto);
 		gap: 9px;
 		padding: 7px 9px;
 		font-size: 0.8rem;
@@ -3759,9 +3778,14 @@
 		gap: 3px;
 		align-items: flex-end;
 	}
-	/* indent the edition title when it's shown nested under an expanded work */
-	.tt-edition.indent {
-		padding-left: 20px;
+	/* An expanded work's editions: the title cell spans the Work + Edition columns
+	   (exclude button first, then the title) so the title sits far left instead of
+	   stranded out past the wide Work column. A slight indent keeps the nesting
+	   legible under the parent work. */
+	.tt-edition.span-work {
+		grid-column: 2 / 4;
+		padding-left: 8px;
+		gap: 10px;
 	}
 
 	.tt-head {
