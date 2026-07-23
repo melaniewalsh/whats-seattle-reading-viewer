@@ -141,10 +141,10 @@
 					|| (await searchAuthors(wantSlug.replace(/-/g, " "), 8)).find((x) => x.slug === wantSlug);
 			if (a) { await selectAuthor(a); return; }
 		}
-		// "By author" (landing="search") opens straight to the search box (current
-		// stays null -> the search-first empty state renders). "All" and the
-		// By-title tab still load the overview / default title.
-		if (searchMode === "author" && landing === "search") {
+		// Search mode (author OR title) opens straight to the search box (current
+		// stays null -> the search-first empty state renders); a ?title link still
+		// loads that title via the effect below. Only "All" loads the overview.
+		if (landing === "search") {
 			loading = false;
 			return;
 		}
@@ -249,12 +249,13 @@
 		}
 	});
 	async function loadDefaultTitle() {
-		// ?title=<work> (e.g. from a Top-works link) opens that title; otherwise
-		// seed the tab with a well-known example.
+		// Only a ?title=<work> link (e.g. from Top works) loads a title; otherwise the
+		// tab shows the empty search box, like author search — no seeded default.
 		let want = null;
 		try { want = new URLSearchParams(window.location.search).get("title"); } catch {}
+		if (!want) return;
 		try {
-			const r = (await searchTitles(want || "the fire next time", 5))[0];
+			const r = (await searchTitles(want, 5))[0];
 			if (r) await selectTitle(r, { scroll: false });
 		} catch {}
 	}
