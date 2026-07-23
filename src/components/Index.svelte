@@ -8,9 +8,16 @@
 
 	const copy = getContext("copy");
 	// Four top-level views. "search" and "rankings" carry a sub-kind toggle.
-	let tab = $state("overview"); // "overview" | "search" | "genres" | "rankings"
+	let tab = $state("overview"); // "overview" | "search" | "genres" | "rankings" | "about"
 	let searchKind = $state("author"); // Search tab: "author" | "title"
 	let rankKind = $state("works"); // Rankings tab: "authors" | "works"
+	let menuOpen = $state(false); // the slide-out hamburger menu
+
+	// Go to a tab and close the hamburger menu (used by the menu + pills).
+	function go(t) {
+		tab = t;
+		menuOpen = false;
+	}
 
 	// The Data & Methodology section is a collapsed <details>; deep links to its
 	// subheadings (#method-…, from e.g. the works table) open it and scroll to them.
@@ -146,15 +153,41 @@
 					<span class="mast-title">{copy.title}</span>
 				</button>
 				<nav class="mast-meta" aria-label="Site">
-					<button class="mast-metalink" class:active={tab === "about"} aria-current={tab === "about" ? "page" : undefined} onclick={() => (tab = "about")}>About</button>
+					<button class="mast-metalink" class:active={tab === "about"} aria-current={tab === "about" ? "page" : undefined} onclick={() => go("about")}>About</button>
+					<button class="mast-burger" aria-label="Open menu" aria-expanded={menuOpen} aria-controls="site-menu" onclick={() => (menuOpen = true)}>
+						<span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+					</button>
 				</nav>
 			</div>
 			<nav class="mast-sections" aria-label="Sections">
-				<button class="pill" class:active={tab === "rankings"} aria-current={tab === "rankings" ? "page" : undefined} onclick={() => (tab = "rankings")}>Most Borrowed</button>
-				<button class="pill" class:active={tab === "search"} aria-current={tab === "search" ? "page" : undefined} onclick={() => (tab = "search")}>Search</button>
-				<button class="pill" class:active={tab === "genres"} aria-current={tab === "genres" ? "page" : undefined} onclick={() => (tab = "genres")}>Genres</button>
+				<button class="pill" class:active={tab === "rankings"} aria-current={tab === "rankings" ? "page" : undefined} onclick={() => go("rankings")}><span class="pill-ic" aria-hidden="true">📚</span>Most Borrowed</button>
+				<button class="pill" class:active={tab === "search"} aria-current={tab === "search" ? "page" : undefined} onclick={() => go("search")}><span class="pill-ic" aria-hidden="true">🔍</span>Search</button>
+				<button class="pill" class:active={tab === "genres"} aria-current={tab === "genres" ? "page" : undefined} onclick={() => go("genres")}><span class="pill-ic" aria-hidden="true">📈</span>Genres</button>
 			</nav>
 		</div>
+
+		<!-- Slide-out hamburger menu (Pudding-style): quick links to every section
+		     plus the broader project's Publications / Data / feedback. -->
+		{#if menuOpen}
+			<button class="menu-backdrop" aria-label="Close menu" onclick={() => (menuOpen = false)}></button>
+		{/if}
+		<nav id="site-menu" class="site-menu" class:open={menuOpen} aria-label="Menu" aria-hidden={!menuOpen}>
+			<button class="menu-close" aria-label="Close menu" onclick={() => (menuOpen = false)}>×</button>
+			<div class="menu-group">
+				<h3 class="menu-h">Explore</h3>
+				<button class="menu-link" onclick={goOverview}>Home</button>
+				<button class="menu-link" onclick={() => go("rankings")}>Most Borrowed</button>
+				<button class="menu-link" onclick={() => go("search")}>Search</button>
+				<button class="menu-link" onclick={() => go("genres")}>Genres</button>
+				<button class="menu-link" onclick={() => go("about")}>About</button>
+			</div>
+			<div class="menu-group">
+				<h3 class="menu-h">The Project</h3>
+				<a class="menu-link" href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">Publications ↗</a>
+				<a class="menu-link" href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Data ↗</a>
+				<a class="menu-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Feedback ↗</a>
+			</div>
+		</nav>
 
 		{#if tab === "search"}
 			<header class="section-masthead">
@@ -179,26 +212,6 @@
 			{/if}
 		{:else if tab === "overview"}
 			<p class="tagline">{copy.dek}</p>
-			<nav class="hub" aria-label="Explore">
-				<button class="hub-card" onclick={() => (tab = "rankings")}>
-					<span class="hub-emoji" aria-hidden="true">📚</span>
-					<span class="hub-h">Most Borrowed</span>
-					<span class="hub-d">The books and authors checked out most — all-time and year by year, by genre.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
-				<button class="hub-card" onclick={() => (tab = "genres")}>
-					<span class="hub-emoji" aria-hidden="true">📈</span>
-					<span class="hub-h">Genres</span>
-					<span class="hub-d">How Seattle's taste in romance, mystery, fantasy and more has shifted over the years.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
-				<button class="hub-card" onclick={() => (tab = "search")}>
-					<span class="hub-emoji" aria-hidden="true">🔍</span>
-					<span class="hub-h">Search</span>
-					<span class="hub-d">Look up any author or title and see its checkout trend at the Seattle Public Library.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
-			</nav>
 			<Viewer searchMode="author" landing="overview" />
 		{:else if tab === "about"}
 			<section class="about-page">
@@ -393,6 +406,98 @@
 		outline-offset: 2px;
 		border-radius: 4px;
 	}
+	/* Hamburger button */
+	.mast-burger {
+		display: inline-flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 4px;
+		width: 30px;
+		height: 30px;
+		padding: 6px 4px;
+		background: none;
+		border: none;
+		cursor: pointer;
+		outline: none;
+	}
+	.mast-burger span {
+		display: block;
+		height: 2px;
+		width: 100%;
+		background: var(--color-fg);
+		border-radius: 2px;
+	}
+	.mast-burger:hover span { background: #3f88cc; }
+	.mast-burger:focus-visible { outline: 2px solid rgba(63, 136, 204, 0.5); outline-offset: 2px; border-radius: 4px; }
+
+	/* Slide-out menu + backdrop */
+	.menu-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 90;
+		background: rgba(20, 28, 38, 0.32);
+		border: none;
+		cursor: pointer;
+		animation: menu-fade 0.15s ease;
+	}
+	@keyframes menu-fade { from { opacity: 0; } to { opacity: 1; } }
+	.site-menu {
+		position: fixed;
+		top: 0;
+		right: 0;
+		z-index: 100;
+		height: 100dvh;
+		width: min(320px, 82vw);
+		box-sizing: border-box;
+		background: #fff;
+		border-left: 1px solid var(--color-border);
+		box-shadow: -12px 0 40px rgba(0, 0, 0, 0.14);
+		padding: 58px 26px 28px;
+		transform: translateX(100%);
+		transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+		overflow-y: auto;
+	}
+	.site-menu.open { transform: translateX(0); }
+	.menu-close {
+		position: absolute;
+		top: 14px;
+		right: 16px;
+		width: 34px;
+		height: 34px;
+		font-size: 1.5rem;
+		line-height: 1;
+		color: var(--color-fg-light);
+		background: none;
+		border: none;
+		border-radius: 999px;
+		cursor: pointer;
+	}
+	.menu-close:hover { background: var(--color-gray-100); color: var(--color-fg); }
+	.menu-group { margin-bottom: 22px; }
+	.menu-h {
+		font-family: var(--font-sans);
+		font-size: 0.7rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: #97a2ad;
+		margin: 0 0 8px;
+	}
+	.menu-link {
+		display: block;
+		width: 100%;
+		text-align: left;
+		font-family: var(--font-display, var(--font-serif));
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: var(--color-fg);
+		background: none;
+		border: none;
+		padding: 5px 0;
+		cursor: pointer;
+		text-decoration: none;
+	}
+	.menu-link:hover { color: #3f88cc; }
 	/* Section pills — the primary nav, a centered row of little buttons. */
 	.mast-sections {
 		display: flex;
@@ -402,6 +507,9 @@
 		padding: 8px 24px 11px;
 	}
 	.pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
 		font-family: var(--font-sans);
 		font-size: 0.78rem;
 		font-weight: 600;
@@ -410,11 +518,12 @@
 		background: var(--color-white);
 		border: 1px solid var(--color-border);
 		border-radius: 999px;
-		padding: 5px 16px;
+		padding: 5px 15px 5px 12px;
 		cursor: pointer;
 		transition: background 0.12s, border-color 0.12s, color 0.12s;
 		outline: none;
 	}
+	.pill-ic { font-size: 0.9em; line-height: 1; }
 	.pill:hover {
 		border-color: #b6c2ce;
 		color: var(--color-fg);
@@ -431,64 +540,13 @@
 	@media (max-width: 600px) {
 		.masthead-top { padding: 6px 14px 0; }
 		.mast-title { font-size: 0.82rem; }
+		/* About is in the hamburger menu on phones — drop the standalone link so the
+		   wordmark has room. */
+		.mast-metalink { display: none; }
 		.mast-sections { padding: 7px 14px 10px; gap: 6px; }
 		.pill { padding: 5px 13px; font-size: 0.74rem; }
 	}
 
-	/* Hub cards on the Overview landing — guide into each section. */
-	.hub {
-		max-width: 940px;
-		margin: 44px auto 8px;
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 18px;
-	}
-	@media (max-width: 720px) {
-		.hub {
-			grid-template-columns: 1fr;
-			margin-top: 32px;
-		}
-	}
-	.hub-card {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 6px;
-		text-align: left;
-		padding: 22px 20px;
-		border: 1px solid var(--color-border);
-		border-radius: 12px;
-		background: var(--color-white);
-		cursor: pointer;
-		font-family: var(--font-sans);
-		transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
-	}
-	.hub-card:hover {
-		border-color: var(--color-fg-light);
-		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-		transform: translateY(-2px);
-	}
-	.hub-emoji {
-		font-size: 1.6rem;
-		line-height: 1;
-	}
-	.hub-h {
-		font-family: var(--font-display, var(--font-serif));
-		font-size: 1.3rem;
-		font-weight: 700;
-		color: var(--color-fg);
-	}
-	.hub-d {
-		font-size: 0.9rem;
-		line-height: 1.45;
-		color: var(--color-fg-light);
-	}
-	.hub-go {
-		margin-top: 4px;
-		font-size: 0.85rem;
-		font-weight: 700;
-		color: #357abd;
-	}
 	/* "Back to rankings" shown after you open a trend from the Rankings tab. */
 	.back-bar {
 		max-width: 720px;
