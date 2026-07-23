@@ -87,6 +87,7 @@
 		if (wikiTouch) wikiHover = !wikiHover;
 	}
 	let chartWrap = $state(null); // ref to the chart container, for the PNG export
+	let titleEl = $state(null); // ref to the plot heading, so a search scrolls to the title
 	let sideEl = $state(null); // ref to the titles panel, for keeping it still when ticking
 
 	// Ticking a work grows the "on the chart" panel above the (stacked) table,
@@ -139,7 +140,7 @@
 		if (wantSlug) {
 			const a = authors.find((x) => x.slug === wantSlug)
 					|| (await searchAuthors(wantSlug.replace(/-/g, " "), 8)).find((x) => x.slug === wantSlug);
-			if (a) { await selectAuthor(a); return; }
+			if (a) { await selectAuthor(a, { scroll: false }); return; }
 		}
 		// Search mode (author OR title) opens straight to the search box (current
 		// stays null -> the search-first empty state renders); a ?title link still
@@ -295,7 +296,7 @@
 	// editions shown as one work there — including alt-title forms the plain
 	// matcher missed (e.g. "Slaughterhouse-five, or, The children's crusade").
 	async function selectTitle(r, { scroll = true } = {}) {
-		await selectAuthor({ slug: r.slug, name: r.author });
+		await selectAuthor({ slug: r.slug, name: r.author }, { scroll: false });
 		await tick();
 		if (!current) return;
 		const want = normalizeWorkKey(r.title);
@@ -321,7 +322,7 @@
 		groups = [...groups, { id: ++groupIdCounter, name, idxs }];
 		hlWorkKey = `g${groupIdCounter}`;
 		await tick();
-		if (scroll) chartWrap?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+		if (scroll) (titleEl || chartWrap)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
 	}
 
 	// When the first work is plotted on a line chart, auto-hide the busy
@@ -335,7 +336,7 @@
 		}
 	});
 
-	async function selectAuthor(a) {
+	async function selectAuthor(a, { scroll = true } = {}) {
 		// One author's drilldown (their series + every qualifying title) comes
 		// from their static JSON file (see db.js).
 		loadError = "";
@@ -384,6 +385,11 @@
 		loading = false;
 		// Re-apply any grouping the user saved for this author (localStorage).
 		restoreGroupings(a.slug);
+		// Bring the plot's title to the top of the viewport after a search.
+		if (scroll) {
+			await tick();
+			titleEl?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+		}
 	}
 
 	// A shareable link (reopens the current author) plus a caption.
@@ -1582,7 +1588,7 @@
 	{#if current}
 		<div class="author">
 			<div class="split" class:collapsed={tableCollapsed}>
-			<div class="split-main">
+			<div class="split-main" bind:this={titleEl}>
 			{#if headingText}
 				{#if isOverview}
 					<h2>{headingText}</h2>

@@ -138,29 +138,33 @@
 
 <svelte:boundary onerror={(e) => console.error(e)}>
 	<article>
-		<header class="headline">
-			<img class="logo" src="{base}/favicon.png" alt="" width="88" height="88" />
-			<h1>{copy.title}</h1>
-			<p class="dek">{copy.dek}</p>
-			<p class="byline">
-				By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project<br />
-				from the University of Washington Information School
-			</p>
-			<p class="wip">
-				This is a work-in-progress. We would love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>!
-			</p>
-		</header>
+		{#if tab === "overview"}
+			<header class="headline">
+				<img class="logo" src="{base}/favicon.png" alt="" width="88" height="88" />
+				<h1>{copy.title}</h1>
+				<p class="dek">{copy.dek}</p>
+				<p class="byline">
+					By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project<br />
+					from the University of Washington Information School
+				</p>
+				<p class="wip">
+					This is a work-in-progress. We would love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>!
+				</p>
+			</header>
+		{:else}
+			<header class="banner">
+				<button class="banner-home" onclick={goOverview} aria-label="{copy.title} — home">
+					<img class="banner-logo" src="{base}/favicon.png" alt="" width="46" height="46" />
+					<span class="banner-title">{copy.title}</span>
+				</button>
+			</header>
+		{/if}
 
 		<div class="tab-groups">
 			<div class="main-tabs" role="tablist" aria-label="Views">
-				<div class="sticker-tabs">
-					<button class="sticker-tab" role="tab" aria-selected={tab === "overview"} class:active={tab === "overview"} onclick={goOverview}>Overview</button>
-				</div>
-				<div class="sticker-tabs">
-					<button class="sticker-tab" role="tab" aria-selected={tab === "search"} class:active={tab === "search"} onclick={() => (tab = "search")}>Search</button>
-					<button class="sticker-tab" role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>Genres</button>
-					<button class="sticker-tab" role="tab" aria-selected={tab === "rankings"} class:active={tab === "rankings"} onclick={() => (tab = "rankings")}>Rankings</button>
-				</div>
+				<button class="tab" role="tab" aria-selected={tab === "search"} class:active={tab === "search"} onclick={() => (tab = "search")}>Search</button>
+				<button class="tab" role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>Genres</button>
+				<button class="tab" role="tab" aria-selected={tab === "rankings"} class:active={tab === "rankings"} onclick={() => (tab = "rankings")}>Rankings</button>
 			</div>
 			{#if tab === "search"}
 				<div class="subtabs" role="tablist" aria-label="Search by">
@@ -314,19 +318,67 @@
 		color: #357abd;
 		font-weight: 600;
 	}
-	/* One row of four view tabs, with a segmented sub-toggle under Search / Rankings. */
+	/* Compact banner header on non-Overview pages: logo + project title, clickable
+	   to return home. */
+	.banner {
+		text-align: center;
+		margin: 6px auto 0;
+	}
+	.banner-home {
+		display: inline-flex;
+		align-items: center;
+		gap: 12px;
+		background: none;
+		border: none;
+		padding: 4px 6px;
+		cursor: pointer;
+	}
+	.banner-logo {
+		display: block;
+		width: 46px;
+		height: 46px;
+	}
+	.banner-title {
+		font-family: var(--font-display, var(--font-serif));
+		font-weight: 700;
+		font-size: clamp(1.4rem, 3.2vw, 1.9rem);
+		line-height: 1;
+		color: #3f88cc;
+	}
+
+	/* Four evenly-spread view tabs across the width, tab-bar style. */
 	.tab-groups {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		margin: 22px auto 26px;
+		max-width: 720px;
+		margin: 18px auto 26px;
 	}
-	/* Overview sits on its own row above Search / Genres / Rankings. */
 	.main-tabs {
 		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 10px;
+		width: 100%;
+		border-bottom: 2px solid var(--color-border);
+	}
+	.tab {
+		flex: 1;
+		padding: 11px 8px;
+		background: none;
+		border: none;
+		border-bottom: 3px solid transparent;
+		margin-bottom: -2px;
+		font-family: var(--font-sans);
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--color-fg-light);
+		cursor: pointer;
+		transition: color 0.12s, border-color 0.12s;
+	}
+	.tab:hover {
+		color: var(--color-fg);
+	}
+	.tab.active {
+		color: var(--color-fg);
+		border-bottom-color: #357abd;
 	}
 	/* "Back to rankings" shown after you open a trend from the Rankings tab. */
 	.back-bar {
@@ -346,41 +398,6 @@
 	.back-rankings:hover {
 		text-decoration: underline;
 		text-underline-offset: 2px;
-	}
-	/* top-level view tabs: bold "sticker" buttons with a hard offset shadow */
-	.sticker-tabs {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 10px;
-		flex-wrap: wrap;
-	}
-	.sticker-tab {
-		--sh: var(--color-fg);
-		font-family: var(--font-sans);
-		font-size: 0.95rem;
-		font-weight: 600;
-		padding: 9px 16px;
-		border-radius: 8px;
-		background: var(--color-white);
-		color: var(--color-fg);
-		border: 2px solid var(--sh);
-		box-shadow: 3px 3px 0 var(--sh);
-		cursor: pointer;
-		transition: transform 0.08s ease, box-shadow 0.08s ease;
-	}
-	.sticker-tab:hover {
-		transform: translate(-1px, -1px);
-		box-shadow: 4px 4px 0 var(--sh);
-	}
-	.sticker-tab:active {
-		transform: translate(2px, 2px);
-		box-shadow: 1px 1px 0 var(--sh);
-	}
-	.sticker-tab.active {
-		--sh: #16324f;
-		background: #357abd;
-		color: var(--color-white);
 	}
 	/* segmented sub-toggle (Author/Title, Authors/Works) beneath the main tabs */
 	.subtabs {
