@@ -220,7 +220,10 @@
 			{/if}
 		{:else if tab === "home"}
 			<header class="hero">
-				<h1>{copy.title}</h1>
+				<div class="hero-title">
+					<img class="hero-logo" src="{base}/favicon.png" alt="" width="56" height="56" />
+					<h1>{copy.title}</h1>
+				</div>
 				<p class="dek">{copy.dek}</p>
 				<p class="byline">By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project</p>
 			</header>
@@ -340,13 +343,26 @@
 		margin: 46px auto 10px;
 		text-align: center;
 	}
+	.hero-title {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 16px;
+		margin: 0 0 14px;
+	}
+	.hero-logo {
+		flex: none;
+		width: clamp(42px, 8vw, 58px);
+		height: auto;
+	}
 	.hero h1 {
 		font-family: var(--font-display, var(--font-serif));
 		font-weight: 700;
 		font-size: clamp(2.3rem, 6vw, 3.6rem);
 		line-height: 1.08;
 		letter-spacing: -0.005em;
-		margin: 0 0 14px;
+		margin: 0;
 		color: var(--color-fg);
 	}
 	.dek {
