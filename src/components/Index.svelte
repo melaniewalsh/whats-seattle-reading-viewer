@@ -566,8 +566,7 @@
 	}
 	/* OurWorldinData-style source + attribution footer */
 	.chart-footer {
-		max-width: 720px;
-		margin: 28px auto 0;
+		margin: 40px 0 0;
 		padding-top: 12px;
 		border-top: 1px solid var(--color-border);
 		font-family: var(--font-sans);

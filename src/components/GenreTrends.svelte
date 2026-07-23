@@ -165,6 +165,28 @@
 	const plotGenres = $derived(
 		isolatedKeys.length ? isolatedKeys.map((k) => k.replace(/^g:/, "")) : [...shown],
 	);
+	// "Focus a genre" search (mirrors the search-tab author/work typeahead):
+	// picking a genre plots + isolates it; "Show all genres" clears the isolation.
+	function pickGenre(name) {
+		if (!name) { isolatedKeys = []; return; }
+		if (!shown.has(name)) shown = new Set(shown).add(name);
+		isolatedKeys = [`g:${name}`];
+	}
+	let genreQuery = $state("");
+	// All-time checkouts per genre, for the little count beside each suggestion.
+	function genreCount(name) {
+		const g = genreByName[name];
+		return g ? sum(seriesArr(g)) : 0;
+	}
+	const genreResults = $derived.by(() => {
+		const q = genreQuery.trim().toLowerCase();
+		if (!q) return [];
+		return genreOrder.filter((g) => g.toLowerCase().includes(q)).slice(0, 10);
+	});
+	function chooseGenre(name) {
+		pickGenre(name);
+		genreQuery = "";
+	}
 	// Name them when there are 1–3 ("Romance + Fantasy"); otherwise just "Genres".
 	const genreTitle = $derived(
 		plotGenres.length && plotGenres.length <= 3 ? plotGenres.join(" + ") : "Genres",
@@ -381,6 +403,36 @@
 			<p class="mode-note">Checkouts grouped by subject heading at the Seattle Public Library.</p>
 		</div>
 
+		<div class="gt-controls">
+			<label class="gt-field grow">
+				<span>Focus a genre</span>
+				<div class="gt-search">
+					<input
+						type="search"
+						placeholder="Search a genre"
+						aria-label="Search for a genre to focus"
+						bind:value={genreQuery}
+						autocomplete="off"
+					/>
+					{#if genreResults.length}
+						<ul class="gt-results">
+							{#each genreResults as g}
+								<li><button onclick={() => chooseGenre(g)}>
+									<span>{g}</span>
+									<span class="count">{compactNumber(genreCount(g))}</span>
+								</button></li>
+							{/each}
+						</ul>
+					{:else if genreQuery.trim().length >= 1}
+						<p class="gt-noresults">No genre matches “{genreQuery.trim()}”.</p>
+					{/if}
+				</div>
+			</label>
+			{#if isolatedKeys.length}
+				<button class="gt-clear" onclick={() => { isolatedKeys = []; genreQuery = ""; }}>Show all genres</button>
+			{/if}
+		</div>
+
 		<p class="genre-caption">
 			{#if genreTotal != null}
 				<strong>{genreTitle}</strong> · {compactNumber(genreTotal)} checkouts · {yearRange} · raw share of all book checkouts
@@ -537,6 +589,20 @@
 	.genre-title { font-family: var(--font-display, var(--font-serif)); font-weight: 700; font-size: clamp(1.7rem, 3.4vw, 2.5rem); color: var(--color-fg); margin: 0; line-height: 1.05; }
 	.mode-note { font-family: var(--font-sans); font-size: 0.95rem; color: var(--color-fg-light); margin: 6px 0 0; line-height: 1.4; }
 	.genre-caption { font-family: var(--font-sans); font-size: 0.9rem; color: var(--color-fg-light); margin: 0 0 8px; line-height: 1.4; }
+	/* "Focus genre" field — mirrors the Most Borrowed tab's filter dropdowns. */
+	.gt-controls { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+	.gt-field { display: inline-flex; flex-direction: column; gap: 4px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg-light); min-width: 260px; }
+	.gt-field.grow { flex: 1; }
+	.gt-search { position: relative; }
+	.gt-search input { width: 100%; box-sizing: border-box; font-family: var(--font-sans); font-size: 0.95rem; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--color-fg); padding: 9px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white); outline: none; }
+	.gt-search input:focus { border-color: #3f88cc; box-shadow: 0 0 0 3px rgba(63, 136, 204, 0.15); }
+	.gt-results { list-style: none; margin: 6px 0 0; padding: 6px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-white); max-height: 340px; overflow-y: auto; position: absolute; width: 100%; z-index: var(--z-top, 60); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
+	.gt-results button { width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 9px 12px; background: none; border: none; border-radius: var(--radius-sm); font-family: var(--font-sans); font-size: 0.95rem; font-weight: 500; text-transform: none; letter-spacing: 0; text-align: left; cursor: pointer; color: var(--color-fg); }
+	.gt-results button:hover { background: var(--color-gray-100); }
+	.gt-results .count { color: var(--color-fg-light); font-weight: 500; font-variant-numeric: tabular-nums; }
+	.gt-noresults { position: absolute; margin: 6px 0 0; padding: 9px 12px; font-family: var(--font-sans); font-size: 0.9rem; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--color-fg-light); }
+	.gt-clear { font-family: var(--font-sans); font-size: 0.85rem; font-weight: 600; text-transform: none; letter-spacing: 0; color: #3f88cc; background: none; border: none; padding: 9px 0; cursor: pointer; white-space: nowrap; }
+	.gt-clear:hover { text-decoration: underline; }
 	.genre-caption strong { color: var(--color-fg); }
 	.chartwrap { width: 100%; }
 

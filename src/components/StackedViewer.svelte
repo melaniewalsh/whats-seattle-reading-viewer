@@ -142,12 +142,16 @@
 					|| (await searchAuthors(wantSlug.replace(/-/g, " "), 8)).find((x) => x.slug === wantSlug);
 			if (a) { await selectAuthor(a, { scroll: false }); return; }
 		}
-		// Search mode lands on a default example — the top author (author mode) or the
-		// default title (title mode, via the effect below) — rather than a blank box,
+		// Search mode lands on a default example — James Baldwin (author mode) or The
+		// Fire Next Time (title mode, via the effect below) — rather than a blank box,
 		// so there's always something on the plot. The search box stays above it.
 		if (landing === "search") {
-			if (searchMode !== "title" && authors.length) {
-				await selectAuthor(authors[0], { scroll: false });
+			if (searchMode !== "title") {
+				let a = null;
+				try { a = (await searchAuthors("James Baldwin", 6)).find((x) => /baldwin/i.test(displayName(x.name))); } catch {}
+				a = a || authors[0];
+				if (a) await selectAuthor(a, { scroll: false });
+				else loading = false;
 			} else {
 				loading = false;
 			}
@@ -297,13 +301,12 @@
 		}
 	});
 	async function loadDefaultTitle() {
-		// Only a ?title=<work> link (e.g. from Top works) loads a title; otherwise the
-		// tab shows the empty search box, like author search — no seeded default.
+		// A ?title=<work> link (e.g. from Top works) loads that title; otherwise the
+		// tab lands on a well-known default, The Fire Next Time.
 		let want = null;
 		try { want = new URLSearchParams(window.location.search).get("title"); } catch {}
-		if (!want) return;
 		try {
-			const r = (await searchTitles(want, 5))[0];
+			const r = (await searchTitles(want || "The Fire Next Time", 5))[0];
 			if (r) await selectTitle(r, { scroll: false });
 		} catch {}
 	}
@@ -1563,17 +1566,17 @@
 				<span>Search by</span>
 				<select value={searchMode} onchange={(e) => setSearchKind(e.currentTarget.value)}>
 					<option value="author">Author</option>
-					<option value="title">Title</option>
+					<option value="title">Work</option>
 				</select>
 			</label>
 			<label class="ta-field grow">
-				<span>Find {searchMode === "title" ? "a title" : "an author"}</span>
+				<span>Find {searchMode === "title" ? "a work" : "an author"}</span>
 				<div class="search">
 					<input
 							id="author-search"
 							type="search"
-							placeholder={searchMode === "title" ? "Search a title" : "Search an author"}
-							aria-label={searchMode === "title" ? "Search for a title" : "Search for an author"}
+							placeholder={searchMode === "title" ? "Search a work" : "Search an author"}
+							aria-label={searchMode === "title" ? "Search for a work" : "Search for an author"}
 							bind:value={query}
 							autocomplete="off"
 					/>
@@ -1596,7 +1599,7 @@
 					{/each}
 				</ul>
 				{:else if query.trim().length >= 2}
-					<p class="no-results">No {searchMode === "title" ? "titles" : "authors"} found for “{query.trim()}”.</p>
+					<p class="no-results">No {searchMode === "title" ? "works" : "authors"} found for “{query.trim()}”.</p>
 				{/if}
 				</div>
 			</label>
@@ -1604,8 +1607,8 @@
 
 		{#if searchMode === "title"}
 			<span class="title-hint" tabindex="0" role="note" aria-label="Only the most-borrowed titles are searchable here — search By author to find any title">
-				<span class="th-ic" aria-hidden="true">ⓘ</span> Not finding a title?
-				<span class="th-pop" role="tooltip"><strong>Only the most-borrowed titles are searchable here</strong>{#if titleMinLabel} — those with at least ~{titleMinLabel} all-time checkouts{/if}. To find any title, search <strong>By&nbsp;author</strong> instead.</span>
+				<span class="th-ic" aria-hidden="true">ⓘ</span> Not finding a work?
+				<span class="th-pop" role="tooltip"><strong>Only the most-borrowed works are searchable here</strong>{#if titleMinLabel} — those with at least ~{titleMinLabel} all-time checkouts{/if}. To find any work, search <strong>By&nbsp;author</strong> instead.</span>
 			</span>
 		{/if}
 
