@@ -7,28 +7,38 @@
 // match on title + author, which is approximate — some covers will be a wrong
 // edition or missing. Callers must handle a null result.
 
+import { searchTitle } from "./cleanTitle.js";
+
 const mem = new Map(); // key -> Promise<string|null>
 
+// Versioned so old poisoned "" (no-cover) entries from stricter/messier queries
+// are ignored after this fix.
 function keyOf(title, author) {
-	return `cover:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
+	return `cover2:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
 }
 
-async function resolve(title, author) {
-	const params = new URLSearchParams({
-		title: title || "",
-		author: author || "",
-		limit: "1",
-		fields: "cover_i",
-	});
+async function queryCover(title, author) {
+	if (!title) return null;
+	const params = new URLSearchParams({ title, limit: "1", fields: "cover_i" });
+	if (author) params.set("author", author);
 	try {
 		const res = await fetch(`https://openlibrary.org/search.json?${params}`);
 		if (!res.ok) return null;
 		const data = await res.json();
-		const id = data?.docs?.[0]?.cover_i;
-		return id ? `https://covers.openlibrary.org/b/id/${id}-M.jpg` : null;
+		return data?.docs?.[0]?.cover_i ?? null;
 	} catch {
 		return null;
 	}
+}
+
+async function resolve(title, author) {
+	// Query with the cleaned-up title (catalog cruft breaks the match). Try with
+	// the author first; if that finds nothing, retry title-only — Open Library's
+	// author strings are often spelled differently than the SPL catalog's.
+	const clean = searchTitle(title);
+	let id = await queryCover(clean, author);
+	if (id == null && author) id = await queryCover(clean, "");
+	return id != null ? `https://covers.openlibrary.org/b/id/${id}-M.jpg` : null;
 }
 
 // Returns a Promise<string|null> (the cover URL, or null if none / on error).
@@ -40,16 +50,21 @@ export function coverUrl(title, author) {
 	try {
 		cached = localStorage.getItem(k);
 	} catch {}
-	if (cached !== null) {
-		const p = Promise.resolve(cached || null);
+	// Only real hits are persisted (see below), so a stored value is always a URL.
+	if (cached) {
+		const p = Promise.resolve(cached);
 		mem.set(k, p);
 		return p;
 	}
 
 	const p = resolve(title, author).then((url) => {
-		try {
-			localStorage.setItem(k, url || "");
-		} catch {}
+		// Persist only successes — a miss might be a transient network/rate-limit
+		// failure, so let it retry next session rather than caching a dead null.
+		if (url) {
+			try {
+				localStorage.setItem(k, url);
+			} catch {}
+		}
 		return url;
 	});
 	mem.set(k, p);

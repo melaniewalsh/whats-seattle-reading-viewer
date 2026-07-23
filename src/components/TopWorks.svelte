@@ -7,6 +7,7 @@
 	import { wikiWork } from "$utils/wiki.js";
 	import { compactNumber } from "$utils/format.js";
 	import { titleCase } from "$utils/titleCase.js";
+	import { cleanWorkTitle, searchTitle } from "$utils/cleanTitle.js";
 	import WikiCard from "$components/WikiCard.svelte";
 
 	// openAuthor(slug) / openTitle(title) are provided by Index.svelte: jump to the
@@ -107,7 +108,7 @@
 			return;
 		}
 		wikiTried.add(k);
-		wikiWork(r[0], displayName(r[1])).then((w) => {
+		wikiWork(searchTitle(r[0]), displayName(r[1])).then((w) => {
 			covers = { ...covers, [k]: w?.thumbnail || null };
 		});
 	}
@@ -116,14 +117,12 @@
 			const k = coverKey(r);
 			if (k in covers || coverInflight.has(k)) continue;
 			coverInflight.add(k);
-			// r[4] = cover baked in at build time: a URL string, or null when Open
-			// Library had no match (skip straight to the Wikipedia fallback). Older
-			// data with no 5th column (undefined) resolves the cover at runtime.
+			// r[4] = cover baked in at build time: a real URL string is used as-is.
+			// Anything else (null from an old failed bake, or no 5th column) resolves
+			// at runtime — the improved lookup catches covers the bake missed.
 			const baked = r[4];
-			if (typeof baked === "string") {
+			if (typeof baked === "string" && baked) {
 				covers = { ...covers, [k]: baked };
-			} else if (baked === null) {
-				fillFromWiki(r);
 			} else {
 				coverUrl(r[0], displayName(r[1])).then((u) => {
 					if (u) covers = { ...covers, [k]: u };
@@ -174,10 +173,8 @@
 		if (!(k in covers) && !coverInflight.has(k)) {
 			coverInflight.add(k);
 			const baked = r[4];
-			if (typeof baked === "string") {
+			if (typeof baked === "string" && baked) {
 				covers = { ...covers, [k]: baked };
-			} else if (baked === null) {
-				fillFromWiki(r);
 			} else {
 				coverUrl(r[0], displayName(r[1])).then((u) => {
 					if (u) covers = { ...covers, [k]: u };
@@ -187,7 +184,7 @@
 		}
 		if (!(k in summaries) && !summaryInflight.has(k)) {
 			summaryInflight.add(k);
-			wikiWork(r[0], displayName(r[1])).then((w) => {
+			wikiWork(searchTitle(r[0]), displayName(r[1])).then((w) => {
 				summaries = { ...summaries, [k]: w?.extract || null };
 				wikiUrls = { ...wikiUrls, [k]: w?.url || null };
 				if (!covers[k] && w?.thumbnail) covers = { ...covers, [k]: w.thumbnail };
@@ -302,7 +299,7 @@
 			const nameMaxW = numColLeft - 12 - (padX + 40);
 			ctx.fillStyle = "#1a1a1a";
 			ctx.font = `600 15px ${IMG_SANS}`;
-			ctx.fillText(ellipsize(ctx, titleCase(r[0]), nameMaxW), padX + 40, lineY);
+			ctx.fillText(ellipsize(ctx, titleCase(cleanWorkTitle(r[0])), nameMaxW), padX + 40, lineY);
 			ctx.fillStyle = "#777777";
 			ctx.font = `13px ${IMG_SANS}`;
 			ctx.fillText(ellipsize(ctx, "by " + displayName(r[1]), nameMaxW), padX + 40, baseY + 39);
@@ -493,7 +490,7 @@
 											{/if}
 										</button>
 									</div>
-									<button class="gal-booktitle" onclick={() => openTitle(r[0])}>{titleCase(r[0])}</button>
+									<button class="gal-booktitle" onclick={() => openTitle(r[0])}>{titleCase(cleanWorkTitle(r[0]))}</button>
 									<div class="gal-by">by {displayName(r[1])}</div>
 									<div class="gal-count">{compactNumber(r[3])} checkouts</div>
 									{#if summaries[k]}
@@ -538,7 +535,7 @@
 									</button>
 									<span class="tw-text">
 										<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
-											<button class="tw-title tw-titlelink" aria-haspopup="dialog" onclick={() => activateName(key)}>{titleCase(row[0])}</button>
+											<button class="tw-title tw-titlelink" aria-haspopup="dialog" onclick={() => activateName(key)}>{titleCase(cleanWorkTitle(row[0]))}</button>
 											{#if hoverKey === key || pinnedKey === key}
 												<span class="wiki-pop"><WikiCard query={row[0]} author={displayName(row[1])} kind="work" links={u} onTrend={() => openTitle(row[0])} /></span>
 											{/if}
