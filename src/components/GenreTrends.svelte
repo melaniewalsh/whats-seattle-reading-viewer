@@ -42,7 +42,7 @@
 
 	let data = $state(null);
 	let loadError = $state("");
-	let mode = $state("partition"); // "partition" | "overlap"
+	let mode = $state("overlap"); // "partition" | "overlap" — overlap only, in the UI
 	let shown = $state(new Set());  // genre names currently plotted
 	let showOther = $state(false);  // the "Other / Unclassified" partition line
 	let expanded = $state(new Set());
@@ -157,6 +157,14 @@
 		return (g.terms || []).some((t) => t.toLowerCase().includes(q))
 			|| (g.ficTerms || []).some((t) => t.toLowerCase().includes(q));
 	}
+
+	// When exactly one genre is on the plot (isolated, or the only one shown), name
+	// it as a serif title above the chart — matching the other views' plot titles.
+	const soleGenre = $derived.by(() => {
+		if (isolatedKeys.length === 1) return isolatedKeys[0].replace(/^g:/, "");
+		if (shown.size === 1) return [...shown][0];
+		return null;
+	});
 
 	// --- Share / download (mirrors the "By author" tab exactly) --------------
 	const plotTitle = $derived(mode === "partition"
@@ -351,16 +359,11 @@
 		<p class="loading"><span class="spinner" aria-hidden="true"></span>Loading genre trends…</p>
 	{:else}
 		<div class="modebar">
-			<div class="seg" role="tablist">
-				<button class="seg-btn" class:on={mode === "partition"} onclick={() => (mode = "partition")}>Partition</button>
-				<button class="seg-btn" class:on={mode === "overlap"} onclick={() => (mode = "overlap")}>Overlap</button>
-			</div>
+			{#if soleGenre}
+				<h2 class="genre-title">{soleGenre}</h2>
+			{/if}
 			<p class="mode-note">
-				{#if mode === "partition"}
-					Each checkout counted <strong>once</strong>, in the first genre it matches — shares sum to 100%
-				{:else}
-					Each genre's <strong>raw</strong> share; books are multi-tagged so these overlap
-				{/if}
+				Each genre's <strong>raw</strong> share of checkouts — books are multi-tagged, so genres overlap.
 			</p>
 		</div>
 
@@ -508,11 +511,9 @@
 	.sh-note strong { color: var(--color-fg); }
 	.loading, .load-error { font-family: var(--font-sans); color: var(--color-fg-light); }
 
-	.modebar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 8px; }
-	.seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: 999px; overflow: hidden; flex: none; }
-	.seg-btn { font-family: var(--font-sans); font-size: 0.82rem; font-weight: 600; padding: 5px 16px; border: none; background: var(--color-white); color: var(--color-fg-light); cursor: pointer; }
-	.seg-btn.on { background: var(--color-fg); color: var(--color-white); }
-	.mode-note { font-family: var(--font-sans); font-size: 0.82rem; color: var(--color-fg-light); margin: 0; flex: 1; min-width: 200px; line-height: 1.4; }
+	.modebar { margin: 0 0 10px; }
+	.genre-title { font-family: var(--font-display, var(--font-serif)); font-weight: 700; font-size: clamp(1.5rem, 3vw, 2rem); color: var(--color-fg); margin: 0 0 2px; line-height: 1.1; }
+	.mode-note { font-family: var(--font-sans); font-size: 0.82rem; color: var(--color-fg-light); margin: 0; line-height: 1.4; }
 	.chartwrap { width: 100%; }
 
 	/* Share / download — identical to the "By author" tab. */

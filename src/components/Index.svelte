@@ -138,9 +138,22 @@
 
 <svelte:boundary onerror={(e) => console.error(e)}>
 	<article>
+		<div class="masthead">
+			<div class="masthead-inner">
+				<button class="mast-home" class:here={tab === "overview"} onclick={goOverview} aria-label="{copy.title} — home">
+					<img class="mast-logo" src="{base}/favicon.png" alt="" width="34" height="34" />
+					<span class="mast-title">{copy.title}</span>
+				</button>
+				<nav class="mast-nav" aria-label="Sections">
+					<button class="mast-link" aria-current={tab === "search" ? "page" : undefined} class:active={tab === "search"} onclick={() => (tab = "search")}>Search</button>
+					<button class="mast-link" aria-current={tab === "genres" ? "page" : undefined} class:active={tab === "genres"} onclick={() => (tab = "genres")}>Genres</button>
+					<button class="mast-link" aria-current={tab === "rankings" ? "page" : undefined} class:active={tab === "rankings"} onclick={() => (tab = "rankings")}>Most Borrowed</button>
+				</nav>
+			</div>
+		</div>
+
 		{#if tab === "overview"}
-			<header class="headline">
-				<img class="logo" src="{base}/favicon.png" alt="" width="88" height="88" />
+			<header class="hero">
 				<h1>{copy.title}</h1>
 				<p class="dek">{copy.dek}</p>
 				<p class="byline">
@@ -151,28 +164,14 @@
 					This is a work-in-progress. We would love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>!
 				</p>
 			</header>
-		{:else}
-			<header class="banner">
-				<button class="banner-home" onclick={goOverview} aria-label="{copy.title} — home">
-					<img class="banner-logo" src="{base}/favicon.png" alt="" width="46" height="46" />
-					<span class="banner-title">{copy.title}</span>
-				</button>
-			</header>
 		{/if}
 
-		<div class="tab-groups">
-			<div class="main-tabs" role="tablist" aria-label="Views">
-				<button class="tab" role="tab" aria-selected={tab === "search"} class:active={tab === "search"} onclick={() => (tab = "search")}>Search</button>
-				<button class="tab" role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>Genres</button>
-				<button class="tab" role="tab" aria-selected={tab === "rankings"} class:active={tab === "rankings"} onclick={() => (tab = "rankings")}>Rankings</button>
+		{#if tab === "search"}
+			<div class="subtabs" role="tablist" aria-label="Search by">
+				<button class="subtab" class:active={searchKind === "author"} aria-selected={searchKind === "author"} onclick={() => setSearchKind("author")}>Author</button>
+				<button class="subtab" class:active={searchKind === "title"} aria-selected={searchKind === "title"} onclick={() => setSearchKind("title")}>Title</button>
 			</div>
-			{#if tab === "search"}
-				<div class="subtabs" role="tablist" aria-label="Search by">
-					<button class="subtab" class:active={searchKind === "author"} aria-selected={searchKind === "author"} onclick={() => setSearchKind("author")}>Author</button>
-					<button class="subtab" class:active={searchKind === "title"} aria-selected={searchKind === "title"} onclick={() => setSearchKind("title")}>Title</button>
-				</div>
-			{/if}
-		</div>
+		{/if}
 
 		{#if rankReturn && tab === "search"}
 			<div class="back-bar">
@@ -263,29 +262,20 @@
 		margin: 0 auto;
 		padding: 0 20px 80px;
 	}
-	.headline {
+	/* Editorial hero — shown on the Overview landing, below the sticky masthead. */
+	.hero {
 		max-width: 720px;
-		margin: 8px auto 32px;
+		margin: 26px auto 30px;
 		text-align: center;
 	}
-	.logo {
-		display: block;
-		width: 88px;
-		height: 88px;
-		margin: 0 auto 12px;
-	}
-	.headline h1 {
-		/* Fraunces display face — matches the rankings masthead title. */
+	.hero h1 {
 		font-family: var(--font-display, var(--font-serif));
 		font-weight: 700;
 		font-size: clamp(2.3rem, 6vw, 3.6rem);
 		line-height: 1.08;
 		letter-spacing: -0.005em;
 		margin: 0 0 16px;
-		/* Slightly deeper blue than the old #6aa9dd so the big title clears WCAG
-		   large-text contrast (~3:1) on white while keeping the light-blue look. */
 		color: #3f88cc;
-		/* soft drop shadow for a bit more presence */
 		text-shadow: 1.5px 2px 0 rgba(53, 122, 189, 0.16);
 	}
 	.dek {
@@ -318,67 +308,86 @@
 		color: #357abd;
 		font-weight: 600;
 	}
-	/* Compact banner header on non-Overview pages: logo + project title, clickable
-	   to return home. */
-	.banner {
-		text-align: center;
-		margin: 6px auto 0;
+	/* Sticky masthead: brand/home on the left, section nav on the right. Breaks out
+	   to the full viewport width so it reads as a real site header. */
+	.masthead {
+		position: sticky;
+		top: 0;
+		z-index: 50;
+		width: 100vw;
+		margin-left: calc(50% - 50vw);
+		background: #fff;
+		border-bottom: 1px solid var(--color-border);
 	}
-	.banner-home {
+	.masthead-inner {
+		max-width: 1120px;
+		margin: 0 auto;
+		min-height: 54px;
+		display: flex;
+		align-items: stretch;
+		justify-content: space-between;
+		gap: 16px;
+		padding: 0 22px;
+	}
+	.mast-home {
+		align-self: center;
 		display: inline-flex;
 		align-items: center;
-		gap: 12px;
+		gap: 9px;
 		background: none;
 		border: none;
-		padding: 4px 6px;
+		padding: 0;
 		cursor: pointer;
 	}
-	.banner-logo {
+	.mast-logo {
 		display: block;
-		width: 46px;
-		height: 46px;
+		width: 34px;
+		height: 34px;
 	}
-	.banner-title {
+	.mast-title {
 		font-family: var(--font-display, var(--font-serif));
 		font-weight: 700;
-		font-size: clamp(1.4rem, 3.2vw, 1.9rem);
+		font-size: 1.15rem;
 		line-height: 1;
 		color: #3f88cc;
+		white-space: nowrap;
 	}
-
-	/* Four evenly-spread view tabs across the width, tab-bar style. */
-	.tab-groups {
+	.mast-nav {
 		display: flex;
-		flex-direction: column;
+		align-items: stretch;
+		gap: 2px;
+	}
+	.mast-link {
+		display: flex;
 		align-items: center;
-		max-width: 720px;
-		margin: 18px auto 26px;
-	}
-	.main-tabs {
-		display: flex;
-		width: 100%;
-		border-bottom: 2px solid var(--color-border);
-	}
-	.tab {
-		flex: 1;
-		padding: 11px 8px;
-		background: none;
-		border: none;
-		border-bottom: 3px solid transparent;
-		margin-bottom: -2px;
 		font-family: var(--font-sans);
-		font-size: 1rem;
+		font-size: 0.95rem;
 		font-weight: 600;
 		color: var(--color-fg-light);
+		background: none;
+		border: none;
+		padding: 0 14px;
 		cursor: pointer;
-		transition: color 0.12s, border-color 0.12s;
+		transition: color 0.12s;
 	}
-	.tab:hover {
+	.mast-link:hover {
 		color: var(--color-fg);
 	}
-	.tab.active {
+	.mast-link.active {
 		color: var(--color-fg);
-		border-bottom-color: #357abd;
+	}
+	@media (max-width: 560px) {
+		.masthead-inner {
+			padding: 0 12px;
+			gap: 8px;
+		}
+		.mast-title {
+			font-size: 1rem;
+		}
+		.mast-link {
+			padding: 0 9px;
+			font-size: 0.9rem;
+		}
 	}
 	/* "Back to rankings" shown after you open a trend from the Rankings tab. */
 	.back-bar {
