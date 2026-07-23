@@ -236,7 +236,7 @@
 		}
 	});
 	// Round down to a clean figure so the note never overstates the threshold.
-	const titleMinLabel = $derived(titleMin ? (Math.floor(titleMin / 500) * 500).toLocaleString() : "");
+	const titleMinLabel = $derived(titleMin ? (Math.max(Math.floor(titleMin / 100) * 100, 100)).toLocaleString() : "");
 
 	// When the "By title" tab is first opened, seed it with a well-known title
 	// (Baldwin's The Fire Next Time) instead of the Seattle-wide overview, so the
