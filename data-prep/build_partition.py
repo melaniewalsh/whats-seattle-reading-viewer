@@ -116,8 +116,11 @@ TAXONOMY = [
     # Sits late in priority, so genre fiction (Romance/Mystery/…) claims its books
     # first; excludes keep the broad "literature" term off kids' nonfiction.
     # Literary fiction proper + classics (Pride & Prejudice, Wuthering Heights).
+    # Note: the bare "novels" form tag was dropped — it's applied so generically
+    # (incl. manga/graphic-novel series like Pokémon) that it swept non-literary
+    # books in here. Classics tagged ONLY "Novels" now fall to General Fiction.
     ("Literary & Classic Fiction", ["literary fiction", "domestic fiction", "psychological fiction",
-        "short stories", "classic literature", "novels"], []),
+        "short stories", "classic literature"], []),
     # The broad BISAC "Literature" tag = contemporary general / book-club fiction
     # (Demon Copperhead, Lessons in Chemistry) — NOT the same as literary fiction,
     # so it gets its own bucket, just after the specific one claims the classics.
