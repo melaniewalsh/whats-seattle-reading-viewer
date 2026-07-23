@@ -4,6 +4,7 @@
 	import { displayName } from "$utils/displayName.js";
 	import { titleCase } from "$utils/titleCase.js";
 	import { lookupUrls } from "$utils/lookup.js";
+	import { compactNumber } from "$utils/format.js";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
@@ -1591,7 +1592,7 @@
 								/>
 							</span>
 						{/if}
-					</div>
+					</div>{#if current.variants?.length}<span class="name-info" tabindex="0" aria-label="{current.variants.length} name variants — hover for details"><span class="ni-icon" aria-hidden="true">i</span><span class="name-info-pop" role="tooltip"><span class="ni-head">{current.variants.length} name variants</span><ul>{#each current.variants as v}<li>{v}</li>{/each}</ul><span class="ni-note">Raw catalog spellings clustered into one author.</span></span></span>{/if}
 					{#if wikiTouch && wikiHover}
 						<button class="wiki-backdrop" aria-label="Close" onclick={() => (wikiHover = false)}></button>
 					{/if}
@@ -1600,11 +1601,11 @@
 			<div class="hdr-line">
 				<span class="meta">
 					{#if isOverview}
-						{abbrevCount(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
+						{compactNumber(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 					{:else if searchMode === "title"}
-						by {displayName(current.name)}{#if titleCheckouts != null}{" · "}{abbrevCount(titleCheckouts)} checkouts{/if}
+						by {displayName(current.name)}{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} checkouts{/if}
 					{:else}
-						{abbrevCount(current.total)} checkouts · {workGroups.size.toLocaleString()} works
+						{compactNumber(current.total)} checkouts · {workGroups.size.toLocaleString()} works
 					{/if}
 				</span>
 				{#if lookupLinks}
@@ -1622,18 +1623,6 @@
 							</div>
 						{/if}
 					</span>
-				{/if}
-				{#if !isOverview && current.variants?.length}
-					<span class="hdr-sep" aria-hidden="true">·</span>
-					<details class="name-variants">
-						<summary>{current.variants.length} name variants</summary>
-						<ul>
-							{#each current.variants as v}
-								<li>{v}</li>
-							{/each}
-						</ul>
-						<p class="nv-note">The raw <code>Creator</code> spellings the catalog used, clustered into one author — if any look like a different person, the clustering may have over-merged.</p>
-					</details>
 				{/if}
 			</div>
 
@@ -2687,53 +2676,81 @@
 		font-size: 0.75rem;
 	}
 
-	.name-variants {
-		font-family: var(--font-sans);
-		margin: 0;
-		font-size: inherit;
+	/* Small (i) next to the author name: hover/focus shows the name-variants popover. */
+	.name-info {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 17px;
+		height: 17px;
+		margin-left: 7px;
+		border-radius: 50%;
+		border: 1.5px solid var(--color-border);
+		color: var(--color-fg-light);
+		font-family: var(--font-serif);
+		font-style: italic;
+		font-weight: 700;
+		font-size: 0.66rem;
+		line-height: 1;
+		cursor: help;
+		vertical-align: 0.35em;
+		outline: none;
 	}
-	/* When open, take the full row so the (long) variant list isn't squeezed. */
-	.name-variants[open] {
-		flex-basis: 100%;
+	.name-info:hover,
+	.name-info:focus-visible {
+		border-color: var(--color-fg-light);
+		color: var(--color-fg);
 	}
-	.name-variants summary {
-		display: inline;
-		cursor: pointer;
-		font-size: inherit;
-		font-weight: 600;
-		color: #357abd;
-		list-style: none;
-		width: fit-content;
-	}
-	.name-variants summary::-webkit-details-marker {
+	.name-info-pop {
 		display: none;
+		position: absolute;
+		top: calc(100% + 7px);
+		left: 0;
+		z-index: 45;
+		width: 270px;
+		max-width: 78vw;
+		padding: 11px 13px;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		box-shadow: 0 8px 26px rgba(0, 0, 0, 0.16);
+		text-align: left;
+		cursor: default;
 	}
-	.name-variants summary:hover {
-		text-decoration: underline;
+	.name-info:hover .name-info-pop,
+	.name-info:focus-within .name-info-pop {
+		display: block;
 	}
-	.name-variants ul {
-		margin: 8px 0 0;
-		padding: 8px 0 8px 18px;
-		max-height: 220px;
+	.ni-head {
+		display: block;
+		font-family: var(--font-sans);
+		font-size: 0.68rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--color-fg-light);
+		margin-bottom: 7px;
+	}
+	.name-info-pop ul {
+		margin: 0;
+		padding: 0 0 0 16px;
+		max-height: 200px;
 		overflow-y: auto;
-		border-left: 2px solid var(--color-border);
 	}
-	.name-variants li {
+	.name-info-pop li {
 		font-family: var(--font-mono, monospace);
 		font-size: 0.8rem;
 		line-height: 1.5;
 		color: var(--color-fg);
-		list-style: none;
 	}
-	.name-variants .nv-note {
-		margin: 6px 0 0;
-		font-size: 0.78rem;
+	.ni-note {
+		display: block;
+		margin-top: 8px;
+		font-family: var(--font-sans);
+		font-size: 0.72rem;
 		line-height: 1.45;
 		color: var(--color-fg-light);
-	}
-	.name-variants .nv-note code {
-		font-family: var(--font-mono, monospace);
-		font-size: 0.72rem;
 	}
 
 	.plot-title {
