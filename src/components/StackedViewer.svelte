@@ -1873,7 +1873,7 @@
 					<button class="side-close" onclick={() => (mobileTableOpen = false)}>Done</button>
 				</div>
 				<button class="side-desktop-head" onclick={() => (tableCollapsed = !tableCollapsed)} aria-expanded={!tableCollapsed}>
-					<span>Add/edit works by this author</span>
+					<span class="sdh-label">See / Edit All Works By This Author</span>
 					<span class="side-chevron" aria-hidden="true">{tableCollapsed ? "▸" : "▾"}</span>
 				</button>
 				<div class="titles">
@@ -2446,29 +2446,31 @@
 	/* On desktop the "Add/remove works by this author" line is a subtitle heading
 	   above the below-the-plot table, and clicking it collapses the table. */
 	@media (min-width: 861px) {
-		/* A clear dropdown-style toggle button (not a plain heading). */
+		/* Gray box that matches the "On the chart" panel above, for visual unity. */
 		.side-desktop-head {
 			display: flex;
 			align-items: center;
 			gap: 8px;
 			width: 100%;
-			padding: 10px 14px;
-			margin: 2px 0 12px;
+			padding: 14px 16px;
+			margin: 2px 0 14px;
 			border: 1px solid var(--color-border);
-			border-radius: 8px;
-			background: var(--color-white);
-			font-family: var(--font-sans);
-			font-weight: 600;
-			font-size: 0.95rem;
-			line-height: 1.2;
-			color: var(--color-fg);
+			border-radius: var(--radius-md);
+			background: var(--color-gray-100);
 			cursor: pointer;
 			text-align: left;
-			transition: background 0.12s, border-color 0.12s;
+			transition: border-color 0.12s;
 		}
 		.side-desktop-head:hover {
 			border-color: var(--color-fg-light);
-			background: var(--color-gray-100);
+		}
+		.sdh-label {
+			font-family: var(--font-sans);
+			font-size: 0.78rem;
+			font-weight: 700;
+			color: var(--color-fg-light);
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
 		}
 		.side-chevron {
 			margin-left: auto;

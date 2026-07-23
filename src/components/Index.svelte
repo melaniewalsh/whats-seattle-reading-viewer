@@ -285,7 +285,7 @@
 	/* Editorial hero — shown on the Overview landing, below the sticky masthead. */
 	.hero {
 		max-width: 720px;
-		margin: 26px auto 30px;
+		margin: 36px auto 30px;
 		text-align: center;
 	}
 	.hero h1 {
@@ -336,8 +336,8 @@
 		z-index: 50;
 		width: 100vw;
 		margin-left: calc(50% - 50vw);
-		background: #fff;
-		border-bottom: 1px solid var(--color-border);
+		background: #3f88cc;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.14);
 	}
 	.masthead-inner {
 		max-width: 1120px;
@@ -369,7 +369,7 @@
 		font-weight: 700;
 		font-size: 1.15rem;
 		line-height: 1;
-		color: #3f88cc;
+		color: #111;
 		white-space: nowrap;
 	}
 	.mast-nav {
@@ -383,18 +383,19 @@
 		font-family: var(--font-sans);
 		font-size: 0.95rem;
 		font-weight: 600;
-		color: var(--color-fg-light);
+		color: #111;
 		background: none;
 		border: none;
+		border-bottom: 2px solid transparent;
 		padding: 0 14px;
 		cursor: pointer;
-		transition: color 0.12s;
+		transition: border-color 0.12s;
 	}
 	.mast-link:hover {
-		color: var(--color-fg);
+		border-bottom-color: rgba(0, 0, 0, 0.35);
 	}
 	.mast-link.active {
-		color: var(--color-fg);
+		border-bottom-color: rgba(0, 0, 0, 0.8);
 	}
 	@media (max-width: 560px) {
 		.masthead-inner {
@@ -487,7 +488,7 @@
 	.subtabs {
 		display: inline-flex;
 		gap: 2px;
-		margin-top: 12px;
+		margin-top: 30px;
 		padding: 3px;
 		border-radius: 999px;
 		background: var(--color-gray-100, #f0f0f0);

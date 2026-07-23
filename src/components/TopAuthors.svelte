@@ -527,7 +527,7 @@
 	.rank-masthead {
 		border-bottom: 3px solid var(--color-fg);
 		padding-bottom: 12px;
-		margin: 4px 0 18px;
+		margin: 34px 0 18px;
 	}
 	.rank-title {
 		font-family: var(--font-display, var(--font-serif));

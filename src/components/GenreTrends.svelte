@@ -497,7 +497,7 @@
 </div>
 
 <style>
-	.genres { margin-top: 8px; }
+	.genres { margin-top: 34px; }
 	.genres input[type="checkbox"] {
 		appearance: auto; -webkit-appearance: auto; width: 16px; height: 16px;
 		accent-color: var(--color-fg); background: none; flex: none; cursor: pointer; margin: 0;
