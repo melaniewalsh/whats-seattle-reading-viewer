@@ -210,18 +210,34 @@ function looksLikeWork(s, author) {
 	);
 }
 
-// Work preview: title-scoped Wikipedia search (author-aware) first, then Wikidata,
-// then a plain-title lookup guarded by looksLikeWork so we never show a same-named
-// non-book page.
+// Stricter than looksLikeWork: the resolved summary must actually name the author,
+// so a different author's same-titled book (Douglas Preston's "Blasphemy" vs Sherman
+// Alexie's) can't win when the fallbacks aren't author-constrained.
+function mentionsAuthor(s, author) {
+	if (!s) return false;
+	const last = (author || "").trim().split(/\s+/).pop()?.toLowerCase() || "";
+	if (last.length < 3) return true; // no usable surname -> can't verify, accept
+	const hay = `${s.title || ""} ${s.description || ""} ${s.extract || ""}`.toLowerCase();
+	return hay.includes(last);
+}
+
+// Work preview: an author-constrained title search first (trusted), then Wikidata
+// and a plain-title lookup — both of which are verified to actually name the author
+// so a same-titled book by someone else never sneaks through.
 export function wikiWork(title, author) {
-	const key = `wikiwork2:${(title || "").trim().toLowerCase()}|${(author || "").trim().toLowerCase()}`;
+	const key = `wikiwork3:${(title || "").trim().toLowerCase()}|${(author || "").trim().toLowerCase()}`;
 	return cached(key, async () => {
-		const en = (await enwikiTitleForWork(title, author)) || (await enwikiTitleFromWikidata(title, author));
+		const en = await enwikiTitleForWork(title, author);
 		if (en) {
 			const s = await summaryByTitle(en);
 			if (s) return s;
 		}
+		const wd = await enwikiTitleFromWikidata(title, author);
+		if (wd) {
+			const s = await summaryByTitle(wd);
+			if (s && mentionsAuthor(s, author)) return s;
+		}
 		const direct = await summaryByTitle(title);
-		return looksLikeWork(direct, author) ? direct : null;
+		return direct && mentionsAuthor(direct, author) && looksLikeWork(direct, author) ? direct : null;
 	});
 }
