@@ -506,6 +506,7 @@
 		margin: 0;
 	}
 	.sec-sub {
+		font-family: var(--font-sans);
 		font-size: 0.95rem;
 		line-height: 1.4;
 		color: var(--color-fg-light);

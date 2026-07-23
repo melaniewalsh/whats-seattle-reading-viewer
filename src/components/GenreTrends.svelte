@@ -524,7 +524,6 @@
 		appearance: auto; -webkit-appearance: auto; width: 16px; height: 16px;
 		accent-color: var(--color-fg); background: none; flex: none; cursor: pointer; margin: 0;
 	}
-	.genres h2 { font-family: var(--font-serif); font-size: 1.9rem; margin: 0 0 4px; }
 	.meta { color: var(--color-fg-light); font-family: var(--font-sans); font-size: 0.95rem; margin: 0 0 10px; }
 	.sh-note { font-family: var(--font-sans); font-size: 0.85rem; margin: 0 0 18px; }
 	.sh-note summary { cursor: pointer; color: var(--color-fg-light); list-style-position: inside; width: fit-content; }

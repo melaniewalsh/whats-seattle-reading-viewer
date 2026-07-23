@@ -10,7 +10,7 @@
 	import YearBrush from "$components/YearBrush.svelte";
 	import WikiCard from "$components/WikiCard.svelte";
 	import Switch from "$components/ui/Switch.svelte";
-	import { getMonths, searchAuthors, searchTitles, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle } from "$components/db.js";
+	import { getMonths, searchAuthors, searchTitles, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks } from "$components/db.js";
 
 	// "author" (default): search authors. "title": reverse lookup — search a title,
 	// resolve to its author, open the author's drilldown with that work highlighted.
@@ -225,6 +225,49 @@
 			: await searchAuthors(needle, 75);
 	}, 120);
 	$effect(() => runSearch(query));
+
+	// Quick-pick chips: a curated MIX rather than just the overall top — a few
+	// recent favorites plus picks from classic literature, romance and nonfiction —
+	// so the suggestions feel varied. Built from the genre ranking data.
+	let mixAuthors = $state([]);
+	let mixTitles = $state([]);
+	let mixLoaded = false;
+	function buildMix(data, mode) {
+		if (!data || !data.data) return [];
+		const recentYear = data.years?.length ? String(data.years[data.years.length - 1]) : "all";
+		// [genre, year, howMany] — recent first, then classics / romance / nonfiction.
+		const plan = [
+			["All genres", recentYear, 3],
+			["Literary & Classic Fiction", "all", 3],
+			["Romance", "all", 2],
+			["Memoir & Biography", "all", 2],
+			["All genres", "all", 3],
+		];
+		const seen = new Set();
+		const out = [];
+		for (const [g, y, n] of plan) {
+			const rows = data.data[g]?.[y] || [];
+			let added = 0;
+			for (const r of rows) {
+				if (added >= n) break;
+				const item = mode === "title" ? { title: r[0], author: r[1], slug: r[2] } : { slug: r[0], name: r[1] };
+				const k = item.slug || item.name || item.title;
+				if (k && !seen.has(k)) { seen.add(k); out.push(item); added++; }
+			}
+		}
+		for (let i = out.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[out[i], out[j]] = [out[j], out[i]];
+		}
+		return out.slice(0, 12);
+	}
+	$effect(() => {
+		if (landing === "search" && !mixLoaded) {
+			mixLoaded = true;
+			getTopAuthors().then((d) => (mixAuthors = buildMix(d, "author"))).catch(() => {});
+			getTopWorks().then((d) => (mixTitles = buildMix(d, "title"))).catch(() => {});
+		}
+	});
 
 	// A few top titles to seed the "By title" quick-picks (like the author chips).
 	let topTitles = $state([]);
@@ -1566,29 +1609,33 @@
 			</span>
 		{/if}
 
-		<!-- quick-pick: most-borrowed authors, or most-borrowed titles in title mode -->
-		{#if searchMode === "title" && topTitles.length}
-			<div class="top-authors">
-				<span class="quick-label">Most borrowed:</span>
-				{#each topTitles as t}
-					<button class="chip" onclick={() => selectTitle(t)}>{cleanTitleForDisplay(t.title)}</button>
-				{/each}
-				<button class="chip surprise-chip" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
-			</div>
-		{:else if searchMode !== "title" && topAuthors.length}
-			<div class="top-authors">
-				<span class="quick-label">Most borrowed:</span>
-				{#each topAuthors as a}
-					<button
-							class="chip"
-							class:current={current && current.name === a.name}
-							onclick={() => selectAuthor(a)}
-					>
-						{displayName(a.name)}
-					</button>
-				{/each}
-				<button class="chip surprise-chip" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
-			</div>
+		<!-- quick-pick: a varied mix (recent, classic, romance, nonfiction) -->
+		{#if searchMode === "title"}
+			{@const picks = mixTitles.length ? mixTitles : topTitles}
+			{#if picks.length}
+				<div class="top-authors">
+					{#each picks as t}
+						<button class="chip" onclick={() => selectTitle(t)}>{cleanTitleForDisplay(t.title)}</button>
+					{/each}
+					<button class="chip surprise-chip" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
+				</div>
+			{/if}
+		{:else}
+			{@const picks = mixAuthors.length ? mixAuthors : topAuthors}
+			{#if picks.length}
+				<div class="top-authors">
+					{#each picks as a}
+						<button
+								class="chip"
+								class:current={current && current.name === a.name}
+								onclick={() => selectAuthor(a)}
+						>
+							{displayName(a.name)}
+						</button>
+					{/each}
+					<button class="chip surprise-chip" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
+				</div>
+			{/if}
 		{/if}
 	{/snippet}
 
