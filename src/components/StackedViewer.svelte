@@ -1535,7 +1535,10 @@
 		</div>
 
 		{#if searchMode === "title"}
-			<p class="title-note"><span class="tn-ic" aria-hidden="true">ℹ</span><span><strong>Only the most-borrowed titles are searchable here</strong>{#if titleMinLabel} — those with at least ~{titleMinLabel} all-time checkouts{/if}. To find any title, search <strong>By&nbsp;author</strong> instead.</span></p>
+			<span class="title-hint" tabindex="0" role="note" aria-label="Only the most-borrowed titles are searchable here — search By author to find any title">
+				<span class="th-ic" aria-hidden="true">ⓘ</span> Not finding a title?
+				<span class="th-pop" role="tooltip"><strong>Only the most-borrowed titles are searchable here</strong>{#if titleMinLabel} — those with at least ~{titleMinLabel} all-time checkouts{/if}. To find any title, search <strong>By&nbsp;author</strong> instead.</span>
+			</span>
 		{/if}
 
 		<!-- quick-pick: most-borrowed authors, or most-borrowed titles in title mode -->
@@ -2064,7 +2067,7 @@
 		</div>
 	{:else}
 		{@render authorPicker()}
-		<p class="hint">Search for an author to begin.</p>
+		<p class="hint">Search for {searchMode === "title" ? "a title" : "an author"} to begin.</p>
 	{/if}
 
 	{#if hoverTip}
@@ -3210,35 +3213,45 @@
 		background: var(--chip-color, var(--color-fg-light));
 	}
 
-	.title-note {
-		display: flex;
-		align-items: flex-start;
-		gap: 9px;
+	/* subtle hover hint instead of a boxed info panel */
+	.title-hint {
+		position: relative;
+		display: inline-block;
+		margin: 10px 0 0;
 		font-family: var(--font-sans);
-		font-size: 0.88rem;
-		line-height: 1.45;
-		color: var(--color-fg);
-		background: #eef4fb;
-		border: 1px solid #cfe0f3;
-		border-radius: 10px;
-		padding: 10px 14px;
-		margin: 12px 0 0;
+		font-size: 0.82rem;
+		color: var(--color-fg-light);
+		cursor: help;
+		outline: none;
 	}
-	.title-note strong { font-weight: 700; }
-	.tn-ic {
-		flex: none;
-		width: 20px;
-		height: 20px;
-		border-radius: 50%;
-		background: #3f88cc;
-		color: #fff;
-		font-size: 0.8rem;
+	.title-hint .th-ic {
+		font-style: normal;
+	}
+	.th-pop {
+		display: none;
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 0;
+		z-index: 45;
+		width: 300px;
+		max-width: 82vw;
+		padding: 10px 13px;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+		font-size: 0.82rem;
+		line-height: 1.5;
+		color: var(--color-fg);
+		cursor: default;
+	}
+	.title-hint:hover .th-pop,
+	.title-hint:focus .th-pop,
+	.title-hint:focus-within .th-pop {
+		display: block;
+	}
+	.th-pop strong {
 		font-weight: 700;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		font-style: italic;
-		font-family: Georgia, serif;
 	}
 	/* top-author quick-pick chips (under the search box) */
 	.top-authors {
