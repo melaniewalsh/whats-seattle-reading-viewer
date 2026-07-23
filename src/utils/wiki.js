@@ -10,6 +10,32 @@
 
 const mem = new Map();
 
+// A genre list fires dozens of lookups at once, each making several requests.
+// Cap how many hit Wikipedia/Wikidata concurrently so the burst doesn't trip
+// rate limits and drop summaries. Excess calls queue and run as slots free up.
+let active = 0;
+const waiting = [];
+function acquire() {
+	if (active < 6) {
+		active++;
+		return Promise.resolve();
+	}
+	return new Promise((resolve) => waiting.push(resolve));
+}
+function release() {
+	const next = waiting.shift();
+	if (next) next();
+	else active--;
+}
+async function wfetch(url) {
+	await acquire();
+	try {
+		return await fetch(url);
+	} finally {
+		release();
+	}
+}
+
 function cached(key, producer) {
 	if (mem.has(key)) return mem.get(key);
 
@@ -24,8 +50,13 @@ function cached(key, producer) {
 	}
 
 	const p = producer().then((v) => {
+		// Only persist real hits. A null here is frequently a transient network or
+		// rate-limit failure during the initial burst of lookups (a genre list fires
+		// dozens at once) — persisting it would hide a resolvable summary forever, even
+		// for famous books. Nulls live only in this session's in-memory cache, so an
+		// item that missed once is retried on the next page load.
 		try {
-			localStorage.setItem(key, v ? JSON.stringify(v) : "");
+			if (v) localStorage.setItem(key, JSON.stringify(v));
 		} catch {}
 		return v;
 	});
@@ -38,7 +69,7 @@ async function summaryByTitle(title) {
 	const t = (title || "").trim();
 	if (!t) return null;
 	try {
-		const res = await fetch(
+		const res = await wfetch(
 			`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(t)}?redirect=true`,
 		);
 		if (!res.ok) return null;
@@ -72,7 +103,7 @@ function looksLikePerson(s) {
 async function authorTitleCandidates(name) {
 	const q = `intitle:"${name}" author OR writer OR novelist OR poet OR illustrator OR cartoonist OR journalist OR comics OR editor`;
 	try {
-		const res = await fetch(
+		const res = await wfetch(
 			`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&srnamespace=0&srlimit=8&format=json&origin=*`,
 		);
 		if (!res.ok) return [];
@@ -111,7 +142,7 @@ function nameVariants(name) {
 // writer/illustrator — so "Peter Brown" resolves to the children's illustrator,
 // and "Lincoln C. Peirce" to the "Lincoln Peirce" cartoonist page.
 export function wikiSummary(name) {
-	return cached(`wiki4:${(name || "").trim().toLowerCase()}`, async () => {
+	return cached(`wiki5:${(name || "").trim().toLowerCase()}`, async () => {
 		const variants = nameVariants(name);
 		let firstDirect = null;
 		for (const v of variants) {
@@ -137,7 +168,7 @@ async function enwikiTitleFromWikidata(title, author) {
 			d || "",
 		);
 	try {
-		const sres = await fetch(
+		const sres = await wfetch(
 			`${api}?action=wbsearchentities&search=${encodeURIComponent(title)}&language=en&uselang=en&type=item&limit=7&format=json&origin=*`,
 		);
 		if (!sres.ok) return null;
@@ -158,7 +189,7 @@ async function enwikiTitleFromWikidata(title, author) {
 			null;
 		if (!pick) return null;
 
-		const eres = await fetch(
+		const eres = await wfetch(
 			`${api}?action=wbgetentities&ids=${pick.id}&props=sitelinks&sitefilter=enwiki&format=json&origin=*`,
 		);
 		if (!eres.ok) return null;
@@ -186,7 +217,7 @@ function pickWorkTitle(hits, author) {
 async function enwikiTitleForWork(title, author) {
 	const q = `intitle:"${title}" ${author}`.trim();
 	try {
-		const res = await fetch(
+		const res = await wfetch(
 			`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&srnamespace=0&srlimit=6&format=json&origin=*`,
 		);
 		if (!res.ok) return null;
@@ -225,7 +256,7 @@ function mentionsAuthor(s, author) {
 // and a plain-title lookup — both of which are verified to actually name the author
 // so a same-titled book by someone else never sneaks through.
 export function wikiWork(title, author) {
-	const key = `wikiwork3:${(title || "").trim().toLowerCase()}|${(author || "").trim().toLowerCase()}`;
+	const key = `wikiwork4:${(title || "").trim().toLowerCase()}|${(author || "").trim().toLowerCase()}`;
 	return cached(key, async () => {
 		const en = await enwikiTitleForWork(title, author);
 		if (en) {
