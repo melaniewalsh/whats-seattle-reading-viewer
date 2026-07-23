@@ -159,11 +159,6 @@
 					</button>
 				</nav>
 			</div>
-			<nav class="mast-sections" aria-label="Sections">
-				<button class="pill" class:active={tab === "rankings"} aria-current={tab === "rankings" ? "page" : undefined} onclick={() => go("rankings")}><span class="pill-ic" aria-hidden="true">📚</span>Most Borrowed</button>
-				<button class="pill" class:active={tab === "search"} aria-current={tab === "search" ? "page" : undefined} onclick={() => go("search")}><span class="pill-ic" aria-hidden="true">🔍</span>Search</button>
-				<button class="pill" class:active={tab === "genres"} aria-current={tab === "genres" ? "page" : undefined} onclick={() => go("genres")}><span class="pill-ic" aria-hidden="true">📈</span>Genres</button>
-			</nav>
 		</div>
 
 		<!-- Slide-out hamburger menu (Pudding-style): quick links to every section
@@ -212,6 +207,11 @@
 			{/if}
 		{:else if tab === "overview"}
 			<p class="tagline">{copy.dek}</p>
+			<nav class="home-nav" aria-label="Sections">
+				<button class="pill" onclick={() => go("rankings")}><span class="pill-ic" aria-hidden="true">📚</span>Most Borrowed</button>
+				<button class="pill" onclick={() => go("search")}><span class="pill-ic" aria-hidden="true">🔍</span>Search</button>
+				<button class="pill" onclick={() => go("genres")}><span class="pill-ic" aria-hidden="true">📈</span>Genres</button>
+			</nav>
 			<Viewer searchMode="author" landing="overview" />
 		{:else if tab === "about"}
 			<section class="about-page">
@@ -498,13 +498,15 @@
 		text-decoration: none;
 	}
 	.menu-link:hover { color: #3f88cc; }
-	/* Section pills — the primary nav, a centered row of little buttons. */
-	.mast-sections {
+	/* Section pills — shown on the HOME page only (like The Pudding's filter
+	   buttons), as the way into each section. Inner pages navigate via the
+	   hamburger menu or the home logo. */
+	.home-nav {
 		display: flex;
 		justify-content: center;
 		flex-wrap: wrap;
-		gap: 8px;
-		padding: 8px 24px 11px;
+		gap: 10px;
+		margin: 4px 0 32px;
 	}
 	.pill {
 		display: inline-flex;
@@ -543,7 +545,7 @@
 		/* About is in the hamburger menu on phones — drop the standalone link so the
 		   wordmark has room. */
 		.mast-metalink { display: none; }
-		.mast-sections { padding: 7px 14px 10px; gap: 6px; }
+		.home-nav { gap: 7px; margin: 2px 0 26px; }
 		.pill { padding: 5px 13px; font-size: 0.74rem; }
 	}
 
