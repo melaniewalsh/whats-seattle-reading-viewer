@@ -1230,6 +1230,9 @@
 		if (!current) return "";
 		if (isOverview) return current.name;
 		if (searchMode === "title") {
+			// A single selected/isolated work names the heading (shown at the top,
+			// not as a caption on the plot).
+			if (isolatedKeys.length === 1) return keyLabel(isolatedKeys[0]);
 			const gs = groups.filter((g) => g.idxs.length);
 			const n = gs.length + singleIdxs.length;
 			if (n !== 1) return ""; // 0 or 2+ works -> no title heading
@@ -1665,7 +1668,7 @@
 						{/if}
 					</div>
 					<div class="chart-wrap" bind:this={chartWrap}>
-				{#if plotTitle}
+				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
 				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`}/>
