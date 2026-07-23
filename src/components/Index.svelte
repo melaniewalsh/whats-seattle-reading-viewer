@@ -189,6 +189,26 @@
 			{/if}
 		{:else if tab === "overview"}
 			<Viewer searchMode="author" landing="overview" />
+			<nav class="hub" aria-label="Explore">
+				<button class="hub-card" onclick={() => (tab = "rankings")}>
+					<span class="hub-emoji" aria-hidden="true">📚</span>
+					<span class="hub-h">Most Borrowed</span>
+					<span class="hub-d">The books and authors checked out most — all-time and year by year, by genre.</span>
+					<span class="hub-go">Explore →</span>
+				</button>
+				<button class="hub-card" onclick={() => (tab = "genres")}>
+					<span class="hub-emoji" aria-hidden="true">📈</span>
+					<span class="hub-h">Genres</span>
+					<span class="hub-d">How Seattle's taste in romance, mystery, fantasy and more has shifted over the years.</span>
+					<span class="hub-go">Explore →</span>
+				</button>
+				<button class="hub-card" onclick={() => (tab = "search")}>
+					<span class="hub-emoji" aria-hidden="true">🔍</span>
+					<span class="hub-h">Search</span>
+					<span class="hub-d">Look up any author or title and see its checkout trend at the Seattle Public Library.</span>
+					<span class="hub-go">Explore →</span>
+				</button>
+			</nav>
 		{:else}
 			{#key searchKind}
 				<Viewer searchMode={searchKind} landing="search" />
@@ -388,6 +408,61 @@
 			padding: 0 9px;
 			font-size: 0.9rem;
 		}
+	}
+
+	/* Hub cards on the Overview landing — guide into each section. */
+	.hub {
+		max-width: 940px;
+		margin: 44px auto 8px;
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 18px;
+	}
+	@media (max-width: 720px) {
+		.hub {
+			grid-template-columns: 1fr;
+			margin-top: 32px;
+		}
+	}
+	.hub-card {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 6px;
+		text-align: left;
+		padding: 22px 20px;
+		border: 1px solid var(--color-border);
+		border-radius: 12px;
+		background: var(--color-white);
+		cursor: pointer;
+		font-family: var(--font-sans);
+		transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+	}
+	.hub-card:hover {
+		border-color: var(--color-fg-light);
+		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+		transform: translateY(-2px);
+	}
+	.hub-emoji {
+		font-size: 1.6rem;
+		line-height: 1;
+	}
+	.hub-h {
+		font-family: var(--font-display, var(--font-serif));
+		font-size: 1.3rem;
+		font-weight: 700;
+		color: var(--color-fg);
+	}
+	.hub-d {
+		font-size: 0.9rem;
+		line-height: 1.45;
+		color: var(--color-fg-light);
+	}
+	.hub-go {
+		margin-top: 4px;
+		font-size: 0.85rem;
+		font-weight: 700;
+		color: #357abd;
 	}
 	/* "Back to rankings" shown after you open a trend from the Rankings tab. */
 	.back-bar {
