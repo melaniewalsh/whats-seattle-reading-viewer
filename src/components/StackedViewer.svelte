@@ -1737,9 +1737,11 @@
 				</div>
 			{/if}
 
-			<div class="picker-below">
-				{@render authorPicker()}
-			</div>
+			{#if !isOverview}
+				<div class="picker-below">
+					{@render authorPicker()}
+				</div>
+			{/if}
 
 			{#if !isOverview}
 			<div class="groups-panel">
