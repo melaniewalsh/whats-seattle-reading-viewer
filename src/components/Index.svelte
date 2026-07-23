@@ -5,6 +5,7 @@
 	import GenreTrends from "$components/GenreTrends.svelte";
 	import TopAuthors from "$components/TopAuthors.svelte";
 	import TopWorks from "$components/TopWorks.svelte";
+	import { publications } from "$data/publications.js";
 
 	const copy = getContext("copy");
 	// Four top-level views. "search" and "rankings" carry a sub-kind toggle.
@@ -17,6 +18,25 @@
 	function go(t) {
 		tab = t;
 		menuOpen = false;
+	}
+
+	// Publications, grouped by year for the Publications view.
+	const pubGroups = (() => {
+		const groups = [];
+		let cur = null;
+		for (const p of publications) {
+			if (!cur || cur.year !== p.year) { cur = { year: p.year, items: [] }; groups.push(cur); }
+			cur.items.push(p);
+		}
+		return groups;
+	})();
+	let copiedBib = $state(null);
+	function copyBib(p) {
+		try {
+			navigator.clipboard.writeText(p.bibtex);
+			copiedBib = p.title;
+			setTimeout(() => (copiedBib === p.title && (copiedBib = null)), 2000);
+		} catch {}
 	}
 
 	// The Data & Methodology section is a collapsed <details>; deep links to its
@@ -46,6 +66,7 @@
 			} else if (params.get("title")) { tab = "search"; searchKind = "title"; }
 			else if (params.get("author")) { tab = "search"; searchKind = "author"; }
 			else if (t === "about") tab = "about";
+			else if (t === "publications") tab = "publications";
 			else if (t === "overview" || t === "all") tab = "overview";
 			else if (t === "home") tab = "home";
 		} catch {}
@@ -187,11 +208,11 @@
 				<button class="menu-link" onclick={() => go("rankings")}>Most Borrowed</button>
 				<button class="menu-link" onclick={() => go("search")}>Search</button>
 				<button class="menu-link" onclick={() => go("genres")}>Genres</button>
-				<button class="menu-link" onclick={() => go("about")}>About</button>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">The Project</h3>
-				<a class="menu-link" href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">Publications ↗</a>
+				<button class="menu-link" onclick={() => go("about")}>About</button>
+				<button class="menu-link" onclick={() => go("publications")}>Publications</button>
 				<a class="menu-link" href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Data ↗</a>
 				<a class="menu-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Feedback ↗</a>
 			</div>
@@ -275,6 +296,33 @@
 				<p>We are thankful to David Christensen, who spearheads the SPL's open data effort and has been a very helpful collaborator and guide.</p>
 
 				<p class="about-more">This is a work-in-progress — we'd love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>. For how the data is sourced and how works are clustered, see <a href="#data-methodology" onclick={() => (methodOpen = true)}>Data &amp; Methodology</a> below.</p>
+			</section>
+		{:else if tab === "publications"}
+			<section class="pubs-page">
+				<h2 class="about-title">Publications</h2>
+				<p class="pubs-intro">Check out our publications related to checkout data from the Seattle Public Library.</p>
+				{#each pubGroups as g}
+					<h3 class="pub-year">{g.year}</h3>
+					{#each g.items as p}
+						{#if p.month}<h4 class="pub-month">{p.month}</h4>{/if}
+						<article class="pub">
+							<a class="pub-title" href={p.url} target="_blank" rel="noopener noreferrer">{p.title}</a>
+							<p class="pub-cite">{p.citation}{#if p.doi}&nbsp;<a href={p.doi} target="_blank" rel="noopener noreferrer">DOI</a>.{/if}</p>
+							{#if p.links?.length}
+								<p class="pub-links">{#each p.links as l, i}{#if i > 0}<span class="pub-sep"> · </span>{/if}<a href={l.url} target="_blank" rel="noopener noreferrer">{l.label}</a>{/each}</p>
+							{/if}
+							{#if p.bibtex}
+								<details class="pub-bib">
+									<summary>BibTeX</summary>
+									<div class="pub-bib-body">
+										<button class="pub-copy" onclick={() => copyBib(p)}>{copiedBib === p.title ? "Copied!" : "Copy"}</button>
+										<pre>{p.bibtex}</pre>
+									</div>
+								</details>
+							{/if}
+						</article>
+					{/each}
+				{/each}
 			</section>
 		{:else}
 			{#key searchKind}
@@ -477,6 +525,102 @@
 		font-size: 0.95rem;
 		color: var(--color-fg-light);
 		margin-top: 22px;
+	}
+	/* Publications list */
+	.pubs-page {
+		max-width: 720px;
+		margin: 34px auto 12px;
+		font-family: var(--font-sans);
+	}
+	.pubs-intro {
+		font-size: 1.05rem;
+		line-height: 1.5;
+		color: var(--color-fg-light);
+		margin: 0 0 8px;
+	}
+	.pub-year {
+		font-family: var(--font-display, var(--font-serif));
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: var(--color-fg);
+		margin: 30px 0 4px;
+		padding-bottom: 6px;
+		border-bottom: 2px solid var(--color-fg);
+	}
+	.pub-month {
+		font-family: var(--font-sans);
+		font-size: 0.75rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--color-fg-light);
+		margin: 20px 0 6px;
+	}
+	.pub {
+		margin: 0 0 22px;
+	}
+	.pub-title {
+		display: inline-block;
+		font-family: var(--font-display, var(--font-serif));
+		font-size: 1.2rem;
+		font-weight: 700;
+		line-height: 1.25;
+		color: var(--color-fg);
+		text-decoration: none;
+		margin-bottom: 5px;
+	}
+	.pub-title:hover { color: #357abd; text-decoration: underline; }
+	.pub-cite {
+		font-size: 0.98rem;
+		line-height: 1.5;
+		color: var(--color-fg);
+		margin: 0 0 5px;
+	}
+	.pub-cite a, .pub-links a { color: #357abd; font-weight: 600; text-decoration: underline; }
+	.pub-links {
+		font-size: 0.92rem;
+		margin: 0;
+	}
+	.pub-sep { color: var(--color-fg-light); }
+	.pub-bib {
+		margin-top: 8px;
+		font-size: 0.9rem;
+	}
+	.pub-bib summary {
+		cursor: pointer;
+		width: fit-content;
+		font-weight: 600;
+		color: var(--color-fg-light);
+	}
+	.pub-bib summary:hover { color: var(--color-fg); }
+	.pub-bib-body { position: relative; margin-top: 8px; }
+	.pub-copy {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		font-family: var(--font-sans);
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--color-fg);
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
+		padding: 3px 10px;
+		cursor: pointer;
+	}
+	.pub-copy:hover { border-color: var(--color-fg-light); }
+	.pub-bib pre {
+		margin: 0;
+		padding: 12px 14px;
+		background: var(--color-gray-100);
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		overflow-x: auto;
+		font-family: var(--font-mono, monospace);
+		font-size: 0.78rem;
+		line-height: 1.5;
+		color: var(--color-fg);
+		white-space: pre;
 	}
 	/* Pudding-style sticky masthead: a slim top strip (wordmark + About) over a
 	   centered row of little section pills. Breaks out to the full viewport width
