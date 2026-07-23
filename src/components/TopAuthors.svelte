@@ -4,10 +4,12 @@
 	import { displayName } from "$utils/displayName.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { compactNumber } from "$utils/format.js";
+	import { wikiSummary } from "$utils/wiki.js";
 	import WikiCard from "$components/WikiCard.svelte";
 
 	// openAuthor(slug) is provided by Index.svelte: jumps to the By-author view.
-	let { openAuthor } = $props();
+	// rankKind / setRankKind drive the Type dropdown that swaps Works ⇄ Authors.
+	let { openAuthor, rankKind = "authors", setRankKind = () => {} } = $props();
 
 	let data = $state(null);
 	let genre = $state("All genres");
@@ -84,6 +86,63 @@
 
 	// Largest count in view — scales the in-row data bars so #1 fills the column.
 	const maxCount = $derived(rows.length ? Math.max(...rows.map((r) => r[2])) : 1);
+
+	// GALLERY (default, unfiltered view): a NYT Best Sellers–style browse where each
+	// genre gets a row of author portraits with a short bio beneath. Choosing a
+	// specific genre drops to the vertical ranking table. rows are [slug, name, count].
+	const galleryMode = $derived(!!data && genre === "All genres");
+	const gallerySections = $derived.by(() => {
+		if (!data) return [];
+		const secs = [];
+		for (const g of data.genres) {
+			const authors = (data.data[g]?.[year] || []).slice(0, 5);
+			if (authors.length)
+				secs.push({
+					genre: g,
+					label: g === "All genres" ? "Most borrowed overall" : `Top in ${g}`,
+					authors,
+				});
+		}
+		return secs;
+	});
+	const galleryAuthors = $derived(gallerySections.flatMap((s) => s.authors));
+
+	// Year stepper for gallery mode: ["all", 2025, 2024, …]. ‹ toward all-time, › older.
+	const yearSeq = $derived(data ? ["all", ...[...data.years].reverse().map(String)] : ["all"]);
+	const yearIdx = $derived(yearSeq.indexOf(String(year)));
+	function stepYear(delta) {
+		const i = yearIdx + delta;
+		if (i >= 0 && i < yearSeq.length) year = yearSeq[i];
+	}
+
+	// Wikipedia portrait + bio for each gallery card. thumbnail | null (none) |
+	// undefined (not fetched). One request per author, shared for both.
+	let portraits = $state({});
+	let summaries = $state({});
+	let wikiUrls = $state({});
+	const cardInflight = new Set();
+	const authorKey = (r) => r[1];
+	function loadCard(r) {
+		const k = authorKey(r);
+		if (k in portraits || cardInflight.has(k)) return;
+		cardInflight.add(k);
+		wikiSummary(displayName(r[1])).then((w) => {
+			portraits = { ...portraits, [k]: w?.thumbnail || null };
+			summaries = { ...summaries, [k]: w?.extract || null };
+			wikiUrls = { ...wikiUrls, [k]: w?.url || null };
+		});
+	}
+	// Load portraits/blurbs for whatever's on screen — gallery cards or ranking rows.
+	$effect(() => {
+		const list = galleryMode ? galleryAuthors : rows;
+		for (const r of list) loadCard(r);
+	});
+	// Trim a Wikipedia extract to a short blurb, breaking on a word boundary.
+	function blurb(s, max = 200) {
+		if (!s) return "";
+		if (s.length <= max) return s;
+		return s.slice(0, max).replace(/\s+\S*$/, "") + "…";
+	}
 
 	// Keep the URL in sync so any view is shareable / reloadable.
 	$effect(() => {
@@ -288,13 +347,24 @@
 	}
 </script>
 
-<div class="top-authors">
+<div class="top-authors" class:wide={galleryMode}>
 	{#if loading}
 		<p class="ta-status">Loading…</p>
 	{:else if loadError}
 		<p class="ta-status ta-error">{loadError}</p>
 	{:else if data}
+			<header class="rank-masthead">
+				<h2 class="rank-title">{genre === "All genres" ? "Seattle's Most-Borrowed Authors" : `Most-Borrowed ${genre} Authors`}</h2>
+				<p class="rank-sub">Ranked by checkouts at the Seattle Public Library.</p>
+			</header>
 		<div class="ta-controls">
+			<label class="ta-field">
+				<span>Show</span>
+				<select value={rankKind} onchange={(e) => setRankKind(e.currentTarget.value)}>
+					<option value="works">Works</option>
+					<option value="authors">Authors</option>
+				</select>
+			</label>
 			<label class="ta-field">
 				<span>Genre</span>
 				<select bind:value={genre}>
@@ -328,64 +398,110 @@
 			{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 		</div>
 
-		<p class="ta-caption">
-			Most-borrowed authors of <strong>{genre === "All genres" ? "all books" : `${genre} books`}</strong>
-			at the Seattle Public Library, {yearLabel(year)}. <span class="ta-hint">Hover or tap a name for more.</span>
-		</p>
-
-		{#if genreTags.length}
-			<details class="ta-note">
-				<summary>Subject tags that define this genre</summary>
-				<p class="ta-tags">{#each genreTags as t}<code class="ta-tag">{t}</code>{/each}</p>
-			</details>
-		{/if}
-
-		{#if rows.length}
-			<table class="ta-table">
-				<thead>
-					<tr>
-						<th class="ta-rank">#</th>
-						<th class="ta-name">Author</th>
-						<th class="ta-count">Checkouts</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each rows as row, i (row[0] + row[1])}
-						<tr>
-							<td class="ta-rank">{i + 1}</td>
-							<td class="ta-name">
-								{#if row[0]}
-									{@const u = lookupUrls(displayName(row[1]))}
-									{@const key = row[0] || row[1]}
-									<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
-										<button class="ta-authorlink" aria-haspopup="dialog" onclick={() => activateName(key)}>{displayName(row[1])}</button>
-										{#if hoverKey === key || pinnedKey === key}
-											<span class="wiki-pop"><WikiCard query={displayName(row[1])} kind="author" links={u} onTrend={() => openAuthor(row[0])} /></span>
-										{/if}
-									</span>
-								{:else}
-									{displayName(row[1])}
-								{/if}
-							</td>
-							<td class="ta-count">
-								<span class="ta-bar">
-									<span class="ta-bar-num" title={row[2].toLocaleString()}>{compactNumber(row[2])}</span>
-									<span class="ta-bar-track"><span class="ta-bar-fill" style="width:{Math.max((row[2] / maxCount) * 100, 1)}%"></span></span>
-								</span>
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+		{#if galleryMode}
+			<div class="gal-yearnav">
+				<button class="gal-arrow" onclick={() => stepYear(1)} disabled={yearIdx >= yearSeq.length - 1} aria-label="Earlier year">‹</button>
+				<span class="gal-yearlabel">{year === "all" ? "All time" : year}</span>
+				<button class="gal-arrow" onclick={() => stepYear(-1)} disabled={yearIdx <= 0} aria-label="More recent">›</button>
+			</div>
+			<div class="gallery">
+				{#each gallerySections as sec (sec.genre)}
+					<section class="gal-sec">
+						<div class="gal-head">
+							{#if sec.genre !== "All genres"}
+								<button class="gal-title gal-title-link" onclick={() => (genre = sec.genre)} title="See the full {sec.genre} ranking">{sec.label}</button>
+							{:else}
+								<h3 class="gal-title">{sec.label}</h3>
+							{/if}
+						</div>
+						<div class="gal-row">
+							{#each sec.authors as r, i (r[0] + r[1] + i)}
+								{@const k = authorKey(r)}
+								<article class="gal-card">
+									<div class="gal-top">
+										<span class="gal-rank">{i + 1}</span>
+										<button class="gal-cover gal-portrait" class:has-img={!!portraits[k]} onclick={() => openAuthor(r[0])} title="See borrowing trend">
+											{#if portraits[k]}
+												<img src={portraits[k]} alt="" loading="lazy" />
+											{:else}
+												<span class="gal-cover-ph" aria-hidden="true">👤</span>
+											{/if}
+										</button>
+									</div>
+									<button class="gal-booktitle" onclick={() => openAuthor(r[0])}>{displayName(r[1])}</button>
+									<div class="gal-count">{compactNumber(r[2])} checkouts</div>
+									{#if summaries[k]}
+										<p class="gal-sum">{blurb(summaries[k])}{#if wikiUrls[k]}{" "}<a class="wiki-more" href={wikiUrls[k]} target="_blank" rel="noopener noreferrer">Wikipedia&nbsp;↗</a>{/if}</p>
+									{:else if !(k in summaries)}
+										<p class="gal-sum gal-sum-ph"></p>
+									{/if}
+								</article>
+							{/each}
+						</div>
+					</section>
+				{/each}
+			</div>
 		{:else}
-			<p class="ta-status">No authors for this genre and year.</p>
-		{/if}
-
-		{#if rows.length}
-			<details class="ta-note ta-footnote">
-				<summary>Note on top author counts</summary>
-				<p>Counts combine <strong>print books, ebooks &amp; audiobooks</strong>. These are raw checkouts — not holds or renewals — and catalog records are inconsistently formatted, so read the rankings as a good sense of what's popular, not an exact or official count.</p>
-			</details>
+			<p class="ta-caption">
+				Most-borrowed authors of <strong>{genre === "All genres" ? "all books" : `${genre} books`}</strong>
+				at the Seattle Public Library, {yearLabel(year)}. <span class="ta-hint">Hover or tap a name for more.</span>
+			</p>
+			<div class="list-layout">
+				<div class="list-main">
+					{#if rows.length}
+					<table class="ta-table">
+						<thead>
+							<tr>
+								<th class="ta-rank">#</th>
+								<th class="ta-name">Author</th>
+								<th class="ta-count">Checkouts</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each rows as row, i (row[0] + row[1])}
+								<tr>
+									<td class="ta-rank">{i + 1}</td>
+									<td class="ta-name">
+										{#if row[0]}
+											{@const u = lookupUrls(displayName(row[1]))}
+											{@const key = row[0] || row[1]}
+											<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
+												<button class="ta-authorlink" aria-haspopup="dialog" onclick={() => activateName(key)}>{displayName(row[1])}</button>
+												{#if hoverKey === key || pinnedKey === key}
+													<span class="wiki-pop"><WikiCard query={displayName(row[1])} kind="author" links={u} onTrend={() => openAuthor(row[0])} /></span>
+												{/if}
+											</span>
+											{#if summaries[authorKey(row)]}
+												<p class="row-sum">{blurb(summaries[authorKey(row)])}{#if wikiUrls[authorKey(row)]}{" "}<a class="wiki-more" href={wikiUrls[authorKey(row)]} target="_blank" rel="noopener noreferrer">Wikipedia&nbsp;↗</a>{/if}</p>
+											{/if}
+										{:else}
+											{displayName(row[1])}
+										{/if}
+									</td>
+									<td class="ta-count">
+										<div class="ta-num" title={row[2].toLocaleString()}>{compactNumber(row[2])}</div>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+					{:else}
+						<p class="ta-status">No authors for this genre and year.</p>
+					{/if}
+				</div>
+				<aside class="list-aside">
+					{#if genreTags.length}
+						<div class="aside-card">
+							<div class="aside-h">Subject tags · {genre}</div>
+							<p class="ta-tags">{#each genreTags as t}<code class="ta-tag">{t}</code>{/each}</p>
+						</div>
+					{/if}
+					<div class="aside-card">
+						<div class="aside-h">About these counts</div>
+						<p class="aside-p">Counts combine print books, ebooks &amp; audiobooks. These are raw checkouts — not holds or renewals — and catalog records are inconsistently formatted, so read the rankings as a good sense of what's popular, not an exact count.</p>
+					</div>
+				</aside>
+			</div>
 		{/if}
 	{/if}
 
@@ -395,19 +511,48 @@
 </div>
 
 <style>
+	/* The rankings break out wider than the page's narrow article column so the
+	   list can breathe and the methodology sits in the right margin, NYT-style. */
 	.top-authors {
-		max-width: 640px;
-		margin: 0 auto;
+		position: relative;
+		left: 50%;
+		transform: translateX(-50%);
+		width: min(1040px, 94vw);
 		font-family: var(--font-sans);
+	}
+	.top-authors.wide {
+		width: min(1160px, 94vw);
+	}
+	/* NYT-style masthead above the ranking controls. */
+	.rank-masthead {
+		border-bottom: 3px solid var(--color-fg);
+		padding-bottom: 12px;
+		margin: 4px 0 18px;
+	}
+	.rank-title {
+		font-family: var(--font-display, var(--font-serif));
+		font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+		font-weight: 700;
+		line-height: 1.05;
+		color: var(--color-fg);
+		margin: 0;
+	}
+	.rank-sub {
+		font-size: 0.95rem;
+		line-height: 1.4;
+		color: var(--color-fg-light);
+		margin: 6px 0 0;
 	}
 	.ta-controls {
 		display: flex;
 		align-items: flex-end;
-		gap: 14px;
+		gap: 12px;
 		flex-wrap: wrap;
-		margin: 8px 0 6px;
+		margin: 8px 0 14px;
 	}
 	.ta-field {
+		flex: 1;
+		min-width: 120px;
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
@@ -418,6 +563,7 @@
 		color: var(--color-fg-light);
 	}
 	.ta-field select {
+		width: 100%;
 		font-family: var(--font-sans);
 		font-size: 0.95rem;
 		font-weight: 500;
@@ -429,7 +575,253 @@
 		border-radius: 8px;
 		background: var(--color-white);
 		cursor: pointer;
-		min-width: 190px;
+		min-width: 0;
+	}
+
+	.list-layout {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 230px;
+		gap: 44px;
+		align-items: start;
+	}
+	.list-main {
+		min-width: 0;
+	}
+	.list-aside {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.aside-h {
+		font-size: 0.72rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--color-fg-light);
+		margin: 0 0 5px;
+	}
+	.aside-p {
+		font-size: 0.78rem;
+		line-height: 1.5;
+		color: var(--color-fg-light);
+		margin: 0 0 8px;
+	}
+	.aside-p a {
+		color: inherit;
+	}
+	@media (max-width: 900px) {
+		.top-authors,
+		.top-authors.wide {
+			position: static;
+			left: auto;
+			transform: none;
+			width: auto;
+			max-width: 100%;
+		}
+		.list-layout {
+			grid-template-columns: 1fr;
+			gap: 16px;
+		}
+	}
+
+	/* Year stepper for the gallery. */
+	.gal-yearnav {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 16px;
+		margin: 2px 0 22px;
+	}
+	.gal-arrow {
+		width: 34px;
+		height: 34px;
+		border-radius: 50%;
+		border: 1.5px solid var(--color-border);
+		background: var(--color-white);
+		color: var(--color-fg);
+		font-size: 1.1rem;
+		line-height: 1;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.gal-arrow:hover:not(:disabled) {
+		border-color: var(--color-fg-light);
+	}
+	.gal-arrow:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+	.gal-yearlabel {
+		font-family: var(--font-serif);
+		font-size: 1.15rem;
+		font-weight: 700;
+		color: var(--color-fg);
+		min-width: 5.5rem;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* Gallery cards. */
+	.gallery {
+		margin: 6px 0 4px;
+	}
+	.gal-sec {
+		margin: 0 0 32px;
+	}
+	.gal-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 12px;
+		margin: 0 0 16px;
+		padding-bottom: 8px;
+		border-bottom: 2px solid var(--color-border);
+	}
+	.gal-title {
+		font-family: var(--font-serif);
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: var(--color-fg);
+		margin: 0;
+	}
+	/* A genre section's title doubles as the link to its full ranking. */
+	.gal-title-link {
+		padding: 0;
+		background: none;
+		border: none;
+		cursor: pointer;
+		text-decoration: none;
+		text-underline-offset: 3px;
+	}
+	.gal-title-link:hover {
+		text-decoration: underline;
+		text-decoration-thickness: 1.5px;
+	}
+	.gal-row {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 24px 20px;
+	}
+	@media (min-width: 640px) {
+		.gal-row {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+	}
+	@media (min-width: 920px) {
+		.gal-row {
+			grid-template-columns: repeat(5, minmax(0, 1fr));
+		}
+	}
+	.gal-card {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	/* NYT-style: a big serif rank numeral sits to the left of a smaller portrait. */
+	.gal-top {
+		display: flex;
+		align-items: flex-start;
+		gap: 8px;
+		margin-bottom: 10px;
+	}
+	.gal-rank {
+		flex: none;
+		font-family: var(--font-serif);
+		font-size: 1.5rem;
+		font-weight: 400;
+		line-height: 1;
+		color: var(--color-fg-light);
+		font-variant-numeric: tabular-nums;
+		padding-top: 2px;
+	}
+	.gal-cover {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+		aspect-ratio: 2 / 3;
+		border: none;
+		padding: 0;
+		background: var(--color-gray-100);
+		border-radius: 4px;
+		overflow: hidden;
+		cursor: pointer;
+		box-shadow: 0 1px 5px rgba(0, 0, 0, 0.18);
+	}
+	.gal-cover:hover {
+		box-shadow: 0 3px 12px rgba(0, 0, 0, 0.28);
+	}
+	/* Author portraits are squarer than book covers. */
+	.gal-portrait {
+		aspect-ratio: 1 / 1;
+		border-radius: 8px;
+	}
+	.gal-cover img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+	.gal-cover-ph {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 34px;
+		opacity: 0.4;
+	}
+	.gal-booktitle {
+		margin-top: 9px;
+		text-align: left;
+		font-family: inherit;
+		font-weight: 700;
+		font-size: 0.9rem;
+		line-height: 1.25;
+		color: var(--color-fg);
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+	}
+	.gal-booktitle:hover {
+		text-decoration: underline;
+	}
+	.gal-count {
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: #7361b6;
+		margin-top: 4px;
+		font-variant-numeric: tabular-nums;
+	}
+	.gal-sum {
+		font-size: 0.78rem;
+		line-height: 1.45;
+		color: var(--color-fg-light);
+		margin: 7px 0 0;
+	}
+	.gal-sum-ph {
+		min-height: 3.2em;
+	}
+	.row-sum {
+		font-size: 0.85rem;
+		font-weight: 400;
+		line-height: 1.45;
+		color: var(--color-fg-light);
+		margin: 5px 0 0;
+	}
+	/* Subtle "keep reading" Wikipedia link at the end of a blurb. */
+	.wiki-more {
+		white-space: nowrap;
+		color: var(--color-fg-light);
+		text-decoration: underline;
+		text-decoration-color: var(--color-border);
+		text-underline-offset: 2px;
+	}
+	.wiki-more:hover {
+		color: var(--color-fg);
+		text-decoration-color: var(--color-fg-light);
 	}
 	/* Share menu ported from the chart views so it matches the plots. */
 	.share-wrap {
@@ -589,6 +981,7 @@
 	}
 	.ta-table {
 		width: 100%;
+		table-layout: fixed;
 		border-collapse: collapse;
 		font-size: 0.95rem;
 	}
@@ -612,40 +1005,23 @@
 		color: var(--color-fg-light);
 		font-variant-numeric: tabular-nums;
 	}
-	.ta-count {
-		width: 40%;
-		vertical-align: middle;
+	td.ta-count {
+		width: 4.5rem;
+		vertical-align: top;
+		padding-top: 11px;
+		padding-left: 14px;
+		text-align: right;
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
 	th.ta-count {
-		text-align: left;
-	}
-	.ta-bar {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		min-height: 22px;
-	}
-	.ta-bar-track {
-		position: relative;
-		flex: 1;
-		min-width: 0;
-		height: 22px;
-	}
-	.ta-bar-fill {
-		position: absolute;
-		left: 0;
-		top: 0;
-		height: 100%;
-		min-width: 2px;
-		border-radius: 3px;
-		background: #7361b6;
-	}
-	.ta-bar-num {
-		flex: none;
-		min-width: 3.75rem;
 		text-align: right;
+		width: 7rem;
+	}
+	.ta-num {
+		font-size: 0.9rem;
+		font-weight: 700;
+		color: var(--color-fg);
 	}
 	.ta-name {
 		font-weight: 600;

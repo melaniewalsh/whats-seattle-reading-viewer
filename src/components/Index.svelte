@@ -68,9 +68,50 @@
 		tab = "search";
 	}
 
+	// Switch the Rankings tab between the Works and Authors lists (the "Show"
+	// dropdown in the rankings control bar). Genre/year persist via the URL, which
+	// the newly-mounted ranking component reads on mount.
+	function setRankKind(kind) {
+		rankKind = kind;
+	}
+
+	// When you open a trend from the Rankings tab, remember where you were so a
+	// "Back to rankings" link can restore that exact list (kind + genre + year).
+	let rankReturn = $state(null);
+	function rememberRankings() {
+		if (tab !== "rankings") return;
+		try {
+			const url = new URL(window.location);
+			rankReturn = { rankKind, genre: url.searchParams.get("genre"), year: url.searchParams.get("year") };
+		} catch {
+			rankReturn = { rankKind, genre: null, year: null };
+		}
+	}
+	function backToRankings() {
+		const r = rankReturn;
+		rankReturn = null;
+		try {
+			const url = new URL(window.location);
+			["author", "title", "kind"].forEach((k) => url.searchParams.delete(k));
+			if (r?.genre) url.searchParams.set("genre", r.genre);
+			else url.searchParams.delete("genre");
+			if (r?.year) url.searchParams.set("year", r.year);
+			else url.searchParams.delete("year");
+			url.searchParams.set("tab", r?.rankKind === "authors" ? "top" : "works");
+			window.history.replaceState({}, "", url);
+		} catch {}
+		rankKind = r?.rankKind || "works";
+		tab = "rankings";
+	}
+	// Drop the return link once you navigate away from the trend view.
+	$effect(() => {
+		if (tab !== "search") rankReturn = null;
+	});
+
 	// Clicking an author (from Rankings, or a card's "See checkout trend") opens the
 	// Search view with that author loaded (Viewer reads ?author on mount).
 	function openAuthor(slug) {
+		rememberRankings();
 		try {
 			const url = new URL(window.location);
 			url.searchParams.set("author", slug);
@@ -83,6 +124,7 @@
 
 	// Clicking a work title opens the Search view for that title (reads ?title).
 	function openTitle(title) {
+		rememberRankings();
 		try {
 			const url = new URL(window.location);
 			url.searchParams.set("title", title);
@@ -110,32 +152,37 @@
 		</header>
 
 		<div class="tab-groups">
-			<div class="sticker-tabs main-tabs" role="tablist" aria-label="Views">
-				<button class="sticker-tab" role="tab" aria-selected={tab === "overview"} class:active={tab === "overview"} onclick={goOverview}>Overview</button>
-				<button class="sticker-tab" role="tab" aria-selected={tab === "search"} class:active={tab === "search"} onclick={() => (tab = "search")}>Search</button>
-				<button class="sticker-tab" role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>Genres</button>
-				<button class="sticker-tab" role="tab" aria-selected={tab === "rankings"} class:active={tab === "rankings"} onclick={() => (tab = "rankings")}>Rankings</button>
+			<div class="main-tabs" role="tablist" aria-label="Views">
+				<div class="sticker-tabs">
+					<button class="sticker-tab" role="tab" aria-selected={tab === "overview"} class:active={tab === "overview"} onclick={goOverview}>Overview</button>
+				</div>
+				<div class="sticker-tabs">
+					<button class="sticker-tab" role="tab" aria-selected={tab === "search"} class:active={tab === "search"} onclick={() => (tab = "search")}>Search</button>
+					<button class="sticker-tab" role="tab" aria-selected={tab === "genres"} class:active={tab === "genres"} onclick={() => (tab = "genres")}>Genres</button>
+					<button class="sticker-tab" role="tab" aria-selected={tab === "rankings"} class:active={tab === "rankings"} onclick={() => (tab = "rankings")}>Rankings</button>
+				</div>
 			</div>
 			{#if tab === "search"}
 				<div class="subtabs" role="tablist" aria-label="Search by">
 					<button class="subtab" class:active={searchKind === "author"} aria-selected={searchKind === "author"} onclick={() => setSearchKind("author")}>Author</button>
 					<button class="subtab" class:active={searchKind === "title"} aria-selected={searchKind === "title"} onclick={() => setSearchKind("title")}>Title</button>
 				</div>
-			{:else if tab === "rankings"}
-				<div class="subtabs" role="tablist" aria-label="Ranking">
-					<button class="subtab" class:active={rankKind === "authors"} aria-selected={rankKind === "authors"} onclick={() => (rankKind = "authors")}>Authors</button>
-					<button class="subtab" class:active={rankKind === "works"} aria-selected={rankKind === "works"} onclick={() => (rankKind = "works")}>Works</button>
-				</div>
 			{/if}
 		</div>
+
+		{#if rankReturn && tab === "search"}
+			<div class="back-bar">
+				<button class="back-rankings" onclick={backToRankings}>← Back to rankings</button>
+			</div>
+		{/if}
 
 		{#if tab === "genres"}
 			<GenreTrends />
 		{:else if tab === "rankings"}
 			{#if rankKind === "works"}
-				<TopWorks {openAuthor} {openTitle} />
+				<TopWorks {openAuthor} {openTitle} {rankKind} {setRankKind} />
 			{:else}
-				<TopAuthors {openAuthor} />
+				<TopAuthors {openAuthor} {rankKind} {setRankKind} />
 			{/if}
 		{:else if tab === "overview"}
 			<Viewer searchMode="author" landing="overview" />
@@ -224,9 +271,9 @@
 		margin: 0 auto 12px;
 	}
 	.headline h1 {
-		/* Match the plot-title font (Source Serif 4) rather than the Fraunces display. */
-		font-family: var(--font-serif);
-		font-weight: 600;
+		/* Fraunces display face — matches the rankings masthead title. */
+		font-family: var(--font-display, var(--font-serif));
+		font-weight: 700;
 		font-size: clamp(2.3rem, 6vw, 3.6rem);
 		line-height: 1.08;
 		letter-spacing: -0.005em;
@@ -273,6 +320,32 @@
 		flex-direction: column;
 		align-items: center;
 		margin: 22px auto 26px;
+	}
+	/* Overview sits on its own row above Search / Genres / Rankings. */
+	.main-tabs {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 10px;
+	}
+	/* "Back to rankings" shown after you open a trend from the Rankings tab. */
+	.back-bar {
+		max-width: 720px;
+		margin: 0 auto 10px;
+	}
+	.back-rankings {
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--color-fg);
+		background: none;
+		border: none;
+		padding: 4px 0;
+		cursor: pointer;
+	}
+	.back-rankings:hover {
+		text-decoration: underline;
+		text-underline-offset: 2px;
 	}
 	/* top-level view tabs: bold "sticker" buttons with a hard offset shadow */
 	.sticker-tabs {
