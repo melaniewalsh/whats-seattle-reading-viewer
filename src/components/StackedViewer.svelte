@@ -1544,6 +1544,11 @@
 		const out = [];
 		groups.forEach((g, gi) => { if (g.idxs.length) out.push({ label: groupLabel(g), color: groupColor(gi), key: `g${g.id}` }); });
 		singleIdxs.forEach((idx, i) => out.push({ label: cleanTitleForDisplay(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
+		// Everything not individually labeled is drawn in one gray band — label it
+		// "Other" so the color is accounted for in the legend (and the shared image).
+		if (out.length && displaySeries.some((s) => !s.isSelected)) {
+			out.push({ label: "Other", color: "oklch(92.2% 0 0)", key: null });
+		}
 		return out;
 	});
 
@@ -2301,6 +2306,9 @@
 	}
 	.split-main {
 		min-width: 0;
+		/* Leave room for the sticky masthead so a search scrolls the title into
+		   view just below it, not underneath it. */
+		scroll-margin-top: 72px;
 	}
 	.split-side {
 		min-width: 0;
@@ -3589,7 +3597,7 @@
 		/* Checkouts gets a min-width so the value isn't crunched against Format
 		   (each row is its own grid, so an `auto` last column shrinks to just the
 		   number). A fixed min also keeps the width stable when editions expand. */
-		grid-template-columns: 26px minmax(120px, 1.1fr) minmax(0, 0.9fr) auto minmax(92px, auto);
+		grid-template-columns: 26px minmax(110px, 0.85fr) minmax(0, 1.5fr) auto minmax(92px, auto);
 		gap: 9px;
 		padding: 7px 9px;
 		font-size: 0.8rem;
@@ -3614,7 +3622,7 @@
 		.split-side .tt-head,
 		.split-side .tt-row,
 		.split-side .work-header {
-			grid-template-columns: 22px minmax(0, 1.7fr) minmax(0, 0.8fr) minmax(42px, auto);
+			grid-template-columns: 22px minmax(0, 0.95fr) minmax(0, 1.75fr) minmax(42px, auto);
 			gap: 8px;
 			padding: 7px 8px;
 		}
@@ -3857,9 +3865,13 @@
 	}
 
 	.tt-row.selected {
-		background: var(--color-gray-100);
+		/* white, not gray -- the colored left bar + bold text carry the selection */
+		background: var(--color-white);
 		font-weight: 600;
 		box-shadow: inset 3px 0 0 0 var(--chip-color, var(--color-fg));
+	}
+	.tt-row.selected:hover {
+		background: var(--color-gray-100);
 	}
 
 	/* Editions matching the table filter are highlighted in place -- the work

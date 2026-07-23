@@ -444,16 +444,27 @@
 			{/each}
 		{/if}
 
-		<!-- Hover marker: just a dot on the hovered line (no tethering crosshair) -->
+		<!-- Hover marker: a faint vertical guide plus a dot on the hovered line -->
 		{#if hoverIndex !== null}
 			{#if selectedItem && selectedItem.values[hoverIndex] > 0}
-				<circle 
-					cx={x(hoverIndex)} 
-					cy={y(selectedItem.top[hoverIndex])} 
-					r="5" 
-					fill={selectedItem.color} 
-					stroke="white" 
-					stroke-width="2" 
+				<line
+					class="hover-guide"
+					x1={x(hoverIndex)}
+					x2={x(hoverIndex)}
+					y1={y(selectedItem.top[hoverIndex])}
+					y2={height - margin.bottom}
+					stroke="#c9c9c9"
+					stroke-width="1"
+					stroke-dasharray="3 3"
+				/>
+				<circle
+					class="hover-dot"
+					cx={x(hoverIndex)}
+					cy={y(selectedItem.top[hoverIndex])}
+					r="5"
+					fill={selectedItem.color}
+					stroke="white"
+					stroke-width="2"
 				/>
 			{/if}
 		{/if}
@@ -525,6 +536,18 @@
 		transition: opacity 0.15s ease;
 	}
 
+	/* Glide the hover dot and guide between points, in step with the tooltip. */
+	.hover-dot {
+		transition: cx 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+			cy 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+	.hover-guide {
+		opacity: 0.9;
+		transition: x1 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+			x2 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+			y1 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
 	.tick text {
 		font-size: 11px;
 		fill: #666;
@@ -532,22 +555,32 @@
 
 	.tooltip {
 		position: absolute;
-		/* float just above the dot on the line; a hair of easing so it doesn't
-		   jitter, but snappy enough not to feel bouncy */
+		/* float just above the dot on the line; glide between points with a gentle
+		   ease so it tracks the cursor smoothly instead of snapping */
 		transform: translate(-50%, calc(-100% - 18px));
-		transition: left 0.04s linear, top 0.04s linear;
-		background: #fff;
-		border: 1px solid #e4e4e4;
+		transition: left 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+			top 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+		background: rgba(255, 255, 255, 0.98);
+		-webkit-backdrop-filter: saturate(1.8) blur(6px);
+		backdrop-filter: saturate(1.8) blur(6px);
+		border: 1px solid rgba(0, 0, 0, 0.06);
 		border-radius: 12px;
 		padding: 14px 18px 15px;
 		font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
 		font-size: 13px;
 		color: #333;
 		pointer-events: none;
-		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.17);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04),
+			0 6px 16px rgba(0, 0, 0, 0.08),
+			0 18px 40px rgba(0, 0, 0, 0.10);
 		min-width: 210px;
 		max-width: 330px;
 		z-index: 10;
+		animation: tt-fade 0.14s ease-out;
+	}
+	@keyframes tt-fade {
+		from { opacity: 0; }
+		to { opacity: 1; }
 	}
 	/* when the point is near the top edge, drop the tooltip below the dot */
 	.tooltip.below {

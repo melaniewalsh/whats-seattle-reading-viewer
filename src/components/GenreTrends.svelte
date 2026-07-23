@@ -565,8 +565,6 @@
 				into one bucket, which flattens real differences. Read them as a rough lens, not an authoritative count.
 			</p>
 		</details>
-
-		<p class="gsource">Source: Seattle Public Library — Checkouts by Title (data.seattle.gov). Genre via subject-heading match; all books (print + digital, incl. audiobooks). Example titles reflect the partition (first-match) assignment.</p>
 	{/if}
 </div>
 
@@ -674,5 +672,4 @@
 	.gt-ex-list { margin: 0; padding-left: 1.4em; columns: 2; column-gap: 28px; }
 	.gt-ex-list li { font-size: 0.82rem; line-height: 1.5; break-inside: avoid; color: var(--color-fg); }
 
-	.gsource { font-family: var(--font-sans); font-size: 0.78rem; color: var(--color-fg-light); margin: 14px 0 0; }
 </style>
