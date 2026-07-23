@@ -1596,7 +1596,7 @@
 								/>
 							</span>
 						{/if}
-					</div>{#if current.variants?.length}<span class="name-info" tabindex="0" aria-label="{current.variants.length} name variants — hover for details"><span class="ni-icon" aria-hidden="true">i</span><span class="name-info-pop" role="tooltip"><span class="ni-head">{current.variants.length} name variants</span><ul>{#each current.variants as v}<li>{v}</li>{/each}</ul><span class="ni-note">Raw catalog spellings clustered into one author.</span></span></span>{/if}
+					</div>{#if searchMode !== "title" && current.variants?.length}<span class="name-info" tabindex="0" aria-label="{current.variants.length} name variants — hover for details"><span class="ni-icon" aria-hidden="true">i</span><span class="name-info-pop" role="tooltip"><span class="ni-head">{current.variants.length} name variants</span><ul>{#each current.variants as v}<li>{v}</li>{/each}</ul><span class="ni-note">Raw catalog spellings clustered into one author.</span></span></span>{/if}
 					{#if wikiTouch && wikiHover}
 						<button class="wiki-backdrop" aria-label="Close" onclick={() => (wikiHover = false)}></button>
 					{/if}
