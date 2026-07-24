@@ -261,7 +261,7 @@
 			</header>
 			<nav class="hub" aria-label="Explore">
 				<button class="hub-card" onclick={goOverview}>
-					<span class="hub-emoji" aria-hidden="true">📊</span>
+					<img class="hub-emoji hub-img" src="{base}/hub-overview.png" alt="" width="34" height="34" />
 					<span class="hub-h">Overview</span>
 					<span class="hub-d">The big picture — total checkouts across the whole library, over time and by format.</span>
 					<span class="hub-go">Explore →</span>
