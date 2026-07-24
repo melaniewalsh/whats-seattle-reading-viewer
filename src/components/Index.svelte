@@ -5,6 +5,7 @@
 	import GenreTrends from "$components/GenreTrends.svelte";
 	import TopAuthors from "$components/TopAuthors.svelte";
 	import TopWorks from "$components/TopWorks.svelte";
+	import NortonExplorer from "$components/NortonExplorer.svelte";
 	import { publications } from "$data/publications.js";
 
 	const copy = getContext("copy");
@@ -67,6 +68,7 @@
 			else if (params.get("author")) { tab = "search"; searchKind = "author"; }
 			else if (t === "about") tab = "about";
 			else if (t === "publications") tab = "publications";
+			else if (t === "norton") tab = "norton";
 			else if (t === "overview" || t === "all") tab = "overview";
 			else if (t === "home") tab = "home";
 		} catch {}
@@ -210,6 +212,10 @@
 				<button class="menu-link" onclick={() => go("genres")}>Genres</button>
 			</div>
 			<div class="menu-group">
+				<h3 class="menu-h">Case Studies</h3>
+				<button class="menu-link" onclick={() => go("norton")}>Canonical American Authors</button>
+			</div>
+			<div class="menu-group">
 				<h3 class="menu-h">The Project</h3>
 				<button class="menu-link" onclick={() => go("about")}>About</button>
 				<button class="menu-link" onclick={() => go("publications")}>Publications</button>
@@ -324,6 +330,15 @@
 					{/each}
 				{/each}
 			</section>
+		{:else if tab === "norton"}
+			<article class="study">
+				<p class="study-kicker">Case Study</p>
+				<h2 class="study-title">Which Canonical American Authors Are People Reading?</h2>
+				<p class="study-lede">Explore library checkout trends for 90+ authors from <a href="https://wwnorton.com/books/9780393884432" target="_blank" rel="noopener noreferrer">The Norton Anthology of American Literature</a> (1945 to the Present).</p>
+				<p class="study-p">This interactive explorer invites you to dive into nearly two decades of Seattle Public Library checkout data for the authors included in Volume E of <em>The Norton Anthology of American Literature</em>. The data covers 2005–2025 and lets you see which authors and works have circulated most heavily in Seattle during this period.</p>
+				<p class="study-p">You can trace spikes of attention after major life events, like an author's death, or explore how adaptations and cultural conversations bring older works back into circulation. You can also <a href="https://docs.google.com/spreadsheets/d/1a_ifxeHJ_5MlaBo-34sEWwqBMAqhZLLX47xaSDkpzc4/edit?usp=sharing" target="_blank" rel="noopener noreferrer">download and explore the data directly</a>.</p>
+				<NortonExplorer />
+			</article>
 		{:else}
 			{#key searchKind}
 				<Viewer searchMode={searchKind} landing="search" {setSearchKind} />
@@ -622,6 +637,42 @@
 		color: var(--color-fg);
 		white-space: pre;
 	}
+	/* Case-study article layout */
+	.study {
+		max-width: 760px;
+		margin: 30px auto 0;
+		font-family: var(--font-sans);
+	}
+	.study-kicker {
+		font-family: var(--font-sans);
+		font-size: 0.72rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: #3f88cc;
+		margin: 0 0 8px;
+	}
+	.study-title {
+		font-family: var(--font-display, var(--font-serif));
+		font-size: clamp(1.9rem, 4vw, 2.9rem);
+		font-weight: 700;
+		line-height: 1.08;
+		color: var(--color-fg);
+		margin: 0 0 12px;
+	}
+	.study-lede {
+		font-size: 1.2rem;
+		line-height: 1.5;
+		color: var(--color-fg);
+		margin: 0 0 18px;
+	}
+	.study-p {
+		font-size: 1.05rem;
+		line-height: 1.65;
+		color: var(--color-fg);
+		margin: 0 0 16px;
+	}
+	.study a { color: #357abd; font-weight: 600; text-decoration: underline; }
 	/* Pudding-style sticky masthead: a slim top strip (wordmark + About) over a
 	   centered row of little section pills. Breaks out to the full viewport width
 	   so it reads as a real site header. */
