@@ -267,7 +267,7 @@
 					<span class="hub-go">Explore →</span>
 				</button>
 				<button class="hub-card" onclick={() => go("rankings")}>
-					<span class="hub-emoji" aria-hidden="true">📚</span>
+					<img class="hub-emoji hub-img" src="{base}/hub-borrowed.png" alt="" width="34" height="34" />
 					<span class="hub-h">Most Borrowed</span>
 					<span class="hub-d">The books and authors checked out most — all-time and year by year, by genre.</span>
 					<span class="hub-go">Explore →</span>
