@@ -60,6 +60,15 @@
 		<p class="ne-loading"><span class="ne-spinner" aria-hidden="true"></span>Loading two decades of checkout data…</p>
 	{:else}
 		<!-- Search + select -->
+		<!-- Selected trend (shown first so the plot is the default view) -->
+		{#if current}
+			<div class="ne-chartblock" bind:this={chartWrap}>
+				<h3 class="ne-heading">{heading}</h3>
+				<p class="ne-sub">{subhead}</p>
+				<LineChart months={data.months} {series} mode="line" />
+			</div>
+		{/if}
+
 		<div class="ne-controls">
 			<label class="ne-field">
 				<span>Search by</span>
@@ -95,15 +104,6 @@
 				<button class="ne-pill" onclick={() => pickAuthor(a)}>{a.name}</button>
 			{/each}
 		</div>
-
-		<!-- Selected trend -->
-		{#if current}
-			<div class="ne-chartblock" bind:this={chartWrap}>
-				<h3 class="ne-heading">{heading}</h3>
-				<p class="ne-sub">{subhead}</p>
-				<LineChart months={data.months} {series} mode="line" />
-			</div>
-		{/if}
 
 		<!-- Top authors / titles -->
 		<div class="ne-toprow">
