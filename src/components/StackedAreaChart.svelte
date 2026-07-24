@@ -137,7 +137,8 @@
 	);
 
 	// Event markers (COVID closure, ransomware, …): resolve each to an x position
-	// and pick a horizontal anchor so near-edge labels don't overflow.
+	// and the chart value there, so a soft arrow can point at the dip. Pick a
+	// horizontal anchor so near-edge labels don't overflow.
 	const annotationMarks = $derived.by(() => {
 		if (!annotations?.length || months.length < 2) return [];
 		return annotations
@@ -146,7 +147,10 @@
 				if (i < 0) return null;
 				const px = x(i);
 				const align = px > width * 0.72 ? 'end' : px < width * 0.28 ? 'start' : 'center';
-				return { ...a, x: px, align, row: idx % 2 };
+				// Stagger the two-line boxes vertically so nearby ones don't collide;
+				// a short arrow gestures down toward the dip below (not onto the line).
+				const boxTop = 6 + (idx % 2) * 46;
+				return { ...a, x: px, align, boxTop, arrowStart: boxTop + 40 };
 			})
 			.filter(Boolean);
 	});
@@ -439,9 +443,11 @@
 
 		<line x1={margin.left} x2={width - margin.right} y1={height - margin.bottom} y2={height - margin.bottom} stroke="#ccc" />
 
-		<!-- Event marker lines (COVID, ransomware, …) -->
+		<!-- Event markers: a soft arrow from the label down to the dip -->
 		{#each annotationMarks as a}
-			<line class="annot-line" x1={a.x} x2={a.x} y1={margin.top} y2={height - margin.bottom} />
+			{@const yEnd = a.arrowStart + 40}
+			<line class="annot-arrow-line" x1={a.x} x2={a.x} y1={a.arrowStart} y2={yEnd} />
+			<polygon class="annot-arrow-head" points="{a.x - 4},{yEnd - 8} {a.x + 4},{yEnd - 8} {a.x},{yEnd}" />
 		{/each}
 
 		<!-- Layers: overlaid lines (line mode) or stacked areas (area mode) -->
@@ -494,11 +500,12 @@
 			{/if}
 		{/if}
 	</svg>
-	<!-- Event marker labels, positioned over the axis lines -->
+	<!-- Event marker labels: description with a Read more link beneath it -->
 	{#each annotationMarks as a}
-		<a class="annot-label align-{a.align}" style="left: {a.x}px; top: {2 + a.row * 26}px;" href={a.url} target="_blank" rel="noopener noreferrer" title="{a.label} — read more">
-			<span class="annot-dot" aria-hidden="true"></span>{a.label}<span class="annot-arrow" aria-hidden="true">↗</span>
-		</a>
+		<div class="annot align-{a.align}" style="left: {a.x}px; top: {a.boxTop}px;">
+			<span class="annot-title">{a.label}</span>
+			<a class="annot-more" href={a.url} target="_blank" rel="noopener noreferrer">Read more</a>
+		</div>
 	{/each}
 	{#if hoverIndex !== null && selectedItem}
         <div class="tooltip" class:below={tooltipBelow} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
@@ -543,42 +550,44 @@
 </div>
 
 <style>
-	/* Event markers (COVID closure, ransomware attack, …) */
-	.annot-line {
-		stroke: #b23b3b;
-		stroke-width: 1.25;
-		stroke-dasharray: 4 3;
-		opacity: 0.55;
-	}
-	.annot-label {
+	/* Event markers (COVID closure, ransomware attack, …) — a soft gray arrow to
+	   the dip plus a small label; deliberately understated, not alarming. */
+	.annot-arrow-line { stroke: #9aa5b1; stroke-width: 1.25; }
+	.annot-arrow-head { fill: #9aa5b1; }
+	.annot {
 		position: absolute;
-		top: 2px;
+		top: 4px;
 		z-index: 6;
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		max-width: 45%;
-		padding: 3px 9px;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 1px;
+		padding: 4px 9px;
+		background: rgba(255, 255, 255, 0.95);
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+		white-space: nowrap;
+	}
+	.annot.align-center { transform: translateX(-50%); }
+	.annot.align-end { transform: translateX(calc(-100% + 8px)); }
+	.annot.align-start { transform: translateX(-8px); }
+	.annot-title {
+		font-family: var(--font-sans, system-ui, sans-serif);
+		font-size: 0.72rem;
+		font-weight: 600;
+		line-height: 1.2;
+		color: var(--color-fg);
+	}
+	.annot-more {
 		font-family: var(--font-sans, system-ui, sans-serif);
 		font-size: 0.7rem;
 		font-weight: 600;
 		line-height: 1.2;
-		color: #8a2b2b;
-		background: rgba(255, 255, 255, 0.94);
-		border: 1px solid rgba(178, 59, 59, 0.35);
-		border-radius: 999px;
-		white-space: nowrap;
-		text-decoration: none;
-		cursor: pointer;
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-		transition: border-color 0.12s, color 0.12s;
+		color: #357abd;
+		text-decoration: underline;
 	}
-	.annot-label:hover { color: #b23b3b; border-color: #b23b3b; }
-	.annot-label.align-center { transform: translateX(-50%); }
-	.annot-label.align-end { transform: translateX(calc(-100% + 8px)); }
-	.annot-label.align-start { transform: translateX(-8px); }
-	.annot-dot { width: 6px; height: 6px; border-radius: 50%; background: #b23b3b; flex: none; }
-	.annot-arrow { color: #b23b3b; font-weight: 700; }
+	.annot-more:hover { color: #26597f; }
 
 	.chart-container {
 		position: relative;

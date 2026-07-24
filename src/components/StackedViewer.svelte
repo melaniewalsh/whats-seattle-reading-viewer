@@ -63,7 +63,7 @@
 	let isOverview = $state(false); // true when showing the library-wide "all checkouts" landing view (no per-title data)
 	// Event markers on the library-wide overview chart — the two big dips.
 	const OVERVIEW_ANNOTATIONS = [
-		{ month: "2020-03", label: "COVID closure", url: "https://www.seattletimes.com/seattle-news/seattle-closing-all-public-libraries-community-centers-parks-programs-in-bid-to-slow-coronavirus/" },
+		{ month: "2020-03", label: "COVID closure", url: "https://web.archive.org/web/20241209044138/https://www.spl.org/about-us/library-impact/2020-impact-report/a-look-back" },
 		{ month: "2024-05", label: "Ransomware attack", url: "https://www.kuow.org/stories/seattle-public-library-goes-low-tech-after-cyberattack-knocks-out-most-digital-services" },
 	];
 	let mobileTableOpen = $state(false); // on narrow screens the title table opens as a drawer
