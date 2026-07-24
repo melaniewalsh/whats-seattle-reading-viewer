@@ -273,7 +273,7 @@
 					<span class="hub-go">Explore →</span>
 				</button>
 				<button class="hub-card" onclick={() => go("genres")}>
-					<span class="hub-emoji" aria-hidden="true">📈</span>
+					<img class="hub-emoji hub-img" src="{base}/hub-genres.png" alt="" width="34" height="34" />
 					<span class="hub-h">Genres</span>
 					<span class="hub-d">How Seattle's taste in romance, mystery, fantasy and more has shifted over the years.</span>
 					<span class="hub-go">Explore →</span>
