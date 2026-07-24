@@ -2565,15 +2565,46 @@
 	.side-mobile-head {
 		display: none; /* only shown as the drawer header on mobile */
 	}
+	/* The works-panel header is a toggle styled exactly like the "On the chart"
+	   panel label (small uppercase sans), at every width. Shown per-breakpoint. */
 	.side-desktop-head {
-		display: none; /* only shown as the collapsible header on desktop */
+		display: none;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 12px 0;
+		margin: 0;
+		border: none;
+		background: none;
+		cursor: pointer;
+		text-align: left;
+	}
+	.sdh-label {
+		font-family: var(--font-sans);
+		font-size: 0.78rem;
+		font-weight: 700;
+		color: var(--color-fg-light);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+	.side-desktop-head:hover .sdh-label {
+		color: var(--color-fg);
+	}
+	.side-chevron {
+		margin-left: auto;
+		color: var(--color-fg);
+		font-size: 1.6rem;
+		line-height: 1;
+		align-self: center;
+		transition: transform 0.15s ease;
+	}
+	.side-chevron.open {
+		transform: rotate(180deg);
 	}
 
-	/* On desktop the "Add/remove works by this author" line is a subtitle heading
-	   above the below-the-plot table, and clicking it collapses the table. */
+	/* On desktop the works panel is one gray card (matching the "On the chart"
+	   panel); the header is a toggle inside it. */
 	@media (min-width: 861px) {
-		/* The whole works panel is one gray card (matching the "On the chart" panel);
-		   the header is a toggle inside it. */
 		.split-side {
 			background: var(--color-gray-100);
 			border: 1px solid var(--color-border);
@@ -2582,41 +2613,10 @@
 		}
 		.side-desktop-head {
 			display: flex;
-			align-items: center;
-			gap: 8px;
-			width: 100%;
-			padding: 12px 0;
-			margin: 0;
-			border: none;
-			background: none;
-			cursor: pointer;
-			text-align: left;
 		}
 		.split-side:not(.collapsed) .side-desktop-head {
 			border-bottom: 1px solid var(--color-border);
 			margin-bottom: 12px;
-		}
-		.side-desktop-head:hover .sdh-label {
-			color: var(--color-fg);
-		}
-		.sdh-label {
-			font-family: var(--font-sans);
-			font-size: 0.78rem;
-			font-weight: 700;
-			color: var(--color-fg-light);
-			text-transform: uppercase;
-			letter-spacing: 0.04em;
-		}
-		.side-chevron {
-			margin-left: auto;
-			color: var(--color-fg);
-			font-size: 1.6rem;
-			line-height: 1;
-			align-self: center;
-			transition: transform 0.15s ease;
-		}
-		.side-chevron.open {
-			transform: rotate(180deg);
 		}
 		.split-side.collapsed .titles {
 			display: none;
@@ -2665,24 +2665,14 @@
 			font-weight: 700;
 			font-size: 0.95rem;
 		}
-		/* ...inline, a plain heading (tap to collapse the table) instead. */
+		/* ...inline, the same small-uppercase toggle as desktop (matching the "On
+		   the chart" panel); the underline only appears once the table is open. */
 		.split-side:not(.open) .side-desktop-head {
 			display: flex;
-			align-items: baseline;
-			gap: 8px;
-			width: 100%;
-			padding: 0 2px 8px;
-			margin: 0 0 10px;
-			border: none;
-			border-bottom: 1.5px solid var(--color-border);
-			background: none;
-			font-family: var(--font-serif);
-			font-weight: 600;
-			font-size: 1.15rem;
-			line-height: 1.15;
-			color: var(--color-fg);
-			cursor: pointer;
-			text-align: left;
+		}
+		.split-side:not(.open):not(.collapsed) .side-desktop-head {
+			border-bottom: 1px solid var(--color-border);
+			margin-bottom: 12px;
 		}
 		.split-side:not(.open).collapsed .titles {
 			display: none;

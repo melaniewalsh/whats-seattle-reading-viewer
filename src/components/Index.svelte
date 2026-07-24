@@ -1020,8 +1020,6 @@
 	/* OurWorldinData-style source + attribution footer */
 	.chart-footer {
 		margin: 40px 0 0;
-		padding-top: 12px;
-		border-top: 1px solid var(--color-border);
 		font-family: var(--font-sans);
 		font-size: 0.8rem;
 		line-height: 1.5;
