@@ -464,13 +464,12 @@
 			{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 		</div>
 
-		{#if galleryMode}
-			<div class="gal-yearnav">
-				<button class="gal-arrow" onclick={() => stepYear(1)} disabled={yearIdx >= yearSeq.length - 1} aria-label="Earlier year">‹</button>
-				<span class="gal-yearlabel">{year === "all" ? "All time" : year}</span>
-				<button class="gal-arrow" onclick={() => stepYear(-1)} disabled={yearIdx <= 0} aria-label="More recent">›</button>
-			</div>
-		{:else}
+		<div class="gal-yearnav">
+			<button class="gal-arrow" onclick={() => stepYear(1)} disabled={yearIdx >= yearSeq.length - 1} aria-label="Earlier year">‹</button>
+			<span class="gal-yearlabel">{year === "all" ? "All time" : year}</span>
+			<button class="gal-arrow" onclick={() => stepYear(-1)} disabled={yearIdx <= 0} aria-label="More recent">›</button>
+		</div>
+		{#if !galleryMode}
 			<p class="ta-caption">
 				Most-borrowed <strong>{genre === "All genres" ? "works" : `${genreLabel(genre)} works`}</strong>
 				at the Seattle Public Library, {yearLabel(year)}. <span class="ta-hint">Hover or tap a title for more.</span>
