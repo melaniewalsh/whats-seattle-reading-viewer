@@ -14,18 +14,34 @@ const mem = new Map(); // key -> Promise<string|null>
 // Versioned so old poisoned "" (no-cover) entries from stricter/messier queries
 // are ignored after this fix.
 function keyOf(title, author) {
-	return `cover3:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
+	return `cover4:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
 }
 
 async function queryCover(title, author) {
 	if (!title) return null;
-	const params = new URLSearchParams({ title, limit: "1", fields: "cover_i" });
+	// Pull the top few matches (not just the first) so we can prefer the most
+	// popular edition — the first relevance hit is sometimes an obscure edition
+	// with a rough scan.
+	const params = new URLSearchParams({
+		title,
+		limit: "5",
+		fields: "cover_i,edition_count,readinglog_count",
+	});
 	if (author) params.set("author", author);
 	try {
 		const res = await fetch(`https://openlibrary.org/search.json?${params}`);
 		if (!res.ok) return null;
 		const data = await res.json();
-		return data?.docs?.[0]?.cover_i ?? null;
+		const docs = (data?.docs || []).filter((d) => d.cover_i != null);
+		if (!docs.length) return null;
+		// Rank by reader count, then edition count: the canonical, widely-held
+		// edition almost always has the cleanest, highest-res cover scan.
+		docs.sort(
+			(a, b) =>
+				(b.readinglog_count || 0) - (a.readinglog_count || 0) ||
+				(b.edition_count || 0) - (a.edition_count || 0)
+		);
+		return docs[0].cover_i ?? null;
 	} catch {
 		return null;
 	}
