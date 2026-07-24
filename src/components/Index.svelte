@@ -334,9 +334,9 @@
 			<article class="study">
 				<p class="study-kicker">Case Study</p>
 				<h2 class="study-title">Which Canonical American Authors Are People Reading?</h2>
-				<p class="study-lede">Explore library checkout trends for 90+ authors from <a href="https://wwnorton.com/books/9780393884432" target="_blank" rel="noopener noreferrer">The Norton Anthology of American Literature</a> (1945 to the Present).</p>
-				<p class="study-p">This interactive explorer invites you to dive into nearly two decades of Seattle Public Library checkout data for the authors included in Volume E of <em>The Norton Anthology of American Literature</em>. The data covers 2005–2025 and lets you see which authors and works have circulated most heavily in Seattle during this period.</p>
+				<p class="study-p">This interactive explorer invites you to dive into nearly two decades of Seattle Public Library checkout data for the 90+ authors included in Volume E of <a href="https://wwnorton.com/books/9780393884432" target="_blank" rel="noopener noreferrer"><em>The Norton Anthology of American Literature</em></a> (1945 to the Present). The data covers 2005–2025 and lets you see which authors and works have circulated most heavily in Seattle during this period.</p>
 				<p class="study-p">You can trace spikes of attention after major life events, like an author's death, or explore how adaptations and cultural conversations bring older works back into circulation. You can also <a href="https://docs.google.com/spreadsheets/d/1a_ifxeHJ_5MlaBo-34sEWwqBMAqhZLLX47xaSDkpzc4/edit?usp=sharing" target="_blank" rel="noopener noreferrer">download and explore the data directly</a>.</p>
+				<h3 class="study-h">Explore Trends</h3>
 				<NortonExplorer />
 			</article>
 		{:else}
@@ -660,12 +660,14 @@
 		color: var(--color-fg);
 		margin: 0 0 12px;
 	}
-	.study-lede {
-		font-family: var(--font-sans);
-		font-size: 1.15rem;
-		line-height: 1.5;
-		color: var(--color-fg-light);
-		margin: 0 0 18px;
+	.study-h {
+		font-family: var(--font-display, var(--font-serif));
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: var(--color-fg);
+		margin: 32px 0 4px;
+		padding-bottom: 8px;
+		border-bottom: 2px solid var(--color-fg);
 	}
 	.study-p {
 		font-family: var(--font-sans);
