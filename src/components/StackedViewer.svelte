@@ -146,7 +146,9 @@
 		if (wantSlug) {
 			const a = authors.find((x) => x.slug === wantSlug)
 					|| (await searchAuthors(wantSlug.replace(/-/g, " "), 8)).find((x) => x.slug === wantSlug);
-			if (a) { await selectAuthor(a, { scroll: false }); return; }
+			// Arrived with an explicit ?author (a click from Most Borrowed, or a
+			// shared link): scroll the plot's title into view so the user lands on it.
+			if (a) { await selectAuthor(a, { scroll: true }); return; }
 		}
 		// Search mode lands on a default example — James Baldwin (author mode) or The
 		// Fire Next Time (title mode, via the effect below) — rather than a blank box,
@@ -313,7 +315,9 @@
 		try { want = new URLSearchParams(window.location.search).get("title"); } catch {}
 		try {
 			const r = (await searchTitles(want || "The Fire Next Time", 5))[0];
-			if (r) await selectTitle(r, { scroll: false });
+			// Scroll to the plot title only when a specific ?title was requested (a
+			// click from Most Borrowed / shared link), not for the blank-tab default.
+			if (r) await selectTitle(r, { scroll: !!want });
 		} catch {}
 	}
 
