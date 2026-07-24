@@ -146,7 +146,16 @@
 				if (i < 0) return null;
 				const px = x(i);
 				const align = px > width * 0.62 ? 'end' : px < width * 0.38 ? 'start' : 'center';
-				return { ...a, x: px, align };
+				// Cap the popover width to the space actually available on that side
+				// so it never runs off the edge on a narrow (mobile) chart. The wrap
+				// sits at px (±10px for the button); leave an 8px gutter.
+				const pad = 8;
+				const avail =
+					align === 'end' ? px + 10 - pad
+					: align === 'start' ? width - (px - 10) - pad
+					: 2 * Math.min(px, width - px) - 2 * pad;
+				const maxw = Math.max(180, Math.min(320, Math.round(avail)));
+				return { ...a, x: px, align, maxw };
 			})
 			.filter(Boolean);
 	});
@@ -493,7 +502,7 @@
 	{#each annotationMarks as a}
 		<div class="qmark-wrap align-{a.align}" style="left: {a.x}px;">
 			<button class="qmark" aria-label="Why the drop here?">?</button>
-			<div class="qmark-pop" role="tooltip">
+			<div class="qmark-pop" role="tooltip" style="max-width: {a.maxw}px;">
 				<p class="qmark-body"><strong>{a.label}.</strong> {a.blurb} <a href={a.url} target="_blank" rel="noopener noreferrer">Read more</a></p>
 			</div>
 		</div>
@@ -580,7 +589,7 @@
 		left: 50%;
 		transform: translateX(-50%);
 		z-index: 8;
-		width: min(320px, 78vw);
+		width: max-content;
 		padding: 12px 14px;
 		background: var(--color-white, #fff);
 		border: 1px solid var(--color-border, #d5d9e0);

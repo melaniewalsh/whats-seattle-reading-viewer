@@ -450,7 +450,7 @@
 			</label>
 			<div class="share-wrap">
 				<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this view" aria-haspopup="true" aria-expanded={shareOpen}>
-					<span aria-hidden="true">↗</span> Share
+					<span aria-hidden="true">↗</span> <span class="ca-label">Share</span>
 				</button>
 				{#if shareOpen}
 					<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
@@ -902,6 +902,26 @@
 	}
 	.share-wrap {
 		flex: none;
+	}
+	/* On phones, keep Show / Genre / Year on a single row. The selects shrink
+	   (tapping opens the full dropdown anyway); Share collapses to a compact
+	   icon at the end of the row so nothing is orphaned on its own line. */
+	@media (max-width: 599px) {
+		.ta-controls {
+			gap: 8px;
+		}
+		.ta-field {
+			min-width: 0;
+		}
+		.ta-field select {
+			padding: 8px 6px;
+		}
+		.share-wrap .ca-label {
+			display: none;
+		}
+		.share-wrap .chart-action {
+			padding: 9px 11px;
+		}
 	}
 	.ta-caption {
 		font-size: 0.92rem;
