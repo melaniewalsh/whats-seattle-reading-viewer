@@ -61,11 +61,14 @@
 	let yearHi = $state(0); // last month index shown (inclusive)
 	let currentSlug = $state(null); // slug of the selected author (for shareable URLs)
 	let isOverview = $state(false); // true when showing the library-wide "all checkouts" landing view (no per-title data)
-	// Event markers on the library-wide overview chart — the two big dips.
-	const OVERVIEW_ANNOTATIONS = [
-		{ month: "2020-03", label: "COVID closure", url: "https://web.archive.org/web/20241209044138/https://www.spl.org/about-us/library-impact/2020-impact-report/a-look-back" },
-		{ month: "2024-05", label: "Ransomware attack", url: "https://www.kuow.org/stories/seattle-public-library-goes-low-tech-after-cyberattack-knocks-out-most-digital-services" },
+	// The two big dips on the library-wide overview chart, explained in a popover.
+	const OVERVIEW_DROPS = [
+		{ year: 2020, label: "COVID-19 closure", blurb: "Seattle temporarily closed all library branches in March 2020 to slow the spread of COVID-19.", url: "https://web.archive.org/web/20241209044138/https://www.spl.org/about-us/library-impact/2020-impact-report/a-look-back" },
+		{ year: 2024, label: "Ransomware attack", blurb: "A May 2024 ransomware attack knocked the library's catalog, e-books, Wi-Fi, and public computers offline for months.", url: "https://www.kuow.org/stories/seattle-public-library-goes-low-tech-after-cyberattack-knocks-out-most-digital-services" },
 	];
+	let dropsHover = $state(false);
+	let dropsPinned = $state(false);
+	const dropsOpen = $derived(dropsHover || dropsPinned);
 	let mobileTableOpen = $state(false); // on narrow screens the title table opens as a drawer
 	let tableCollapsed = $state(true); // the works table starts collapsed; opened via its header or "Make a custom work"
 	let autoHidAuthorTotal = $state(false); // whether we've auto-hidden the author-total line for this author yet
@@ -1757,8 +1760,28 @@
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={isOverview ? OVERVIEW_ANNOTATIONS : []}/>
+				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`}/>
 			</div>
+
+			{#if isOverview}
+				<div class="drops-note" role="note"
+						onmouseenter={() => (dropsHover = true)}
+						onmouseleave={() => (dropsHover = false)}>
+					<button class="drops-q" aria-expanded={dropsOpen} onclick={() => (dropsPinned = !dropsPinned)}>
+						<span class="drops-qmark" aria-hidden="true">?</span> Why are there such steep drops?
+					</button>
+					{#if dropsOpen}
+						<div class="drops-pop">
+							{#each OVERVIEW_DROPS as d}
+								<div class="drops-item">
+									<span class="drops-year">{d.year}</span>
+									<p class="drops-body"><strong>{d.label}.</strong> {d.blurb} <a href={d.url} target="_blank" rel="noopener noreferrer">Read more</a></p>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
 
 			{#if legendItems.length >= 2}
 				<div class="format-legend">
@@ -2923,6 +2946,73 @@
 		text-align: center;
 		margin: 0 0 8px;
 	}
+
+	/* "Why are there such steep drops?" — a hover/click popover explaining the
+	   two big dips (COVID closure, ransomware attack). */
+	.drops-note {
+		position: relative;
+		display: inline-block;
+		margin: 6px 0 0;
+	}
+	.drops-q {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--color-fg-light);
+		background: none;
+		border: none;
+		padding: 4px 0;
+		cursor: pointer;
+	}
+	.drops-q:hover { color: var(--color-fg); }
+	.drops-qmark {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 17px;
+		height: 17px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: var(--color-fg-light);
+		border: 1.5px solid var(--color-border);
+		border-radius: 50%;
+	}
+	.drops-q:hover .drops-qmark { border-color: var(--color-fg-light); color: var(--color-fg); }
+	.drops-pop {
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 0;
+		z-index: 45;
+		width: min(360px, 88vw);
+		padding: 14px 16px;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		box-shadow: 0 8px 26px rgba(0, 0, 0, 0.14);
+		font-family: var(--font-sans);
+	}
+	.drops-item { display: flex; gap: 12px; }
+	.drops-item + .drops-item { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-gray-100); }
+	.drops-year {
+		flex: none;
+		font-size: 0.72rem;
+		font-weight: 800;
+		color: var(--color-fg-light);
+		font-variant-numeric: tabular-nums;
+		padding-top: 2px;
+	}
+	.drops-body {
+		margin: 0;
+		font-size: 0.88rem;
+		line-height: 1.5;
+		color: var(--color-fg);
+	}
+	.drops-body strong { font-weight: 700; }
+	.drops-body a { color: #357abd; font-weight: 600; text-decoration: underline; white-space: nowrap; }
+	.drops-body a:hover { color: #26597f; }
 
 	.legend {
 		list-style: none;

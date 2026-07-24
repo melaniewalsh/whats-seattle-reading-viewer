@@ -15,8 +15,7 @@
 		topTitles = 8,
 		mode = 'area',
 		grandTotal = 0,   // the author's (or overview's) all-time total, for the share line
-		shareOf = '',     // phrase after "% of ", e.g. "J. K. Rowling's checkouts"
-		annotations = []  // [{ month:"YYYY-MM", label, url }] — event markers on the axis
+		shareOf = ''      // phrase after "% of ", e.g. "J. K. Rowling's checkouts"
 	} = $props();
 
 	// Measured from the container (bind:clientWidth) so the chart fits any
@@ -135,25 +134,6 @@
 			.domain([0, Math.max(months.length - 1, 1)])
 			.range([margin.left, width - margin.right])
 	);
-
-	// Event markers (COVID closure, ransomware, …): resolve each to an x position
-	// and the chart value there, so a soft arrow can point at the dip. Pick a
-	// horizontal anchor so near-edge labels don't overflow.
-	const annotationMarks = $derived.by(() => {
-		if (!annotations?.length || months.length < 2) return [];
-		return annotations
-			.map((a, idx) => {
-				const i = months.findIndex((m) => m === a.month || m.startsWith(a.month));
-				if (i < 0) return null;
-				const px = x(i);
-				const align = px > width * 0.72 ? 'end' : px < width * 0.28 ? 'start' : 'center';
-				// Stagger the two-line boxes vertically so nearby ones don't collide;
-				// a short arrow gestures down toward the dip below (not onto the line).
-				const boxTop = 6 + (idx % 2) * 46;
-				return { ...a, x: px, align, boxTop, arrowStart: boxTop + 40 };
-			})
-			.filter(Boolean);
-	});
 
 	// Area mode stacks the series; line mode overlays them from a zero baseline.
 	// `layers` is the mode-appropriate render list -- each carries a `top` array
@@ -443,13 +423,6 @@
 
 		<line x1={margin.left} x2={width - margin.right} y1={height - margin.bottom} y2={height - margin.bottom} stroke="#ccc" />
 
-		<!-- Event markers: a soft arrow from the label down to the dip -->
-		{#each annotationMarks as a}
-			{@const yEnd = a.arrowStart + 40}
-			<line class="annot-arrow-line" x1={a.x} x2={a.x} y1={a.arrowStart} y2={yEnd} />
-			<polygon class="annot-arrow-head" points="{a.x - 4},{yEnd - 8} {a.x + 4},{yEnd - 8} {a.x},{yEnd}" />
-		{/each}
-
 		<!-- Layers: overlaid lines (line mode) or stacked areas (area mode) -->
 		{#if mode === 'line'}
 			{#each linePaths as p}
@@ -500,13 +473,6 @@
 			{/if}
 		{/if}
 	</svg>
-	<!-- Event marker labels: description with a Read more link beneath it -->
-	{#each annotationMarks as a}
-		<div class="annot align-{a.align}" style="left: {a.x}px; top: {a.boxTop}px;">
-			<span class="annot-title">{a.label}</span>
-			<a class="annot-more" href={a.url} target="_blank" rel="noopener noreferrer">Read more</a>
-		</div>
-	{/each}
 	{#if hoverIndex !== null && selectedItem}
         <div class="tooltip" class:below={tooltipBelow} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
             <div class="tt-title">
@@ -550,45 +516,6 @@
 </div>
 
 <style>
-	/* Event markers (COVID closure, ransomware attack, …) — a soft gray arrow to
-	   the dip plus a small label; deliberately understated, not alarming. */
-	.annot-arrow-line { stroke: #9aa5b1; stroke-width: 1.25; }
-	.annot-arrow-head { fill: #9aa5b1; }
-	.annot {
-		position: absolute;
-		top: 4px;
-		z-index: 6;
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 1px;
-		padding: 4px 9px;
-		background: rgba(255, 255, 255, 0.95);
-		border: 1px solid var(--color-border);
-		border-radius: 8px;
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-		white-space: nowrap;
-	}
-	.annot.align-center { transform: translateX(-50%); }
-	.annot.align-end { transform: translateX(calc(-100% + 8px)); }
-	.annot.align-start { transform: translateX(-8px); }
-	.annot-title {
-		font-family: var(--font-sans, system-ui, sans-serif);
-		font-size: 0.72rem;
-		font-weight: 600;
-		line-height: 1.2;
-		color: var(--color-fg);
-	}
-	.annot-more {
-		font-family: var(--font-sans, system-ui, sans-serif);
-		font-size: 0.7rem;
-		font-weight: 600;
-		line-height: 1.2;
-		color: #357abd;
-		text-decoration: underline;
-	}
-	.annot-more:hover { color: #26597f; }
-
 	.chart-container {
 		position: relative;
 		width: 100%;
