@@ -14,20 +14,22 @@ const mem = new Map(); // key -> Promise<string|null>
 // Versioned so old poisoned "" (no-cover) entries from stricter/messier queries
 // are ignored after this fix.
 function keyOf(title, author) {
-	return `cover4:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
+	return `cover5:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
 }
 
 async function queryCover(title, author) {
 	if (!title) return null;
-	// Pull the top few matches (not just the first) so we can prefer the most
-	// popular edition — the first relevance hit is sometimes an obscure edition
-	// with a rough scan.
+	// Use a general `q=` search (title + author as free text) rather than the
+	// field-scoped `title=`/`author=` params. Field-scoped search only matches
+	// exact edition records and misses Open Library's merged "work" — e.g. it
+	// returns an obscure 1-edition "Sorcerer's Stone" record instead of the
+	// canonical Harry Potter work (cataloged under "Philosopher's Stone"). The
+	// general search finds the merged work and tolerates title/name variants.
 	const params = new URLSearchParams({
-		title,
+		q: author ? `${title} ${author}` : title,
 		limit: "5",
 		fields: "cover_i,edition_count,readinglog_count",
 	});
-	if (author) params.set("author", author);
 	try {
 		const res = await fetch(`https://openlibrary.org/search.json?${params}`);
 		if (!res.ok) return null;
