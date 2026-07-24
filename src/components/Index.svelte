@@ -404,10 +404,10 @@
 				<h3 id="method-caveats">Caveats</h3>
 				<p>
 					Author and title names come straight from library catalog records, which are
-					inconsistently formatted and occasionally merged or misspelled. Titles borrowed fewer
-					than 25 times are left out of an author's per-title breakdown (their total still counts
-					them). Genres are inferred from catalog subject headings, which are themselves
-					imperfect. Read the trends as indicative, not exact.
+					inconsistently formatted and occasionally merged or misspelled, so an author's
+					per-title breakdown includes long-tail variants of the same work. Genres are inferred
+					from catalog subject headings, which are themselves imperfect. Read the trends as
+					indicative, not exact.
 				</p>
 
 				<h3 id="method-ack">Acknowledgements</h3>

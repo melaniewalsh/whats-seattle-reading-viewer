@@ -1947,7 +1947,7 @@
 					<span class="side-chevron" class:open={!tableCollapsed} aria-hidden="true">▾</span>
 				</button>
 				<div class="titles">
-				<p class="works-min-note">Only titles borrowed at least <strong>25 times</strong> all-time are listed here — smaller ones still count toward the author's total. Highlighted rows are works with multiple editions: drag one work onto another to merge them, or expand a work and hit <em>exclude</em> to split an edition off. <a class="works-why" href="#method-clustering">Why is clustering by work so hard?</a></p>
+				<p class="works-min-note">Every title string is listed here, including long-tail catalog variants. Highlighted rows are works with multiple editions: drag one work onto another to merge them, or expand a work and hit <em>exclude</em> to split an edition off. <a class="works-why" href="#method-clustering">Why is clustering by work so hard?</a></p>
 				<div class="titles-header">
 					<input
 							class="title-filter"
