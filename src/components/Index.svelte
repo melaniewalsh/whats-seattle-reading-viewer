@@ -31,6 +31,9 @@
 		}
 		return groups;
 	})();
+	// Figures for the Top-500 case study are the static plots rendered on the
+	// project's Quarto essay (hotlinked from GitHub Pages).
+	const spl500Fig = "https://melaniewalsh.github.io/whats-seattle-reading/posts/spl-500-novels/index_files/figure-html/";
 	let copiedBib = $state(null);
 	function copyBib(p) {
 		try {
@@ -69,6 +72,7 @@
 			else if (t === "about") tab = "about";
 			else if (t === "publications") tab = "publications";
 			else if (t === "norton") tab = "norton";
+			else if (t === "spl500") tab = "spl500";
 			else if (t === "overview" || t === "all") tab = "overview";
 			else if (t === "home") tab = "home";
 		} catch {}
@@ -214,6 +218,7 @@
 			<div class="menu-group">
 				<h3 class="menu-h">Case Studies</h3>
 				<button class="menu-link" onclick={() => go("norton")}>Canonical American Authors</button>
+				<button class="menu-link" onclick={() => go("spl500")}>Top 500 “Greatest” Novels</button>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">The Project</h3>
@@ -338,6 +343,27 @@
 				<p class="study-p">You can trace spikes of attention after major life events, like an author's death, or explore how adaptations and cultural conversations bring older works back into circulation. You can also <a href="https://docs.google.com/spreadsheets/d/1a_ifxeHJ_5MlaBo-34sEWwqBMAqhZLLX47xaSDkpzc4/edit?usp=sharing" target="_blank" rel="noopener noreferrer">download and explore the data directly</a>.</p>
 				<h3 class="study-h">Explore Trends</h3>
 				<NortonExplorer />
+			</article>
+		{:else if tab === "spl500"}
+			<article class="study">
+				<p class="study-kicker">Case Study</p>
+				<h2 class="study-title">Library Checkouts for the Top 500 “Greatest” Novels</h2>
+				<p class="study-byline">Neel Gupta · February 2026</p>
+				<div class="study-callout">Originally published as part of the <a href="https://www.responsible-datasets-in-context.com/posts/spl-500-novels/" target="_blank" rel="noopener noreferrer">Responsible Datasets in Context</a> project, which pairs datasets with critical essays for more ethical, humanistic data education.</div>
+				<p class="study-p">This case study looks at Seattle Public Library circulation for the <a href="https://www.responsible-datasets-in-context.com/posts/top-500-novels/top-500-novels.html" target="_blank" rel="noopener noreferrer">Top 500 “Greatest” Novels</a> — the novels most widely held in libraries worldwide, according to the library consortium OCLC. The Seattle Public Library's <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6/about_data" target="_blank" rel="noopener noreferrer">open checkout data</a> is one of the only publicly available sources of book-reception data in the country, recording checkouts from 2005 to 2025.</p>
+
+				<h3 class="study-h">Authorial Death</h3>
+				<p class="study-p">In <a href="https://doi.org/10.63744/P6qPH135jhY2" target="_blank" rel="noopener noreferrer">prior work</a>, we found that an author's death leads to a temporary boost in library checkouts — at least if they're famous. Plotting the checkout time series for authors who died in the last two decades bears this out.</p>
+				<figure class="study-fig"><img src="{spl500Fig}cell-5-output-1.png" alt="Checkout time series for authors who died in the last 20 years, showing spikes around each author's death" loading="lazy" /></figure>
+
+				<h3 class="study-h">Backlist Titles</h3>
+				<p class="study-p">Do works by the same author rise and fall together? The Top 500 has 89 authors with multiple titles, so we tested whether their books get checked out at similar rates over time — the “backlist” effect, where attention to one book lifts interest in an author's earlier work.</p>
+				<figure class="study-fig"><img src="{spl500Fig}cell-8-output-1.png" alt="Correlation of checkout patterns among books by the same author" loading="lazy" /></figure>
+
+				<h3 class="study-h">Genres</h3>
+				<p class="study-p">The dataset's genre metadata lets us run the same correlation test across genres — seeing which genres are the most internally correlated in their patterns of reception over time.</p>
+
+				<p class="study-more"><a href="https://melaniewalsh.github.io/whats-seattle-reading/posts/spl-500-novels/index.html" target="_blank" rel="noopener noreferrer">Read the full data essay →</a> with the interactive explorer, the complete dataset browser, and reproducible code.</p>
 			</article>
 		{:else}
 			{#key searchKind}
@@ -677,6 +703,43 @@
 		margin: 0 0 16px;
 	}
 	.study a { color: #357abd; font-weight: 600; text-decoration: underline; }
+	.study-byline {
+		font-family: var(--font-sans);
+		font-size: 0.9rem;
+		color: var(--color-fg-light);
+		margin: 0 0 16px;
+	}
+	.study-callout {
+		font-family: var(--font-sans);
+		font-size: 0.92rem;
+		line-height: 1.5;
+		color: var(--color-fg-light);
+		background: var(--color-gray-100);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		padding: 12px 16px;
+		margin: 0 0 20px;
+	}
+	.study-fig {
+		margin: 4px 0 22px;
+	}
+	.study-fig img {
+		display: block;
+		width: 100%;
+		height: auto;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-white);
+	}
+	.study-more {
+		font-family: var(--font-sans);
+		font-size: 1rem;
+		line-height: 1.6;
+		color: var(--color-fg-light);
+		margin: 30px 0 0;
+		padding-top: 20px;
+		border-top: 1px solid var(--color-border);
+	}
 	/* Pudding-style sticky masthead: a slim top strip (wordmark + About) over a
 	   centered row of little section pills. Breaks out to the full viewport width
 	   so it reads as a real site header. */
