@@ -8,7 +8,7 @@
 	import { compactNumber } from "$utils/format.js";
 	import { titleCase } from "$utils/titleCase.js";
 	import { cleanWorkTitle, searchTitle } from "$utils/cleanTitle.js";
-	import { curateGenres, genreLabel } from "$utils/rankGenres.js";
+	import { curateGenres, extraGenres, genreLabel } from "$utils/rankGenres.js";
 	import WikiCard from "$components/WikiCard.svelte";
 
 	// openAuthor(slug) / openTitle(title) are provided by Index.svelte: jump to the
@@ -74,11 +74,13 @@
 			return;
 		}
 		data = d;
-		if (!genreList.includes(genre)) genre = genreList[0] || "All genres";
+		if (!data.genres.includes(genre)) genre = "All genres";
 		if (year !== "all" && !data.years.includes(Number(year))) year = "all";
 	});
-	// The curated, ordered subset of genres shown in the rankings.
+	// Curated genres (gallery + top of the dropdown) and the rest (filterable
+	// under a divider).
 	const genreList = $derived(data ? curateGenres(data.genres) : []);
+	const extra = $derived(data ? extraGenres(data.genres) : []);
 
 	// rows are [title, author, slug, checkouts]
 	const rows = $derived.by(() => {
@@ -428,6 +430,13 @@
 					{#each genreList as g}
 						<option value={g}>{genreLabel(g)}</option>
 					{/each}
+					{#if extra.length}
+						<optgroup label="More genres">
+							{#each extra as g}
+								<option value={g}>{g}</option>
+							{/each}
+						</optgroup>
+					{/if}
 				</select>
 			</label>
 			<label class="ta-field">

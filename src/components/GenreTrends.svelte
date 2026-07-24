@@ -48,6 +48,7 @@
 	let showOther = $state(false);  // the "Other / Unclassified" partition line
 	let expanded = $state(new Set());
 	let genreFilter = $state(""); // search box: filter the table by genre name OR subject term
+	let showTerms = $state(false); // reveal the subject-heading terms behind each genre (off by default)
 	// Long sections start collapsed so the table isn't a wall of rows.
 	let collapsedGroups = $state(new Set(["Kids & Young Adult", "Nonfiction"]));
 	function toggleGroup(name) {
@@ -486,7 +487,7 @@
 		<div class="gtable-head-row">
 			<h3 class="gtable-title">All {genreOrder.length} genres</h3>
 			<div class="bulk">
-				<button onclick={showAll}>Show all</button><button onclick={hideAll}>Hide all</button>
+				<button onclick={showAll}>Show all</button><button onclick={hideAll}>Hide all</button><button class:on={showTerms} onclick={() => (showTerms = !showTerms)} title="Show the catalog subject headings each genre is built from">Subject terms</button>
 			</div>
 		</div>
 		<div class="gt-search">
@@ -521,7 +522,9 @@
 					</div>
 					{#if expanded.has(name)}
 						<div class="gt-detail">
-							<div class="gt-terms">Subject terms:{#if g.terms?.length} {#each g.terms as t, i}<code>{t}</code>{i < g.terms.length - 1 ? " " : ""}{/each}{/if}{#if g.ficTerms?.length}<span class="gt-ficlbl">{g.terms?.length ? "· " : ""}only with a <strong>Fiction</strong> tag:</span> {#each g.ficTerms as t, i}<code class="fic">{t}</code>{i < g.ficTerms.length - 1 ? " " : ""}{/each}{/if}</div>
+							{#if showTerms}
+								<div class="gt-terms">Subject terms:{#if g.terms?.length} {#each g.terms as t, i}<code>{t}</code>{i < g.terms.length - 1 ? " " : ""}{/each}{/if}{#if g.ficTerms?.length}<span class="gt-ficlbl">{g.terms?.length ? "· " : ""}only with a <strong>Fiction</strong> tag:</span> {#each g.ficTerms as t, i}<code class="fic">{t}</code>{i < g.ficTerms.length - 1 ? " " : ""}{/each}{/if}</div>
+							{/if}
 							{#if cleanExamples(g.examples).length}
 								<span class="gt-ex-label">Most-checked-out titles</span>
 								<ol class="gt-ex-list">{#each cleanExamples(g.examples) as title}<li>{title}</li>{/each}</ol>
@@ -543,7 +546,7 @@
 				{#if expanded.has("__other")}
 					<div class="gt-detail">
 						<div class="gt-terms">Books matching <em>none</em> of the {genreOrder.length} genres — mostly general, un-genre'd nonfiction.</div>
-						{#if data.otherTags?.length}
+						{#if showTerms && data.otherTags?.length}
 							<div class="gt-terms">Top subject tags here: {#each data.otherTags as t, i}<code>{t[0]}</code><span class="gt-pct">{t[1]}%</span>{i < data.otherTags.length - 1 ? " " : ""}{/each}</div>
 						{/if}
 						{#if cleanExamples(data.otherExamples).length}
@@ -643,6 +646,7 @@
 	.gtable-title { font-family: var(--font-serif); font-size: 1.2rem; margin: 0; }
 	.bulk { display: flex; gap: 6px; }
 	.bulk button { font-family: var(--font-sans); font-size: 0.72rem; border: 1px solid var(--color-border); background: var(--color-white); color: var(--color-fg-light); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+	.bulk button.on { background: var(--color-fg); border-color: var(--color-fg); color: var(--color-white); }
 	.gtable-hint { font-family: var(--font-sans); font-size: 0.85rem; color: var(--color-fg-light); margin: 0 0 12px; line-height: 1.45; }
 	.gt-search { position: relative; margin: 0 0 12px; }
 	.gt-search-input { width: 100%; box-sizing: border-box; padding: 9px 34px 9px 14px; font-family: var(--font-sans); font-size: 0.9rem; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-white); color: var(--color-fg); }
