@@ -14,7 +14,27 @@ const mem = new Map(); // key -> Promise<string|null>
 // Versioned so old poisoned "" (no-cover) entries from stricter/messier queries
 // are ignored after this fix.
 function keyOf(title, author) {
-	return `cover5:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
+	return `cover6:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
+}
+
+// Token-overlap (Jaccard) between two titles, ignoring punctuation and a few
+// stopwords. Used to check that a search result is really the same title.
+const TITLE_STOP = new Set(["a", "an", "the", "and", "or", "of", "to", "in", "for", "is"]);
+function titleTokens(s) {
+	return new Set(
+		(s || "")
+			.toLowerCase()
+			.replace(/[^a-z0-9 ]+/g, " ")
+			.split(/\s+/)
+			.filter((t) => t && !TITLE_STOP.has(t))
+	);
+}
+function titleSimilarity(a, b) {
+	const A = titleTokens(a), B = titleTokens(b);
+	if (!A.size || !B.size) return 0;
+	let inter = 0;
+	for (const t of A) if (B.has(t)) inter++;
+	return inter / (A.size + B.size - inter);
 }
 
 async function queryCover(title, author) {
@@ -23,12 +43,11 @@ async function queryCover(title, author) {
 	// field-scoped `title=`/`author=` params. Field-scoped search only matches
 	// exact edition records and misses Open Library's merged "work" — e.g. it
 	// returns an obscure 1-edition "Sorcerer's Stone" record instead of the
-	// canonical Harry Potter work (cataloged under "Philosopher's Stone"). The
-	// general search finds the merged work and tolerates title/name variants.
+	// canonical Harry Potter work (cataloged under "Philosopher's Stone").
 	const params = new URLSearchParams({
 		q: author ? `${title} ${author}` : title,
-		limit: "5",
-		fields: "cover_i,edition_count,readinglog_count",
+		limit: "10",
+		fields: "cover_i,edition_count,readinglog_count,title",
 	});
 	try {
 		const res = await fetch(`https://openlibrary.org/search.json?${params}`);
@@ -36,14 +55,22 @@ async function queryCover(title, author) {
 		const data = await res.json();
 		const docs = (data?.docs || []).filter((d) => d.cover_i != null);
 		if (!docs.length) return null;
-		// Rank by reader count, then edition count: the canonical, widely-held
-		// edition almost always has the cleanest, highest-res cover scan.
-		docs.sort(
+		// Keep only results whose title actually matches the one we asked for. A
+		// bare popularity sort collapses a whole series onto its most-borrowed
+		// volume — every "Harry Potter …" query returns book 1, the runaway
+		// favorite. The token-overlap gate still accepts genuine variants of the
+		// same title (Sorcerer's ↔ Philosopher's). If nothing clears the gate,
+		// fall back to all results so an odd title still gets some cover.
+		const gated = docs.filter((d) => titleSimilarity(title, d.title) >= 0.6);
+		const pool = gated.length ? gated : docs;
+		// Among same-title results, prefer the most popular edition — it has the
+		// cleanest, highest-res cover scan.
+		pool.sort(
 			(a, b) =>
 				(b.readinglog_count || 0) - (a.readinglog_count || 0) ||
 				(b.edition_count || 0) - (a.edition_count || 0)
 		);
-		return docs[0].cover_i ?? null;
+		return pool[0].cover_i ?? null;
 	} catch {
 		return null;
 	}

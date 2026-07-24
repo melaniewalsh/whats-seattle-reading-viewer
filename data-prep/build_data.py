@@ -1123,6 +1123,22 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     print(f"  wrote top-works.json ({len(genres_out)} genres x {len(years)} years)")
 
 
+_TITLE_STOP = {"a", "an", "the", "and", "or", "of", "to", "in", "for", "is"}
+
+
+def _title_tokens(s):
+    import re as _re
+    return {t for t in _re.sub(r"[^a-z0-9 ]+", " ", (s or "").lower()).split() if t and t not in _TITLE_STOP}
+
+
+def _title_similarity(a, b):
+    A, B = _title_tokens(a), _title_tokens(b)
+    if not A or not B:
+        return 0.0
+    inter = len(A & B)
+    return inter / (len(A) + len(B) - inter)
+
+
 def _resolve_ol_cover(title, author):
     """Open Library search -> a -L.jpg cover URL, or None. Matches the site's
     runtime logic (utils/covers.js) so baked and fallback covers agree.
@@ -1131,12 +1147,16 @@ def _resolve_ol_cover(title, author):
     field-scoped `title=`/`author=` params: field-scoped search only matches
     exact edition records and misses Open Library's merged "work" (e.g. it
     returns an obscure 1-edition "Sorcerer's Stone" record instead of the
-    canonical Harry Potter work, filed under "Philosopher's Stone"). Among the
-    top matches, prefer the most popular edition (reader count, then edition
-    count) since the canonical, widely-held edition has the cleanest cover."""
+    canonical Harry Potter work, filed under "Philosopher's Stone").
+
+    Then gate results by title-token overlap so a fuzzy search doesn't collapse
+    a whole series onto its most popular volume (every "Harry Potter …" query
+    otherwise returns book 1). The gate still accepts genuine title variants
+    (Sorcerer's ↔ Philosopher's). Among survivors, prefer the most popular
+    edition (reader count, then edition count) for the cleanest cover scan."""
     import urllib.request as _u, urllib.parse as _up, json as _j
     term = f"{title or ''} {author or ''}".strip()
-    q = _up.urlencode({"q": term, "limit": "5", "fields": "cover_i,edition_count,readinglog_count"})
+    q = _up.urlencode({"q": term, "limit": "10", "fields": "cover_i,edition_count,readinglog_count,title"})
     try:
         req = _u.Request(
             f"https://openlibrary.org/search.json?{q}",
@@ -1147,8 +1167,10 @@ def _resolve_ol_cover(title, author):
         docs = [d for d in docs if d.get("cover_i") is not None]
         if not docs:
             return None
-        docs.sort(key=lambda d: (d.get("readinglog_count") or 0, d.get("edition_count") or 0), reverse=True)
-        cid = docs[0].get("cover_i")
+        gated = [d for d in docs if _title_similarity(title, d.get("title")) >= 0.6]
+        pool = gated or docs
+        pool.sort(key=lambda d: (d.get("readinglog_count") or 0, d.get("edition_count") or 0), reverse=True)
+        cid = pool[0].get("cover_i")
         return f"https://covers.openlibrary.org/b/id/{cid}-L.jpg" if cid else None
     except Exception:
         return None
