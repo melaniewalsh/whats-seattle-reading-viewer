@@ -654,19 +654,21 @@
 	}
 	.study-title {
 		font-family: var(--font-display, var(--font-serif));
-		font-size: clamp(1.9rem, 4vw, 2.9rem);
+		font-size: clamp(1.7rem, 3.4vw, 2.5rem); /* = the site's standard page/section title */
 		font-weight: 700;
-		line-height: 1.08;
+		line-height: 1.1;
 		color: var(--color-fg);
 		margin: 0 0 12px;
 	}
 	.study-lede {
-		font-size: 1.2rem;
+		font-family: var(--font-sans);
+		font-size: 1.15rem;
 		line-height: 1.5;
-		color: var(--color-fg);
+		color: var(--color-fg-light);
 		margin: 0 0 18px;
 	}
 	.study-p {
+		font-family: var(--font-sans);
 		font-size: 1.05rem;
 		line-height: 1.65;
 		color: var(--color-fg);

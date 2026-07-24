@@ -154,7 +154,7 @@
 	.ne-pill:hover { border-color: #b6c2ce; }
 
 	.ne-chartblock { margin: 30px 0 10px; }
-	.ne-heading { font-family: var(--font-display, var(--font-serif)); font-size: clamp(1.6rem, 3.2vw, 2.2rem); font-weight: 700; color: var(--color-fg); margin: 0; line-height: 1.1; }
+	.ne-heading { font-family: var(--font-display, var(--font-serif)); font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; color: var(--color-fg); margin: 0; line-height: 1.1; }
 	.ne-sub { font-family: var(--font-sans); font-size: 0.95rem; color: var(--color-fg-light); margin: 4px 0 14px; }
 
 	.ne-toprow { margin: 26px 0 10px; }
@@ -162,7 +162,7 @@
 	.ne-toggle input { width: 15px; height: 15px; accent-color: var(--color-fg); cursor: pointer; }
 	.ne-tables { display: grid; grid-template-columns: minmax(0, 1fr); gap: 30px; }
 	@media (max-width: 640px) { .ne-field.grow { flex: 1.4; } }
-	.ne-th { font-family: var(--font-display, var(--font-serif)); font-size: 1.15rem; font-weight: 700; color: var(--color-fg); margin: 0 0 6px; padding-bottom: 6px; border-bottom: 2px solid var(--color-fg); }
+	.ne-th { font-family: var(--font-display, var(--font-serif)); font-size: 1.2rem; font-weight: 700; color: var(--color-fg); margin: 0 0 6px; padding-bottom: 6px; border-bottom: 2px solid var(--color-fg); }
 	.ne-th-n { font-family: var(--font-sans); font-size: 0.72rem; font-weight: 700; color: var(--color-fg-light); vertical-align: middle; margin-left: 4px; }
 	.ne-list { list-style: none; margin: 0; padding: 0 4px 0 0; counter-reset: ne; max-height: 440px; overflow-y: auto; }
 	.ne-list li { counter-increment: ne; }
