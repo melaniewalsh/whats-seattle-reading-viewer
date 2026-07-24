@@ -275,8 +275,8 @@
 				<button class="hub-card" onclick={() => go("genres")}>
 					<span class="hub-emoji hub-icons" aria-hidden="true">
 						<img class="hub-img" src="{base}/hub-genres.png" alt="" width="34" height="34" />
-						<img class="hub-img" src="{base}/hub-heart.png" alt="" width="34" height="34" />
-						<img class="hub-img" src="{base}/hub-ghost.png" alt="" width="34" height="34" />
+						<img class="hub-img hub-img-sm" src="{base}/hub-heart.png" alt="" width="34" height="34" />
+						<img class="hub-img hub-img-sm" src="{base}/hub-ghost.png" alt="" width="34" height="34" />
 					</span>
 					<span class="hub-h">Genres</span>
 					<span class="hub-d">How Seattle's taste in romance, mystery, fantasy and more has shifted over the years.</span>
@@ -522,6 +522,7 @@
 	.hub-emoji { font-size: 1.7rem; line-height: 1; }
 	.hub-img { width: 2rem; height: 2rem; object-fit: contain; }
 	.hub-icons { display: inline-flex; align-items: center; gap: 0.35rem; }
+	.hub-img-sm { width: 1.4rem; height: 1.4rem; }
 	.hub-h {
 		font-family: var(--font-display, var(--font-serif));
 		font-size: 1.4rem;
