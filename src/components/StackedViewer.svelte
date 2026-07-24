@@ -61,6 +61,11 @@
 	let yearHi = $state(0); // last month index shown (inclusive)
 	let currentSlug = $state(null); // slug of the selected author (for shareable URLs)
 	let isOverview = $state(false); // true when showing the library-wide "all checkouts" landing view (no per-title data)
+	// Event markers on the library-wide overview chart — the two big dips.
+	const OVERVIEW_ANNOTATIONS = [
+		{ month: "2020-03", label: "COVID closure", url: "https://www.seattletimes.com/seattle-news/seattle-closing-all-public-libraries-community-centers-parks-programs-in-bid-to-slow-coronavirus/" },
+		{ month: "2024-05", label: "Ransomware attack", url: "https://www.kuow.org/stories/seattle-public-library-goes-low-tech-after-cyberattack-knocks-out-most-digital-services" },
+	];
 	let mobileTableOpen = $state(false); // on narrow screens the title table opens as a drawer
 	let tableCollapsed = $state(true); // the works table starts collapsed; opened via its header or "Make a custom work"
 	let autoHidAuthorTotal = $state(false); // whether we've auto-hidden the author-total line for this author yet
@@ -1752,7 +1757,7 @@
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`}/>
+				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={isOverview ? OVERVIEW_ANNOTATIONS : []}/>
 			</div>
 
 			{#if legendItems.length >= 2}

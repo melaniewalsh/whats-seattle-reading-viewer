@@ -15,7 +15,8 @@
 		topTitles = 8,
 		mode = 'area',
 		grandTotal = 0,   // the author's (or overview's) all-time total, for the share line
-		shareOf = ''      // phrase after "% of ", e.g. "J. K. Rowling's checkouts"
+		shareOf = '',     // phrase after "% of ", e.g. "J. K. Rowling's checkouts"
+		annotations = []  // [{ month:"YYYY-MM", label, url }] — event markers on the axis
 	} = $props();
 
 	// Measured from the container (bind:clientWidth) so the chart fits any
@@ -134,6 +135,21 @@
 			.domain([0, Math.max(months.length - 1, 1)])
 			.range([margin.left, width - margin.right])
 	);
+
+	// Event markers (COVID closure, ransomware, …): resolve each to an x position
+	// and pick a horizontal anchor so near-edge labels don't overflow.
+	const annotationMarks = $derived.by(() => {
+		if (!annotations?.length || months.length < 2) return [];
+		return annotations
+			.map((a, idx) => {
+				const i = months.findIndex((m) => m === a.month || m.startsWith(a.month));
+				if (i < 0) return null;
+				const px = x(i);
+				const align = px > width * 0.72 ? 'end' : px < width * 0.28 ? 'start' : 'center';
+				return { ...a, x: px, align, row: idx % 2 };
+			})
+			.filter(Boolean);
+	});
 
 	// Area mode stacks the series; line mode overlays them from a zero baseline.
 	// `layers` is the mode-appropriate render list -- each carries a `top` array
@@ -423,6 +439,11 @@
 
 		<line x1={margin.left} x2={width - margin.right} y1={height - margin.bottom} y2={height - margin.bottom} stroke="#ccc" />
 
+		<!-- Event marker lines (COVID, ransomware, …) -->
+		{#each annotationMarks as a}
+			<line class="annot-line" x1={a.x} x2={a.x} y1={margin.top} y2={height - margin.bottom} />
+		{/each}
+
 		<!-- Layers: overlaid lines (line mode) or stacked areas (area mode) -->
 		{#if mode === 'line'}
 			{#each linePaths as p}
@@ -473,6 +494,12 @@
 			{/if}
 		{/if}
 	</svg>
+	<!-- Event marker labels, positioned over the axis lines -->
+	{#each annotationMarks as a}
+		<a class="annot-label align-{a.align}" style="left: {a.x}px; top: {2 + a.row * 26}px;" href={a.url} target="_blank" rel="noopener noreferrer" title="{a.label} — read more">
+			<span class="annot-dot" aria-hidden="true"></span>{a.label}<span class="annot-arrow" aria-hidden="true">↗</span>
+		</a>
+	{/each}
 	{#if hoverIndex !== null && selectedItem}
         <div class="tooltip" class:below={tooltipBelow} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
             <div class="tt-title">
@@ -516,6 +543,43 @@
 </div>
 
 <style>
+	/* Event markers (COVID closure, ransomware attack, …) */
+	.annot-line {
+		stroke: #b23b3b;
+		stroke-width: 1.25;
+		stroke-dasharray: 4 3;
+		opacity: 0.55;
+	}
+	.annot-label {
+		position: absolute;
+		top: 2px;
+		z-index: 6;
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		max-width: 45%;
+		padding: 3px 9px;
+		font-family: var(--font-sans, system-ui, sans-serif);
+		font-size: 0.7rem;
+		font-weight: 600;
+		line-height: 1.2;
+		color: #8a2b2b;
+		background: rgba(255, 255, 255, 0.94);
+		border: 1px solid rgba(178, 59, 59, 0.35);
+		border-radius: 999px;
+		white-space: nowrap;
+		text-decoration: none;
+		cursor: pointer;
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+		transition: border-color 0.12s, color 0.12s;
+	}
+	.annot-label:hover { color: #b23b3b; border-color: #b23b3b; }
+	.annot-label.align-center { transform: translateX(-50%); }
+	.annot-label.align-end { transform: translateX(calc(-100% + 8px)); }
+	.annot-label.align-start { transform: translateX(-8px); }
+	.annot-dot { width: 6px; height: 6px; border-radius: 50%; background: #b23b3b; flex: none; }
+	.annot-arrow { color: #b23b3b; font-weight: 700; }
+
 	.chart-container {
 		position: relative;
 		width: 100%;
