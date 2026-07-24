@@ -279,7 +279,7 @@
 					<span class="hub-go">Explore →</span>
 				</button>
 				<button class="hub-card" onclick={() => go("search")}>
-					<span class="hub-emoji" aria-hidden="true">🔍</span>
+					<img class="hub-emoji hub-img" src="{base}/hub-search.png" alt="" width="34" height="34" />
 					<span class="hub-h">Search</span>
 					<span class="hub-d">Look up any author or title and see its checkout trend at the Seattle Public Library.</span>
 					<span class="hub-go">Explore →</span>
@@ -460,7 +460,7 @@
 	}
 	.hero-logo {
 		flex: none;
-		width: clamp(42px, 8vw, 58px);
+		width: clamp(60px, 12vw, 92px);
 		height: auto;
 	}
 	.hero h1 {
@@ -516,6 +516,7 @@
 		transform: translateY(-2px);
 	}
 	.hub-emoji { font-size: 1.7rem; line-height: 1; }
+	.hub-img { width: 2rem; height: 2rem; object-fit: contain; }
 	.hub-h {
 		font-family: var(--font-display, var(--font-serif));
 		font-size: 1.4rem;
