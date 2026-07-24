@@ -1124,10 +1124,19 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
 
 
 def _resolve_ol_cover(title, author):
-    """Open Library search -> a -M.jpg cover URL, or None. Matches the site's
-    runtime logic (utils/covers.js) so baked and fallback covers agree."""
+    """Open Library search -> a -L.jpg cover URL, or None. Matches the site's
+    runtime logic (utils/covers.js) so baked and fallback covers agree.
+
+    Uses a general `q=` search (title + author as free text) rather than the
+    field-scoped `title=`/`author=` params: field-scoped search only matches
+    exact edition records and misses Open Library's merged "work" (e.g. it
+    returns an obscure 1-edition "Sorcerer's Stone" record instead of the
+    canonical Harry Potter work, filed under "Philosopher's Stone"). Among the
+    top matches, prefer the most popular edition (reader count, then edition
+    count) since the canonical, widely-held edition has the cleanest cover."""
     import urllib.request as _u, urllib.parse as _up, json as _j
-    q = _up.urlencode({"title": title or "", "author": author or "", "limit": "1", "fields": "cover_i"})
+    term = f"{title or ''} {author or ''}".strip()
+    q = _up.urlencode({"q": term, "limit": "5", "fields": "cover_i,edition_count,readinglog_count"})
     try:
         req = _u.Request(
             f"https://openlibrary.org/search.json?{q}",
@@ -1135,8 +1144,12 @@ def _resolve_ol_cover(title, author):
         )
         with _u.urlopen(req, timeout=25) as r:
             docs = (_j.loads(r.read()) or {}).get("docs") or []
-        cid = docs[0].get("cover_i") if docs else None
-        return f"https://covers.openlibrary.org/b/id/{cid}-M.jpg" if cid else None
+        docs = [d for d in docs if d.get("cover_i") is not None]
+        if not docs:
+            return None
+        docs.sort(key=lambda d: (d.get("readinglog_count") or 0, d.get("edition_count") or 0), reverse=True)
+        cid = docs[0].get("cover_i")
+        return f"https://covers.openlibrary.org/b/id/{cid}-L.jpg" if cid else None
     except Exception:
         return None
 
