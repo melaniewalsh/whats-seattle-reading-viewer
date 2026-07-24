@@ -357,8 +357,12 @@
 				<figure class="study-fig"><img src="{spl500Fig}cell-5-output-1.png" alt="Checkout time series for authors who died in the last 20 years, showing spikes around each author's death" loading="lazy" /></figure>
 
 				<h3 class="study-h">Backlist Titles</h3>
-				<p class="study-p">Do works by the same author rise and fall together? The Top 500 has 89 authors with multiple titles, so we tested whether their books get checked out at similar rates over time — the “backlist” effect, where attention to one book lifts interest in an author's earlier work.</p>
-				<figure class="study-fig"><img src="{spl500Fig}cell-8-output-1.png" alt="Correlation of checkout patterns among books by the same author" loading="lazy" /></figure>
+				<p class="study-p">Do works by the same author rise and fall together? The Top 500 has 89 authors with multiple titles, so we tested whether their books get checked out at similar rates over time — the “backlist” effect, where attention to one book lifts interest in an author's earlier work. On average, books by the same author correlate at 0.42 — almost 3× higher than two random books in the dataset (0.16).</p>
+				<figure class="study-fig"><img src="{spl500Fig}cell-8-output-1.png" alt="Correlation matrix of J.K. Rowling's Harry Potter books" loading="lazy" /><figcaption>The middle four <em>Harry Potter</em> books move almost in lockstep; the first book and the final two have their own dynamics.</figcaption></figure>
+				<p class="study-p">The time-series plots show what's going on with those edge books:</p>
+				<figure class="study-fig"><img src="{spl500Fig}cell-9-output-1.png" alt="Prisoner of Azkaban vs Chamber of Secrets checkouts over time" loading="lazy" /><figcaption><em>Prisoner of Azkaban</em> and <em>Chamber of Secrets</em> track almost perfectly — a correlation of 0.97.</figcaption></figure>
+				<figure class="study-fig"><img src="{spl500Fig}cell-10-output-1.png" alt="Prisoner of Azkaban vs Sorcerer's Stone checkouts over time" loading="lazy" /><figcaption><em>Azkaban</em> and <em>Sorcerer's Stone</em> track well too — until a huge 2020 spike for <em>Sorcerer's Stone</em> throws off the correlation.</figcaption></figure>
+				<figure class="study-fig"><img src="{spl500Fig}cell-11-output-1.png" alt="Deathly Hallows vs Half-Blood Prince checkouts over time" loading="lazy" /><figcaption>Apart from their release-date peaks, the final two books follow the same dynamics.</figcaption></figure>
 
 				<h3 class="study-h">Genres</h3>
 				<p class="study-p">The dataset's genre metadata lets us run the same correlation test across genres — seeing which genres are the most internally correlated in their patterns of reception over time.</p>
@@ -730,6 +734,13 @@
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-md);
 		background: var(--color-white);
+	}
+	.study-fig figcaption {
+		font-family: var(--font-sans);
+		font-size: 0.9rem;
+		line-height: 1.5;
+		color: var(--color-fg-light);
+		margin: 8px 2px 0;
 	}
 	.study-more {
 		font-family: var(--font-sans);
