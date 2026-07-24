@@ -14,7 +14,7 @@ const mem = new Map(); // key -> Promise<string|null>
 // Versioned so old poisoned "" (no-cover) entries from stricter/messier queries
 // are ignored after this fix.
 function keyOf(title, author) {
-	return `cover7:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
+	return `cover8:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
 }
 
 const TITLE_STOP = new Set(["a", "an", "the", "and", "or", "of", "to", "in", "for", "is"]);
@@ -61,7 +61,7 @@ async function queryCover(title, author) {
 	const params = new URLSearchParams({
 		q: author ? `${title} ${author}` : title,
 		limit: "20",
-		fields: "cover_i,edition_count,readinglog_count,title,language,author_name",
+		fields: "key,cover_i,edition_count,readinglog_count,title,language,author_name",
 	});
 	try {
 		const res = await fetch(`https://openlibrary.org/search.json?${params}`);
@@ -77,16 +77,45 @@ async function queryCover(title, author) {
 		// all results so an odd title still gets some cover.
 		const gated = docs.filter((d) => titleContainment(title, d.title) >= 0.6);
 		const pool = gated.length ? gated : docs;
-		// Prefer an English edition, then the most popular one (cleanest scan).
+		// Prefer a work with an English edition, then the most popular one.
 		pool.sort(
 			(a, b) =>
 				(hasEnglish(b) ? 1 : 0) - (hasEnglish(a) ? 1 : 0) ||
 				(b.readinglog_count || 0) - (a.readinglog_count || 0) ||
 				(b.edition_count || 0) - (a.edition_count || 0)
 		);
-		return pool[0].cover_i ?? null;
+		return pool[0] ?? null;
 	} catch {
 		return null;
+	}
+}
+
+// A work's default cover_i can be a foreign-language edition even when English
+// editions exist (e.g. Game Changer's cover is the French "Sortie de zone").
+// When the work is multilingual, check its editions: if the default cover
+// positively belongs to a non-English edition, swap in an English edition's
+// cover. Conservative — we only swap on a confirmed non-English owner, so good
+// English defaults (whose owning edition isn't language-tagged) are left alone.
+async function englishCover(doc) {
+	const cover = doc.cover_i;
+	const langs = doc.language;
+	if (!doc.key || !langs || langs.every((l) => l === "eng")) return cover;
+	try {
+		const res = await fetch(`https://openlibrary.org${doc.key}/editions.json?limit=50`);
+		if (!res.ok) return cover;
+		const entries = (await res.json())?.entries || [];
+		let ownerLangs = null;
+		const engCovers = [];
+		for (const e of entries) {
+			const el = (e.languages || []).map((l) => (l.key || "").split("/").pop());
+			const covers = (e.covers || []).filter((c) => c && c > 0);
+			if (el.includes("eng")) engCovers.push(...covers);
+			if (covers.includes(cover)) ownerLangs = el;
+		}
+		if (ownerLangs && !ownerLangs.includes("eng") && engCovers.length) return engCovers[0];
+		return cover;
+	} catch {
+		return cover;
 	}
 }
 
@@ -95,8 +124,10 @@ async function resolve(title, author) {
 	// the author first; if that finds nothing, retry title-only — Open Library's
 	// author strings are often spelled differently than the SPL catalog's.
 	const clean = searchTitle(title);
-	let id = await queryCover(clean, author);
-	if (id == null && author) id = await queryCover(clean, "");
+	let doc = await queryCover(clean, author);
+	if (!doc && author) doc = await queryCover(clean, "");
+	if (!doc) return null;
+	const id = await englishCover(doc);
 	// -L (large, up to ~500px) instead of -M (~180px) so covers stay crisp on
 	// retina displays and when shown at larger sizes.
 	return id != null ? `https://covers.openlibrary.org/b/id/${id}-L.jpg` : null;

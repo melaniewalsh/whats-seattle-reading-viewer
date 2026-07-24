@@ -1159,6 +1159,39 @@ def _has_english(d):
     return (not lg) or ("eng" in lg)
 
 
+def _english_cover(work_key, default_cover, language):
+    """A work's default cover_i can be a foreign-language edition even when
+    English ones exist (e.g. Game Changer's cover is the French "Sortie de
+    zone"). When the work is multilingual, check its editions: if the default
+    cover positively belongs to a non-English edition, swap in an English
+    edition's cover. Conservative — only swaps on a confirmed non-English owner,
+    so good English defaults (whose owning edition isn't tagged) are left be."""
+    import urllib.request as _u, json as _j
+    if not work_key or not language or all(l == "eng" for l in language):
+        return default_cover
+    try:
+        req = _u.Request(
+            f"https://openlibrary.org{work_key}/editions.json?limit=50",
+            headers={"User-Agent": "whats-seattle-reading cover build (melwalsh@uw.edu)"},
+        )
+        with _u.urlopen(req, timeout=25) as r:
+            entries = (_j.loads(r.read()) or {}).get("entries") or []
+    except Exception:
+        return default_cover
+    owner_langs = None
+    eng_covers = []
+    for e in entries:
+        el = [l.get("key", "").split("/")[-1] for l in (e.get("languages") or [])]
+        covers = [c for c in (e.get("covers") or []) if c and c > 0]
+        if "eng" in el:
+            eng_covers += covers
+        if default_cover in covers:
+            owner_langs = el
+    if owner_langs is not None and "eng" not in owner_langs and eng_covers:
+        return eng_covers[0]
+    return default_cover
+
+
 def _resolve_ol_cover(title, author):
     """Open Library search -> a -L.jpg cover URL, or None. Matches the site's
     runtime logic (utils/covers.js) so baked and fallback covers agree.
@@ -1178,7 +1211,7 @@ def _resolve_ol_cover(title, author):
     then the most popular one (reader count, then edition count)."""
     import urllib.request as _u, urllib.parse as _up, json as _j
     term = f"{title or ''} {author or ''}".strip()
-    q = _up.urlencode({"q": term, "limit": "20", "fields": "cover_i,edition_count,readinglog_count,title,language,author_name"})
+    q = _up.urlencode({"q": term, "limit": "20", "fields": "key,cover_i,edition_count,readinglog_count,title,language,author_name"})
     try:
         req = _u.Request(
             f"https://openlibrary.org/search.json?{q}",
@@ -1192,7 +1225,8 @@ def _resolve_ol_cover(title, author):
         gated = [d for d in docs if _title_containment(title, d.get("title")) >= 0.6]
         pool = gated or docs
         pool.sort(key=lambda d: (_has_english(d), d.get("readinglog_count") or 0, d.get("edition_count") or 0), reverse=True)
-        cid = pool[0].get("cover_i")
+        best = pool[0]
+        cid = _english_cover(best.get("key"), best.get("cover_i"), best.get("language"))
         return f"https://covers.openlibrary.org/b/id/{cid}-L.jpg" if cid else None
     except Exception:
         return None
