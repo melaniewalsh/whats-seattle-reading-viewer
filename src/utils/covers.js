@@ -14,27 +14,41 @@ const mem = new Map(); // key -> Promise<string|null>
 // Versioned so old poisoned "" (no-cover) entries from stricter/messier queries
 // are ignored after this fix.
 function keyOf(title, author) {
-	return `cover6:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
+	return `cover7:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
 }
 
-// Token-overlap (Jaccard) between two titles, ignoring punctuation and a few
-// stopwords. Used to check that a search result is really the same title.
 const TITLE_STOP = new Set(["a", "an", "the", "and", "or", "of", "to", "in", "for", "is"]);
 function titleTokens(s) {
-	return new Set(
-		(s || "")
-			.toLowerCase()
-			.replace(/[^a-z0-9 ]+/g, " ")
-			.split(/\s+/)
-			.filter((t) => t && !TITLE_STOP.has(t))
-	);
+	return (s || "")
+		.toLowerCase()
+		.replace(/[^a-z0-9 ]+/g, " ")
+		.split(/\s+/)
+		.filter((t) => t && !TITLE_STOP.has(t));
 }
-function titleSimilarity(a, b) {
-	const A = titleTokens(a), B = titleTokens(b);
-	if (!A.size || !B.size) return 0;
+// Fraction of the REQUESTED title's words that appear in the result's title.
+// Containment (not symmetric Jaccard) so a subtitle on the result — "Still Life
+// (A Three Pines Mystery)" — doesn't dilute the score, while a different volume
+// in a series (sharing only boilerplate like "Harry Potter") still falls short.
+function titleContainment(requested, found) {
+	const A = titleTokens(requested);
+	if (!A.length) return 0;
+	const B = new Set(titleTokens(found));
 	let inter = 0;
 	for (const t of A) if (B.has(t)) inter++;
-	return inter / (A.size + B.size - inter);
+	return inter / A.length;
+}
+
+// Study guides, summaries, and workbooks masquerade as the real book (and can be
+// weirdly popular), so drop them entirely.
+const JUNK_RE = /\b(summary|summaries|study\s?guide|analysis|sparknotes|cliffs?notes|workbook|conversation starters|quicklet|instaread|blinkist|bookrags|trivia[- ]on)\b/i;
+function isJunk(d) {
+	if (JUNK_RE.test(d.title || "")) return true;
+	return (d.author_name || []).some((a) => JUNK_RE.test(a));
+}
+// Prefer editions that include English (or have no language recorded) over
+// Spanish-only / other-language work records.
+function hasEnglish(d) {
+	return !d.language || d.language.includes("eng");
 }
 
 async function queryCover(title, author) {
@@ -46,27 +60,27 @@ async function queryCover(title, author) {
 	// canonical Harry Potter work (cataloged under "Philosopher's Stone").
 	const params = new URLSearchParams({
 		q: author ? `${title} ${author}` : title,
-		limit: "10",
-		fields: "cover_i,edition_count,readinglog_count,title",
+		limit: "20",
+		fields: "cover_i,edition_count,readinglog_count,title,language,author_name",
 	});
 	try {
 		const res = await fetch(`https://openlibrary.org/search.json?${params}`);
 		if (!res.ok) return null;
 		const data = await res.json();
-		const docs = (data?.docs || []).filter((d) => d.cover_i != null);
+		const docs = (data?.docs || []).filter((d) => d.cover_i != null && !isJunk(d));
 		if (!docs.length) return null;
 		// Keep only results whose title actually matches the one we asked for. A
 		// bare popularity sort collapses a whole series onto its most-borrowed
 		// volume — every "Harry Potter …" query returns book 1, the runaway
-		// favorite. The token-overlap gate still accepts genuine variants of the
-		// same title (Sorcerer's ↔ Philosopher's). If nothing clears the gate,
-		// fall back to all results so an odd title still gets some cover.
-		const gated = docs.filter((d) => titleSimilarity(title, d.title) >= 0.6);
+		// favorite. Containment still accepts genuine variants of the same title
+		// (Sorcerer's ↔ Philosopher's). If nothing clears the gate, fall back to
+		// all results so an odd title still gets some cover.
+		const gated = docs.filter((d) => titleContainment(title, d.title) >= 0.6);
 		const pool = gated.length ? gated : docs;
-		// Among same-title results, prefer the most popular edition — it has the
-		// cleanest, highest-res cover scan.
+		// Prefer an English edition, then the most popular one (cleanest scan).
 		pool.sort(
 			(a, b) =>
+				(hasEnglish(b) ? 1 : 0) - (hasEnglish(a) ? 1 : 0) ||
 				(b.readinglog_count || 0) - (a.readinglog_count || 0) ||
 				(b.edition_count || 0) - (a.edition_count || 0)
 		);

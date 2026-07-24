@@ -1124,19 +1124,39 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
 
 
 _TITLE_STOP = {"a", "an", "the", "and", "or", "of", "to", "in", "for", "is"}
+_JUNK_RE = __import__("re").compile(
+    r"\b(summary|summaries|study\s?guide|analysis|sparknotes|cliffs?notes|workbook|"
+    r"conversation starters|quicklet|instaread|blinkist|bookrags|trivia[- ]on)\b",
+    __import__("re").I,
+)
 
 
 def _title_tokens(s):
     import re as _re
-    return {t for t in _re.sub(r"[^a-z0-9 ]+", " ", (s or "").lower()).split() if t and t not in _TITLE_STOP}
+    return [t for t in _re.sub(r"[^a-z0-9 ]+", " ", (s or "").lower()).split() if t and t not in _TITLE_STOP]
 
 
-def _title_similarity(a, b):
-    A, B = _title_tokens(a), _title_tokens(b)
-    if not A or not B:
+def _title_containment(requested, found):
+    """Fraction of the requested title's words present in the found title.
+    Containment (not symmetric Jaccard) so a subtitle on the result doesn't
+    dilute the score, while a different volume in a series still falls short."""
+    A = _title_tokens(requested)
+    if not A:
         return 0.0
-    inter = len(A & B)
-    return inter / (len(A) + len(B) - inter)
+    B = set(_title_tokens(found))
+    return sum(1 for t in A if t in B) / len(A)
+
+
+def _is_junk(d):
+    # Study guides / summaries / workbooks masquerade as the real book.
+    if _JUNK_RE.search(d.get("title") or ""):
+        return True
+    return any(_JUNK_RE.search(a) for a in (d.get("author_name") or []))
+
+
+def _has_english(d):
+    lg = d.get("language")
+    return (not lg) or ("eng" in lg)
 
 
 def _resolve_ol_cover(title, author):
@@ -1149,14 +1169,16 @@ def _resolve_ol_cover(title, author):
     returns an obscure 1-edition "Sorcerer's Stone" record instead of the
     canonical Harry Potter work, filed under "Philosopher's Stone").
 
-    Then gate results by title-token overlap so a fuzzy search doesn't collapse
-    a whole series onto its most popular volume (every "Harry Potter …" query
-    otherwise returns book 1). The gate still accepts genuine title variants
-    (Sorcerer's ↔ Philosopher's). Among survivors, prefer the most popular
-    edition (reader count, then edition count) for the cleanest cover scan."""
+    Drop study-guide / summary junk (it masquerades as the real book and can be
+    weirdly popular), then gate results by title containment so a fuzzy search
+    doesn't collapse a whole series onto its most popular volume (every "Harry
+    Potter …" query otherwise returns book 1) — while still accepting genuine
+    title variants (Sorcerer's ↔ Philosopher's) and subtitled editions ("Still
+    Life (A Three Pines Mystery)"). Among survivors, prefer an English edition,
+    then the most popular one (reader count, then edition count)."""
     import urllib.request as _u, urllib.parse as _up, json as _j
     term = f"{title or ''} {author or ''}".strip()
-    q = _up.urlencode({"q": term, "limit": "10", "fields": "cover_i,edition_count,readinglog_count,title"})
+    q = _up.urlencode({"q": term, "limit": "20", "fields": "cover_i,edition_count,readinglog_count,title,language,author_name"})
     try:
         req = _u.Request(
             f"https://openlibrary.org/search.json?{q}",
@@ -1164,12 +1186,12 @@ def _resolve_ol_cover(title, author):
         )
         with _u.urlopen(req, timeout=25) as r:
             docs = (_j.loads(r.read()) or {}).get("docs") or []
-        docs = [d for d in docs if d.get("cover_i") is not None]
+        docs = [d for d in docs if d.get("cover_i") is not None and not _is_junk(d)]
         if not docs:
             return None
-        gated = [d for d in docs if _title_similarity(title, d.get("title")) >= 0.6]
+        gated = [d for d in docs if _title_containment(title, d.get("title")) >= 0.6]
         pool = gated or docs
-        pool.sort(key=lambda d: (d.get("readinglog_count") or 0, d.get("edition_count") or 0), reverse=True)
+        pool.sort(key=lambda d: (_has_english(d), d.get("readinglog_count") or 0, d.get("edition_count") or 0), reverse=True)
         cid = pool[0].get("cover_i")
         return f"https://covers.openlibrary.org/b/id/{cid}-L.jpg" if cid else None
     except Exception:
