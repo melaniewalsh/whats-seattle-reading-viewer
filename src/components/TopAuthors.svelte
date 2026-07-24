@@ -4,6 +4,7 @@
 	import { displayName } from "$utils/displayName.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { compactNumber } from "$utils/format.js";
+	import { curateGenres, genreLabel } from "$utils/rankGenres.js";
 	import { wikiSummary } from "$utils/wiki.js";
 	import WikiCard from "$components/WikiCard.svelte";
 
@@ -70,9 +71,11 @@
 			return;
 		}
 		data = d;
-		if (!data.genres.includes(genre)) genre = data.genres[0];
+		if (!genreList.includes(genre)) genre = genreList[0] || "All genres";
 		if (year !== "all" && !data.years.includes(Number(year))) year = "all";
 	});
+	// The curated, ordered subset of genres shown in the rankings.
+	const genreList = $derived(data ? curateGenres(data.genres) : []);
 
 	const rows = $derived.by(() => {
 		if (!data) return [];
@@ -94,12 +97,12 @@
 	const gallerySections = $derived.by(() => {
 		if (!data) return [];
 		const secs = [];
-		for (const g of data.genres) {
+		for (const g of genreList) {
 			const authors = (data.data[g]?.[year] || []).slice(0, 5);
 			if (authors.length)
 				secs.push({
 					genre: g,
-					label: g === "All genres" ? "Most borrowed overall" : `Top in ${g}`,
+					label: g === "All genres" ? "Most borrowed overall" : `Top in ${genreLabel(g)}`,
 					authors,
 				});
 		}
@@ -161,7 +164,7 @@
 
 	function shareTarget() {
 		const link = window.location.href;
-		const who = genre === "All genres" ? "authors" : `${genre} authors`;
+		const who = genre === "All genres" ? "authors" : `${genreLabel(genre)} authors`;
 		const when = year === "all" ? "" : `, ${year}`;
 		const text = `What Is Seattle Reading? — Top ${who}${when}`;
 		return { link, text };
@@ -192,7 +195,7 @@
 		ctx.textBaseline = "alphabetic";
 
 		// Title + subtitle
-		const title = genre === "All genres" ? "Most-borrowed authors" : `Top ${genre} authors`;
+		const title = genre === "All genres" ? "Most-borrowed authors" : `Top ${genreLabel(genre)} authors`;
 		ctx.fillStyle = "#1a1a1a";
 		ctx.font = '600 24px Georgia, "Times New Roman", serif';
 		ctx.fillText(ellipsize(ctx, title, W - padX * 2), padX, 46);
@@ -354,7 +357,7 @@
 		<p class="ta-status ta-error">{loadError}</p>
 	{:else if data}
 			<header class="rank-masthead">
-				<h2 class="rank-title">{genre === "All genres" ? "Seattle's Most-Borrowed Authors" : `Most-Borrowed ${genre} Authors`}</h2>
+				<h2 class="rank-title">{genre === "All genres" ? "Seattle's Most-Borrowed Authors" : `Most-Borrowed ${genreLabel(genre)} Authors`}</h2>
 				<p class="rank-sub">Ranked by checkouts at the Seattle Public Library.</p>
 			</header>
 		<div class="ta-controls">
@@ -368,8 +371,8 @@
 			<label class="ta-field">
 				<span>Genre</span>
 				<select bind:value={genre}>
-					{#each data.genres as g}
-						<option value={g}>{g}</option>
+					{#each genreList as g}
+						<option value={g}>{genreLabel(g)}</option>
 					{/each}
 				</select>
 			</label>
@@ -443,7 +446,7 @@
 			</div>
 		{:else}
 			<p class="ta-caption">
-				Most-borrowed authors of <strong>{genre === "All genres" ? "all books" : `${genre} books`}</strong>
+				Most-borrowed authors of <strong>{genre === "All genres" ? "all books" : `${genreLabel(genre)} books`}</strong>
 				at the Seattle Public Library, {yearLabel(year)}. <span class="ta-hint">Hover or tap a name for more.</span>
 			</p>
 			<div class="list-layout">
