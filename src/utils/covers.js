@@ -14,7 +14,7 @@ const mem = new Map(); // key -> Promise<string|null>
 // Versioned so old poisoned "" (no-cover) entries from stricter/messier queries
 // are ignored after this fix.
 function keyOf(title, author) {
-	return `cover2:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
+	return `cover3:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
 }
 
 async function queryCover(title, author) {
@@ -38,7 +38,9 @@ async function resolve(title, author) {
 	const clean = searchTitle(title);
 	let id = await queryCover(clean, author);
 	if (id == null && author) id = await queryCover(clean, "");
-	return id != null ? `https://covers.openlibrary.org/b/id/${id}-M.jpg` : null;
+	// -L (large, up to ~500px) instead of -M (~180px) so covers stay crisp on
+	// retina displays and when shown at larger sizes.
+	return id != null ? `https://covers.openlibrary.org/b/id/${id}-L.jpg` : null;
 }
 
 // Returns a Promise<string|null> (the cover URL, or null if none / on error).
