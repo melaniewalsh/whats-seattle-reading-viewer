@@ -1944,7 +1944,7 @@
 				</div>
 				<button class="side-desktop-head" onclick={() => (tableCollapsed = !tableCollapsed)} aria-expanded={!tableCollapsed}>
 					<span class="sdh-label">Add / Edit All Works By This Author</span>
-					<span class="side-chevron" aria-hidden="true">{tableCollapsed ? "▸" : "▾"}</span>
+					<span class="side-chevron" class:open={!tableCollapsed} aria-hidden="true">▾</span>
 				</button>
 				<div class="titles">
 				<p class="works-min-note">Only titles borrowed at least <strong>25 times</strong> all-time are listed here — smaller ones still count toward the author's total. Highlighted rows are works with multiple editions: drag one work onto another to merge them, or expand a work and hit <em>exclude</em> to split an edition off. <a class="works-why" href="#method-clustering">Why is clustering by work so hard?</a></p>
@@ -2609,9 +2609,14 @@
 		}
 		.side-chevron {
 			margin-left: auto;
-			color: var(--color-fg-light);
-			font-size: 0.85rem;
+			color: var(--color-fg);
+			font-size: 1.6rem;
+			line-height: 1;
 			align-self: center;
+			transition: transform 0.15s ease;
+		}
+		.side-chevron.open {
+			transform: rotate(180deg);
 		}
 		.split-side.collapsed .titles {
 			display: none;
