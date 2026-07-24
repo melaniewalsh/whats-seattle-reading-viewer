@@ -1834,7 +1834,7 @@
 					<p class="auto-group-note">{autoGroupNote}</p>
 				{/if}
 
-				{#if (groups.some((g) => g.idxs.length) || singleIdxs.length)}
+				{#if (chartMode === "line" && showAuthorTotal) || groups.some((g) => g.idxs.length) || singleIdxs.length}
 					<!-- This doubles as the chart legend: every line on the chart is a row
 					     here, with its color, an "Only" toggle to isolate it, and controls. -->
 					<ul class="group-chips">
@@ -1943,7 +1943,7 @@
 					<button class="side-close" onclick={() => (mobileTableOpen = false)}>Done</button>
 				</div>
 				<button class="side-desktop-head" onclick={() => (tableCollapsed = !tableCollapsed)} aria-expanded={!tableCollapsed}>
-					<span class="sdh-label">See / Edit All Works By This Author</span>
+					<span class="sdh-label">Add / Edit All Works By This Author</span>
 					<span class="side-chevron" aria-hidden="true">{tableCollapsed ? "▸" : "▾"}</span>
 				</button>
 				<div class="titles">

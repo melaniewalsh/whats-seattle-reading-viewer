@@ -128,8 +128,14 @@
 	});
 
 	function toggleShown(name) {
-		const n = new Set(shown); n.has(name) ? n.delete(name) : n.add(name); shown = n;
-		isolatedKeys = isolatedKeys.filter((k) => k !== `g:${name}`);
+		const n = new Set(shown);
+		const adding = !n.has(name);
+		adding ? n.add(name) : n.delete(name);
+		shown = n;
+		// Ticking a genre should put it on the plot. If a single genre is currently
+		// isolated (the default "focus" state), clear that focus so the newly-ticked
+		// genre actually shows alongside the rest of the plotted set.
+		isolatedKeys = adding ? [] : isolatedKeys.filter((k) => k !== `g:${name}`);
 	}
 	function toggleExpand(name) {
 		const n = new Set(expanded); n.has(name) ? n.delete(name) : n.add(name); expanded = n;
