@@ -54,8 +54,9 @@
 		}
 	}
 
-	// A shared ?tab= / ?author= makes each view linkable (old tab names still work).
-	onMount(() => {
+	// Derive the current view from the URL params. Used on first load AND on
+	// browser Back/Forward (popstate) so history navigation restores the view.
+	function applyUrlState() {
 		try {
 			const params = new URLSearchParams(window.location.search);
 			const t = params.get("tab");
@@ -74,11 +75,20 @@
 			else if (t === "norton") tab = "norton";
 			else if (t === "spl500") tab = "spl500";
 			else if (t === "overview" || t === "all") tab = "overview";
-			else if (t === "home") tab = "home";
+			else tab = "home";
 		} catch {}
+	}
+
+	// A shared ?tab= / ?author= makes each view linkable (old tab names still work).
+	onMount(() => {
+		applyUrlState();
 		scrollToMethod();
 		window.addEventListener("hashchange", scrollToMethod);
-		return () => window.removeEventListener("hashchange", scrollToMethod);
+		window.addEventListener("popstate", applyUrlState);
+		return () => {
+			window.removeEventListener("hashchange", scrollToMethod);
+			window.removeEventListener("popstate", applyUrlState);
+		};
 	});
 
 	// Clear any deep-link params so a freshly-mounted view isn't hijacked by a
@@ -163,7 +173,7 @@
 			const url = new URL(window.location);
 			url.searchParams.set("author", slug);
 			["tab", "kind", "genre", "year", "title"].forEach((k) => url.searchParams.delete(k));
-			window.history.replaceState({}, "", url);
+			window.history.pushState({}, "", url);
 		} catch {}
 		searchKind = "author";
 		tab = "search";
@@ -176,7 +186,7 @@
 			const url = new URL(window.location);
 			url.searchParams.set("title", title);
 			["tab", "kind", "genre", "year", "author"].forEach((k) => url.searchParams.delete(k));
-			window.history.replaceState({}, "", url);
+			window.history.pushState({}, "", url);
 		} catch {}
 		searchKind = "title";
 		tab = "search";
@@ -191,7 +201,7 @@
 			url.searchParams.set("genre", genre);
 			url.searchParams.set("year", "all");
 			["kind", "author", "title"].forEach((k) => url.searchParams.delete(k));
-			window.history.replaceState({}, "", url);
+			window.history.pushState({}, "", url);
 		} catch {}
 		rankKind = "works";
 		tab = "rankings";
