@@ -14,7 +14,7 @@ const mem = new Map(); // key -> Promise<string|null>
 // Versioned so old poisoned "" (no-cover) entries from stricter/messier queries
 // are ignored after this fix.
 function keyOf(title, author) {
-	return `cover8:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
+	return `cover9:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
 }
 
 const TITLE_STOP = new Set(["a", "an", "the", "and", "or", "of", "to", "in", "for", "is"]);
@@ -37,6 +37,14 @@ function titleContainment(requested, found) {
 	for (const t of A) if (B.has(t)) inter++;
 	return inter / A.length;
 }
+// Identical set of significant title tokens — the same title, not one that
+// merely contains the other ("Book" vs "The Book Thief").
+function sameTitleTokens(a, b) {
+	const A = new Set(titleTokens(a)), B = new Set(titleTokens(b));
+	if (A.size !== B.size || !A.size) return false;
+	for (const t of A) if (!B.has(t)) return false;
+	return true;
+}
 
 // Study guides, summaries, and workbooks masquerade as the real book (and can be
 // weirdly popular), so drop them entirely.
@@ -51,7 +59,22 @@ function hasEnglish(d) {
 	return !d.language || d.language.includes("eng");
 }
 
-async function queryCover(title, author) {
+// Author-name tokens of length >= 3 (skips initials and short particles).
+function authorTokens(s) {
+	return (s || "").toLowerCase().replace(/[^a-z ]+/g, " ").split(/\s+/).filter((t) => t.length >= 3);
+}
+// Does any of a result's authors share a name token with the one we asked for?
+// Tolerant of ordering/format ("Rowling, J. K." vs "J. K. Rowling").
+function authorMatches(requested, names) {
+	const R = new Set(authorTokens(requested));
+	if (!R.size) return true;
+	for (const n of names || []) {
+		for (const t of authorTokens(n)) if (R.has(t)) return true;
+	}
+	return false;
+}
+
+async function queryCover(title, author, { queryAuthor = true } = {}) {
 	if (!title) return null;
 	// Use a general `q=` search (title + author as free text) rather than the
 	// field-scoped `title=`/`author=` params. Field-scoped search only matches
@@ -59,7 +82,7 @@ async function queryCover(title, author) {
 	// returns an obscure 1-edition "Sorcerer's Stone" record instead of the
 	// canonical Harry Potter work (cataloged under "Philosopher's Stone").
 	const params = new URLSearchParams({
-		q: author ? `${title} ${author}` : title,
+		q: author && queryAuthor ? `${title} ${author}` : title,
 		limit: "20",
 		fields: "key,cover_i,edition_count,readinglog_count,title,language,author_name",
 	});
@@ -68,15 +91,28 @@ async function queryCover(title, author) {
 		if (!res.ok) return null;
 		const data = await res.json();
 		const docs = (data?.docs || []).filter((d) => d.cover_i != null && !isJunk(d));
-		if (!docs.length) return null;
-		// Keep only results whose title actually matches the one we asked for. A
-		// bare popularity sort collapses a whole series onto its most-borrowed
-		// volume — every "Harry Potter …" query returns book 1, the runaway
-		// favorite. Containment still accepts genuine variants of the same title
-		// (Sorcerer's ↔ Philosopher's). If nothing clears the gate, fall back to
-		// all results so an odd title still gets some cover.
-		const gated = docs.filter((d) => titleContainment(title, d.title) >= 0.6);
-		const pool = gated.length ? gated : docs;
+		// Require a real title match (containment) — a bare popularity sort would
+		// collapse a series onto its most-borrowed volume (every "Harry Potter …"
+		// returns book 1). Then, when it doesn't empty the pool, also require the
+		// author to match: this rejects a same-title book by a different author,
+		// while still keeping a title match for a classic whose editions are
+		// credited to a translator rather than the original author.
+		const titleGated = docs.filter((d) => titleContainment(title, d.title) >= 0.6);
+		const authorGated = author ? titleGated.filter((d) => authorMatches(author, d.author_name)) : titleGated;
+		let pool;
+		if (authorGated.length) {
+			pool = authorGated;
+		} else {
+			// No author match — keep only exact same-title works (a classic credited
+			// to a translator, not the original author). Requiring an identical
+			// title-token set stops a generic title from matching a different, more
+			// popular book ("Book" → "The Book Thief", "The New Book" → "New Spring").
+			pool = titleGated.filter((d) => sameTitleTokens(title, d.title));
+		}
+		// No popularity fallback: if nothing matches we return null and the UI shows
+		// a 📖 placeholder, rather than a random popular book (the old fallback
+		// surfaced e.g. "Banned in the U.S.A." for "The New Book").
+		if (!pool.length) return null;
 		// Prefer a work with an English edition, then the most popular one.
 		pool.sort(
 			(a, b) =>
@@ -125,7 +161,10 @@ async function resolve(title, author) {
 	// author strings are often spelled differently than the SPL catalog's.
 	const clean = searchTitle(title);
 	let doc = await queryCover(clean, author);
-	if (!doc && author) doc = await queryCover(clean, "");
+	// Retry with a title-only query (author still filters the results) — Open
+	// Library's author strings are often spelled differently than the catalog's,
+	// which can hurt the combined query's relevance.
+	if (!doc && author) doc = await queryCover(clean, author, { queryAuthor: false });
 	if (!doc) return null;
 	const id = await englishCover(doc);
 	// -L (large, up to ~500px) instead of -M (~180px) so covers stay crisp on

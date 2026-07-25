@@ -1159,6 +1159,19 @@ def _has_english(d):
     return (not lg) or ("eng" in lg)
 
 
+def _author_tokens(s):
+    import re as _re
+    return {t for t in _re.sub(r"[^a-z ]+", " ", (s or "").lower()).split() if len(t) >= 3}
+
+
+def _author_matches(requested, names):
+    # Any shared name token (>=3 chars); tolerant of ordering/format.
+    R = _author_tokens(requested)
+    if not R:
+        return True
+    return any(_author_tokens(n) & R for n in (names or []))
+
+
 def _english_cover(work_key, default_cover, language):
     """A work's default cover_i can be a foreign-language edition even when
     English ones exist (e.g. Game Changer's cover is the French "Sortie de
@@ -1203,14 +1216,28 @@ def _resolve_ol_cover(title, author):
     canonical Harry Potter work, filed under "Philosopher's Stone").
 
     Drop study-guide / summary junk (it masquerades as the real book and can be
-    weirdly popular), then gate results by title containment so a fuzzy search
+    weirdly popular), then require a title-containment match so a fuzzy search
     doesn't collapse a whole series onto its most popular volume (every "Harry
     Potter …" query otherwise returns book 1) — while still accepting genuine
     title variants (Sorcerer's ↔ Philosopher's) and subtitled editions ("Still
-    Life (A Three Pines Mystery)"). Among survivors, prefer an English edition,
-    then the most popular one (reader count, then edition count)."""
+    Life (A Three Pines Mystery)"). When it doesn't empty the pool, also require
+    the author to match (rejects a same-title book by a different author, while
+    keeping a classic whose editions are credited to a translator). There is NO
+    popularity fallback: no title match -> None (the site shows a placeholder)
+    rather than a random popular book. Among survivors, prefer an English
+    edition, then the most popular one."""
+    best = _search_cover(title, author, query_author=True)
+    if best is None and author:
+        best = _search_cover(title, author, query_author=False)
+    if best is None:
+        return None
+    cid = _english_cover(best.get("key"), best.get("cover_i"), best.get("language"))
+    return f"https://covers.openlibrary.org/b/id/{cid}-L.jpg" if cid else None
+
+
+def _search_cover(title, author, query_author=True):
     import urllib.request as _u, urllib.parse as _up, json as _j
-    term = f"{title or ''} {author or ''}".strip()
+    term = f"{title or ''} {author or ''}".strip() if (author and query_author) else (title or "")
     q = _up.urlencode({"q": term, "limit": "20", "fields": "key,cover_i,edition_count,readinglog_count,title,language,author_name"})
     try:
         req = _u.Request(
@@ -1219,17 +1246,23 @@ def _resolve_ol_cover(title, author):
         )
         with _u.urlopen(req, timeout=25) as r:
             docs = (_j.loads(r.read()) or {}).get("docs") or []
-        docs = [d for d in docs if d.get("cover_i") is not None and not _is_junk(d)]
-        if not docs:
-            return None
-        gated = [d for d in docs if _title_containment(title, d.get("title")) >= 0.6]
-        pool = gated or docs
-        pool.sort(key=lambda d: (_has_english(d), d.get("readinglog_count") or 0, d.get("edition_count") or 0), reverse=True)
-        best = pool[0]
-        cid = _english_cover(best.get("key"), best.get("cover_i"), best.get("language"))
-        return f"https://covers.openlibrary.org/b/id/{cid}-L.jpg" if cid else None
     except Exception:
         return None
+    docs = [d for d in docs if d.get("cover_i") is not None and not _is_junk(d)]
+    title_gated = [d for d in docs if _title_containment(title, d.get("title")) >= 0.6]
+    author_gated = [d for d in title_gated if _author_matches(author, d.get("author_name"))] if author else title_gated
+    if author_gated:
+        pool = author_gated
+    else:
+        # No author match — keep only exact same-title works (a classic credited
+        # to a translator, not a different, more popular book that merely
+        # contains the words: "Book" -> "The Book Thief").
+        rq = set(_title_tokens(title))
+        pool = [d for d in title_gated if rq and set(_title_tokens(d.get("title"))) == rq]
+    if not pool:
+        return None
+    pool.sort(key=lambda d: (_has_english(d), d.get("readinglog_count") or 0, d.get("edition_count") or 0), reverse=True)
+    return pool[0]
 
 
 def _bake_work_covers(data):
