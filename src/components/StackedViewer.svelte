@@ -2183,7 +2183,7 @@
 								<span class="tt-cell tt-format" role="cell">
 									<span class="badge badge-{t.format}">{formatLabel(t.format)}</span>
 								</span>
-								<span class="tt-cell tt-count" role="cell">{t.total.toLocaleString()}</span>
+								<span class="tt-cell tt-count" role="cell">{compactNumber(t.total)}</span>
 							</label>
 						</li>
 					{/snippet}
@@ -2239,7 +2239,7 @@
 									<span class="tt-cell tt-format" role="cell">
 										{#each fmts as f}<span class="badge badge-{f}">{formatLabel(f)}</span>{/each}
 									</span>
-									<span class="tt-cell tt-count" role="cell">{w.total.toLocaleString()}</span>
+									<span class="tt-cell tt-count" role="cell">{compactNumber(w.total)}</span>
 								</li>
 								{#if workOpen(w)}
 									{#each w.editions as t (t.idx)}
