@@ -48,7 +48,7 @@
 	let showOther = $state(false);  // the "Other / Unclassified" partition line
 	let expanded = $state(new Set());
 	let genreFilter = $state(""); // search box: filter the table by genre name OR subject term
-	let showTerms = $state(false); // reveal the subject-heading terms behind each genre (off by default)
+	let showTerms = $state(true); // subject-heading terms behind each genre (always shown)
 	// Long sections start collapsed so the table isn't a wall of rows.
 	let collapsedGroups = $state(new Set(["Kids & Young Adult", "Nonfiction"]));
 	function toggleGroup(name) {
@@ -410,36 +410,6 @@
 			<p class="mode-note">Checkouts grouped by subject heading at the Seattle Public Library.</p>
 		</div>
 
-		<div class="gt-controls">
-			<label class="gt-field grow">
-				<span>Focus a genre</span>
-				<div class="gt-search">
-					<input
-						type="search"
-						placeholder="Search a genre"
-						aria-label="Search for a genre to focus"
-						bind:value={genreQuery}
-						autocomplete="off"
-					/>
-					{#if genreResults.length}
-						<ul class="gt-results">
-							{#each genreResults as g}
-								<li><button onclick={() => chooseGenre(g)}>
-									<span>{g}</span>
-									<span class="count">{compactNumber(genreCount(g))}</span>
-								</button></li>
-							{/each}
-						</ul>
-					{:else if genreQuery.trim().length >= 1}
-						<p class="gt-noresults">No genre matches “{genreQuery.trim()}”.</p>
-					{/if}
-				</div>
-			</label>
-			{#if isolatedKeys.length}
-				<button class="gt-clear" onclick={() => { isolatedKeys = []; genreQuery = ""; }}>Show all genres</button>
-			{/if}
-		</div>
-
 		<p class="genre-caption">
 			{#if genreTotal != null}
 				<strong>{genreTitle}</strong> · {compactNumber(genreTotal)} checkouts · {yearRange} · raw share of all book checkouts
@@ -487,7 +457,7 @@
 		<div class="gtable-head-row">
 			<h3 class="gtable-title">All {genreOrder.length} genres</h3>
 			<div class="bulk">
-				<button onclick={showAll}>Show all</button><button onclick={hideAll}>Hide all</button><button class:on={showTerms} onclick={() => (showTerms = !showTerms)} title="Show the catalog subject headings each genre is built from">Subject terms</button>
+				<button onclick={showAll}>Show all</button><button onclick={hideAll}>Hide all</button>
 			</div>
 		</div>
 		<div class="gt-search">
