@@ -1988,7 +1988,7 @@
 					<button class="side-close" onclick={() => (mobileTableOpen = false)}>Done</button>
 				</div>
 				<button class="side-desktop-head" onclick={() => (tableCollapsed = !tableCollapsed)} aria-expanded={!tableCollapsed}>
-					<span class="sdh-label">Add / Edit All Works By This Author</span>
+					<span class="sdh-label">Add / Edit All Works By This Author{#if workGroups.size} <span class="sdh-count">({workGroups.size.toLocaleString()})</span>{/if}</span>
 					<span class="side-chevron" class:open={!tableCollapsed} aria-hidden="true">▾</span>
 				</button>
 				<div class="titles-header side-filter">
@@ -2649,6 +2649,11 @@
 		color: var(--color-fg-light);
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
+	}
+	.sdh-count {
+		margin-left: 5px;
+		font-weight: 600;
+		opacity: 0.7;
 	}
 	.side-desktop-head:hover .sdh-label {
 		color: var(--color-fg);
