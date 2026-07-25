@@ -1856,11 +1856,6 @@
 				</button>
 			</div>
 
-						{#if !isOverview}
-						<button class="top-works-btn" onclick={toggleTopWorks} title={hasPlotted ? "Clear the chart back to just the author's total line (keeps your work grouping)" : "Plot the 5 most-borrowed works (their editions grouped into one line each)"}>
-							{hasPlotted ? "✕ Clear chart" : "Show top works"}
-						</button>
-						{/if}
 					</div>
 					<div class="chart-wrap" bind:this={chartWrap}>
 				{#if plotTitle && searchMode !== "title"}
@@ -1872,19 +1867,25 @@
 			{#if legendItems.length >= 2}
 				<div class="format-legend">
 					{#each legendItems as it}
-						{#if it.key}
+						{#if it.key === "other"}
+							<span class="fmt-leg other-leg" class:hidden-leg={isHidden("other")} class:dim={isolatedKeys.length}>
+								<span class="fmt-sw" style="background:{it.color}"></span>{it.label}
+								<button class="leg-x" title={isHidden("other") ? "Show “Other” again" : "Hide “Other”"} onclick={() => toggleHidden("other")}>×</button>
+							</span>
+						{:else if it.key}
 							<button
 									class="fmt-leg leg-btn"
-									class:hidden-leg={isHidden(it.key)}
-									title={isHidden(it.key) ? "Hidden — click to show again" : "Hide this from the chart"}
-									onclick={() => toggleHidden(it.key)}
+									class:on={isIsolated(it.key)}
+									class:dim={isolatedKeys.length && !isIsolated(it.key)}
+									title="Show only this — click again to bring the others back"
+									onclick={() => toggleIsolate(it.key)}
 							><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</button>
 						{:else}
 							<span class="fmt-leg"><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</span>
 						{/if}
 					{/each}
-					{#if hiddenKeys.length}
-						<button class="leg-showall" onclick={clearHidden}>Show all</button>
+					{#if isolatedKeys.length || hiddenKeys.length}
+						<button class="leg-showall" onclick={() => { clearIsolate(); clearHidden(); }}>Show all</button>
 					{/if}
 				</div>
 			{/if}
@@ -2584,6 +2585,37 @@
 	}
 	.leg-btn.hidden-leg .fmt-sw {
 		background: var(--color-gray-300, #ccc) !important;
+	}
+	/* "Other" band: not isolatable, but has a small × to hide it. */
+	.other-leg {
+		gap: 4px;
+		padding: 2px 2px 2px 4px;
+	}
+	.other-leg.dim {
+		opacity: 0.38;
+	}
+	.other-leg.hidden-leg {
+		opacity: 0.55;
+		text-decoration: line-through;
+	}
+	.other-leg.hidden-leg .fmt-sw {
+		background: var(--color-gray-300, #ccc) !important;
+	}
+	.leg-x {
+		border: none;
+		background: none;
+		padding: 0 3px;
+		font-size: 1rem;
+		line-height: 1;
+		color: var(--color-fg-light);
+		cursor: pointer;
+		border-radius: 4px;
+		text-decoration: none;
+		display: inline-block;
+	}
+	.leg-x:hover {
+		background: var(--color-gray-100);
+		color: var(--color-fg);
 	}
 	.fmt-sw {
 		width: 12px;
