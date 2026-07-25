@@ -1721,30 +1721,26 @@
 			</span>
 		{/if}
 
-		<!-- quick-pick: a varied mix (recent, classic, romance, nonfiction) -->
+		<!-- quick-pick: a varied mix (recent, classic, romance, nonfiction), tucked in a dropdown -->
 		{#if searchMode === "title"}
 			{@const picks = mixTitles.length ? mixTitles : topTitles}
 			{#if picks.length}
-				<div class="top-authors">
-					{#each picks as t}
-						<button class="chip" onclick={() => selectTitle(t)}>{cleanTitleForDisplay(t.title)}</button>
-					{/each}
+				<div class="suggest-row">
+					<select class="suggest-select" aria-label="Suggested titles" onchange={(e) => { const i = +e.currentTarget.value; e.currentTarget.value = "-1"; if (i >= 0) selectTitle(picks[i]); }}>
+						<option value="-1">Suggestions</option>
+						{#each picks as t, i}<option value={i}>{cleanTitleForDisplay(t.title)}</option>{/each}
+					</select>
 					<button class="chip surprise-chip" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
 				</div>
 			{/if}
 		{:else}
 			{@const picks = mixAuthors.length ? mixAuthors : topAuthors}
 			{#if picks.length}
-				<div class="top-authors">
-					{#each picks as a}
-						<button
-								class="chip"
-								class:current={current && current.name === a.name}
-								onclick={() => selectAuthor(a)}
-						>
-							{displayName(a.name)}
-						</button>
-					{/each}
+				<div class="suggest-row">
+					<select class="suggest-select" aria-label="Suggested authors" onchange={(e) => { const i = +e.currentTarget.value; e.currentTarget.value = "-1"; if (i >= 0) selectAuthor(picks[i]); }}>
+						<option value="-1">Suggestions</option>
+						{#each picks as a, i}<option value={i}>{displayName(a.name)}</option>{/each}
+					</select>
 					<button class="chip surprise-chip" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
 				</div>
 			{/if}
@@ -3615,6 +3611,26 @@
 		gap: 8px;
 		margin: 14px 0 4px;
 		font-family: var(--font-sans);
+	}
+
+	.suggest-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		margin: 14px 0 4px;
+		font-family: var(--font-sans);
+	}
+	.suggest-select {
+		font-family: var(--font-sans);
+		font-size: 0.9rem;
+		font-weight: 500;
+		color: var(--color-fg);
+		padding: 7px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		background: var(--color-white);
+		cursor: pointer;
 	}
 
 	.quick-label {
