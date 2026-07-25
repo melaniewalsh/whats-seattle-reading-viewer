@@ -1621,6 +1621,9 @@
 		const hidden = hiddenIdxSet();
 		let areaAll = only ? chartSeries.filter((s) => only.has(s.titleIdx)) : chartSeries;
 		if (hidden) areaAll = areaAll.filter((s) => !hidden.has(s.titleIdx));
+		// "Other" is the rolled-up band of unselected titles — hide it by dropping
+		// everything that isn't an individually-labeled work.
+		if (hiddenKeys.includes("other")) areaAll = areaAll.filter((s) => s.isSelected);
 		return capAreaLayers(areaAll);
 	});
 
@@ -1644,8 +1647,11 @@
 		singleIdxs.forEach((idx, i) => out.push({ label: cleanTitleForDisplay(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
 		// Everything not individually labeled is drawn in one gray band — label it
 		// "Other" so the color is accounted for in the legend (and the shared image).
-		if (out.length && displaySeries.some((s) => !s.isSelected)) {
-			out.push({ label: "Other", color: "oklch(92.2% 0 0)", key: null });
+		// Based on chartSeries (not displaySeries) so the entry stays put — and
+		// clickable to un-hide — even after "Other" is hidden. key "other" makes it
+		// a toggle like the rest.
+		if (out.length && chartSeries.some((s) => !s.isSelected)) {
+			out.push({ label: "Other", color: "oklch(92.2% 0 0)", key: "other" });
 		}
 		return out;
 	});
@@ -2013,15 +2019,7 @@
 								<button class="chip-remove" title="Remove this title" onclick={() => toggleTitle(idx)}>×</button>
 							</li>
 						{/each}
-						{#if isolatedKeys.length}
-							<li class="group-chip-row">
-								<button class="show-all-btn" onclick={clearIsolate}>Show all</button>
-							</li>
-						{/if}
 					</ul>
-					{#if isolatedKeys.length === 1}
-						<p class="compare-hint">Click “Only” on another line to compare them side by side.</p>
-					{/if}
 				{/if}
 
 				{#if activeGroup}
@@ -2041,8 +2039,6 @@
 								placeholder={groupLabel(activeGroup)}
 						/>
 					</div>
-				{:else if groups.length}
-					<p class="editing-hint">Click a work to edit it, or drag a title onto a work to add it.</p>
 				{/if}
 			</div>
 			{/if}
@@ -2461,10 +2457,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
-		margin: 8px 0 2px;
-	}
-	.split-main.has-work-cover .genre-ranks {
-		padding-left: 60px;
+		margin: 16px 0 18px;
 	}
 	.genre-rank {
 		font-family: var(--font-sans);
