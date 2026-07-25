@@ -52,6 +52,7 @@
 	let titleSort = $state("work"); // 'work' = editions grouped by work; 'borrowed' = most checkouts; 'alpha' = A–Z
 	let workOrder = $state("checkouts"); // in 'work' mode, order the works by 'checkouts' (total, default) or 'name' (A–Z)
 	let isolatedKeys = $state([]); // when non-empty, the chart shows ONLY these series (keys 'g<id>' | 's<idx>'); multiple = compare
+	let hiddenKeys = $state([]); // keys the user has clicked to hide/ignore from the stacked "All titles" chart
 	let showAuthorTotal = $state(true); // show the author's aggregate total line in the line view
 	let dragIdx = $state(null); // title index currently being dragged onto a group pill
 	let dragGroupId = $state(null); // group pill currently being dragged (to merge into another)
@@ -444,6 +445,7 @@
 		titleFilter = "";
 		chartMode = "line";
 		isolatedKeys = [];
+		hiddenKeys = [];
 		showAuthorTotal = true;
 		autoHidAuthorTotal = false;
 		autoGroupNote = "";
@@ -1493,6 +1495,29 @@
 		return set;
 	}
 
+	// Clicking a legend entry hides that band from the stacked "All titles" chart.
+	const isHidden = (key) => hiddenKeys.includes(key);
+	function toggleHidden(key) {
+		hiddenKeys = hiddenKeys.includes(key)
+				? hiddenKeys.filter((k) => k !== key)
+				: [...hiddenKeys, key];
+	}
+	function clearHidden() { hiddenKeys = []; }
+	// The title indices the hidden keys refer to (null = hide nothing).
+	function hiddenIdxSet() {
+		if (!hiddenKeys.length) return null;
+		const set = new Set();
+		for (const key of hiddenKeys) {
+			if (key.startsWith("g")) {
+				const g = groups.find((g) => g.id === Number(key.slice(1)));
+				if (g) g.idxs.forEach((i) => set.add(i));
+			} else if (key.startsWith("s")) {
+				set.add(Number(key.slice(1)));
+			}
+		}
+		return set;
+	}
+
 	// A prolific author can have 1000+ qualifying titles; drawing a stacked-area
 	// layer for each one janks/hangs the tab. Keep the biggest AREA_LAYER_CAP
 	// layers (plus anything the user selected) and roll the rest into one "Other
@@ -1559,7 +1584,9 @@
 		}
 		// area mode
 		const only = isolatedIdxSet();
-		const areaAll = only ? chartSeries.filter((s) => only.has(s.titleIdx)) : chartSeries;
+		const hidden = hiddenIdxSet();
+		let areaAll = only ? chartSeries.filter((s) => only.has(s.titleIdx)) : chartSeries;
+		if (hidden) areaAll = areaAll.filter((s) => !hidden.has(s.titleIdx));
 		return capAreaLayers(areaAll);
 	});
 
@@ -1801,17 +1828,16 @@
 						{#if it.key}
 							<button
 									class="fmt-leg leg-btn"
-									class:on={isIsolated(it.key)}
-									class:dim={isolatedKeys.length && !isIsolated(it.key)}
-									title="Show only this — click again to bring the others back"
-									onclick={() => toggleIsolate(it.key)}
+									class:hidden-leg={isHidden(it.key)}
+									title={isHidden(it.key) ? "Hidden — click to show again" : "Hide this from the chart"}
+									onclick={() => toggleHidden(it.key)}
 							><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</button>
 						{:else}
 							<span class="fmt-leg"><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</span>
 						{/if}
 					{/each}
-					{#if isolatedKeys.length}
-						<button class="leg-showall" onclick={clearIsolate}>Show all</button>
+					{#if hiddenKeys.length}
+						<button class="leg-showall" onclick={clearHidden}>Show all</button>
 					{/if}
 				</div>
 			{/if}
@@ -2485,6 +2511,14 @@
 	.leg-btn.on {
 		background: var(--color-gray-100);
 		box-shadow: inset 0 0 0 1.5px var(--color-border);
+	}
+	/* A legend entry the user clicked to hide from the chart. */
+	.leg-btn.hidden-leg {
+		opacity: 0.4;
+		text-decoration: line-through;
+	}
+	.leg-btn.hidden-leg .fmt-sw {
+		background: var(--color-gray-300, #ccc) !important;
 	}
 	.fmt-sw {
 		width: 12px;
