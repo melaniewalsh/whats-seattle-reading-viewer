@@ -4,6 +4,7 @@
 	import { displayName } from "$utils/displayName.js";
 	import { titleCase } from "$utils/titleCase.js";
 	import { lookupUrls } from "$utils/lookup.js";
+	import { coverUrl } from "$utils/covers.js";
 	import { compactNumber } from "$utils/format.js";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
@@ -105,6 +106,7 @@
 	}
 	let chartWrap = $state(null); // ref to the chart container, for the PNG export
 	let titleEl = $state(null); // ref to the plot heading, so a search scrolls to the title
+	let workCover = $state(null); // book-cover thumbnail for the heading in work-search mode
 	let sideEl = $state(null); // ref to the titles panel, for keeping it still when ticking
 
 	// Ticking a work grows the "on the chart" panel above the (stacked) table,
@@ -1327,6 +1329,19 @@
 		return lookupUrls(q);
 	});
 
+	// In work-search mode, fetch a book cover for the single plotted work and show
+	// it next to the title heading (Open Library, cached — same source as the
+	// Most Borrowed thumbnails). Null while loading, missing, or in author mode.
+	$effect(() => {
+		const title = headingText;
+		const author = current ? displayName(current.name) : "";
+		if (searchMode !== "title" || !title) { workCover = null; return; }
+		let cancelled = false;
+		workCover = null;
+		coverUrl(title, author).then((u) => { if (!cancelled) workCover = u; });
+		return () => { cancelled = true; };
+	});
+
 	// In "By title" mode, the total checkouts of the single plotted title (summed
 	// over its editions). null when zero or several titles are shown -- then the
 	// title heading is blank anyway, so there's no single count to report.
@@ -1685,7 +1700,10 @@
 	{#if current}
 		<div class="author">
 			<div class="split" class:collapsed={tableCollapsed}>
-			<div class="split-main" bind:this={titleEl}>
+			<div class="split-main" class:has-work-cover={searchMode === "title" && workCover} bind:this={titleEl}>
+			{#if searchMode === "title" && workCover}
+				<img class="work-cover" src={workCover} alt="" loading="lazy" onerror={() => (workCover = null)} />
+			{/if}
 			{#if headingText}
 				{#if isOverview}
 					<h2>{headingText}</h2>
@@ -2353,6 +2371,23 @@
 		/* Leave room for the sticky masthead so a search scrolls the title into
 		   view just below it, not underneath it. */
 		scroll-margin-top: 72px;
+		position: relative;
+	}
+	/* Book cover beside the work title (work-search mode). */
+	.work-cover {
+		position: absolute;
+		top: 3px;
+		left: 0;
+		width: 46px;
+		height: auto;
+		max-height: 68px;
+		object-fit: contain;
+		border-radius: 3px;
+		box-shadow: 0 1px 5px rgba(0, 0, 0, 0.22);
+	}
+	.split-main.has-work-cover .hd-name,
+	.split-main.has-work-cover .hdr-line {
+		padding-left: 60px;
 	}
 	.split-side {
 		min-width: 0;
