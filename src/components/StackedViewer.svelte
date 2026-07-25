@@ -19,9 +19,20 @@
 	let { searchMode = "author", landing = "overview", setSearchKind = () => {} } = $props();
 
 	// Colors for title lines.
+	// Palette for the stacked "All titles" bands. Leads with the site blue so the
+	// biggest work matches the "Total" area, then alternates high-contrast hues so
+	// adjacent bands stay distinguishable for color-blind viewers (orange sits
+	// between blue and purple — blue↔purple is the pair red-green color-blindness
+	// most confuses).
 	const TITLE_COLORS = [
-		"#e3120b", "#1f7a4d", "#e58a00", "#6a4c93",
-		"#0b7285", "#c2255c", "#5c940d", "#7048e8"
+		"#3f88cc", // site blue — the dominant band
+		"#e58a00", // orange
+		"#6a4c93", // purple (site accent)
+		"#1f7a4d", // green
+		"#c2255c", // magenta
+		"#0b7285", // teal
+		"#b0813b", // warm tan
+		"#5f6b7a"  // slate
 	];
 	const INK = "var(--color-fg)";
 
