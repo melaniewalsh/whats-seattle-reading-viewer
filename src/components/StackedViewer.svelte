@@ -1847,10 +1847,13 @@
 						type="button"
 						class:active={chartMode === "area"}
 						onclick={() => {
-							// First visit to the stacked view with nothing selected yet:
-							// cluster editions into works automatically so the stack is
-							// colored by work instead of an all-gray pile of editions.
-							if (!isOverview && chartMode !== "area" && !groups.length && !singleIdxs.length) {
+							// Cluster editions into the top works so the stack is colored by
+							// work. Do it when nothing is plotted yet, OR in work-search mode
+							// where only the single searched work is focused — there "All
+							// titles" should broaden to the author's top titles, not just show
+							// that one work + "Other".
+							const onlySearchedWork = searchMode === "title" && groups.length <= 1 && singleIdxs.length <= 1;
+							if (!isOverview && chartMode !== "area" && ((!groups.length && !singleIdxs.length) || onlySearchedWork)) {
 								autoGroupByWork({ keepChartMode: true });
 							}
 							chartMode = "area";

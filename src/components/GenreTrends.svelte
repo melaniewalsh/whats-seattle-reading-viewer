@@ -133,10 +133,15 @@
 		const adding = !n.has(name);
 		adding ? n.add(name) : n.delete(name);
 		shown = n;
-		// Ticking a genre should put it on the plot. If a single genre is currently
-		// isolated (the default "focus" state), clear that focus so the newly-ticked
-		// genre actually shows alongside the rest of the plotted set.
-		isolatedKeys = adding ? [] : isolatedKeys.filter((k) => k !== `g:${name}`);
+		const k = `g:${name}`;
+		// Keep whatever is currently on the plot and just add/remove this one. If a
+		// focused subset is showing (isolatedKeys), add the ticked genre TO that
+		// subset rather than clearing the focus and revealing every plotted genre.
+		if (adding) {
+			if (isolatedKeys.length) isolatedKeys = [...isolatedKeys, k];
+		} else {
+			isolatedKeys = isolatedKeys.filter((x) => x !== k);
+		}
 	}
 	function toggleExpand(name) {
 		const n = new Set(expanded); n.has(name) ? n.delete(name) : n.add(name); expanded = n;
@@ -455,7 +460,6 @@
 		</div>
 
 		<div class="gtable-head-row">
-			<h3 class="gtable-title">All {genreOrder.length} genres</h3>
 			<div class="bulk">
 				<button onclick={showAll}>Show all</button><button onclick={hideAll}>Hide all</button>
 			</div>
