@@ -181,6 +181,22 @@
 		searchKind = "title";
 		tab = "search";
 	}
+
+	// Open the Most Borrowed works ranking filtered to a genre, all-time (used by
+	// the "#N in Genre" badges on a searched work).
+	function openGenre(genre) {
+		try {
+			const url = new URL(window.location);
+			url.searchParams.set("tab", "works");
+			url.searchParams.set("genre", genre);
+			url.searchParams.set("year", "all");
+			["kind", "author", "title"].forEach((k) => url.searchParams.delete(k));
+			window.history.replaceState({}, "", url);
+		} catch {}
+		rankKind = "works";
+		tab = "rankings";
+		try { window.scrollTo({ top: 0 }); } catch {}
+	}
 </script>
 
 <svelte:boundary onerror={(e) => console.error(e)}>
@@ -375,7 +391,7 @@
 			</article>
 		{:else}
 			{#key searchKind}
-				<Viewer searchMode={searchKind} landing="search" {setSearchKind} />
+				<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} />
 			{/key}
 		{/if}
 

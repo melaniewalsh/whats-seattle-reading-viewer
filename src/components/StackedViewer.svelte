@@ -17,7 +17,7 @@
 	// resolve to its author, open the author's drilldown with that work highlighted.
 	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
 	// (the "By author" tab -> open straight to the search box).
-	let { searchMode = "author", landing = "overview", setSearchKind = () => {} } = $props();
+	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {} } = $props();
 
 	// Colors for title lines.
 	// Palette for the stacked "All titles" bands. Leads with the site blue so the
@@ -1817,7 +1817,7 @@
 			{#if searchMode === "title" && genreRanks.length}
 				<div class="genre-ranks">
 					{#each genreRanks.slice(0, 4) as gr}
-						<span class="genre-rank"><strong>#{gr.rank}</strong> in {gr.genre}</span>
+						<button type="button" class="genre-rank" onclick={() => openGenre(gr.genre)} title="See the most-borrowed {gr.genre} books"><strong>#{gr.rank}</strong> in {gr.genre}</button>
 					{/each}
 				</div>
 			{/if}
@@ -2476,6 +2476,12 @@
 		border-radius: 999px;
 		padding: 2px 10px;
 		white-space: nowrap;
+		cursor: pointer;
+		transition: border-color 0.12s, background 0.12s;
+	}
+	.genre-rank:hover {
+		border-color: #3f88cc;
+		background: var(--color-white);
 	}
 	.genre-rank strong {
 		font-weight: 700;
