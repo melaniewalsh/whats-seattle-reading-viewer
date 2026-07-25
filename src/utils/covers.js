@@ -14,7 +14,7 @@ const mem = new Map(); // key -> Promise<string|null>
 // Versioned so old poisoned "" (no-cover) entries from stricter/messier queries
 // are ignored after this fix.
 function keyOf(title, author) {
-	return `cover9:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
+	return `cover10:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
 }
 
 const TITLE_STOP = new Set(["a", "an", "the", "and", "or", "of", "to", "in", "for", "is"]);
@@ -165,6 +165,17 @@ async function resolve(title, author) {
 	// Library's author strings are often spelled differently than the catalog's,
 	// which can hurt the combined query's relevance.
 	if (!doc && author) doc = await queryCover(clean, author, { queryAuthor: false });
+	// A stray leading article in the catalog title ("A Long Way Down" for Jason
+	// Reynolds' "Long Way Down") pins the search to a different, identically-titled
+	// book. If all we found is a same-title book by a DIFFERENT author, retry
+	// without the leading article and take it only if the author then matches.
+	if (doc && author && !authorMatches(author, doc.author_name)) {
+		const alt = clean.replace(/^(a|an|the)\s+/i, "");
+		if (alt !== clean) {
+			const d2 = await queryCover(alt, author);
+			if (d2 && authorMatches(author, d2.author_name)) doc = d2;
+		}
+	}
 	if (!doc) return null;
 	const id = await englishCover(doc);
 	// -L (large, up to ~500px) instead of -M (~180px) so covers stay crisp on

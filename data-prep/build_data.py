@@ -1226,9 +1226,20 @@ def _resolve_ol_cover(title, author):
     popularity fallback: no title match -> None (the site shows a placeholder)
     rather than a random popular book. Among survivors, prefer an English
     edition, then the most popular one."""
+    import re as _re
     best = _search_cover(title, author, query_author=True)
     if best is None and author:
         best = _search_cover(title, author, query_author=False)
+    # A stray leading article in the catalog title ("A Long Way Down" for Jason
+    # Reynolds' "Long Way Down") pins the search to a different, identically-titled
+    # book. If all we found is a same-title book by a DIFFERENT author, retry
+    # without the leading article and take it only if the author then matches.
+    if best is not None and author and not _author_matches(author, best.get("author_name")):
+        alt = _re.sub(r"^(a|an|the)\s+", "", title, flags=_re.I)
+        if alt != title:
+            d2 = _search_cover(alt, author, query_author=True)
+            if d2 is not None and _author_matches(author, d2.get("author_name")):
+                best = d2
     if best is None:
         return None
     cid = _english_cover(best.get("key"), best.get("cover_i"), best.get("language"))
