@@ -108,6 +108,7 @@
 	let chartWrap = $state(null); // ref to the chart container, for the PNG export
 	let titleEl = $state(null); // ref to the plot heading, so a search scrolls to the title
 	let workCover = $state(null); // book-cover thumbnail for the heading in work-search mode
+	let topWorksData = $state(null); // genre-ranked top works (for the "#N in Genre" badges)
 	let sideEl = $state(null); // ref to the titles panel, for keeping it still when ticking
 
 	// Ticking a work grows the "on the chart" panel above the (stacked) table,
@@ -1344,6 +1345,39 @@
 		return () => { cancelled = true; };
 	});
 
+	// Load the genre-ranked top-works once, to badge a searched work with its
+	// all-time rank in each genre ("#1 in Romance").
+	$effect(() => {
+		if (searchMode === "title" && !topWorksData) {
+			getTopWorks().then((d) => (topWorksData = d)).catch(() => {});
+		}
+	});
+
+	// The genres where the current work sits in the all-time top 20, best rank first.
+	const GENRE_RANK_MAX = 20;
+	const genreRanks = $derived.by(() => {
+		if (searchMode !== "title" || !topWorksData || !headingText || !current) return [];
+		const wantTitle = normalizeWorkKey(headingText);
+		if (!wantTitle) return [];
+		const wantAuthor = displayName(current.name).toLowerCase();
+		const out = [];
+		for (const genre of topWorksData.genres) {
+			if (genre === "All genres") continue;
+			const list = topWorksData.data[genre]?.["all"];
+			if (!list) continue;
+			const n = Math.min(list.length, GENRE_RANK_MAX);
+			for (let i = 0; i < n; i++) {
+				const row = list[i];
+				if (normalizeWorkKey(row[0]) === wantTitle && displayName(row[1]).toLowerCase() === wantAuthor) {
+					out.push({ genre, rank: i + 1 });
+					break;
+				}
+			}
+		}
+		out.sort((a, b) => a.rank - b.rank);
+		return out;
+	});
+
 	// In "By title" mode, the total checkouts of the single plotted title (summed
 	// over its editions). null when zero or several titles are shown -- then the
 	// title heading is blank anyway, so there's no single count to report.
@@ -1780,6 +1814,13 @@
 					</span>
 				{/if}
 			</div>
+			{#if searchMode === "title" && genreRanks.length}
+				<div class="genre-ranks">
+					{#each genreRanks.slice(0, 4) as gr}
+						<span class="genre-rank"><strong>#{gr.rank}</strong> in {gr.genre}</span>
+					{/each}
+				</div>
+			{/if}
 
 						<div class="plot-toolbar">
 					<div class="mode-toggle" role="group" aria-label="Chart type">
@@ -2414,6 +2455,31 @@
 	.split-main.has-work-cover .hd-name,
 	.split-main.has-work-cover .hdr-line {
 		padding-left: 60px;
+	}
+	/* "#N in Genre" ranking badges under the work title. */
+	.genre-ranks {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin: 8px 0 2px;
+	}
+	.split-main.has-work-cover .genre-ranks {
+		padding-left: 60px;
+	}
+	.genre-rank {
+		font-family: var(--font-sans);
+		font-size: 0.8rem;
+		font-weight: 500;
+		color: var(--color-fg);
+		background: var(--color-gray-100);
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		padding: 2px 10px;
+		white-space: nowrap;
+	}
+	.genre-rank strong {
+		font-weight: 700;
+		color: #3f88cc;
 	}
 	.split-side {
 		min-width: 0;
