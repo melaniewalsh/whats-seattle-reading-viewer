@@ -1538,8 +1538,9 @@
 			return chartMode === "area" ? overviewAreaSeries : [authorLine].filter(Boolean);
 		}
 		if (chartMode === "line") {
-			if (isolatedKeys.length) return lineParts.filter((s) => isolatedKeys.includes(s.key));
-			return lineParts;
+			// "Total" is always the single filled area of the author's/work's total,
+			// regardless of any grouping done for the "All titles" view.
+			return [authorLine].filter(Boolean);
 		}
 		// area mode
 		const only = isolatedIdxSet();
@@ -1560,7 +1561,7 @@
 		// so the legend stays put while isolating -- the isolated entry just lights
 		// up and the rest dim, and you can click again to bring them back.
 		if (chartMode === "line") {
-			return lineParts.map((s) => ({ label: s.label, color: s.color, key: s.key }));
+			return []; // "Total" is a single series — no legend needed.
 		}
 		const out = [];
 		groups.forEach((g, gi) => { if (g.idxs.length) out.push({ label: groupLabel(g), color: groupColor(gi), key: `g${g.id}` }); });
