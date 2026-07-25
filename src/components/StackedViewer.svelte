@@ -1893,7 +1893,12 @@
 										class="chip-edit"
 										class:on={g.id === activeGroupId}
 										title="Edit which editions are in this work"
-										onclick={() => (activeGroupId = activeGroupId === g.id ? null : g.id)}
+										onclick={() => {
+											const editing = activeGroupId !== g.id;
+											activeGroupId = editing ? g.id : null;
+											// Opening "Edit" should reveal the works table you're editing in.
+											if (editing) tableCollapsed = false;
+										}}
 								>{g.id === activeGroupId ? "Done" : "Edit"}</button>
 								<button class="chip-remove" title="Remove from the chart" onclick={() => removeGroup(g.id)}>×</button>
 							</li>
