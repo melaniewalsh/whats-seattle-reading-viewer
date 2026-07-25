@@ -217,6 +217,21 @@
 		}))
 	);
 
+	// In line ("Total") mode, fill the area under the aggregate/total line so the
+	// default view reads as a filled area chart (comparison lines still overlay).
+	const aggregateArea = $derived.by(() => {
+		if (mode !== 'line') return null;
+		const agg = lineLayers.find((s) => s.isAggregate);
+		if (!agg) return null;
+		return {
+			color: agg.color,
+			d: d3area()
+				.x((_, i) => x(i))
+				.y0(() => y(0))
+				.y1((_, i) => y(agg.values[i]))(agg.values)
+		};
+	});
+
 	const yTicks = $derived(y.ticks(5));
 
 	// Abbreviate axis numbers: 700000 -> "700k", 1200000 -> "1.2M", 1500 -> "1.5k".
@@ -450,6 +465,9 @@
 
 		<!-- Layers: overlaid lines (line mode) or stacked areas (area mode) -->
 		{#if mode === 'line'}
+			{#if aggregateArea}
+				<path d={aggregateArea.d} fill={aggregateArea.color} opacity="0.13" class="agg-area" />
+			{/if}
 			{#each linePaths as p}
 				<path
 					d={p.d}

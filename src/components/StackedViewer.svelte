@@ -1418,7 +1418,7 @@
 	// catalog form like "emily st john mandel, 1979".
 	const authorLine = $derived(
 			current
-					? {key: "author", label: isOverview ? current.name : displayName(current.name), color: INK, values: current.series, groupIndex: -2, isAggregate: true}
+					? {key: "author", label: isOverview ? current.name : displayName(current.name), color: "#3f88cc", values: current.series, groupIndex: -2, isAggregate: true}
 					: null
 	);
 
@@ -1731,7 +1731,7 @@
 						class:active={chartMode === "line"}
 						onclick={() => (chartMode = "line")}
 				>
-					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><polyline points="2,18 8,11 13,15 22,4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M2 20 L2 14 L8 8 L13 12 L22 3 L22 20 Z" fill="currentColor" opacity="0.85"/></svg>
 					Total
 				</button>
 				<button
@@ -1748,7 +1748,7 @@
 						}}
 				>
 					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M2 19 L8 11 L13 15 L22 5 L22 20 L2 20 Z" fill="currentColor" opacity="0.85"/></svg>
-					{isOverview ? "By format" : "By title"}
+					{isOverview ? "By format" : "All titles"}
 				</button>
 			</div>
 
