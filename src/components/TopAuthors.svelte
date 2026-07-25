@@ -1,5 +1,6 @@
 <script>
 	import { onMount } from "svelte";
+	import { base } from "$app/paths";
 	import { getTopAuthors, getGenreTerms } from "$components/db.js";
 	import { displayName } from "$utils/displayName.js";
 	import { lookupUrls } from "$utils/lookup.js";
@@ -442,9 +443,9 @@
 									</div>
 									<button class="gal-booktitle" onclick={() => openAuthor(r[0])}>{displayName(r[1])}</button>
 									<div class="gal-count">{compactNumber(r[2])} checkouts</div>
-									{#if summaries[k]}
-										<p class="gal-sum">{blurb(summaries[k])}{#if wikiUrls[k]}{" "}<a class="wiki-more" href={wikiUrls[k]} target="_blank" rel="noopener noreferrer">Wikipedia&nbsp;↗</a>{/if}</p>
-									{:else if !(k in summaries)}
+									{#if k in summaries}
+										<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links">{#if wikiUrls[k]}<a class="icon-link" href={wikiUrls[k]} target="_blank" rel="noopener noreferrer" title="Wikipedia article"><img class="ic-img" src="{base}/wikipedia-logo.png" alt="Wikipedia" width="17" height="17" /></a>{/if}<a class="icon-link" href={lookupUrls(displayName(r[1])).spl} target="_blank" rel="noopener noreferrer" title="Seattle Public Library catalog"><img class="ic-img" src="{base}/spl-logo.png" alt="SPL catalog" width="17" height="17" /></a></span></p>
+									{:else}
 										<p class="gal-sum gal-sum-ph"></p>
 									{/if}
 								</article>
@@ -488,8 +489,8 @@
 													<span class="wiki-pop"><WikiCard query={displayName(row[1])} kind="author" links={u} onTrend={() => openAuthor(row[0])} /></span>
 												{/if}
 											</span>
-											{#if summaries[authorKey(row)]}
-												<p class="row-sum">{blurb(summaries[authorKey(row)])}{#if wikiUrls[authorKey(row)]}{" "}<a class="wiki-more" href={wikiUrls[authorKey(row)]} target="_blank" rel="noopener noreferrer">Wikipedia&nbsp;↗</a>{/if}</p>
+											{#if authorKey(row) in summaries}
+												<p class="row-sum">{#if summaries[authorKey(row)]}{blurb(summaries[authorKey(row)])} {/if}<span class="src-links">{#if wikiUrls[authorKey(row)]}<a class="icon-link" href={wikiUrls[authorKey(row)]} target="_blank" rel="noopener noreferrer" title="Wikipedia article"><img class="ic-img" src="{base}/wikipedia-logo.png" alt="Wikipedia" width="17" height="17" /></a>{/if}<a class="icon-link" href={u.spl} target="_blank" rel="noopener noreferrer" title="Seattle Public Library catalog"><img class="ic-img" src="{base}/spl-logo.png" alt="SPL catalog" width="17" height="17" /></a></span></p>
 											{/if}
 										{:else}
 											{displayName(row[1])}
@@ -822,17 +823,26 @@
 		color: var(--color-fg-light);
 		margin: 5px 0 0;
 	}
-	/* Subtle "keep reading" Wikipedia link at the end of a blurb. */
-	.wiki-more {
-		white-space: nowrap;
-		color: var(--color-fg-light);
-		text-decoration: underline;
-		text-decoration-color: var(--color-border);
-		text-underline-offset: 2px;
+	/* Source icons (Wikipedia article + SPL catalog) at the end of a blurb. */
+	.src-links {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		vertical-align: middle;
 	}
-	.wiki-more:hover {
-		color: var(--color-fg);
-		text-decoration-color: var(--color-fg-light);
+	.icon-link {
+		display: inline-flex;
+		opacity: 0.5;
+		transition: opacity 0.15s ease;
+	}
+	.icon-link:hover {
+		opacity: 1;
+	}
+	.ic-img {
+		display: block;
+		width: 17px;
+		height: 17px;
+		object-fit: contain;
 	}
 	/* Share menu ported from the chart views so it matches the plots. */
 	.share-wrap {

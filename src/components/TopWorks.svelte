@@ -1,5 +1,6 @@
 <script>
 	import { onMount } from "svelte";
+	import { base } from "$app/paths";
 	import { getTopWorks, getGenreTerms } from "$components/db.js";
 	import { displayName } from "$utils/displayName.js";
 	import { coverUrl } from "$utils/covers.js";
@@ -504,9 +505,9 @@
 									<button class="gal-booktitle" onclick={() => openTitle(r[0])}>{titleCase(cleanWorkTitle(r[0]))}</button>
 									<div class="gal-by">by {displayName(r[1])}</div>
 									<div class="gal-count">{compactNumber(r[3])} checkouts</div>
-									{#if summaries[k]}
-										<p class="gal-sum">{blurb(summaries[k])}{#if wikiUrls[k]}{" "}<a class="wiki-more" href={wikiUrls[k]} target="_blank" rel="noopener noreferrer">Wikipedia&nbsp;↗</a>{/if}</p>
-									{:else if !(k in summaries)}
+									{#if k in summaries}
+										<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links">{#if wikiUrls[k]}<a class="icon-link" href={wikiUrls[k]} target="_blank" rel="noopener noreferrer" title="Wikipedia article"><img class="ic-img" src="{base}/wikipedia-logo.png" alt="Wikipedia" width="17" height="17" /></a>{/if}<a class="icon-link" href={lookupUrls(`${r[0]} ${displayName(r[1])}`).spl} target="_blank" rel="noopener noreferrer" title="Seattle Public Library catalog"><img class="ic-img" src="{base}/spl-logo.png" alt="SPL catalog" width="17" height="17" /></a></span></p>
+									{:else}
 										<p class="gal-sum gal-sum-ph"></p>
 									{/if}
 								</article>
@@ -552,8 +553,8 @@
 											{/if}
 										</span>
 										<span class="tw-by">by {displayName(row[1])}</span>
-											{#if summaries[coverKey(row)]}
-												<p class="row-sum">{blurb(summaries[coverKey(row)])}{#if wikiUrls[coverKey(row)]}{" "}<a class="wiki-more" href={wikiUrls[coverKey(row)]} target="_blank" rel="noopener noreferrer">Wikipedia&nbsp;↗</a>{/if}</p>
+											{#if coverKey(row) in summaries}
+												<p class="row-sum">{#if summaries[coverKey(row)]}{blurb(summaries[coverKey(row)])} {/if}<span class="src-links">{#if wikiUrls[coverKey(row)]}<a class="icon-link" href={wikiUrls[coverKey(row)]} target="_blank" rel="noopener noreferrer" title="Wikipedia article"><img class="ic-img" src="{base}/wikipedia-logo.png" alt="Wikipedia" width="17" height="17" /></a>{/if}<a class="icon-link" href={u.spl} target="_blank" rel="noopener noreferrer" title="Seattle Public Library catalog"><img class="ic-img" src="{base}/spl-logo.png" alt="SPL catalog" width="17" height="17" /></a></span></p>
 											{/if}
 									</span>
 								</div>
@@ -832,17 +833,26 @@
 		color: var(--color-fg-light);
 		margin: 5px 0 0;
 	}
-	/* Subtle "keep reading" Wikipedia link at the end of a blurb. */
-	.wiki-more {
-		white-space: nowrap;
-		color: var(--color-fg-light);
-		text-decoration: underline;
-		text-decoration-color: var(--color-border);
-		text-underline-offset: 2px;
+	/* Source icons (Wikipedia article + SPL catalog) at the end of a blurb. */
+	.src-links {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		vertical-align: middle;
 	}
-	.wiki-more:hover {
-		color: var(--color-fg);
-		text-decoration-color: var(--color-fg-light);
+	.icon-link {
+		display: inline-flex;
+		opacity: 0.5;
+		transition: opacity 0.15s ease;
+	}
+	.icon-link:hover {
+		opacity: 1;
+	}
+	.ic-img {
+		display: block;
+		width: 17px;
+		height: 17px;
+		object-fit: contain;
 	}
 	/* NYT-style masthead above the ranking controls. */
 	.rank-masthead {
