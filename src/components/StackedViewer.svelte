@@ -2002,7 +2002,7 @@
 					/>
 				</div>
 				<div class="titles">
-				<p class="works-min-note">Every title string is listed here, including long-tail catalog variants. Highlighted rows are works with multiple editions: drag one work onto another to merge them, or expand a work and hit <em>exclude</em> to split an edition off. <a class="works-why" href="#method-clustering">Why is clustering by work so hard?</a></p>
+				<p class="works-min-note">Every title associated with this author is listed here. We automatically cluster related titles into “Works”—attempting to gather ebooks, audiobooks, and print editions into one category. There may be incorrect or missing titles, especially with series. You can drag and drop titles into the correct Work, or exclude ones that don't belong. <a class="works-why" href="#method-clustering">Why is clustering by work so hard?</a></p>
 				{#if titleSort === "work"}
 					<div class="works-actions">
 						<button type="button" class="wa-btn" onclick={saveGroupings} title="Remember this author's grouping in your browser, so your fixes are here next time">💾 Save my groupings</button>
