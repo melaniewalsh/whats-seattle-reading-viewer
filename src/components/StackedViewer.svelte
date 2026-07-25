@@ -1956,17 +1956,18 @@
 					<span class="sdh-label">Add / Edit All Works By This Author</span>
 					<span class="side-chevron" class:open={!tableCollapsed} aria-hidden="true">▾</span>
 				</button>
-				<div class="titles">
-				<p class="works-min-note">Every title string is listed here, including long-tail catalog variants. Highlighted rows are works with multiple editions: drag one work onto another to merge them, or expand a work and hit <em>exclude</em> to split an edition off. <a class="works-why" href="#method-clustering">Why is clustering by work so hard?</a></p>
-				<div class="titles-header">
+				<div class="titles-header side-filter">
 					<input
 							class="title-filter"
 							type="search"
 							placeholder="Filter titles…"
 							bind:value={titleFilter}
+							onfocus={() => (tableCollapsed = false)}
 							autocomplete="off"
 					/>
 				</div>
+				<div class="titles">
+				<p class="works-min-note">Every title string is listed here, including long-tail catalog variants. Highlighted rows are works with multiple editions: drag one work onto another to merge them, or expand a work and hit <em>exclude</em> to split an edition off. <a class="works-why" href="#method-clustering">Why is clustering by work so hard?</a></p>
 				{#if titleSort === "work"}
 					<div class="works-actions">
 						<button type="button" class="wa-btn" onclick={saveGroupings} title="Remember this author's grouping in your browser, so your fixes are here next time">💾 Save my groupings</button>
