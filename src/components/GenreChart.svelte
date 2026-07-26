@@ -30,16 +30,26 @@
 	const isActive = (key) => !isolatedKeys.length || isolatedKeys.includes(key);
 	// Scale the y-axis to whatever is currently visible: isolating a genre both
 	// hides the others AND zooms the axis so the lone line fills the chart.
-	const yMax = $derived(Math.max(1, ...series.filter((s) => isActive(s.key)).flatMap((s) => s.values)) * 1.08);
+	const yMax = $derived.by(() => {
+		const vals = series.filter((s) => isActive(s.key)).flatMap((s) => s.values);
+		const m = vals.length ? Math.max(...vals) : 0;
+		// Scale to the actual peak so isolating a tiny genre (e.g. 0.1%) zooms right
+		// in; only fall back to 1 when everything is 0 (avoids a 0-height axis).
+		return (m > 0 ? m : 1) * 1.08;
+	});
 	// Clamp to [0, yMax]: "Other" is a residual (total − overlapping genres) and can
 	// go slightly negative in some months; without this the line would spill below
 	// the x-axis (the SVG is overflow:visible) down onto the legend.
 	const yOf = (v) => margin.top + innerH - (Math.max(0, Math.min(v, yMax)) / yMax) * innerH;
 
 	const yTicks = $derived.by(() => {
-		const step = yMax > 40 ? 10 : yMax > 16 ? 5 : yMax > 8 ? 2 : yMax > 4 ? 1 : 0.5;
+		const step = yMax > 40 ? 10 : yMax > 16 ? 5 : yMax > 8 ? 2 : yMax > 4 ? 1
+			: yMax > 2 ? 0.5 : yMax > 0.8 ? 0.2 : yMax > 0.4 ? 0.1 : yMax > 0.15 ? 0.05 : 0.02;
 		const out = [];
-		for (let v = 0; v <= yMax; v += step) out.push(v);
+		// Round to the step's precision so floating-point sums don't yield labels
+		// like "0.150000002%".
+		const dp = step < 0.1 ? 2 : step < 1 ? 1 : 0;
+		for (let v = 0; v <= yMax + 1e-9; v += step) out.push(Number(v.toFixed(dp)));
 		return out;
 	});
 	// one tick per January, thinned to ~one label per 60px
