@@ -1,6 +1,7 @@
 <script>
 	// StackedViewer.svelte
 	import { onMount, tick } from "svelte";
+	import { base } from "$app/paths";
 	import { displayName } from "$utils/displayName.js";
 	import { titleCase } from "$utils/titleCase.js";
 	import { lookupUrls } from "$utils/lookup.js";
@@ -1836,6 +1837,8 @@
 				</span>
 				{#if lookupLinks}
 					<span class="hdr-sep" aria-hidden="true">·</span>
+					<a class="hdr-spl" href={lookupLinks.spl} target="_blank" rel="noopener noreferrer" title="Find in the Seattle Public Library catalog"><img class="hdr-spl-ic" src="{base}/spl-logo.png" alt="SPL catalog" width="16" height="16" /></a>
+					<span class="hdr-sep" aria-hidden="true">·</span>
 					<span class="lookup-wrap">
 						<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere">Learn more <span class="hdr-caret" aria-hidden="true">▾</span></button>
 						{#if lookupOpen}
@@ -3054,6 +3057,22 @@
 	}
 	.hdr-chip:hover {
 		text-decoration: underline;
+	}
+	/* SPL catalog icon link, sitting just left of "Learn more". */
+	.hdr-spl {
+		display: inline-flex;
+		align-items: center;
+		vertical-align: -3px;
+		opacity: 0.8;
+	}
+	.hdr-spl:hover {
+		opacity: 1;
+	}
+	.hdr-spl-ic {
+		width: 16px;
+		height: 16px;
+		object-fit: contain;
+		display: block;
 	}
 	.hdr-caret {
 		font-size: 0.7rem;
