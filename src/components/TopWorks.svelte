@@ -142,7 +142,10 @@
 	// genre gets a row of large book covers with a short blurb beneath. The moment a
 	// filter (a specific genre, or any year) is chosen we drop to the vertical ranking
 	// table instead — the gallery is only for the "everything, all-time" landing.
-	const galleryMode = $derived(!!data && genre === "All genres");
+	// "Most borrowed overall" can be opened as its own top-10 list (like the genre
+	// pages) instead of only appearing as a 5-card row in the gallery.
+	let overallList = $state(false);
+	const galleryMode = $derived(!!data && genre === "All genres" && !overallList);
 	const gallerySections = $derived.by(() => {
 		if (!data) return [];
 		const secs = [];
@@ -427,7 +430,7 @@
 			</label>
 			<label class="ta-field">
 				<span>Genre</span>
-				<select bind:value={genre}>
+				<select bind:value={genre} onchange={() => (overallList = false)}>
 					{#each genreList as g}
 						<option value={g}>{genreLabel(g)}</option>
 					{/each}
@@ -471,6 +474,9 @@
 			<button class="gal-arrow" onclick={() => stepYear(-1)} disabled={yearIdx <= 0} aria-label="More recent">›</button>
 		</div>
 		{#if !galleryMode}
+			{#if overallList}
+				<button class="overall-back" onclick={() => (overallList = false)}>← All genres</button>
+			{/if}
 			<p class="ta-caption">
 				Most-borrowed <strong>{genre === "All genres" ? "works" : `${genreLabel(genre)} works`}</strong>
 				at the Seattle Public Library, {yearLabel(year)}. <span class="ta-hint">Hover or tap a title for more.</span>
@@ -485,7 +491,7 @@
 							{#if sec.genre !== "All genres"}
 								<button class="gal-title gal-title-link" onclick={() => (genre = sec.genre)} title="See the full {sec.genre} ranking">{sec.label}</button>
 							{:else}
-								<h3 class="gal-title">{sec.label}</h3>
+								<button class="gal-title gal-title-link" onclick={() => (overallList = true)} title="See the full top-10 overall">{sec.label}</button>
 							{/if}
 						</div>
 						<div class="gal-row">
@@ -940,6 +946,19 @@
 			padding: 9px 11px;
 		}
 	}
+	.overall-back {
+		display: inline-block;
+		margin: 4px 0 10px;
+		padding: 0;
+		background: none;
+		border: none;
+		font-family: var(--font-sans);
+		font-size: 0.9rem;
+		font-weight: 600;
+		color: #3f88cc;
+		cursor: pointer;
+	}
+	.overall-back:hover { text-decoration: underline; }
 	.ta-caption {
 		font-size: 0.92rem;
 		line-height: 1.5;
