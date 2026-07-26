@@ -386,6 +386,24 @@
             : 0
     );
 
+    // Consolidate the work's editions by FORMAT so the tooltip shows one pill per
+    // format (audio / print / ebook), not one per edition — a work can have several
+    // audiobook or print editions.
+    const formatPills = $derived.by(() => {
+        if (hoverIndex === null || !groupSiblings.length) return [];
+        const byFmt = new Map();
+        for (const s of groupSiblings) {
+            const v = s.values[hoverIndex];
+            if (!v) continue;
+            const key = s.format ?? 'other';
+            const cur = byFmt.get(key) || { format: key, value: 0, color: s.color, hit: false };
+            cur.value += v;
+            if (s.titleIdx === selectedItem?.titleIdx) cur.hit = true;
+            byFmt.set(key, cur);
+        }
+        return [...byFmt.values()].sort((a, b) => b.value - a.value);
+    });
+
     // The hovered thing's share of THAT MONTH's total checkouts. In the format
     // overview each layer is a format, so this reads "38% of this month's
     // checkouts are audiobook"; for a multi-edition work it's the whole work's
@@ -555,13 +573,14 @@
             </div>
             <div class="tt-date">{formatMonth(months[hoverIndex])}</div>
 
-            {#if mode !== 'line' && groupSiblings.length > 1}
-                <!-- one "medium pill" per edition of the hovered work -->
+            {#if mode !== 'line' && formatPills.length > 1}
+                <!-- one "medium pill" per FORMAT of the hovered work (editions of the
+                     same format are summed together) -->
                 <div class="tooltip-editions">
-                    {#each groupSiblings.filter((s) => s.values[hoverIndex] > 0) as sib}
-                        <span class="ed-pill" class:on={sib.titleIdx === selectedItem.titleIdx} style="--pc: {sib.color}">
-                            <span class="ed-pill-fmt">{FMT_LABEL[sib.format] ?? sib.format ?? 'edition'}</span>
-                            <span class="ed-pill-val">{groupTotal ? `${Math.round((sib.values[hoverIndex] / groupTotal) * 100)}%` : sib.values[hoverIndex].toLocaleString()}</span>
+                    {#each formatPills as fp}
+                        <span class="ed-pill" class:on={fp.hit} style="--pc: {fp.color}">
+                            <span class="ed-pill-fmt">{FMT_LABEL[fp.format] ?? fp.format ?? 'edition'}</span>
+                            <span class="ed-pill-val">{groupTotal ? `${Math.round((fp.value / groupTotal) * 100)}%` : fp.value.toLocaleString()}</span>
                         </span>
                     {/each}
                 </div>
