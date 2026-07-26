@@ -1841,10 +1841,15 @@
 					</span>
 				{/if}
 			</div>
-			{#if searchMode === "title" && genreRanks.length}
+			{#if (searchMode === "title" && genreRanks.length) || subjectTerms.length}
 				<div class="genre-ranks">
-					{#each genreRanks.slice(0, 4) as gr}
-						<button type="button" class="genre-rank" onclick={() => openGenre(gr.genre)} title="See the most-borrowed {gr.genre} books"><strong>#{gr.rank}</strong> in {gr.genre}</button>
+					{#if searchMode === "title"}
+						{#each genreRanks.slice(0, 4) as gr}
+							<button type="button" class="genre-rank" onclick={() => openGenre(gr.genre)} title="See the most-borrowed {gr.genre} books"><strong>#{gr.rank}</strong> in {gr.genre}</button>
+						{/each}
+					{/if}
+					{#each subjectTerms.slice(0, 3) as term}
+						<span class="subj-pill">{term}</span>
 					{/each}
 				</div>
 			{/if}
@@ -1948,16 +1953,6 @@
 				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 			</div>
 
-			{#if subjectTerms.length}
-				<div class="subject-terms">
-					<span class="st-label">{searchMode === "title" ? "Top subjects for this title" : "Top subjects for this author"}</span>
-					<ul class="st-chips">
-						{#each subjectTerms as term}
-							<li><code class="st-chip">{term}</code></li>
-						{/each}
-					</ul>
-				</div>
-			{/if}
 
 
 			{#if !isOverview}
@@ -2504,6 +2499,18 @@
 	.genre-rank strong {
 		font-weight: 700;
 		color: #3f88cc;
+	}
+	/* Subject-tag pills next to the genre-rank badges, near the top. */
+	.subj-pill {
+		font-family: var(--font-sans);
+		font-size: 0.8rem;
+		font-weight: 500;
+		color: var(--color-fg-light);
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		padding: 2px 10px;
+		white-space: nowrap;
 	}
 	.split-side {
 		min-width: 0;
