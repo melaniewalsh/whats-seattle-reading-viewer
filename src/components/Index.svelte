@@ -8,6 +8,7 @@
 	import NortonExplorer from "$components/NortonExplorer.svelte";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import { getMonths, getAuthor, searchTitles, densify } from "$components/db.js";
+	import { coverUrl } from "$utils/covers.js";
 	import { compactNumber } from "$utils/format.js";
 	import { publications } from "$data/publications.js";
 
@@ -50,8 +51,13 @@
 				title: hit.title,
 				authorSlug: hit.slug,
 				checkouts: sum.reduce((s, v) => s + v, 0),
-				peak: sum[peakIdx] > 0 ? { idx: peakIdx, value: sum[peakIdx], month: months[peakIdx] } : null
+				peak: sum[peakIdx] > 0 ? { idx: peakIdx, value: sum[peakIdx], month: months[peakIdx] } : null,
+				cover: null
 			};
+			// Fetch the book cover (Open Library, cached) and slot it in when ready.
+			coverUrl(hit.title, hit.author).then((u) => {
+				if (u && featured) featured = { ...featured, cover: u };
+			});
 		} catch {}
 	}
 
@@ -368,11 +374,20 @@
 			{#if featured}
 				<section class="featured" aria-label="Featured trend">
 					<p class="featured-eyebrow">Featured trend of the month</p>
-					<h2 class="featured-title">
-						<button class="flink" onclick={() => openTitle(featured.title)}>The Odyssey</button>
-						<span class="featured-by">by <button class="flink" onclick={() => openAuthor(featured.authorSlug)}>Homer</button></span>
-					</h2>
-					<p class="featured-sub">{compactNumber(featured.checkouts)} checkouts at the Seattle Public Library, 2006–2026</p>
+					<div class="featured-head">
+						{#if featured.cover}
+							<button class="featured-cover" onclick={() => openTitle(featured.title)} title="See the full trend">
+								<img src={featured.cover} alt="The Odyssey" loading="lazy" />
+							</button>
+						{/if}
+						<div class="featured-headtext">
+							<h2 class="featured-title">
+								<button class="flink" onclick={() => openTitle(featured.title)}>The Odyssey</button>
+								<span class="featured-by">by <button class="flink" onclick={() => openAuthor(featured.authorSlug)}>Homer</button></span>
+							</h2>
+							<p class="featured-sub">{compactNumber(featured.checkouts)} checkouts at the Seattle Public Library, 2006–2026</p>
+						</div>
+					</div>
 					<div class="featured-chart">
 						<LineChart months={featured.months} series={featured.series} mode="area" peak={featured.peak} />
 					</div>
@@ -596,6 +611,28 @@
 		text-transform: uppercase;
 		color: #3f88cc;
 		margin: 0 0 4px;
+	}
+	.featured-head {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+	}
+	.featured-cover {
+		flex: none;
+		padding: 0;
+		border: none;
+		background: none;
+		cursor: pointer;
+		line-height: 0;
+	}
+	.featured-cover img {
+		width: 64px;
+		height: auto;
+		border-radius: 4px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+	}
+	.featured-headtext {
+		min-width: 0;
 	}
 	.featured-title {
 		font-family: var(--font-display, var(--font-serif));
