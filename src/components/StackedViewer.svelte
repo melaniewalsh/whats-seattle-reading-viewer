@@ -160,7 +160,10 @@
 		// user searches for a specific author.
 		let wantSlug = null;
 		try { wantSlug = new URLSearchParams(window.location.search).get("author"); } catch {}
-		if (wantSlug) {
+		// In title mode, a ?title (which may sit alongside its ?author) must win —
+		// otherwise we'd open the author and never seed the searched work. Let the
+		// title effect (loadDefaultTitle) handle it instead of selecting the author.
+		if (wantSlug && searchMode !== "title") {
 			const a = authors.find((x) => x.slug === wantSlug)
 					|| (await searchAuthors(wantSlug.replace(/-/g, " "), 8)).find((x) => x.slug === wantSlug);
 			// Arrived with an explicit ?author (a click from Most Borrowed, or a
@@ -1313,6 +1316,9 @@
 	// long concatenated title just clutters, so leave it blank.
 	const plotTitle = $derived.by(() => {
 		if (!current) return "";
+		// "Total" (line mode) is the author's overall trend, so a lingering
+		// isolated-title caption doesn't belong — only caption the stacked view.
+		if (chartMode === "line") return "";
 		if (isolatedKeys.length === 1) return keyLabel(isolatedKeys[0]);
 		return "";
 	});
