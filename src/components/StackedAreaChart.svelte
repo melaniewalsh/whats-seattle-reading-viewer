@@ -217,6 +217,17 @@
 		}))
 	);
 
+	// The top edge of each stacked band, drawn as a line so every area gets a crisp
+	// outline in its own colour (the fill sits just under it).
+	const areaTopLines = $derived(
+		stackedSeries.map((s) => ({
+			...s,
+			d: d3line()
+				.x((_, i) => x(i))
+				.y((_, i) => y(s.top[i]))(s.values)
+		}))
+	);
+
 	// In line ("Total") mode, fill the area under the aggregate/total line so the
 	// default view reads as a filled area chart (comparison lines still overlay).
 	const aggregateArea = $derived.by(() => {
@@ -483,10 +494,21 @@
 				<path
 					d={p.d}
 					fill={p.color}
-					stroke="var(--color-bg, #fff)"
-					stroke-width="0.5"
+					fill-opacity="0.78"
+					stroke="none"
 					opacity={pathOpacity(p)}
 					class="area-path"
+				/>
+			{/each}
+			{#each areaTopLines as p}
+				<path
+					d={p.d}
+					fill="none"
+					stroke={p.color}
+					stroke-width="1.75"
+					stroke-linejoin="round"
+					opacity={pathOpacity(p)}
+					class="area-top"
 				/>
 			{/each}
 		{/if}
