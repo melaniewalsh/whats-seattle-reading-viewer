@@ -6,6 +6,9 @@
 	import TopAuthors from "$components/TopAuthors.svelte";
 	import TopWorks from "$components/TopWorks.svelte";
 	import NortonExplorer from "$components/NortonExplorer.svelte";
+	import LineChart from "$components/StackedAreaChart.svelte";
+	import { getMonths, getAuthor, searchTitles, densify } from "$components/db.js";
+	import { compactNumber } from "$utils/format.js";
 	import { publications } from "$data/publications.js";
 
 	const copy = getContext("copy");
@@ -14,6 +17,39 @@
 	let searchKind = $state("author"); // Search tab: "author" | "title"
 	let rankKind = $state("works"); // Rankings tab: "authors" | "works"
 	let menuOpen = $state(false); // the slide-out hamburger menu
+
+	// "Featured trend of the month" on the home hub: this month, The Odyssey.
+	let featured = $state(null);
+	let featuredLoaded = false;
+	$effect(() => {
+		if (tab === "home" && !featuredLoaded) {
+			featuredLoaded = true;
+			loadFeatured();
+		}
+	});
+	async function loadFeatured() {
+		try {
+			const [months, hits] = await Promise.all([getMonths(), searchTitles("The Odyssey", 30)]);
+			const hit = hits.find((h) => /odyssey/i.test(h.title) && /homer/i.test(h.author)) || hits.find((h) => /odyssey/i.test(h.title));
+			if (!hit) return;
+			const author = await getAuthor(hit.slug);
+			if (!author) return;
+			const monthCount = months.length;
+			const want = author.titles.filter((t) => /odyssey/i.test(t.title));
+			const sum = new Array(monthCount).fill(0);
+			for (const t of want) {
+				const dense = densify(t.series, monthCount);
+				for (let i = 0; i < monthCount; i++) sum[i] += dense[i] || 0;
+			}
+			featured = {
+				months,
+				series: [{ label: "The Odyssey", color: "#3f88cc", values: sum }],
+				title: hit.title,
+				authorSlug: hit.slug,
+				checkouts: sum.reduce((s, v) => s + v, 0)
+			};
+		} catch {}
+	}
 
 	// Go to a tab and close the hamburger menu (used by the menu + pills).
 	function go(t) {
@@ -324,6 +360,21 @@
 					<span class="hub-go">Explore →</span>
 				</button>
 			</nav>
+
+			{#if featured}
+				<section class="featured" aria-label="Featured trend">
+					<p class="featured-eyebrow">Featured trend of the month</p>
+					<h2 class="featured-title">
+						<button class="flink" onclick={() => openTitle(featured.title)}>The Odyssey</button>
+						<span class="featured-by">by <button class="flink" onclick={() => openAuthor(featured.authorSlug)}>Homer</button></span>
+					</h2>
+					<p class="featured-sub">{compactNumber(featured.checkouts)} checkouts at the Seattle Public Library, 2006–2026</p>
+					<div class="featured-chart">
+						<LineChart months={featured.months} series={featured.series} mode="area" />
+					</div>
+					<button class="featured-cta" onclick={() => openTitle(featured.title)}>Explore the full trend →</button>
+				</section>
+			{/if}
 		{:else if tab === "overview"}
 			<Viewer searchMode="author" landing="overview" />
 		{:else if tab === "about"}
@@ -525,6 +576,74 @@
 		margin: 12px 0 0;
 	}
 	.byline a { color: #357abd; font-weight: 600; text-decoration: underline; }
+	.featured {
+		max-width: 880px;
+		margin: 40px auto 10px;
+		padding: 22px 24px 24px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md, 12px);
+		background: var(--color-white);
+	}
+	.featured-eyebrow {
+		font-family: var(--font-sans);
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: #3f88cc;
+		margin: 0 0 4px;
+	}
+	.featured-title {
+		font-family: var(--font-display, var(--font-serif));
+		font-size: clamp(1.6rem, 4vw, 2.2rem);
+		font-weight: 700;
+		line-height: 1.1;
+		margin: 0 0 4px;
+		color: var(--color-fg);
+	}
+	.featured-by {
+		font-family: var(--font-sans);
+		font-size: 0.9rem;
+		font-weight: 500;
+		color: var(--color-fg-light);
+	}
+	.flink {
+		font: inherit;
+		color: inherit;
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		text-decoration: underline;
+		text-decoration-color: var(--color-border);
+		text-underline-offset: 3px;
+	}
+	.flink:hover {
+		color: #3f88cc;
+		text-decoration-color: #3f88cc;
+	}
+	.featured-sub {
+		font-family: var(--font-sans);
+		font-size: 0.92rem;
+		color: var(--color-fg-light);
+		margin: 0 0 14px;
+	}
+	.featured-chart {
+		margin: 0 0 8px;
+	}
+	.featured-cta {
+		font-family: var(--font-sans);
+		font-size: 0.92rem;
+		font-weight: 600;
+		color: #3f88cc;
+		background: none;
+		border: none;
+		padding: 4px 0 0;
+		cursor: pointer;
+	}
+	.featured-cta:hover {
+		text-decoration: underline;
+	}
 	.hub {
 		max-width: 880px;
 		margin: 36px auto 10px;
