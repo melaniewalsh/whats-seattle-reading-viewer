@@ -19,6 +19,15 @@
 	function go(t) {
 		tab = t;
 		menuOpen = false;
+		// Reset the URL to this tab so a stale ?title/?author from a previous
+		// drilldown doesn't linger (and hijack the view on reload / Back).
+		try {
+			const url = new URL(window.location);
+			["author", "title", "genre", "year", "kind"].forEach((k) => url.searchParams.delete(k));
+			if (t === "home") url.searchParams.delete("tab");
+			else url.searchParams.set("tab", t === "rankings" ? (rankKind === "authors" ? "top" : "works") : t);
+			window.history.pushState({}, "", url);
+		} catch {}
 	}
 
 	// Publications, grouped by year for the Publications view.

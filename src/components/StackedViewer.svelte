@@ -397,6 +397,13 @@
 		const name = cleanTitleForDisplay(current.titles[idxs[0]].title) || r.title;
 		groups = [...groups, { id: ++groupIdCounter, name, idxs }];
 		hlWorkKey = `g${groupIdCounter}`;
+		// Reflect the opened title in the URL so it updates as you pick new works
+		// (selectAuthor, called above, cleared the previous ?title).
+		try {
+			const url = new URL(window.location.href);
+			url.searchParams.set("title", r.title);
+			window.history.replaceState({}, "", url);
+		} catch {}
 		await tick();
 		if (scroll) (titleEl || chartWrap)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
 	}
@@ -434,10 +441,13 @@
 		currentSlug = a.slug;
 		isOverview = false;
 		mobileTableOpen = false;
-		// reflect the author in the URL so the page is shareable / reloadable
+		// reflect the author in the URL so the page is shareable / reloadable.
+		// Clear any stale ?title from a previous work drilldown; selectTitle re-adds
+		// it right after when we're actually opening a specific title.
 		try {
 			const url = new URL(window.location.href);
 			url.searchParams.set("author", a.slug);
+			url.searchParams.delete("title");
 			window.history.replaceState({}, "", url);
 		} catch {}
 		// reset the controls for the new author
