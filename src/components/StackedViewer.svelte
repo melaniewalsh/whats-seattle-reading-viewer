@@ -17,7 +17,7 @@
 	// resolve to its author, open the author's drilldown with that work highlighted.
 	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
 	// (the "By author" tab -> open straight to the search box).
-	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {} } = $props();
+	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {} } = $props();
 
 	// Colors for title lines.
 	// Palette for the stacked "All titles" bands. Leads with the site blue so the
@@ -1823,7 +1823,7 @@
 					{#if isOverview}
 						{compactNumber(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 					{:else if searchMode === "title"}
-						by {displayName(current.name)}{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} checkouts{/if}
+						by <button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} checkouts{/if}
 					{:else}
 						{compactNumber(current.total)} checkouts · {workGroups.size.toLocaleString()} works
 					{/if}
@@ -3015,6 +3015,22 @@
 		font-family: var(--font-sans);
 		color: var(--color-fg-light);
 		margin: 0;
+	}
+	/* Author name in the work heading — click to switch to that author's search. */
+	.author-link {
+		font: inherit;
+		color: inherit;
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		text-decoration: underline;
+		text-decoration-color: var(--color-border);
+		text-underline-offset: 2px;
+	}
+	.author-link:hover {
+		color: #3f88cc;
+		text-decoration-color: #3f88cc;
 	}
 	.hdr-sep {
 		color: var(--color-fg-light);

@@ -410,7 +410,7 @@
 			</article>
 		{:else}
 			{#key searchKind}
-				<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} />
+				<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} />
 			{/key}
 		{/if}
 
