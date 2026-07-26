@@ -682,14 +682,16 @@
 		if (!current || isOverview || !months.length || !current.titles?.length) return;
 		const author = displayName(current.name);
 		const wg = workGroups;
-		const rows = [["author", "work", "title", "format", "month", "checkouts"]];
+		const rows = [["author", "work", "title", "format", "date", "checkouts"]];
 		current.titles.forEach((t, idx) => {
 			const work = wg.get(effectiveKey(idx, t.title))?.name || cleanTitleForDisplay(t.title) || t.title;
 			const series = t.series || [];
 			for (let i = 0; i < months.length; i++) {
 				const v = series[i] || 0;
 				if (!v) continue;
-				rows.push([author, titleCase(work), t.title, formatLabel(t.format), months[i], v]);
+				// Append a dummy day so "2023-05" becomes a full "2023-05-01" date that
+				// spreadsheets and pandas parse as a date out of the box.
+				rows.push([author, titleCase(work), t.title, formatLabel(t.format), `${months[i]}-01`, v]);
 			}
 		});
 		const cell = (v) => {
