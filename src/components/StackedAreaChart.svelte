@@ -16,7 +16,8 @@
 		mode = 'area',
 		grandTotal = 0,   // the author's (or overview's) all-time total, for the share line
 		shareOf = '',     // phrase after "% of ", e.g. "J. K. Rowling's checkouts"
-		annotations = []  // [{ month, label, blurb, url }] — a "?" marker above each dip
+		annotations = [],  // [{ month, label, blurb, url }] — a "?" marker above each dip
+		peak = null       // { idx, value, month } — a static callout pointing at the peak
 	} = $props();
 
 	// Measured from the container (bind:clientWidth) so the chart fits any
@@ -531,6 +532,22 @@
 			{/each}
 		{/if}
 
+		<!-- Static peak callout: a dot on the peak + its month and checkouts -->
+		{#if peak}
+			{@const px = x(peak.idx)}
+			{@const py = y(peak.value)}
+			{@const rightSide = px < width * 0.6}
+			<g class="peak-callout" pointer-events="none">
+				<circle cx={px} cy={py} r="3.5" fill="#3f88cc" stroke="#fff" stroke-width="1.5" />
+				<text
+						x={rightSide ? px + 8 : px - 8}
+						y={py + 4}
+						text-anchor={rightSide ? 'start' : 'end'}
+						class="peak-label"
+				>Peak: {formatMonth(peak.month)} · {peak.value.toLocaleString()} checkouts</text>
+			</g>
+		{/if}
+
 		<!-- Hover marker: a faint vertical guide plus a dot on the hovered line -->
 		{#if hoverIndex !== null}
 			{#if selectedItem && selectedItem.values[hoverIndex] > 0}
@@ -704,6 +721,17 @@
 		stroke-linejoin: round;
 		stroke-linecap: round;
 		transition: opacity 0.15s ease;
+	}
+	.peak-label {
+		font-family: var(--font-sans);
+		font-size: 0.72rem;
+		font-weight: 700;
+		fill: var(--color-fg);
+		/* white halo so it reads over the filled area */
+		paint-order: stroke;
+		stroke: var(--color-bg, #fff);
+		stroke-width: 3.5px;
+		stroke-linejoin: round;
 	}
 
 	/* Glide the hover dot and guide between points, in step with the tooltip. */

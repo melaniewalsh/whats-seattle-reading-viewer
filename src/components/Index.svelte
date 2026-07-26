@@ -41,12 +41,16 @@
 				const dense = densify(t.series, monthCount);
 				for (let i = 0; i < monthCount; i++) sum[i] += dense[i] || 0;
 			}
+			// The all-time peak month, to annotate on the chart.
+			let peakIdx = 0;
+			for (let i = 1; i < monthCount; i++) if (sum[i] > sum[peakIdx]) peakIdx = i;
 			featured = {
 				months,
 				series: [{ label: "The Odyssey", color: "#3f88cc", values: sum }],
 				title: hit.title,
 				authorSlug: hit.slug,
-				checkouts: sum.reduce((s, v) => s + v, 0)
+				checkouts: sum.reduce((s, v) => s + v, 0),
+				peak: sum[peakIdx] > 0 ? { idx: peakIdx, value: sum[peakIdx], month: months[peakIdx] } : null
 			};
 		} catch {}
 	}
@@ -370,7 +374,7 @@
 					</h2>
 					<p class="featured-sub">{compactNumber(featured.checkouts)} checkouts at the Seattle Public Library, 2006–2026</p>
 					<div class="featured-chart">
-						<LineChart months={featured.months} series={featured.series} mode="area" />
+						<LineChart months={featured.months} series={featured.series} mode="area" peak={featured.peak} />
 					</div>
 					<button class="featured-cta" onclick={() => openTitle(featured.title)}>Explore the full trend →</button>
 				</section>
