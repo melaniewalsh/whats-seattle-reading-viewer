@@ -886,6 +886,12 @@
 	// Whether anything is currently plotted on top of the author-total line.
 	const hasPlotted = $derived(groups.some((g) => g.idxs.length) || singleIdxs.length > 0);
 
+	// A "solo" single is a plotted edition that is NOT already inside a plotted
+	// group. Clicking an edition whose work is on the chart (e.g. a work search)
+	// keeps it in its work and floats it in the table — but it must not spawn a
+	// phantom single line/legend chip, so chart + legend use this filtered list.
+	const soloSingleIdxs = $derived(singleIdxs.filter((idx) => !groups.some((g) => g.idxs.includes(idx))));
+
 	// The "Show top works" button doubles as a toggle: once works are plotted it
 	// clears them and returns to the author-only view.
 	function toggleTopWorks() {
@@ -1186,11 +1192,12 @@
 				g.idxs = [...g.idxs, idx];
 			}
 		} else {
-			// single-selection mode: no group is active
+			// single-selection mode: no group is active. Plot this edition as its own
+			// line, but DON'T pull it out of its work — clicking an edition should
+			// select/float it within the cluster, not split it into a separate work.
 			if (singleIdxs.includes(idx)) {
 				singleIdxs = singleIdxs.filter((i) => i !== idx);
 			} else {
-				releaseTitle(idx);
 				singleIdxs = [...singleIdxs, idx];
 			}
 		}
@@ -1523,7 +1530,7 @@
 		});
 
 		const singleColorOf = new Map();
-		singleIdxs.forEach((idx, i) => {
+		soloSingleIdxs.forEach((idx, i) => {
 			singleColorOf.set(idx, TITLE_COLORS[i % TITLE_COLORS.length]);
 		});
 
@@ -1589,7 +1596,7 @@
 				});
 			}
 		});
-		singleIdxs.forEach((idx, i) => {
+		soloSingleIdxs.forEach((idx, i) => {
 			parts.push({
 				key: `s${idx}`,
 				label: current.titles[idx].title,
@@ -1739,7 +1746,7 @@
 		groups.forEach((g, gi) => { if (g.idxs.length) out.push({ label: groupLabel(g), color: groupColor(gi), key: `g${g.id}` }); });
 		// Full edition title (not the cleaned work name): if you plotted one specific
 		// edition, the legend should name exactly which one.
-		singleIdxs.forEach((idx, i) => out.push({ label: titleCase(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
+		soloSingleIdxs.forEach((idx, i) => out.push({ label: titleCase(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
 		// Everything not individually labeled is drawn in one gray band — label it
 		// "Other" so the color is accounted for in the legend (and the shared image).
 		// Based on chartSeries (not displaySeries) so the entry stays put — and
@@ -2116,7 +2123,7 @@
 								<button class="chip-remove" title="Remove from the chart" onclick={() => removeGroup(g.id)}>×</button>
 							</li>
 						{/each}
-						{#each singleIdxs as idx, i (idx)}
+						{#each soloSingleIdxs as idx, i (idx)}
 							<li class="group-chip-row" class:dim={isolatedKeys.length && !isIsolated(`s${idx}`)}>
 								<span class="group-chip static-chip" style="--chip-color: {singleColor(i)}">
 									<span class="chip-sw"></span>
