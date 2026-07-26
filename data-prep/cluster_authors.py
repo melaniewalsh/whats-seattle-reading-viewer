@@ -800,6 +800,10 @@ def name_variant_remap(name_totals):
     import re as _re
 
     def toks(name):
+        # Drop parenthetical name-expansions ("Salinger, J. D. (Jerome David)")
+        # before tokenizing, so a record that spells the initials out doesn't split
+        # from the plain-initials form of the same author.
+        name = _re.sub(r"\([^)]*\)", " ", name)
         return " ".join(sorted(
             t for t in _re.findall(r"[a-z0-9]+", name.lower())
             if not _re.fullmatch(r"\d{4}", t)))
