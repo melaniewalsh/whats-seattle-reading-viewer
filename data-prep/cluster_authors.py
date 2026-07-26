@@ -799,14 +799,24 @@ def name_variant_remap(name_totals):
     import collections
     import re as _re
 
-    def toks(name):
+    def tok_list(name):
         # Drop parenthetical name-expansions ("Salinger, J. D. (Jerome David)")
         # before tokenizing, so a record that spells the initials out doesn't split
         # from the plain-initials form of the same author.
         name = _re.sub(r"\([^)]*\)", " ", name)
-        return " ".join(sorted(
-            t for t in _re.findall(r"[a-z0-9]+", name.lower())
-            if not _re.fullmatch(r"\d{4}", t)))
+        return [t for t in _re.findall(r"[a-z0-9]+", name.lower()) if not _re.fullmatch(r"\d{4}", t)]
+
+    # "Core" = the multi-letter name words (surnames, given names), order-insensitive.
+    # Single-letter tokens are treated as initials and kept aside — this is what
+    # lets "Alan Bradley" and "C. Alan Bradley" (same core "alan bradley", initials
+    # {} vs {c}) reunite, while "J. Smith" and "K. Smith" (conflicting initials) do
+    # not. Grouping on the core also still folds pure order/case variants and
+    # spelled-out initials (Salinger).
+    def core_key(tl):
+        return " ".join(sorted(t for t in tl if len(t) > 1))
+
+    def initials(tl):
+        return frozenset(t for t in tl if len(t) == 1)
 
     def birth_year(name):
         m = _re.findall(r"\d{4}", name)
@@ -814,21 +824,29 @@ def name_variant_remap(name_totals):
 
     groups = collections.defaultdict(list)
     for name, total in name_totals:
-        key = toks(name)
-        if key:
-            groups[key].append((name, int(total or 0)))
+        tl = tok_list(name)
+        ck = core_key(tl)
+        if ck:  # need at least one real name word; skip all-initial records
+            groups[ck].append((name, int(total or 0), initials(tl), birth_year(name)))
 
     remap = {}
     for members in groups.values():
         if len(members) < 2:
             continue
-        births = {birth_year(n) for n, _ in members if birth_year(n)}
-        if len(births) > 1:
-            continue  # conflicting birth years -> likely different people
-        rep = max(members, key=lambda m: m[1])[0]
-        for name, _ in members:
-            if name != rep:
-                remap[name] = rep
+        # Highest-total form is the representative the rest fold into.
+        members.sort(key=lambda m: -m[1])
+        rep_name, _, rep_ini, rep_by = members[0]
+        for name, _, ini, by in members[1:]:
+            if name == rep_name:
+                continue
+            # Initials must be nested (one a subset of the other) -- i.e. no
+            # CONFLICTING initial like "J." vs "K." that marks different people.
+            if not (ini <= rep_ini or rep_ini <= ini):
+                continue
+            # Different recorded birth years -> different people.
+            if by and rep_by and by != rep_by:
+                continue
+            remap[name] = rep_name
     return remap
 
 
