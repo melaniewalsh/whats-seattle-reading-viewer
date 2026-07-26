@@ -1032,9 +1032,28 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     titles = [r[0] for r in con.execute("SELECT DISTINCT title FROM clean WHERE title IS NOT NULL").fetchall()]
     con.execute("DROP TABLE IF EXISTS titlework")
     con.execute("CREATE TABLE titlework(title VARCHAR, wk VARCHAR)")
+
+    # Curated groupings (src/data/work-overrides.json) win over the automatic
+    # normalize_work_key, so Most Borrowed clusters the same way the site's
+    # curated author drilldowns do. Each override cluster gets an author-scoped
+    # key so two authors' clusters can't collide.
+    override_wk = {}
+    try:
+        import json as _json
+        ov = _json.load(open(PROJECT_DIR / "src" / "data" / "work-overrides.json"))
+        for slug, clusters in ov.items():
+            for i, cluster in enumerate(clusters or []):
+                key = f"ovr:{slug}:{i}"
+                for t in (cluster or []):
+                    override_wk[t] = key
+        print(f"  applied {len(override_wk)} curated title overrides "
+              f"across {len(ov)} authors")
+    except Exception as e:  # pragma: no cover - overrides are optional
+        print(f"  (no work overrides applied: {e})")
+
     con.executemany(
         "INSERT INTO titlework VALUES (?, ?)",
-        [(t, normalize_work_key(t)) for t in titles],
+        [(t, override_wk.get(t) or normalize_work_key(t)) for t in titles],
     )
 
     # Best display title + author for each work (the highest-checkout edition).
