@@ -2123,7 +2123,7 @@
 											class="chip-name"
 											onmousemove={(e) => (hoverTip = { text: current.titles[idx].title, x: e.clientX, y: e.clientY })}
 											onmouseleave={() => (hoverTip = null)}
-									>{cleanTitleForDisplay(current.titles[idx].title)}</span>
+									>{titleCase(current.titles[idx].title)}</span>
 								</span>
 								<button class="chip-remove" title="Remove this title" onclick={() => toggleTitle(idx)}>×</button>
 							</li>
