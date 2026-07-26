@@ -1309,7 +1309,13 @@
 			// While filtering, show a work only if it (or an edition) matches -- but
 			// still show ALL of its editions and its full count/total.
 			if (f && !nameMatch && matchCount === 0) continue;
-			editions.sort((x, y) => y.total - x.total);
+			// A plotted individual edition floats to the top of its work, so the one
+			// you're looking at is visually prioritized; otherwise by checkouts.
+			editions.sort((x, y) => {
+				const xp = singleIdxs.includes(x.idx) ? 1 : 0;
+				const yp = singleIdxs.includes(y.idx) ? 1 : 0;
+				return yp - xp || y.total - x.total;
+			});
 			blocks.push({ key, name: w.name, editions, total: w.total, matchCount });
 		}
 		blocks.sort((a, b) =>
@@ -1379,7 +1385,7 @@
 			if (n !== 1) return n > 1 ? displayName(current.name) : "";
 			return gs.length
 				? groupLabel(gs[0])
-				: cleanTitleForDisplay(current.titles[singleIdxs[0]].title);
+				: titleCase(current.titles[singleIdxs[0]].title);
 		}
 		return displayName(current.name);
 	});
@@ -1731,7 +1737,9 @@
 		}
 		const out = [];
 		groups.forEach((g, gi) => { if (g.idxs.length) out.push({ label: groupLabel(g), color: groupColor(gi), key: `g${g.id}` }); });
-		singleIdxs.forEach((idx, i) => out.push({ label: cleanTitleForDisplay(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
+		// Full edition title (not the cleaned work name): if you plotted one specific
+		// edition, the legend should name exactly which one.
+		singleIdxs.forEach((idx, i) => out.push({ label: titleCase(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
 		// Everything not individually labeled is drawn in one gray band — label it
 		// "Other" so the color is accounted for in the legend (and the shared image).
 		// Based on chartSeries (not displaySeries) so the entry stays put — and
