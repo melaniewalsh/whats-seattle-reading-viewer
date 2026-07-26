@@ -551,6 +551,17 @@
                 <div class="tt-value">{selectedItem.values[hoverIndex].toLocaleString()}<span class="tt-value-unit">checkouts</span></div>
             {/if}
 
+            {#if selectedItem.otherTitles?.length}
+                <div class="tt-others">
+                    {#each selectedItem.otherTitles.slice(0, 8) as name}
+                        <div class="tt-other">{name}</div>
+                    {/each}
+                    {#if selectedItem.otherTitles.length > 8}
+                        <div class="tt-other-more">+{selectedItem.otherTitles.length - 8} more</div>
+                    {/if}
+                </div>
+            {/if}
+
             {#if monthSharePct !== null}
                 <div class="tooltip-total"><span class="tt-share" style="color: {selectedItem.color};">{fmtPct(monthSharePct)} of this month's checkouts</span></div>
             {:else if workSharePct !== null && shareOf}
@@ -742,6 +753,27 @@
 		font-size: 1.3rem;
 		font-weight: 700;
 		color: #1a1a1a;
+	}
+	/* The titles rolled into an "Other titles" band, listed in its tooltip. */
+	.tt-others {
+		margin: 4px 0 2px 19px;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+	.tt-other {
+		font-size: 0.8rem;
+		color: #444;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 240px;
+	}
+	.tt-other-more {
+		font-size: 0.74rem;
+		font-weight: 600;
+		color: #888;
+		margin-top: 1px;
 	}
 	.tt-value-unit {
 		font-size: 0.68rem;

@@ -1576,7 +1576,13 @@
 			values: otherValues,
 			isSelected: false,
 			groupIndex: -1,
-			titleIdx: -1
+			titleIdx: -1,
+			// The titles rolled into this band, biggest first, so the tooltip can
+			// name what's inside "Other".
+			otherTitles: rest
+				.slice()
+				.sort((a, b) => b.values.reduce((s, v) => s + v, 0) - a.values.reduce((s, v) => s + v, 0))
+				.map((s) => cleanTitleForDisplay(s.label))
 		});
 		return kept;
 	}
