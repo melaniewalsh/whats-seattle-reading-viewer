@@ -1360,7 +1360,11 @@
 	$effect(() => {
 		const title = headingText;
 		const author = current ? displayName(current.name) : "";
-		if (searchMode !== "title" || !title) { workCover = null; return; }
+		// Only when exactly one work is on the plot (so the heading IS a book title).
+		// When "All titles" broadened the chart the heading is the AUTHOR name — no
+		// cover then, and never in author-search mode.
+		const singleWork = groups.filter((g) => g.idxs.length).length + singleIdxs.length === 1;
+		if (searchMode !== "title" || !singleWork || !title) { workCover = null; return; }
 		let cancelled = false;
 		workCover = null;
 		coverUrl(title, author).then((u) => { if (!cancelled) workCover = u; });
@@ -1429,6 +1433,24 @@
 		}
 	}
 	const top5Terms = (map) => [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map((e) => e[0]);
+
+	// Split display text into segments, marking the run(s) that match the current
+	// table filter, so only the matched word is highlighted (not the whole row).
+	function markMatch(text) {
+		const f = titleFilter.trim();
+		if (!f) return [{ t: text, hit: false }];
+		const lo = text.toLowerCase(), flo = f.toLowerCase();
+		const parts = [];
+		let i = 0;
+		for (;;) {
+			const idx = lo.indexOf(flo, i);
+			if (idx === -1) { parts.push({ t: text.slice(i), hit: false }); break; }
+			if (idx > i) parts.push({ t: text.slice(i, idx), hit: false });
+			parts.push({ t: text.slice(idx, idx + f.length), hit: true });
+			i = idx + f.length;
+		}
+		return parts;
+	}
 
 	const subjectTerms = $derived.by(() => {
 		if (!current || isOverview) return [];
@@ -1819,7 +1841,7 @@
 								/>
 							</span>
 						{/if}
-					</div>{#if searchMode !== "title" && current.variants?.length}<span class="name-info" tabindex="0" aria-label="{current.variants.length} name variants — hover for details"><span class="ni-icon" aria-hidden="true">i</span><span class="name-info-pop" role="tooltip"><span class="ni-head">{current.variants.length} name variants</span><ul>{#each current.variants as v}<li>{v}</li>{/each}</ul><span class="ni-note">Raw catalog spellings clustered into one author.</span></span></span>{/if}</div>
+					</div>{#if searchMode !== "title" && current.variants?.length}<span class="name-info" tabindex="0" aria-label="{current.variants.length} name variants — hover for details"><span class="ni-icon" aria-hidden="true">i</span><span class="name-info-pop" role="tooltip"><span class="ni-head">{current.variants.length} name variants</span><ul>{#each current.variants as v}<li>{v}</li>{/each}</ul><span class="ni-note">Raw catalog spellings clustered into one author.</span></span></span>{/if}{#if lookupLinks}<a class="hdr-spl name-spl" href={lookupLinks.spl} target="_blank" rel="noopener noreferrer" title="Find in the Seattle Public Library catalog"><img class="hdr-spl-ic" src="{base}/spl-logo.png" alt="SPL catalog" width="18" height="18" /></a>{/if}</div>
 					{#if wikiTouch && wikiHover}
 						<button class="wiki-backdrop" aria-label="Close" onclick={() => (wikiHover = false)}></button>
 					{/if}
@@ -1836,8 +1858,6 @@
 					{/if}
 				</span>
 				{#if lookupLinks}
-					<span class="hdr-sep" aria-hidden="true">·</span>
-					<a class="hdr-spl" href={lookupLinks.spl} target="_blank" rel="noopener noreferrer" title="Find in the Seattle Public Library catalog"><img class="hdr-spl-ic" src="{base}/spl-logo.png" alt="SPL catalog" width="16" height="16" /></a>
 					<span class="hdr-sep" aria-hidden="true">·</span>
 					<span class="lookup-wrap">
 						<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere">Learn more <span class="hdr-caret" aria-hidden="true">▾</span></button>
@@ -2203,7 +2223,7 @@
 											<span class="other-group-dot"
 												  title="In “{owner ? groupLabel(owner) : titleCase(t.title)}”"></span>
 										{/if}
-										<span class="t-name">{titleCase(t.title)}</span>
+										<span class="t-name">{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}</span>
 									</span>
 								{:else}
 									<span class="tt-cell tt-work" role="cell" title={showWork ? t.workName : ""}>
@@ -2221,7 +2241,7 @@
 											<span class="other-group-dot"
 												  title="In “{owner ? groupLabel(owner) : titleCase(t.title)}”"></span>
 										{/if}
-										<span class="t-name">{titleCase(t.title)}</span>
+										<span class="t-name">{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}</span>
 									</span>
 								{/if}
 								<span class="tt-cell tt-format" role="cell">
@@ -3073,6 +3093,12 @@
 		height: 16px;
 		object-fit: contain;
 		display: block;
+	}
+	/* SPL icon sitting to the right of the author/work name (after the "i" info). */
+	.name-spl {
+		align-self: center;
+		margin-left: 8px;
+		flex: none;
 	}
 	.hdr-caret {
 		font-size: 0.7rem;
@@ -4231,14 +4257,13 @@
 		background: var(--color-gray-100);
 	}
 
-	/* Editions matching the table filter are highlighted in place -- the work
-	   still shows ALL its editions, these are just the ones you searched for. */
-	.tt-row.filter-match {
-		background: #fff3bf;
-		box-shadow: inset 3px 0 0 0 #f0b429;
-	}
-	.tt-row.filter-match:hover {
+	/* Editions matching the table filter: the matching text is highlighted inline
+	   (see <mark class="t-hit">), so the row itself stays un-tinted. */
+	.t-hit {
 		background: #ffec99;
+		color: inherit;
+		border-radius: 3px;
+		padding: 0 1px;
 	}
 	.match-note {
 		color: #a37500;
