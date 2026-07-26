@@ -123,7 +123,12 @@
 				terms: g.terms, ficTerms: g.ficTerms, examples: cleanExamples(g.examples).slice(0, 4) });
 		}
 		if (showOther) {
-			out.push({ key: "g:__other", name: "Other / Unclassified", color: "#b0b0b0", values: clip(data.other) });
+			// "Other" is a residual (total − the overlapping genres). Because a book
+			// can be tagged with several genres at once, the genres sometimes sum to
+			// more than 100% and push this residual slightly negative — a data
+			// artifact, not a real negative share. Clamp to 0 so the line and the
+			// tooltip both read 0% rather than e.g. −10%.
+			out.push({ key: "g:__other", name: "Other / Unclassified", color: "#b0b0b0", values: clip(data.other).map((v) => Math.max(0, v)) });
 		}
 		return out;
 	});
