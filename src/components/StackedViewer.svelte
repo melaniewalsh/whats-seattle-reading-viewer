@@ -1886,7 +1886,7 @@
 								/>
 							</span>
 						{/if}
-					</div>{#if searchMode !== "title" && current.variants?.length}<span class="name-info" tabindex="0" aria-label="{current.variants.length} name variants — hover for details"><span class="ni-icon" aria-hidden="true">i</span><span class="name-info-pop" role="tooltip"><span class="ni-head">{current.variants.length} name variants</span><ul>{#each current.variants as v}<li>{v}</li>{/each}</ul><span class="ni-note">Raw catalog spellings clustered into one author.</span></span></span>{/if}{#if lookupLinks}<a class="hdr-spl name-spl" href={lookupLinks.spl} target="_blank" rel="noopener noreferrer" title="Find in the Seattle Public Library catalog"><img class="hdr-spl-ic" src="{base}/spl-logo.png" alt="SPL catalog" width="18" height="18" /></a>{/if}</div>
+					</div>{#if searchMode !== "title" && current.variants?.length}<span class="name-info" tabindex="0" aria-label="{current.variants.length} name variants — hover for details"><span class="ni-icon" aria-hidden="true">i</span><span class="name-info-pop" role="tooltip"><span class="ni-head">{current.variants.length} name variants</span><ul>{#each current.variants as v}<li>{v}</li>{/each}</ul><span class="ni-note">Raw catalog spellings clustered into one author.</span></span></span>{/if}</div>
 					{#if wikiTouch && wikiHover}
 						<button class="wiki-backdrop" aria-label="Close" onclick={() => (wikiHover = false)}></button>
 					{/if}
@@ -1904,6 +1904,7 @@
 				</span>
 				{#if lookupLinks}
 					<span class="hdr-sep" aria-hidden="true">·</span>
+					<a class="hdr-spl" href={lookupLinks.spl} target="_blank" rel="noopener noreferrer" title="Find in the Seattle Public Library catalog"><img class="hdr-spl-ic" src="{base}/spl-logo.png" alt="SPL catalog" width="16" height="16" /></a>
 					<span class="lookup-wrap">
 						<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere">Learn more <span class="hdr-caret" aria-hidden="true">▾</span></button>
 						{#if lookupOpen}
