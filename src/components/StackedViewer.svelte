@@ -3925,6 +3925,8 @@
 		font-size: 0.9rem;
 		font-weight: 500;
 		cursor: pointer;
+		/* white rows on the gray panel; multi-edition ".cluster" rows tint over this */
+		background: var(--color-white);
 		border-top: 1px solid var(--color-gray-100);
 	}
 	.title-list > li:first-child.work-header {
@@ -4133,6 +4135,7 @@
 		cursor: pointer;
 		font-family: var(--font-sans);
 		font-size: 0.9rem;
+		background: var(--color-white);
 	}
 
 	.tt-row:hover {
