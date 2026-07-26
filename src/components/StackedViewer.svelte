@@ -65,6 +65,7 @@
 	let dragOverWorkKey = $state(null); // work row currently under the dragged work
 	let hlWorkKey = $state(null); // work key highlighted by hovering its pill or its table row (they're linked)
 	let autoGroupNote = $state(""); // feedback after "Group editions into works"
+	let searchedWork = $state(null); // { name, idxs } of the work searched in title mode, so "Total" can snap back to it
 	let loadError = $state(""); // message when an author fails to load
 	let loading = $state(false); // true while an author's data is being fetched
 	let hoverTip = $state(null); // { text, x, y } instant tooltip for full edition titles
@@ -397,6 +398,7 @@
 		const name = cleanTitleForDisplay(current.titles[idxs[0]].title) || r.title;
 		groups = [...groups, { id: ++groupIdCounter, name, idxs }];
 		hlWorkKey = `g${groupIdCounter}`;
+		searchedWork = { name, idxs: [...idxs] };
 		// Reflect the opened title in the URL so it updates as you pick new works
 		// (selectAuthor, called above, cleared the previous ?title).
 		try {
@@ -1328,7 +1330,9 @@
 			if (isolatedKeys.length === 1) return keyLabel(isolatedKeys[0]);
 			const gs = groups.filter((g) => g.idxs.length);
 			const n = gs.length + singleIdxs.length;
-			if (n !== 1) return ""; // 0 or 2+ works -> no title heading
+			// 2+ works plotted ("All titles" broadened to the author's top works) ->
+			// name the author, so the heading isn't blank. Exactly one work -> its title.
+			if (n !== 1) return n > 1 ? displayName(current.name) : "";
 			return gs.length
 				? groupLabel(gs[0])
 				: cleanTitleForDisplay(current.titles[singleIdxs[0]].title);
@@ -1859,7 +1863,18 @@
 				<button
 						type="button"
 						class:active={chartMode === "line"}
-						onclick={() => (chartMode = "line")}
+						onclick={() => {
+							chartMode = "line";
+							// In work-search mode, "Total" returns to just the searched work
+							// so its title heading comes back after "All titles" broadened
+							// the chart to the author's top works.
+							if (searchMode === "title" && searchedWork) {
+								groups = [{ id: ++groupIdCounter, name: searchedWork.name, idxs: [...searchedWork.idxs] }];
+								singleIdxs = [];
+								activeGroupId = null;
+								isolatedKeys = [];
+							}
+						}}
 				>
 					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M2 20 L2 14 L8 8 L13 12 L22 3 L22 20 Z" fill="currentColor" opacity="0.85"/></svg>
 					Total
