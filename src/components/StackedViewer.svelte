@@ -2,6 +2,7 @@
 	// StackedViewer.svelte
 	import { onMount, tick } from "svelte";
 	import { base } from "$app/paths";
+	import workOverrides from "$data/work-overrides.json";
 	import { displayName } from "$utils/displayName.js";
 	import { titleCase } from "$utils/titleCase.js";
 	import { lookupUrls } from "$utils/lookup.js";
@@ -913,9 +914,19 @@
 	//   2. Else a manual table override (drag-merge target, or `excl-<idx>` when
 	//      excluded).
 	//   3. Else the auto-computed key.
+	// Curated groupings shipped in src/data/work-overrides.json ("slug": [[title,…],…]).
+	// Maps each listed title -> a stable cluster key, applied as the baseline below a
+	// visitor's own drag/drop edits and above the automatic normalizeWorkKey.
+	const overrideKeyByTitle = $derived.by(() => {
+		const clusters = currentSlug ? workOverrides[currentSlug] : null;
+		if (!Array.isArray(clusters)) return null;
+		const m = new Map();
+		clusters.forEach((titles, i) => (titles || []).forEach((t) => m.set(t, `ovr-${i}`)));
+		return m.size ? m : null;
+	});
 	function effectiveKey(idx, title) {
 		for (const g of groups) if (g.idxs.includes(idx)) return `g${g.id}`;
-		return workAssign[idx] ?? normalizeWorkKey(title);
+		return workAssign[idx] ?? overrideKeyByTitle?.get(title) ?? normalizeWorkKey(title);
 	}
 
 	// Pull one edition out of its work cluster into its own singleton work. Also
@@ -958,6 +969,30 @@
 	// reorders titles. Per-browser; a title renamed in a future rebuild is quietly
 	// dropped rather than misapplied.
 	let savedGrouping = $state(false); // this author has a saved custom grouping
+	// Curator mode: a hidden "Export groupings" button for the maintainer only.
+	// Enable by visiting the site once with ?curate=1 (remembered per browser).
+	let curator = $state(false);
+	let exportNote = $state("");
+	onMount(() => {
+		try {
+			const p = new URLSearchParams(window.location.search);
+			if (p.get("curate") === "1") localStorage.setItem("spl:curate", "1");
+			curator = localStorage.getItem("spl:curate") === "1";
+		} catch {}
+	});
+	// Copy this author's groupings as a `"slug": [[...]]` entry ready to paste into
+	// data-prep/work_overrides.json (which the build applies over the auto-clustering).
+	function exportGroupings() {
+		if (!current || !currentSlug) return;
+		const entry = `${JSON.stringify(currentSlug)}: ${JSON.stringify(currentClusters())}`;
+		try {
+			navigator.clipboard.writeText(entry);
+			exportNote = "Copied — paste into src/data/work-overrides.json (inside the { }).";
+		} catch {
+			exportNote = entry;
+		}
+		setTimeout(() => (exportNote = ""), 6000);
+	}
 	const worksLSKey = (slug) => `spl:works:${slug}`;
 
 	// Snapshot the current grouping as clusters of title strings.
@@ -2136,7 +2171,9 @@
 					<div class="works-actions">
 						<button type="button" class="wa-btn" onclick={saveGroupings} title="Remember this author's grouping in your browser, so your fixes are here next time">💾 Save my groupings</button>
 						<button type="button" class="wa-btn wa-reset" onclick={clearGroupings} title="Discard custom grouping and go back to automatic clustering">↺ Reset to automatic</button>
+						{#if curator}<button type="button" class="wa-btn wa-export" onclick={exportGroupings} title="Copy this author's groupings to paste into work_overrides.json">⬇ Export groupings</button>{/if}
 						{#if savedGrouping}<span class="wa-saved" role="status">✓ custom grouping saved</span>{/if}
+						{#if exportNote}<span class="wa-saved" role="status">{exportNote}</span>{/if}
 					</div>
 				{/if}
 				<div class="title-table" role="table" aria-label="Titles, grouped by work" style="--work-w:{workColW}px; --edition-w:{editionColW}px">
