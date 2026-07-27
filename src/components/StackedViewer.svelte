@@ -1760,7 +1760,7 @@
 		// up and the rest dim, and you can click again to bring them back.
 		if (chartMode === "line") {
 			// Label any editions overlaid on the total (the total area needs none).
-			return soloSingleIdxs.map((idx, i) => ({ label: titleCase(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
+			return singleIdxs.map((idx, i) => ({ label: titleCase(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
 		}
 		const out = [];
 		groups.forEach((g, gi) => { if (g.idxs.length) out.push({ label: groupLabel(g), color: groupColor(gi), key: `g${g.id}` }); });
@@ -2143,7 +2143,7 @@
 								<button class="chip-remove" title="Remove from the chart" onclick={() => removeGroup(g.id)}>×</button>
 							</li>
 						{/each}
-						{#each soloSingleIdxs as idx, i (idx)}
+						{#each singleIdxs as idx, i (idx)}
 							<li class="group-chip-row" class:dim={isolatedKeys.length && !isIsolated(`s${idx}`)}>
 								<span class="group-chip static-chip" style="--chip-color: {singleColor(i)}">
 									<span class="chip-sw"></span>
