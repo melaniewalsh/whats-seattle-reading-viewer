@@ -512,7 +512,7 @@
 									<div class="gal-by">by {displayName(r[1])}</div>
 									<div class="gal-count">{compactNumber(r[3])} checkouts</div>
 									{#if k in summaries}
-										<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links">{#if wikiUrls[k]}<a class="icon-link" href={wikiUrls[k]} target="_blank" rel="noopener noreferrer" title="Wikipedia article">Wikipedia</a>{/if}<a class="icon-link" href={lookupUrls(`${r[0]} ${displayName(r[1])}`).spl} target="_blank" rel="noopener noreferrer" title="Seattle Public Library catalog"><img class="ic-img" src="{base}/spl-logo.png" alt="" width="16" height="16" />SPL&nbsp;catalog</a></span></p>
+										<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links">{#if wikiUrls[k]}<a class="icon-link" href={wikiUrls[k]} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a>{/if}<a class="icon-link" href={lookupUrls(`${r[0]} ${displayName(r[1])}`).spl} target="_blank" rel="noopener noreferrer" title="Seattle Public Library catalog"><img class="ic-img" src="{base}/spl-logo.png" alt="" width="16" height="16" />SPL&nbsp;catalog</a></span></p>
 									{:else}
 										<p class="gal-sum gal-sum-ph"></p>
 									{/if}
@@ -560,7 +560,7 @@
 										</span>
 										<span class="tw-by">by {displayName(row[1])}</span>
 											{#if coverKey(row) in summaries}
-												<p class="row-sum">{#if summaries[coverKey(row)]}{blurb(summaries[coverKey(row)])} {/if}<span class="src-links">{#if wikiUrls[coverKey(row)]}<a class="icon-link" href={wikiUrls[coverKey(row)]} target="_blank" rel="noopener noreferrer" title="Wikipedia article">Wikipedia</a>{/if}<a class="icon-link" href={u.spl} target="_blank" rel="noopener noreferrer" title="Seattle Public Library catalog"><img class="ic-img" src="{base}/spl-logo.png" alt="" width="16" height="16" />SPL&nbsp;catalog</a></span></p>
+												<p class="row-sum">{#if summaries[coverKey(row)]}{blurb(summaries[coverKey(row)])} {/if}<span class="src-links">{#if wikiUrls[coverKey(row)]}<a class="icon-link" href={wikiUrls[coverKey(row)]} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a>{/if}<a class="icon-link" href={u.spl} target="_blank" rel="noopener noreferrer" title="Seattle Public Library catalog"><img class="ic-img" src="{base}/spl-logo.png" alt="" width="16" height="16" />SPL&nbsp;catalog</a></span></p>
 											{/if}
 									</span>
 								</div>
