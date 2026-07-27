@@ -1400,10 +1400,11 @@
 		if (isOverview) return current.name;
 		if (searchMode === "title") {
 			const gs = groups.filter((g) => g.idxs.length);
-			// One individually-clicked edition is the focus -> show its FULL edition
-			// title (e.g. "The Odyssey / Homer ; Translated by Emily Wilson"), not the
-			// bare work name, so the heading names exactly what you singled out.
-			if (soloSingleIdxs.length === 1 && gs.length <= 1) return titleCase(current.titles[soloSingleIdxs[0]].title);
+			// Show the FULL edition title ONLY when a single clicked edition is the sole
+			// thing on the chart (nothing else plotted). If a work band or other titles
+			// are also shown, the bare edition title would misrepresent the chart, so we
+			// keep the work/author name instead.
+			if (gs.length === 0 && soloSingleIdxs.length === 1) return titleCase(current.titles[soloSingleIdxs[0]].title);
 			// Focused on a single work (the searched work) -> its title stays the
 			// heading even when you click individual editions to overlay them.
 			if (gs.length === 1) return groupLabel(gs[0]);
@@ -1936,7 +1937,7 @@
 					{#if isOverview}
 						{compactNumber(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 					{:else if searchMode === "title"}
-						by <button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} checkouts{/if}
+						by <button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} checkouts all-time{/if}
 					{:else}
 						{compactNumber(current.total)} checkouts · {workGroups.size.toLocaleString()} works
 					{/if}
