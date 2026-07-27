@@ -9,6 +9,7 @@
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import { getMonths, getAuthor, searchTitles, densify } from "$components/db.js";
 	import { coverUrl } from "$utils/covers.js";
+	import { lookupUrls } from "$utils/lookup.js";
 	import { compactNumber } from "$utils/format.js";
 	import { publications } from "$data/publications.js";
 
@@ -20,6 +21,21 @@
 	let menuOpen = $state(false); // the slide-out hamburger menu
 
 	// "Featured trend of the month" on the home hub: this month, The Odyssey.
+	// "Last updated" = the most recent month present in the data.
+	let lastUpdated = $state("");
+	onMount(async () => {
+		try {
+			const months = await getMonths();
+			const last = months[months.length - 1];
+			if (last) {
+				const [y, mo] = last.split("-");
+				const names = ["January", "February", "March", "April", "May", "June",
+					"July", "August", "September", "October", "November", "December"];
+				lastUpdated = `${names[Number(mo) - 1]} ${y}`;
+			}
+		} catch {}
+	});
+
 	let featured = $state(null);
 	let featuredLoaded = false;
 	$effect(() => {
@@ -391,7 +407,10 @@
 					<div class="featured-chart">
 						<LineChart months={featured.months} series={featured.series} mode="area" peak={featured.peak} />
 					</div>
-					<button class="featured-cta" onclick={() => openTitle(featured.title)}>Explore the full trend →</button>
+					<div class="featured-actions">
+						<button class="featured-cta" onclick={() => openTitle(featured.title)}>Explore the full trend →</button>
+						<a class="featured-spl" href={lookupUrls("The Odyssey Homer").spl} target="_blank" rel="noopener noreferrer" title="Find The Odyssey in the Seattle Public Library catalog"><img src="{base}/spl-logo.png" alt="" width="18" height="18" /> Find at SPL</a>
+					</div>
 				</section>
 			{/if}
 		{:else if tab === "overview"}
@@ -540,6 +559,7 @@
 				What Is Seattle Reading?
 				<span class="cf-sep">·</span>
 				<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a>
+				{#if lastUpdated}<span class="cf-sep">·</span> Last updated: {lastUpdated}{/if}
 			</p>
 		</footer>
 	</article>
@@ -683,6 +703,31 @@
 		cursor: pointer;
 	}
 	.featured-cta:hover {
+		text-decoration: underline;
+	}
+	.featured-actions {
+		display: flex;
+		align-items: center;
+		gap: 18px;
+		flex-wrap: wrap;
+		margin-top: 6px;
+	}
+	.featured-spl {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-family: var(--font-sans);
+		font-size: 0.92rem;
+		font-weight: 600;
+		color: var(--color-fg-light);
+		text-decoration: none;
+	}
+	.featured-spl img {
+		display: block;
+		object-fit: contain;
+	}
+	.featured-spl:hover {
+		color: #3f88cc;
 		text-decoration: underline;
 	}
 	.hub {

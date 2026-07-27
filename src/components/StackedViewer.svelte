@@ -685,7 +685,7 @@
 		const wg = workGroups;
 		const rows = [["author", "work", "title", "format", "date", "checkouts"]];
 		current.titles.forEach((t, idx) => {
-			const work = wg.get(effectiveKey(idx, t.title))?.name || cleanTitleForDisplay(t.title) || t.title;
+			const work = wg.get(workIdentityKey(idx, t.title))?.name || cleanTitleForDisplay(t.title) || t.title;
 			const series = t.series || [];
 			for (let i = 0; i < months.length; i++) {
 				const v = series[i] || 0;
@@ -934,6 +934,12 @@
 		for (const g of groups) if (g.idxs.includes(idx)) return `g${g.id}`;
 		return workAssign[idx] ?? overrideKeyByTitle?.get(title) ?? normalizeWorkKey(title);
 	}
+	// A title's WORK identity, independent of what's plotted on the chart. The table
+	// clusters by this so plotting/selecting an edition (which moves it in/out of a
+	// chart group) never reshuffles the table — the edition stays under its work.
+	function workIdentityKey(idx, title) {
+		return workAssign[idx] ?? overrideKeyByTitle?.get(title) ?? normalizeWorkKey(title);
+	}
 
 	// Pull one edition out of its work cluster into its own singleton work. Also
 	// take it out of any group first, so the exclusion actually sticks.
@@ -1065,7 +1071,7 @@
 		const m = new Map();
 		if (!current) return m;
 		current.titles.forEach((t, idx) => {
-			const key = effectiveKey(idx, t.title);
+			const key = workIdentityKey(idx, t.title);
 			if (!key) return;
 			if (!m.has(key)) m.set(key, { idxs: [], name: cleanTitleForDisplay(t.title) || t.title, topTotal: -1, total: 0 });
 			const w = m.get(key);
@@ -1193,11 +1199,13 @@
 			}
 		} else {
 			// single-selection mode: no group is active. Plot this edition as its own
-			// line, but DON'T pull it out of its work — clicking an edition should
-			// select/float it within the cluster, not split it into a separate work.
+			// line. releaseTitle pulls it out of the work's plotted AGGREGATE (so its
+			// checkouts aren't double-counted) — but the TABLE clusters by work
+			// identity, so the edition still shows under its work, just floated + lit up.
 			if (singleIdxs.includes(idx)) {
 				singleIdxs = singleIdxs.filter((i) => i !== idx);
 			} else {
+				releaseTitle(idx);
 				singleIdxs = [...singleIdxs, idx];
 			}
 		}
@@ -1226,7 +1234,7 @@
 		let rows = current.titles.map((t, idx) => ({
 			...t,
 			idx,
-			workKey: effectiveKey(idx, t.title),
+			workKey: workIdentityKey(idx, t.title),
 			workName: cleanTitleForDisplay(t.title) || t.title
 		}));
 
@@ -1712,9 +1720,11 @@
 			return chartMode === "area" ? overviewAreaSeries : [authorLine].filter(Boolean);
 		}
 		if (chartMode === "line") {
-			// "Total" is always the single filled area of the author's/work's total,
-			// regardless of any grouping done for the "All titles" view.
-			return [authorLine].filter(Boolean);
+			// "Total" = the work/author total (filled area), plus any editions you
+			// explicitly clicked in the table, overlaid as their own lines. Group
+			// aggregates from "All titles" are NOT overlaid here.
+			const singles = lineParts.filter((s) => s.isSingle);
+			return [authorLine, ...singles].filter(Boolean);
 		}
 		// area mode
 		const only = isolatedIdxSet();
@@ -1740,7 +1750,8 @@
 		// so the legend stays put while isolating -- the isolated entry just lights
 		// up and the rest dim, and you can click again to bring them back.
 		if (chartMode === "line") {
-			return []; // "Total" is a single series — no legend needed.
+			// Label any editions overlaid on the total (the total area needs none).
+			return soloSingleIdxs.map((idx, i) => ({ label: titleCase(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
 		}
 		const out = [];
 		groups.forEach((g, gi) => { if (g.idxs.length) out.push({ label: groupLabel(g), color: groupColor(gi), key: `g${g.id}` }); });
