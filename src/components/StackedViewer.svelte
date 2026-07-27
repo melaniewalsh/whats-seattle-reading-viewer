@@ -1205,7 +1205,8 @@
 			if (singleIdxs.includes(idx)) {
 				singleIdxs = singleIdxs.filter((i) => i !== idx);
 			} else {
-				releaseTitle(idx);
+				// Keep it in its work (so the work total stays intact and the table
+				// keeps it clustered); it's drawn as an overlay line on top.
 				singleIdxs = [...singleIdxs, idx];
 			}
 		}
@@ -1390,17 +1391,16 @@
 		if (!current) return "";
 		if (isOverview) return current.name;
 		if (searchMode === "title") {
-			// A single selected/isolated work names the heading (shown at the top,
-			// not as a caption on the plot).
-			if (isolatedKeys.length === 1) return keyLabel(isolatedKeys[0]);
 			const gs = groups.filter((g) => g.idxs.length);
+			// Focused on a single work (the searched work) -> its title stays the
+			// heading even when you click individual editions to overlay them.
+			if (gs.length === 1) return groupLabel(gs[0]);
+			if (isolatedKeys.length === 1) return keyLabel(isolatedKeys[0]);
 			const n = gs.length + singleIdxs.length;
 			// 2+ works plotted ("All titles" broadened to the author's top works) ->
 			// name the author, so the heading isn't blank. Exactly one work -> its title.
 			if (n !== 1) return n > 1 ? displayName(current.name) : "";
-			return gs.length
-				? groupLabel(gs[0])
-				: titleCase(current.titles[singleIdxs[0]].title);
+			return titleCase(current.titles[singleIdxs[0]].title);
 		}
 		return displayName(current.name);
 	});
@@ -1604,7 +1604,9 @@
 				});
 			}
 		});
-		soloSingleIdxs.forEach((idx, i) => {
+		// Use ALL clicked editions here (even ones inside a plotted work): line mode
+		// overlays them on the total, so there's no stacking / double-count.
+		singleIdxs.forEach((idx, i) => {
 			parts.push({
 				key: `s${idx}`,
 				label: current.titles[idx].title,
@@ -1720,11 +1722,18 @@
 			return chartMode === "area" ? overviewAreaSeries : [authorLine].filter(Boolean);
 		}
 		if (chartMode === "line") {
-			// "Total" = the work/author total (filled area), plus any editions you
-			// explicitly clicked in the table, overlaid as their own lines. Group
-			// aggregates from "All titles" are NOT overlaid here.
+			// "Total" = a filled total area, plus any editions you clicked (overlaid
+			// as their own lines — no stacking, so no double-count). In work-search
+			// mode the base is the WORK's total (its plotted group), not the author's.
 			const singles = lineParts.filter((s) => s.isSingle);
-			return [authorLine, ...singles].filter(Boolean);
+			let base = authorLine;
+			if (searchMode === "title" && !isOverview) {
+				const gs = groups.filter((g) => g.idxs.length);
+				if (gs.length === 1) {
+					base = { key: "worktotal", label: groupLabel(gs[0]), color: "#3f88cc", values: sumSeries(gs[0].idxs), isAggregate: true };
+				}
+			}
+			return [base, ...singles].filter(Boolean);
 		}
 		// area mode
 		const only = isolatedIdxSet();
