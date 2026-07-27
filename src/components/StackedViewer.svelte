@@ -1205,9 +1205,12 @@
 			if (singleIdxs.includes(idx)) {
 				singleIdxs = singleIdxs.filter((i) => i !== idx);
 			} else {
-				// Keep it in its work (so the work total stays intact and the table
-				// keeps it clustered); it's drawn as an overlay line on top.
+				// Pull it out of the work's aggregate so it shows as its own band (no
+				// double-count); the table still clusters it under its work (identity).
+				releaseTitle(idx);
 				singleIdxs = [...singleIdxs, idx];
+				// Flip to the stacked "All titles" view so the edition is visible there.
+				if (chartMode !== "area") chartMode = "area";
 			}
 		}
 	}
