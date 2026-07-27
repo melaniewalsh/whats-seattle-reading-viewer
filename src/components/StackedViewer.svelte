@@ -776,7 +776,12 @@
 	}
 
 	const groupColor = (gi) => TITLE_COLORS[gi % TITLE_COLORS.length];
-	const singleColor = (i) => TITLE_COLORS[i % TITLE_COLORS.length];
+	// Index 0 (site blue) is reserved for the primary aggregate — the author/work
+	// total, or the first plotted work band. Individually-clicked editions start
+	// AFTER the plotted groups so a clicked edition never wears the same blue as
+	// the work band it was pulled out of; it gets its own distinct hue.
+	const plottedGroupCount = $derived(groups.filter((g) => g.idxs.length).length);
+	const singleColor = (i) => TITLE_COLORS[(Math.max(plottedGroupCount, 1) + i) % TITLE_COLORS.length];
 	// A group's color is fixed to its position in `groups` (the chart uses the
 	// same), so the pills can be displayed in any order without colors shuffling.
 	const groupColorFor = (g) => groupColor(groups.findIndex((x) => x.id === g.id));
@@ -1395,6 +1400,10 @@
 		if (isOverview) return current.name;
 		if (searchMode === "title") {
 			const gs = groups.filter((g) => g.idxs.length);
+			// One individually-clicked edition is the focus -> show its FULL edition
+			// title (e.g. "The Odyssey / Homer ; Translated by Emily Wilson"), not the
+			// bare work name, so the heading names exactly what you singled out.
+			if (soloSingleIdxs.length === 1 && gs.length <= 1) return titleCase(current.titles[soloSingleIdxs[0]].title);
 			// Focused on a single work (the searched work) -> its title stays the
 			// heading even when you click individual editions to overlay them.
 			if (gs.length === 1) return groupLabel(gs[0]);
@@ -1542,7 +1551,7 @@
 
 		const singleColorOf = new Map();
 		soloSingleIdxs.forEach((idx, i) => {
-			singleColorOf.set(idx, TITLE_COLORS[i % TITLE_COLORS.length]);
+			singleColorOf.set(idx, singleColor(i));
 		});
 
 		// Each group's all-time total (summed over its editions), for the tooltip's
