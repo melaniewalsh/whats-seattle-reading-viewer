@@ -17,7 +17,8 @@
 		grandTotal = 0,   // the author's (or overview's) all-time total, for the share line
 		shareOf = '',     // phrase after "% of ", e.g. "J. K. Rowling's checkouts"
 		annotations = [],  // [{ month, label, blurb, url }] — a "?" marker above each dip
-		peak = null       // { idx, value, month } — a static callout pointing at the peak
+		peak = null,      // { idx, value, month } — a static callout pointing at the peak
+		legendHoverKey = null  // key of the legend entry being hovered -> light up its band(s)
 	} = $props();
 
 	// Measured from the container (bind:clientWidth) so the chart fits any
@@ -417,6 +418,12 @@
 
     // opacity for a given area layer, given the current hover state
     function pathOpacity(p) {
+        // Hovering a legend entry lights up its band(s) and dims the rest — this
+        // takes precedence over the cursor-driven hover highlight.
+        if (legendHoverKey) {
+            const lk = p.legendKey ?? p.key;
+            return lk === legendHoverKey ? 0.95 : 0.18;
+        }
         if (!hoveredSeriesKey) return 0.9;
         if (p.label === hoveredSeriesKey) return 0.95;
         if (

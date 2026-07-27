@@ -66,6 +66,7 @@
 	let dragWorkKey = $state(null); // work row being dragged in the table (to merge into another)
 	let dragOverWorkKey = $state(null); // work row currently under the dragged work
 	let hlWorkKey = $state(null); // work key highlighted by hovering its pill or its table row (they're linked)
+	let legendHoverKey = $state(null); // legend entry being hovered -> lights up its band on the chart
 	let autoGroupNote = $state(""); // feedback after "Group editions into works"
 	let searchedWork = $state(null); // { name, idxs } of the work searched in title mode, so "Total" can snap back to it
 	let loadError = $state(""); // message when an author fails to load
@@ -1208,7 +1209,14 @@
 			// checkouts aren't double-counted) — but the TABLE clusters by work
 			// identity, so the edition still shows under its work, just floated + lit up.
 			if (singleIdxs.includes(idx)) {
+				// Untick: remove the standalone edition and, if it's an edition of a
+				// plotted work, fold it back into that work's group so the work total
+				// stays whole (rather than leaving the edition orphaned).
 				singleIdxs = singleIdxs.filter((i) => i !== idx);
+				if (searchMode === "title" && searchedWork?.idxs.includes(idx)) {
+					const g = groups.find((gr) => gr.idxs.some((i) => searchedWork.idxs.includes(i)));
+					if (g) g.idxs = [...g.idxs, idx];
+				}
 			} else {
 				// Pull it out of the work's aggregate so it shows as its own band (no
 				// double-count); the table still clusters it under its work (identity).
@@ -1576,7 +1584,10 @@
 				workTotal: isGrouped ? groupTotals.get(gi) : (isSingle ? t.total : null), // work's all-time total, for the "% of author" line
 				isSelected: isGrouped || isSingle, // Expose this flag for sorting and tooltip logic
 				groupIndex: gi, // which group this book belongs to (-1 if none/single)
-				titleIdx: idx // original title index, for isolate filtering
+				titleIdx: idx, // original title index, for isolate filtering
+				// Which legend entry this layer belongs to, so hovering a legend item can
+				// light up its band(s) on the chart. Unselected titles map to "other".
+				legendKey: isGrouped ? `g${groups[gi].id}` : (isSingle ? `s${idx}` : "other")
 			};
 		});
 
@@ -1693,6 +1704,7 @@
 			isSelected: false,
 			groupIndex: -1,
 			titleIdx: -1,
+			legendKey: "other",
 			// The titles rolled into this band, biggest first, so the tooltip can
 			// name what's inside "Other".
 			otherTitles: rest
@@ -1982,10 +1994,12 @@
 							chartMode = "line";
 							// In work-search mode, "Total" returns to just the searched work
 							// so its title heading comes back after "All titles" broadened
-							// the chart to the author's top works.
+							// the chart to the author's top works. KEEP any editions the user
+							// clicked — they stay ticked and overlay the total as their own
+							// lines until the user unticks them (the work group excludes them
+							// so they aren't double-counted).
 							if (searchMode === "title" && searchedWork) {
-								groups = [{ id: ++groupIdCounter, name: searchedWork.name, idxs: [...searchedWork.idxs] }];
-								singleIdxs = [];
+								groups = [{ id: ++groupIdCounter, name: searchedWork.name, idxs: searchedWork.idxs.filter((i) => !singleIdxs.includes(i)) }];
 								activeGroupId = null;
 								isolatedKeys = [];
 							}
@@ -2003,7 +2017,10 @@
 							// where only the single searched work is focused — there "All
 							// titles" should broaden to the author's top titles, not just show
 							// that one work + "Other".
-							const onlySearchedWork = searchMode === "title" && groups.length <= 1 && singleIdxs.length <= 1;
+							// Broaden to the author's top titles only from a clean single-work
+							// view — if the user has clicked editions, keep them (don't re-group
+							// and wipe the selection); just switch to the stacked view.
+							const onlySearchedWork = searchMode === "title" && groups.length <= 1 && singleIdxs.length === 0;
 							if (!isOverview && chartMode !== "area" && ((!groups.length && !singleIdxs.length) || onlySearchedWork)) {
 								autoGroupByWork({ keepChartMode: true });
 							}
@@ -2020,14 +2037,15 @@
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={isOverview ? OVERVIEW_DROPS : []}/>
+				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={isOverview ? OVERVIEW_DROPS : []} legendHoverKey={legendHoverKey}/>
 			</div>
 
 			{#if legendItems.length >= 2}
 				<div class="format-legend">
 					{#each legendItems as it}
 						{#if it.key === "other"}
-							<span class="fmt-leg other-leg" class:hidden-leg={isHidden("other")} class:dim={isolatedKeys.length}>
+							<span class="fmt-leg other-leg" class:hidden-leg={isHidden("other")} class:dim={isolatedKeys.length}
+									onmouseenter={() => (legendHoverKey = "other")} onmouseleave={() => (legendHoverKey = null)}>
 								<span class="fmt-sw" style="background:{it.color}"></span>{it.label}
 								<button class="leg-x" title={isHidden("other") ? "Show “Other” again" : "Hide “Other”"} onclick={() => toggleHidden("other")}>×</button>
 							</span>
@@ -2038,6 +2056,10 @@
 									class:dim={isolatedKeys.length && !isIsolated(it.key)}
 									title="Show only this — click again to bring the others back"
 									onclick={() => toggleIsolate(it.key)}
+									onmouseenter={() => (legendHoverKey = it.key)}
+									onmouseleave={() => (legendHoverKey = null)}
+									onfocus={() => (legendHoverKey = it.key)}
+									onblur={() => (legendHoverKey = null)}
 							><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</button>
 						{:else}
 							<span class="fmt-leg"><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</span>
