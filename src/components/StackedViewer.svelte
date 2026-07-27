@@ -1951,7 +1951,7 @@
 					{:else if searchMode === "title"}
 						by <button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} checkouts all-time{/if}
 					{:else}
-						{compactNumber(current.total)} checkouts · {workGroups.size.toLocaleString()} works
+						{compactNumber(current.total)} checkouts all-time · {workGroups.size.toLocaleString()} works
 					{/if}
 				</span>
 				{#if lookupLinks}
@@ -1991,18 +1991,14 @@
 						type="button"
 						class:active={chartMode === "line"}
 						onclick={() => {
+							// "Total" and "All titles" are lossless VIEW toggles: switching to
+							// the total-line view keeps whatever is plotted (the searched work,
+							// or the broadened top-titles set, plus any clicked editions) so
+							// clicking "All titles" again restores exactly what you had. It no
+							// longer collapses the broadened set back to the searched work.
 							chartMode = "line";
-							// In work-search mode, "Total" returns to just the searched work
-							// so its title heading comes back after "All titles" broadened
-							// the chart to the author's top works. KEEP any editions the user
-							// clicked — they stay ticked and overlay the total as their own
-							// lines until the user unticks them (the work group excludes them
-							// so they aren't double-counted).
-							if (searchMode === "title" && searchedWork) {
-								groups = [{ id: ++groupIdCounter, name: searchedWork.name, idxs: searchedWork.idxs.filter((i) => !singleIdxs.includes(i)) }];
-								activeGroupId = null;
-								isolatedKeys = [];
-							}
+							activeGroupId = null;
+							isolatedKeys = [];
 						}}
 				>
 					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M2 20 L2 14 L8 8 L13 12 L22 3 L22 20 Z" fill="currentColor" opacity="0.85"/></svg>

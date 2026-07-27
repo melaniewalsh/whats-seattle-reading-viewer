@@ -472,7 +472,7 @@
 							<tr>
 								<th class="ta-rank">#</th>
 								<th class="ta-name">Author</th>
-								<th class="ta-count">Checkouts</th>
+								<th class="ta-count">{year === "all" ? "Checkouts" : `Checkouts in ${year}`}</th>
 							</tr>
 						</thead>
 						<tbody>
