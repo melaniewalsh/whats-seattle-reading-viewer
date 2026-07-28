@@ -833,6 +833,11 @@
 		// above misses it, so also strip a dangling "(" clause to end of string.
 		t = t.replace(/\s*\([^)]*$/, " ");
 		t = t.replace(/\[[^\]]*\]/g, " "); // drop cataloging brackets: "[text ]", "[sound recording]", etc.
+		// Audiobooks are often split into "Title, Part 1" / "Title, Part 2" (occasionally
+		// "Title Part 1"). Strip a trailing part marker — requiring a number/number-word
+		// after "part" so real titles like "The Best Part of My Day" aren't touched — so
+		// the parts cluster with each other and with the single-file/print edition.
+		t = t.replace(/[,\s]+part\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3})\b.*$/i, " ");
 		// Repeatedly strip a trailing ":"/";" segment when it's edition/format noise
 		// (series/book/volume, "the original screenplay", "read by <narrator>",
 		// illustrated/anniversary editions, "a novel", etc.) OR an "or, ..."
@@ -858,6 +863,7 @@
 	function cleanTitleForDisplay(title) {
 		let t = (title || "").split(" / ")[0];
 		t = t.replace(/\s*:\s*.*$/, ""); // drop subtitle after the first colon
+		t = t.replace(/[,\s]+part\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3})\b.*$/i, ""); // drop "…, Part 1" audiobook split
 		t = t.replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
 		return titleCase(t);
 	}

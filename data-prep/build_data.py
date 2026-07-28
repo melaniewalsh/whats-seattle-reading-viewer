@@ -992,6 +992,11 @@ def normalize_work_key(title):
     t = re.sub(r"\([^)]*\)", " ", t)
     t = re.sub(r"\s*\([^)]*$", " ", t)
     t = re.sub(r"\[[^\]]*\]", " ", t)
+    # Audiobooks are often split into "Title, Part 1" / "Title, Part 2" (occasionally
+    # "Title Part 1"). Strip a trailing part marker — requiring a number/number-word
+    # after "part" so real titles like "The Best Part of My Day" aren't touched — so
+    # the parts cluster with each other and with the single-file/print edition.
+    t = re.sub(r"[,\s]+part\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3})\b.*$", " ", t, flags=re.I)
 
     def _noise_repl(m):
         seg = m.group(0)
@@ -1011,6 +1016,7 @@ def normalize_work_key(title):
 def clean_title_for_display(title):
     t = (title or "").split(" / ")[0]
     t = re.sub(r"\s*:\s*.*$", "", t)
+    t = re.sub(r"[,\s]+part\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3})\b.*$", "", t, flags=re.I)
     t = re.sub(r"\([^)]*\)", "", t)
     t = re.sub(r"\s+", " ", t).strip()
     return t
