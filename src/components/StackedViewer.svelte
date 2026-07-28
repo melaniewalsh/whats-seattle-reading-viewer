@@ -783,6 +783,14 @@
 	// the work band it was pulled out of; it gets its own distinct hue.
 	const plottedGroupCount = $derived(groups.filter((g) => g.idxs.length).length);
 	const singleColor = (i) => TITLE_COLORS[(Math.max(plottedGroupCount, 1) + i) % TITLE_COLORS.length];
+	// The colour a work's band wears on the chart (the group its editions live in),
+	// so the table row can show the same swatch. "" when the work isn't plotted.
+	function workPlotColor(w) {
+		for (let gi = 0; gi < groups.length; gi++) {
+			if (groups[gi].idxs.length && w.editions.some((e) => groups[gi].idxs.includes(e.idx))) return groupColor(gi);
+		}
+		return "";
+	}
 	// A group's color is fixed to its position in `groups` (the chart uses the
 	// same), so the pills can be displayed in any order without colors shuffling.
 	const groupColorFor = (g) => groupColor(groups.findIndex((x) => x.id === g.id));
@@ -2282,9 +2290,9 @@
 						{@const single = isSingleSelected(t.idx)}
 						{@const singleIdx = single ? singleIdxs.indexOf(t.idx) : -1}
 						{@const ownerColor = owner
-								? TITLE_COLORS[ownerIdx % TITLE_COLORS.length]
+								? groupColor(ownerIdx)
 								: single
-										? TITLE_COLORS[singleIdx % TITLE_COLORS.length]
+										? singleColor(soloSingleIdxs.indexOf(t.idx))
 										: ""}
 						{@const isCurrentOwner = activeGroupId ? owner?.id === activeGroupId : single}
 						<li
@@ -2363,13 +2371,16 @@
 							{#each visibleWorkBlocks as w (w.key)}
 								{@const multi = w.editions.length > 1}
 								{@const fmts = [...new Set(w.editions.map((e) => e.format))]}
+								{@const wColor = workPlotColor(w)}
 								<li
 										class="work-header"
 										role="row"
 										class:cluster={multi}
 										class:expanded={workOpen(w)}
+										class:plotted={!!wColor}
 										class:work-drop={dragOverWorkKey === w.key}
 										class:hl={hlWorkKey === w.key}
+										style={wColor ? `--chip-color:${wColor}` : ""}
 										draggable="true"
 										onmouseenter={() => (hlWorkKey = w.key)}
 										onmouseleave={() => (hlWorkKey === w.key && (hlWorkKey = null))}
@@ -2467,6 +2478,12 @@
 		background: none;
 		flex: none;
 		cursor: pointer;
+	}
+	/* The plot checkbox wears the colour its work/edition has on the chart, so the
+	   table marker matches the plotted band (blue work, its own hue once an edition
+	   is ticked out, back to the work colour when unticked). */
+	.tt-plot input[type="checkbox"] {
+		accent-color: var(--chip-color, var(--color-fg));
 	}
 
 	/* Filter row mirroring the Most Borrowed tab's Show/Genre/Year fields. */
@@ -4361,6 +4378,11 @@
 	}
 	.tt-row.selected:hover {
 		background: var(--color-gray-100);
+	}
+	/* A plotted work's header gets the same coloured left bar as a selected edition,
+	   in its band's colour, so the table mirrors the chart. */
+	.work-header.plotted {
+		box-shadow: inset 3px 0 0 0 var(--chip-color, var(--color-fg));
 	}
 
 	/* Editions matching the table filter: the matching text is highlighted inline
