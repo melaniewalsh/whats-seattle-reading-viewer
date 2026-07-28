@@ -1755,6 +1755,14 @@
 	// so the pill never says "hidden" while the total is on screen.
 	const authorTotalShown = $derived(showAuthorTotal || singleIdxs.length === 0);
 
+	// In a title search, the "Total" line's base is the SEARCHED WORK's own total
+	// (the blue "The Odyssey" band), not the author aggregate — so it's always the
+	// focus of the view and is never decluttered away. Only the author aggregate
+	// (author mode, or a broadened multi-work view) gets the hide/declutter behavior.
+	const lineBaseIsWork = $derived(
+		searchMode === "title" && !isOverview && groups.filter((g) => g.idxs.length).length === 1
+	);
+
 	// What the chart actually draws. "line": author total + per-group and
 	// per-title lines. "area": the stacked-by-title chart (capped). Either way,
 	// when a series is isolated we show only it.
@@ -1769,13 +1777,18 @@
 			// mode the base is the WORK's total (its plotted group), not the author's.
 			const singles = lineParts.filter((s) => s.isSingle);
 			let base = authorLine;
-			if (searchMode === "title" && !isOverview) {
+			if (lineBaseIsWork) {
 				const gs = groups.filter((g) => g.idxs.length);
-				if (gs.length === 1) {
-					base = { key: "worktotal", label: groupLabel(gs[0]), color: "#3f88cc", values: sumSeries(gs[0].idxs), isAggregate: true };
-				}
+				// The searched work's FULL total — all its editions, including any you
+				// clicked out to overlay — so "Total" always shows the whole work, with
+				// the clicked edition drawn on top for comparison.
+				const workIdxs = [...gs[0].idxs, ...singleIdxs.filter((i) => searchedWork?.idxs.includes(i))];
+				base = { key: "worktotal", label: groupLabel(gs[0]), color: "#3f88cc", values: sumSeries(workIdxs), isAggregate: true };
 			}
-			return [authorTotalShown ? base : null, ...singles].filter(Boolean);
+			// The work total is always shown (it's the point of a title search); only the
+			// author aggregate can be hidden once an edition line is overlaid.
+			const showBase = lineBaseIsWork || authorTotalShown;
+			return [showBase ? base : null, ...singles].filter(Boolean);
 		}
 		// area mode
 		const only = isolatedIdxSet();
@@ -2136,7 +2149,7 @@
 					<!-- This doubles as the chart legend: every line on the chart is a row
 					     here, with its color, an "Only" toggle to isolate it, and controls. -->
 					<ul class="group-chips">
-						{#if chartMode === "line"}
+						{#if chartMode === "line" && !lineBaseIsWork}
 							<li class="group-chip-row" class:dim={!authorTotalShown || isolatedKeys.length}>
 								<span class="group-chip static-chip" style="--chip-color: {INK}">
 									<span class="chip-sw"></span>
