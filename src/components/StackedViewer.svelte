@@ -2170,7 +2170,7 @@
 						{#each sortedGroups as g (g.id)}
 							<li
 									class="group-chip-row"
-									class:dim={isolatedKeys.length && !isIsolated(`g${g.id}`)}
+									class:dim={(chartMode === "line" && !lineBaseIsWork) || (isolatedKeys.length && !isIsolated(`g${g.id}`))}
 									class:hl={hlWorkKey === `g${g.id}`}
 									onmouseenter={() => (hlWorkKey = `g${g.id}`)}
 									onmouseleave={() => (hlWorkKey === `g${g.id}` && (hlWorkKey = null))}
