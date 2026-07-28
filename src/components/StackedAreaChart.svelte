@@ -418,11 +418,11 @@
 
     // opacity for a given area layer, given the current hover state
     function pathOpacity(p) {
-        // Hovering a legend entry lights up its band(s) and dims the rest — this
+        // Hovering a legend entry lights up its band(s) and dims the rest hard — this
         // takes precedence over the cursor-driven hover highlight.
         if (legendHoverKey) {
             const lk = p.legendKey ?? p.key;
-            return lk === legendHoverKey ? 0.95 : 0.18;
+            return lk === legendHoverKey ? 0.95 : 0.08;
         }
         if (!hoveredSeriesKey) return 0.9;
         if (p.label === hoveredSeriesKey) return 0.95;
@@ -435,6 +435,17 @@
             return 0.7;
         }
         return 0.3;
+    }
+
+    // The crisp top-edge outlines read stronger than a faded fill at the same
+    // opacity, so during a legend hover fade the non-hovered outlines almost to
+    // nothing — otherwise they "pop" over the dimmed areas.
+    function topLineOpacity(p) {
+        if (legendHoverKey) {
+            const lk = p.legendKey ?? p.key;
+            return lk === legendHoverKey ? 0.95 : 0.03;
+        }
+        return pathOpacity(p);
     }
 </script>
 
@@ -533,7 +544,7 @@
 					stroke={p.color}
 					stroke-width="1.75"
 					stroke-linejoin="round"
-					opacity={pathOpacity(p)}
+					opacity={topLineOpacity(p)}
 					class="area-top"
 				/>
 			{/each}
