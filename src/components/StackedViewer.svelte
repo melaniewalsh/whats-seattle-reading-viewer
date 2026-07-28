@@ -416,12 +416,14 @@
 		if (scroll) (titleEl || chartWrap)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
 	}
 
-	// When the first work is plotted on a line chart, auto-hide the busy
-	// author-total line so the added trend line stands out. Only fires once per
-	// author (tracked by autoHidAuthorTotal), so the Hide/Show toggle still wins
-	// after that.
+	// When you overlay an individual edition on the "Total" line chart, auto-hide the
+	// busy author-total area so the added trend line stands out. Only fires for
+	// overlaid editions (singles) — NOT for broadened works, which in "Total" mode
+	// are summed into the total rather than drawn as their own lines, so hiding the
+	// total there would just leave the chart empty while graying the pill. Fires once
+	// per author (tracked by autoHidAuthorTotal), so the Hide/Show toggle wins after.
 	$effect(() => {
-		if (chartMode === "line" && groups.length + singleIdxs.length > 0 && !autoHidAuthorTotal) {
+		if (chartMode === "line" && singleIdxs.length > 0 && !autoHidAuthorTotal) {
 			showAuthorTotal = false;
 			autoHidAuthorTotal = true;
 		}
@@ -1746,6 +1748,13 @@
 		}));
 	});
 
+	// In "Total" (line) mode the base area IS the author/work total. It's only truly
+	// hidden when the user hid it AND there are overlaid edition lines to look at
+	// instead — hiding it with nothing else would leave an empty chart, so we keep
+	// it. The "Author total" pill's grayed state follows this (not raw showAuthorTotal)
+	// so the pill never says "hidden" while the total is on screen.
+	const authorTotalShown = $derived(showAuthorTotal || singleIdxs.length === 0);
+
 	// What the chart actually draws. "line": author total + per-group and
 	// per-title lines. "area": the stacked-by-title chart (capped). Either way,
 	// when a series is isolated we show only it.
@@ -1766,7 +1775,7 @@
 					base = { key: "worktotal", label: groupLabel(gs[0]), color: "#3f88cc", values: sumSeries(gs[0].idxs), isAggregate: true };
 				}
 			}
-			return [base, ...singles].filter(Boolean);
+			return [authorTotalShown ? base : null, ...singles].filter(Boolean);
 		}
 		// area mode
 		const only = isolatedIdxSet();
@@ -2123,21 +2132,26 @@
 					<p class="auto-group-note">{autoGroupNote}</p>
 				{/if}
 
-				{#if (chartMode === "line" && showAuthorTotal) || groups.some((g) => g.idxs.length) || singleIdxs.length}
+				{#if chartMode === "line" || groups.some((g) => g.idxs.length) || singleIdxs.length}
 					<!-- This doubles as the chart legend: every line on the chart is a row
 					     here, with its color, an "Only" toggle to isolate it, and controls. -->
 					<ul class="group-chips">
 						{#if chartMode === "line"}
-							<li class="group-chip-row" class:dim={!showAuthorTotal || isolatedKeys.length}>
+							<li class="group-chip-row" class:dim={!authorTotalShown || isolatedKeys.length}>
 								<span class="group-chip static-chip" style="--chip-color: {INK}">
 									<span class="chip-sw"></span>
 									<span class="chip-name">Author total</span>
 								</span>
-								<button
-										class="chip-only end"
-										title={showAuthorTotal ? "Hide the author's total line" : "Show the author's total line"}
-										onclick={() => (showAuthorTotal = !showAuthorTotal)}
-								>{showAuthorTotal ? "Hide" : "Show"}</button>
+								<!-- Hiding the total only makes sense when there are overlaid
+								     edition lines to see instead; with nothing else it's the whole
+								     chart, so we drop the toggle rather than gray a visible series. -->
+								{#if singleIdxs.length}
+									<button
+											class="chip-only end"
+											title={showAuthorTotal ? "Hide the author's total line" : "Show the author's total line"}
+											onclick={() => (showAuthorTotal = !showAuthorTotal)}
+									>{showAuthorTotal ? "Hide" : "Show"}</button>
+								{/if}
 							</li>
 						{/if}
 						{#each sortedGroups as g (g.id)}
