@@ -2175,13 +2175,15 @@
 									onmouseenter={() => (hlWorkKey = `g${g.id}`)}
 									onmouseleave={() => (hlWorkKey === `g${g.id}` && (hlWorkKey = null))}
 							>
-								<span
+								<button
+										type="button"
 										class="group-chip"
 										class:active={g.id === activeGroupId}
 										class:drag-over={dragOverId === g.id}
 										style="--chip-color: {groupColorFor(g)}"
-										title="Drag onto another work to merge them"
+										title="Show only this work — or drag onto another work to merge them"
 										draggable="true"
+										onclick={() => { if (chartMode === "line") chartMode = "area"; toggleIsolate(`g${g.id}`); }}
 										ondragstart={(e) => { dragGroupId = g.id; try { e.dataTransfer.setData("text/plain", String(g.id)); e.dataTransfer.effectAllowed = "move"; } catch {} }}
 										ondragend={() => { dragGroupId = null; dragOverId = null; }}
 										ondragover={(e) => { e.preventDefault(); if (dragGroupId !== g.id) dragOverId = g.id; }}
@@ -2194,7 +2196,7 @@
 											onmousemove={(e) => (hoverTip = { text: groupLabel(g), x: e.clientX, y: e.clientY })}
 											onmouseleave={() => (hoverTip = null)}
 									>{groupLabel(g)}</span>
-								</span>
+								</button>
 								<button
 										class="chip-edit"
 										class:on={g.id === activeGroupId}
