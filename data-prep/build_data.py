@@ -1098,6 +1098,21 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         """
     )
 
+    # The freshest slice: the single most recent month of data, per (work, subjects),
+    # for a "most borrowed this month" ranking. `mi` is the month index, so its max
+    # is the latest month (months[-1]).
+    max_mi = con.execute("SELECT max(mi) FROM clean").fetchone()[0]
+    con.execute(
+        f"""
+        CREATE TABLE cwm AS
+        SELECT tw.wk AS wk, c.subjects AS subjects,
+               CAST(sum(c.checkouts) AS BIGINT) AS c
+        FROM clean c JOIN titlework tw ON c.title = tw.title
+        WHERE tw.wk <> '' AND c.mi = {int(max_mi)}
+        GROUP BY wk, subjects
+        """
+    )
+
     GENRE_EXCLUDE = {
         "Fiction", "Nonfiction", "Art", "Illustrated Works", "Informational Works",
         "Instructional & Educational Works", "Readers Publications",
@@ -1126,10 +1141,14 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
 
         gdata = {str(y): topn(per_year.get(y, [])) for y in years}
         gdata["all"] = topn(list(all_time.items()))
+        month_rows = con.execute(
+            f"SELECT wk, CAST(sum(c) AS BIGINT) AS c FROM cwm {where} GROUP BY wk"
+        ).fetchall()
+        gdata["month"] = topn([(wk, c) for wk, c in month_rows])
         data[name] = gdata
         genres_out.append(name)
 
-    for tbl in ("cw", "workmeta", "titlework"):
+    for tbl in ("cw", "cwm", "workmeta", "titlework"):
         con.execute(f"DROP TABLE IF EXISTS {tbl}")
 
     # Resolve each unique work's cover URL now (Open Library search), so the site
@@ -1143,9 +1162,9 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         print(f"  WARNING: cover baking failed ({e}); site will resolve covers at runtime")
 
     (out_dir / "top-works.json").write_bytes(
-        _dumps({"years": years, "genres": genres_out, "data": data})
+        _dumps({"years": years, "genres": genres_out, "latestMonth": months[-1], "data": data})
     )
-    print(f"  wrote top-works.json ({len(genres_out)} genres x {len(years)} years)")
+    print(f"  wrote top-works.json ({len(genres_out)} genres x {len(years)} years; latest month {months[-1]})")
 
 
 _TITLE_STOP = {"a", "an", "the", "and", "or", "of", "to", "in", "for", "is"}

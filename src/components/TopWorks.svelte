@@ -77,7 +77,8 @@
 		}
 		data = d;
 		if (!data.genres.includes(genre)) genre = "All genres";
-		if (year !== "all" && !data.years.includes(Number(year))) year = "all";
+		if (year === "month") { if (!data.latestMonth) year = "all"; }
+		else if (year !== "all" && !data.years.includes(Number(year))) year = "all";
 	});
 	// Curated genres (gallery + top of the dropdown) and the rest (filterable
 	// under a divider).
@@ -163,9 +164,22 @@
 	});
 	const galleryBooks = $derived(gallerySections.flatMap((s) => s.books));
 
-	// Year stepper for gallery mode (NYT "previous week" arrows, but by year):
-	// ["all", 2025, 2024, …]. ‹ steps toward all-time, › steps to older years.
-	const yearSeq = $derived(data ? ["all", ...[...data.years].reverse().map(String)] : ["all"]);
+	// The single freshest month of data (from the build), e.g. "2026-07", shown as
+	// its own "this month" ranking. Only present once the data has been rebuilt with
+	// it; older data just omits the option.
+	const latestMonth = $derived(data?.latestMonth || null);
+	const monthLabel = $derived(latestMonth ? fmtMonth(latestMonth) : "");
+	function fmtMonth(ym) {
+		const [y, m] = (ym || "").split("-");
+		const names = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+		return m ? `${names[Number(m) - 1]} ${y}` : ym;
+	}
+
+	// Year stepper for gallery mode (NYT "previous week" arrows). The freshest month
+	// leads, then all-time, then years newest→oldest. ‹ steps toward older, › newer.
+	const yearSeq = $derived(
+		data ? [...(latestMonth ? ["month"] : []), "all", ...[...data.years].reverse().map(String)] : ["all"]
+	);
 	const yearIdx = $derived(yearSeq.indexOf(String(year)));
 	function stepYear(delta) {
 		const i = yearIdx + delta;
@@ -226,7 +240,7 @@
 	});
 
 
-	const yearLabel = (y) => (y === "all" ? "all time" : y);
+	const yearLabel = (y) => (y === "all" ? "all time" : y === "month" ? monthLabel : y);
 
 	function shareTarget() {
 		const link = window.location.href;
@@ -447,6 +461,7 @@
 			<label class="ta-field">
 				<span>Year</span>
 				<select bind:value={year}>
+					{#if latestMonth}<option value="month">This month ({monthLabel})</option>{/if}
 					<option value="all">All time</option>
 					{#each [...data.years].reverse() as y}
 						<option value={String(y)}>{y}</option>
@@ -471,7 +486,7 @@
 
 		<div class="gal-yearnav">
 			<button class="gal-arrow" onclick={() => stepYear(1)} disabled={yearIdx >= yearSeq.length - 1} aria-label="Earlier year">‹</button>
-			<span class="gal-yearlabel">{year === "all" ? "All time" : year}</span>
+			<span class="gal-yearlabel">{year === "all" ? "All time" : year === "month" ? "This month" : year}</span>
 			<button class="gal-arrow" onclick={() => stepYear(-1)} disabled={yearIdx <= 0} aria-label="More recent">›</button>
 		</div>
 		{#if !galleryMode}
@@ -534,7 +549,7 @@
 					<tr>
 						<th class="ta-rank">#</th>
 						<th class="ta-name">Work</th>
-						<th class="ta-count">{year === "all" ? "Checkouts" : `Checkouts in ${year}`}</th>
+						<th class="ta-count">{year === "all" ? "Checkouts" : `Checkouts in ${year === "month" ? monthLabel : year}`}</th>
 					</tr>
 				</thead>
 				<tbody>
