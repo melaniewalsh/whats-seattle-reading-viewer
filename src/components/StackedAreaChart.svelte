@@ -230,6 +230,23 @@
 		}))
 	);
 
+	// Hovering a legend entry in the stacked view spotlights that series: it's
+	// redrawn (summed across its editions) from baseline 0, so you read its REAL
+	// values instead of its elevated position in the stack — which would otherwise
+	// make a band look like it has checkouts in months where it has none.
+	const spotlightArea = $derived.by(() => {
+		if (!legendHoverKey || mode !== 'area' || !stackedSeries.length) return null;
+		const matched = stackedSeries.filter((s) => (s.legendKey ?? s.key) === legendHoverKey);
+		if (!matched.length) return null;
+		const n = matched[0].values.length;
+		const vals = Array.from({ length: n }, (_, i) => matched.reduce((sum, s) => sum + (s.values[i] || 0), 0));
+		return {
+			color: matched[0].color,
+			fill: d3area().x((_, i) => x(i)).y0(() => y(0)).y1((_, i) => y(vals[i]))(vals),
+			line: d3line().x((_, i) => x(i)).y((_, i) => y(vals[i]))(vals)
+		};
+	});
+
 	// In line ("Total") mode, fill the area under the aggregate/total line so the
 	// default view reads as a filled area chart (comparison lines still overlay).
 	const aggregateArea = $derived.by(() => {
@@ -422,7 +439,10 @@
         // takes precedence over the cursor-driven hover highlight.
         if (legendHoverKey) {
             const lk = p.legendKey ?? p.key;
-            return lk === legendHoverKey ? 0.95 : 0.08;
+            // In area mode the matched band is redrawn from baseline 0 (spotlightArea),
+            // so hide its stacked copy; in line mode the lines are already from 0.
+            if (lk === legendHoverKey) return mode === 'area' ? 0 : 0.95;
+            return 0.08;
         }
         if (!hoveredSeriesKey) return 0.9;
         if (p.label === hoveredSeriesKey) return 0.95;
@@ -443,7 +463,8 @@
     function topLineOpacity(p) {
         if (legendHoverKey) {
             const lk = p.legendKey ?? p.key;
-            return lk === legendHoverKey ? 0.95 : 0.03;
+            if (lk === legendHoverKey) return mode === 'area' ? 0 : 0.95;
+            return 0.03;
         }
         return pathOpacity(p);
     }
@@ -548,6 +569,11 @@
 					class="area-top"
 				/>
 			{/each}
+			{#if spotlightArea}
+				<!-- Legend-hovered series, redrawn from baseline 0 to show its real values -->
+				<path d={spotlightArea.fill} fill={spotlightArea.color} fill-opacity="0.78" stroke="none" opacity="0.95" class="area-path spotlight" />
+				<path d={spotlightArea.line} fill="none" stroke={spotlightArea.color} stroke-width="1.75" stroke-linejoin="round" opacity="0.95" class="area-top spotlight" />
+			{/if}
 		{/if}
 
 		<!-- Static peak callout: a dot on the peak + its month and checkouts -->
