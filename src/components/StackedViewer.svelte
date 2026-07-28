@@ -12,6 +12,7 @@
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 	import WikiCard from "$components/WikiCard.svelte";
+	import BorrowMenu from "$components/BorrowMenu.svelte";
 	import Switch from "$components/ui/Switch.svelte";
 	import { getMonths, searchAuthors, searchTitles, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks } from "$components/db.js";
 
@@ -1992,17 +1993,15 @@
 				</span>
 				{#if lookupLinks}
 					<span class="hdr-sep" aria-hidden="true">·</span>
-					<a class="hdr-spl" href={lookupLinks.spl} target="_blank" rel="noopener noreferrer" title="Find in the Seattle Public Library catalog"><img class="hdr-spl-ic" src="{base}/spl-logo.png" alt="SPL catalog" width="16" height="16" /></a>
+					<BorrowMenu q={searchMode === "title" ? `${headingText} ${displayName(current.name)}` : headingText} />
 					<span class="lookup-wrap">
 						<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere">Learn more <span class="hdr-caret" aria-hidden="true">▾</span></button>
 						{#if lookupOpen}
 							<button class="share-backdrop" aria-label="Close" onclick={() => (lookupOpen = false)}></button>
 							<div class="lookup-menu" role="menu">
-								<a role="menuitem" class="lm-spl" href={lookupLinks.spl} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Seattle Public Library <span aria-hidden="true">↗</span></a>
 								<a role="menuitem" href={lookupLinks.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Wikipedia <span aria-hidden="true">↗</span></a>
 								<a role="menuitem" href={lookupLinks.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Goodreads <span aria-hidden="true">↗</span></a>
 								<a role="menuitem" href={lookupLinks.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>LibraryThing <span aria-hidden="true">↗</span></a>
-								<a role="menuitem" href={lookupLinks.worldcat} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>WorldCat <span aria-hidden="true">↗</span></a>
 							</div>
 						{/if}
 					</span>

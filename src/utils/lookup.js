@@ -9,5 +9,6 @@ export function lookupUrls(q) {
 		goodreads: `https://www.goodreads.com/search?q=${e}`,
 		librarything: `https://www.librarything.com/search.php?search=${e}`,
 		worldcat: `https://search.worldcat.org/search?q=${e}`,
+		bookshop: `https://bookshop.org/search?keywords=${e}`,
 	};
 }
