@@ -1369,7 +1369,10 @@
 			// expanded rows show ONLY the matching editions -- but the "N editions" badge
 			// and the checkout total stay the work's FULL numbers, so a search never
 			// makes a cluster look smaller than it is.
-			if (f && !nameMatch && matchCount === 0) continue;
+			// EXCEPTION: while dragging a title or work, keep every work visible so any
+			// of them can be a drop target -- otherwise you can't drag a matched title
+			// INTO a work that doesn't itself match the current filter.
+			if (f && !nameMatch && matchCount === 0 && dragIdx === null && dragWorkKey === null) continue;
 			// A plotted individual edition floats to the top of its work, so the one
 			// you're looking at is visually prioritized; otherwise by checkouts.
 			editions.sort((x, y) => {
@@ -3771,10 +3774,16 @@
 		gap: 0;
 	}
 
-	/* linked highlight (see .work-header.hl): ring the name pill when its work
-	   row is hovered, and vice versa */
-	.group-chip-row.hl .group-chip {
+	/* linked highlight (see .work-header.hl): ring the WHOLE pill when its work row
+	   is hovered, and vice versa. The ring lives on the ROW so it wraps both the
+	   name and the pencil as one stadium — not just the name segment (whose square
+	   right edge left the pencil sticking out past the ring). */
+	.group-chip-row.hl {
+		border-radius: 999px;
 		box-shadow: 0 0 0 2px #e58a00;
+	}
+	.group-chip-row.hl .group-chip,
+	.group-chip-row.hl .chip-edit {
 		border-color: #e58a00;
 	}
 
