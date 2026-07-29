@@ -47,6 +47,9 @@
 		position: relative;
 		display: inline-flex;
 	}
+	/* The single accent control — shares the shared-control box (0.82rem/600,
+	   6px 14px padding, 1.5px border, 999px radius) but fills blue. The border is
+	   transparent so its height matches the outlined controls beside it. */
 	.borrow-btn {
 		display: inline-flex;
 		align-items: center;
@@ -54,8 +57,9 @@
 		font-family: var(--font-sans);
 		font-size: 0.82rem;
 		font-weight: 600;
-		padding: 5px 11px;
-		border: none;
+		line-height: 1;
+		padding: 6px 14px;
+		border: 1.5px solid transparent;
 		border-radius: 999px;
 		background: #3f88cc;
 		color: #fff;

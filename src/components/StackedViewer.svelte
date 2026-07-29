@@ -2895,14 +2895,22 @@
 		background: var(--color-gray-100);
 	}
 
+	/* ---- Shared control metrics ----------------------------------------------
+	   Every pill control on the page (Total/All titles, Borrow, Learn, Download,
+	   Share, Add/edit) shares this box: 0.82rem/600 text, 6px 14px padding, a
+	   1.5px border, and a 999px radius, so they all sit at the SAME height. Neutral
+	   controls are outlined; the one accent (Borrow) fills blue but keeps a
+	   transparent 1.5px border so its height matches. Emphasis comes from fill,
+	   never from size. */
 	.chart-action {
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: 0.82rem;
 		font-weight: 600;
-		padding: 6px 12px;
+		line-height: 1;
+		padding: 6px 14px;
 		border: 1.5px solid var(--color-border);
 		border-radius: 999px;
 		background: var(--color-white);
@@ -3300,7 +3308,8 @@
 		color: var(--color-fg-light);
 		opacity: 0.55;
 	}
-	/* "Learn" — a purple pill mirroring the blue "Borrow" button next to it. */
+	/* "Learn" — a neutral outlined pill (secondary), same box as the shared control
+	   spec. Borrow is the single accent; Learn stays quiet beside it. */
 	.hdr-chip {
 		display: inline-flex;
 		align-items: center;
@@ -3308,21 +3317,23 @@
 		font-family: var(--font-sans);
 		font-size: 0.82rem;
 		font-weight: 600;
-		padding: 5px 11px;
-		border: none;
+		line-height: 1;
+		padding: 6px 14px;
+		border: 1.5px solid var(--color-border);
 		border-radius: 999px;
-		background: #6a4c93;
-		color: #fff;
+		background: var(--color-white);
+		color: var(--color-fg);
 		cursor: pointer;
 		white-space: nowrap;
-		transition: background 0.12s;
+		transition: border-color 0.12s, background 0.12s;
 	}
 	.hdr-chip:hover {
-		background: #573d7a;
+		border-color: var(--color-fg-light);
+		background: #f7f7f7;
 	}
 	.hdr-caret {
 		font-size: 0.7em;
-		opacity: 0.85;
+		opacity: 0.6;
 	}
 	/* SPL catalog icon link, sitting just left of "Learn more". */
 	.hdr-spl {
@@ -4089,7 +4100,7 @@
 		display: inline-flex;
 		gap: 0;
 		margin: 0 0 14px;
-		border: 1px solid var(--color-border);
+		border: 1.5px solid var(--color-border);
 		border-radius: 999px;
 		overflow: hidden;
 		font-family: var(--font-sans);
@@ -4099,8 +4110,10 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		padding: 6px 15px;
-		font-size: 0.85rem;
+		padding: 6px 14px;
+		font-size: 0.82rem;
+		font-weight: 600;
+		line-height: 1;
 		background: var(--color-white);
 		border: none;
 		color: var(--color-fg-light);
