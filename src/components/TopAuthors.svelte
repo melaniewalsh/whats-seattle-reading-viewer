@@ -550,7 +550,7 @@
 		margin: 0;
 	}
 	.rank-sub {
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 		line-height: 1.4;
 		color: var(--color-fg-light);
 		margin: 6px 0 0;
@@ -569,7 +569,7 @@
 		flex-direction: column;
 		gap: 4px;
 		font-family: var(--font-sans);
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
@@ -578,7 +578,7 @@
 	.ta-field select {
 		width: 100%;
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		font-weight: 500;
 		text-transform: none;
 		letter-spacing: 0;
@@ -606,7 +606,7 @@
 		gap: 16px;
 	}
 	.aside-h {
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
@@ -614,7 +614,7 @@
 		margin: 0 0 5px;
 	}
 	.aside-p {
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		line-height: 1.5;
 		color: var(--color-fg-light);
 		margin: 0 0 8px;
@@ -694,7 +694,7 @@
 	}
 	.gal-title {
 		font-family: var(--font-serif);
-		font-size: 1.25rem;
+		font-size: var(--text-xl);
 		font-weight: 700;
 		color: var(--color-fg);
 		margin: 0;
@@ -742,7 +742,7 @@
 	.gal-rank {
 		flex: none;
 		font-family: var(--font-serif);
-		font-size: 1.5rem;
+		font-size: var(--text-2xl);
 		font-weight: 400;
 		line-height: 1;
 		color: var(--color-fg-light);
@@ -790,7 +790,7 @@
 		text-align: left;
 		font-family: inherit;
 		font-weight: 700;
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		line-height: 1.25;
 		color: var(--color-fg);
 		background: none;
@@ -802,14 +802,14 @@
 		text-decoration: underline;
 	}
 	.gal-count {
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		font-weight: 700;
 		color: #3f88cc;
 		margin-top: 4px;
 		font-variant-numeric: tabular-nums;
 	}
 	.gal-sum {
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		line-height: 1.45;
 		color: var(--color-fg-light);
 		margin: 7px 0 0;
@@ -818,7 +818,7 @@
 		min-height: 3.2em;
 	}
 	.row-sum {
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 		font-weight: 400;
 		line-height: 1.45;
 		color: var(--color-fg-light);
@@ -837,7 +837,7 @@
 		gap: 4px;
 		white-space: nowrap;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--color-fg-light);
 		text-decoration: none;
@@ -863,7 +863,7 @@
 		align-items: center;
 		gap: 6px;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		line-height: 1;
 		padding: 6px 14px;
@@ -908,7 +908,7 @@
 		border-radius: 7px;
 		background: none;
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--color-fg);
 		cursor: pointer;
@@ -925,7 +925,7 @@
 		height: 22px;
 		flex: none;
 		border-radius: 5px;
-		font-size: 0.75rem;
+		font-size: var(--text-xs);
 		font-weight: 700;
 		color: #fff;
 		font-style: normal;
@@ -944,13 +944,13 @@
 		background: var(--color-border);
 	}
 	.share-msg {
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: #2e7d32;
 		align-self: center;
 	}
 	.ta-caption {
-		font-size: 0.92rem;
+		font-size: var(--text-base);
 		line-height: 1.5;
 		color: var(--color-fg-light);
 		margin: 0 0 14px;
@@ -964,7 +964,7 @@
 	}
 	.ta-note {
 		margin: -6px 0 16px;
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 	}
 	.ta-footnote {
 		margin: 20px 0 0;
@@ -981,7 +981,7 @@
 	.ta-note p {
 		margin: 6px 0 0;
 		padding-left: 2px;
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		line-height: 1.5;
 		color: var(--color-fg-light);
 		max-width: 60ch;
@@ -991,7 +991,7 @@
 	}
 	.ta-tags {
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		color: var(--color-fg-light);
 		margin: -8px 0 16px;
 		line-height: 1.9;
@@ -1003,7 +1003,7 @@
 	.ta-tag {
 		display: inline-block;
 		font-family: var(--font-mono, monospace);
-		font-size: 0.74rem;
+		font-size: var(--text-xs);
 		background: var(--color-gray-100);
 		color: var(--color-fg);
 		border-radius: 5px;
@@ -1014,11 +1014,11 @@
 		width: 100%;
 		table-layout: fixed;
 		border-collapse: collapse;
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 	}
 	.ta-table th {
 		text-align: left;
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
@@ -1050,7 +1050,7 @@
 		width: 7rem;
 	}
 	.ta-num {
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		font-weight: 700;
 		color: var(--color-fg);
 	}
