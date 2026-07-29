@@ -2002,8 +2002,9 @@
 						{compactNumber(current.total)} checkouts all-time · {workGroups.size.toLocaleString()} works
 					{/if}
 				</span>
-				{#if lookupLinks}
-					<span class="hdr-sep" aria-hidden="true">·</span>
+			</div>
+			{#if lookupLinks}
+			<div class="hdr-actions">
 					<BorrowMenu q={searchMode === "title" ? `${headingText} ${displayName(current.name)}` : headingText} />
 					<span class="lookup-wrap">
 						<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere">Learn more <span class="hdr-caret" aria-hidden="true">▾</span></button>
@@ -2016,8 +2017,8 @@
 							</div>
 						{/if}
 					</span>
-				{/if}
 			</div>
+			{/if}
 			{#if (searchMode === "title" && genreRanks.length) || subjectTerms.length}
 				<div class="genre-ranks">
 					{#if searchMode === "title"}
@@ -3066,6 +3067,29 @@
 	}
 
 	@media (max-width: 860px) {
+		/* Download data / Download image / Share span the width evenly on phones
+		   instead of wrapping. (The "Add/edit titles" button is positioned absolutely
+		   here, so it's out of this flex flow.) */
+		.chart-actions {
+			flex-wrap: nowrap;
+			justify-content: stretch;
+			gap: 6px;
+		}
+		.chart-actions > .chart-action,
+		.chart-actions > .share-wrap {
+			flex: 1 1 0;
+			min-width: 0;
+		}
+		.chart-actions > .chart-action,
+		.chart-actions .share-wrap > .chart-action {
+			justify-content: center;
+			padding: 8px 4px;
+			font-size: 0.74rem;
+			white-space: nowrap;
+		}
+		.chart-actions .share-wrap > .chart-action {
+			width: 100%;
+		}
 		.split {
 			display: block;
 		}
@@ -3204,7 +3228,7 @@
 		flex-wrap: wrap;
 		align-items: baseline;
 		gap: 3px 8px;
-		margin: 3px 0 14px;
+		margin: 3px 0 8px;
 		font-family: var(--font-sans);
 		color: var(--color-fg-light);
 	}
@@ -3212,6 +3236,14 @@
 		font-family: var(--font-sans);
 		color: var(--color-fg-light);
 		margin: 0;
+	}
+	/* Borrow + Learn more sit on their own line under the byline, left-aligned. */
+	.hdr-actions {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin: 0 0 14px;
 	}
 	/* Author name in the work heading — click to switch to that author's search. */
 	.author-link {
