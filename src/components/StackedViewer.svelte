@@ -2165,9 +2165,6 @@
 			<div class="groups-panel">
 				<div class="groups-header">
 					<span class="groups-label">On the chart</span>
-					<div class="groups-actions">
-						<button class="new-group" onclick={addGroup}>Make a custom work</button>
-					</div>
 				</div>
 				{#if autoGroupNote}
 					<p class="auto-group-note">{autoGroupNote}</p>
@@ -2298,11 +2295,12 @@
 					/>
 				</div>
 				<div class="titles">
-				<div class="works-min-note">Every title associated with this author is listed here. Drag and drop titles into the correct Work, exclude ones that don't belong, or make your own.<details class="works-more"><summary>How does this work?</summary><span class="works-more-body">We automatically cluster related titles into “Works”—attempting to gather ebooks, audiobooks, and print editions into one category. There may be incorrect or missing titles, especially with series. <a class="works-why" href="#method-clustering">Why is clustering works so hard?</a></span></details></div>
+				<div class="works-min-note">Drag and drop titles into the correct Work, exclude ones that don't belong, or make your own.<details class="works-more"><summary>How does this work?</summary><span class="works-more-body">Every title associated with this author is listed here. We automatically cluster related titles into “Works”—attempting to gather ebooks, audiobooks, and print editions into one category. There may be incorrect or missing titles, especially with series. <a class="works-why" href="#method-clustering">Why is clustering works so hard?</a></span></details></div>
 				{#if titleSort === "work"}
 					<div class="works-actions">
 						<button type="button" class="wa-btn" onclick={saveGroupings} title="Remember this author's grouping in your browser, so your fixes are here next time">💾 Save my groupings</button>
 						<button type="button" class="wa-btn wa-reset" onclick={clearGroupings} title="Discard custom grouping and go back to automatic clustering">↺ Reset to automatic</button>
+						<button type="button" class="wa-btn" onclick={addGroup} title="Start a new, empty work you can drag titles into">＋ Make a custom work</button>
 						{#if curator}<button type="button" class="wa-btn wa-export" onclick={exportGroupings} title="Copy this author's groupings to paste into work_overrides.json">⬇ Export groupings</button>{/if}
 						{#if savedFlash}<span class="wa-saved" role="status">✓ custom grouping saved</span>{/if}
 						{#if exportNote}<span class="wa-saved" role="status">{exportNote}</span>{/if}
