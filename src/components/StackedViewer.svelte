@@ -4351,10 +4351,12 @@
 		.split-side .tt-head,
 		.split-side .tt-row,
 		.split-side .work-header {
-			/* Work title gets the bulk; the Edition column here holds only the small
-			   "N editions" pill (collapsed rows) — expanded edition titles span both
-			   columns (.span-work), so they're unaffected by this split. */
-			grid-template-columns: 22px minmax(0, 1.9fr) minmax(0, 1fr) minmax(42px, auto);
+			/* Work title gets all the slack (minmax(0,1fr)); the Edition column here
+			   holds only the small "N editions" pill (collapsed rows), so size it to its
+			   content (auto) — a fixed fraction clipped the pill's trailing "s".
+			   Expanded edition titles span both columns (.span-work), so they're
+			   unaffected by this split. */
+			grid-template-columns: 22px minmax(0, 1fr) auto minmax(42px, auto);
 			gap: 8px;
 			padding: 7px 8px;
 		}
