@@ -557,13 +557,13 @@
 </div>
 
 <style>
-	.genres { margin-top: 34px; }
+	.genres { margin-top: var(--space-6); }
 	.genres input[type="checkbox"] {
 		appearance: auto; -webkit-appearance: auto; width: 16px; height: 16px;
 		accent-color: var(--color-fg); background: none; flex: none; cursor: pointer; margin: 0;
 	}
 	.meta { color: var(--color-fg-light); font-family: var(--font-sans); font-size: var(--text-base); margin: 0 0 10px; }
-	.sh-note { font-family: var(--font-sans); font-size: var(--text-sm); margin: 0 0 18px; }
+	.sh-note { font-family: var(--font-sans); font-size: var(--text-sm); margin: 0 0 var(--space-5); }
 	.sh-note summary { cursor: pointer; color: var(--color-fg-light); list-style-position: inside; width: fit-content; }
 	.sh-note summary:hover { color: var(--color-fg); }
 	.sh-note p { font-size: var(--text-sm); line-height: 1.55; color: var(--color-fg-light); margin: 8px 0 0; max-width: 68ch; }
@@ -571,12 +571,12 @@
 	.loading, .load-error { font-family: var(--font-sans); color: var(--color-fg-light); }
 
 	/* Section masthead — matches the Most Borrowed tab (serif title + subtitle + rule). */
-	.modebar { border-bottom: 3px solid var(--color-fg); padding-bottom: 12px; margin: 34px 0 18px; }
+	.modebar { border-bottom: 3px solid var(--color-fg); padding-bottom: var(--space-3); margin: var(--space-6) 0 var(--space-5); }
 	.genre-title { font-family: var(--font-display, var(--font-serif)); font-weight: 700; font-size: clamp(1.7rem, 3.4vw, 2.5rem); color: var(--color-fg); margin: 0; line-height: 1.05; }
 	.mode-note { font-family: var(--font-sans); font-size: var(--text-base); color: var(--color-fg-light); margin: 6px 0 0; line-height: 1.4; }
 	.genre-caption { font-family: var(--font-sans); font-size: var(--text-base); color: var(--color-fg-light); margin: 0 0 8px; line-height: 1.4; }
 	/* "Focus genre" field — mirrors the Most Borrowed tab's filter dropdowns. */
-	.gt-controls { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+	.gt-controls { display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap; margin: 0 0 var(--space-4); }
 	.gt-field { display: inline-flex; flex-direction: column; gap: 4px; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg-light); min-width: 260px; }
 	.gt-field.grow { flex: 1; }
 	.gt-search { position: relative; }
@@ -621,7 +621,7 @@
 	.gleg-sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
 	.gleg-showall { border: 1px solid var(--color-border); background: var(--color-white); padding: 3px 12px; border-radius: 999px; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); cursor: pointer; }
 
-	.gtable-head-row { display: flex; align-items: baseline; justify-content: space-between; margin: 26px 0 4px; gap: 12px; }
+	.gtable-head-row { display: flex; align-items: baseline; justify-content: space-between; margin: var(--space-5) 0 var(--space-1); gap: var(--space-3); }
 	.gtable-title { font-family: var(--font-serif); font-size: var(--text-xl); margin: 0; }
 	.bulk { display: flex; gap: 6px; }
 	.bulk button { font-family: var(--font-sans); font-size: var(--text-xs); border: 1px solid var(--color-border); background: var(--color-white); color: var(--color-fg-light); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
