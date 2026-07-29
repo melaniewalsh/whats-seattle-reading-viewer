@@ -1053,9 +1053,12 @@
 		color: #3f88cc;
 		white-space: nowrap;
 	}
-	/* Search shortcut — styled like an input, acts as a link to the Search view. */
+	/* Search shortcut — styled like an input, acts as a link to the Search view.
+	   margin-left:auto shoves it to the right so it sits next to About + the menu
+	   (rather than floating in the middle). */
 	.mast-search {
-		flex: 1 1 auto;
+		flex: 0 1 320px;
+		margin-left: auto;
 		max-width: 340px;
 		display: inline-flex;
 		align-items: center;
