@@ -288,6 +288,14 @@
 					<img class="mast-logo" src="{base}/favicon.png" alt="" width="30" height="30" />
 					<span class="mast-title">{copy.title}</span>
 				</button>
+				<!-- Header shortcut to the Search view; behaves like a search field but
+				     just navigates there on click (the real search box lives on the page). -->
+				<button class="mast-search" onclick={() => go("search")} aria-label="Search authors or titles">
+					<svg class="mast-search-ic" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+						<circle cx="9" cy="9" r="6" /><line x1="13.5" y1="13.5" x2="18" y2="18" />
+					</svg>
+					<span class="mast-search-ph">Search authors or titles</span>
+				</button>
 				<nav class="mast-meta" aria-label="Site">
 					<button class="mast-metalink" class:active={tab === "about"} aria-current={tab === "about" ? "page" : undefined} onclick={() => go("about")}>About</button>
 					<button class="mast-burger" aria-label="Open menu" aria-expanded={menuOpen} aria-controls="site-menu" onclick={() => (menuOpen = true)}>
@@ -1045,6 +1053,43 @@
 		color: #3f88cc;
 		white-space: nowrap;
 	}
+	/* Search shortcut — styled like an input, acts as a link to the Search view. */
+	.mast-search {
+		flex: 1 1 auto;
+		max-width: 340px;
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		height: 34px;
+		padding: 0 14px;
+		background: var(--color-gray-100);
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		color: var(--color-fg);
+		cursor: pointer;
+		transition: border-color 0.12s, background 0.12s;
+	}
+	.mast-search:hover {
+		border-color: #3f88cc;
+		background: #fff;
+	}
+	.mast-search:focus-visible {
+		outline: 2px solid rgba(63, 136, 204, 0.5);
+		outline-offset: 2px;
+	}
+	.mast-search-ic {
+		width: 16px;
+		height: 16px;
+		flex: none;
+		color: #3f88cc;
+	}
+	.mast-search-ph {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 	/* Top-right meta links (About, …) — small and understated. */
 	.mast-meta {
 		display: flex;
@@ -1165,11 +1210,18 @@
 	}
 	.menu-link:hover { color: #3f88cc; }
 	@media (max-width: 600px) {
-		.masthead-top { padding: 6px 14px 0; }
+		/* Wrap so the search bar drops to its own full-width row under the
+		   wordmark + hamburger instead of crowding them. */
+		.masthead-top { flex-wrap: wrap; padding: 6px 14px 8px; }
 		.mast-title { font-size: var(--text-sm); }
 		/* About is in the hamburger menu on phones — drop the standalone link so the
 		   wordmark has room. */
 		.mast-metalink { display: none; }
+		.mast-search {
+			order: 3;
+			flex-basis: 100%;
+			max-width: none;
+		}
 	}
 
 	/* "Back to rankings" shown after you open a trend from the Rankings tab. */

@@ -285,11 +285,18 @@
 	let hoverIndex = $state(null);
 	let hoveredSeriesKey = $state(null); // Track the active book layer
 	let pointerY = $state(0); // cursor height (viewBox units), for a steady tooltip
+	let svgEl; // the plot <svg>, for hit-testing taps outside it
+	// On touch there's no hover: a tap PINS the tooltip so it survives the finger
+	// lifting, and it's placed away from the finger (see tooltipTop). Mouse keeps
+	// the live hover behaviour (pinned stays false).
+	let pinned = $state(false);
 
-	function onMove(event) {
+	// Shared hit-test: set hoverIndex (month) + hoveredSeriesKey (layer) from a
+	// pointer position over the plot.
+	function locate(event) {
 		const svg = event.currentTarget.ownerSVGElement || event.currentTarget;
 		const r = svg.getBoundingClientRect();
-		
+
 		// horizontal index (Month)
 		const px = (event.clientX - r.left) * (width / r.width);
 		const i = Math.round(x.invert(px));
@@ -321,10 +328,39 @@
 		}
 	}
 
+	function onMove(event) {
+		// Touch moves only matter once a tap has pinned (drag to scrub); ignore the
+		// browser's synthetic touch-hover noise otherwise.
+		if (event.pointerType === 'touch' && !pinned) return;
+		locate(event);
+	}
+
+	function onDown(event) {
+		if (event.pointerType !== 'touch') return; // mouse uses hover, not tap
+		event.preventDefault(); // don't let the tap turn into text selection / a click
+		pinned = true;
+		locate(event);
+	}
+
 	function onLeave() {
+		if (pinned) return; // a pinned (touch) tooltip stays put when the finger lifts
 		hoverIndex = null;
 		hoveredSeriesKey = null;
 	}
+
+	function dismiss() {
+		pinned = false;
+		hoverIndex = null;
+		hoveredSeriesKey = null;
+	}
+
+	// While pinned, a tap anywhere outside the plot dismisses the tooltip.
+	$effect(() => {
+		if (!pinned) return;
+		const handler = (e) => { if (!svgEl || !svgEl.contains(e.target)) dismiss(); };
+		document.addEventListener('pointerdown', handler, true);
+		return () => document.removeEventListener('pointerdown', handler, true);
+	});
 
 	const MONTH_NAMES = [
 		'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
@@ -347,10 +383,17 @@
 	// Float the tooltip at the cursor's height (not the data point's) so it tracks
 	// the mouse smoothly instead of bouncing up and down a spiky line. The dot and
 	// dashed guide still mark the exact data point.
+	// When pinned (touch), park the card on the OPPOSITE vertical half from the
+	// finger so the finger never covers it: finger in the lower half → card at top,
+	// finger in the upper half → card at bottom.
 	const tooltipTop = $derived(
-		hoverIndex === null ? margin.top : Math.min(Math.max(pointerY, margin.top), height - margin.bottom)
+		hoverIndex === null ? margin.top
+			: pinned ? (pointerY < height / 2 ? height - margin.bottom : margin.top)
+			: Math.min(Math.max(pointerY, margin.top), height - margin.bottom)
 	);
-	const tooltipBelow = $derived(hoverIndex !== null && tooltipTop < 90);
+	const tooltipBelow = $derived(
+		hoverIndex !== null && (pinned ? pointerY >= height / 2 : tooltipTop < 90)
+	);
 
 	// The big tooltip heading: the work title (in area mode) or the line's name.
 	const tooltipTitle = $derived(
@@ -508,9 +551,12 @@
 	{/if}
 
 	<svg
+		bind:this={svgEl}
+		class="plot-svg"
 		viewBox="0 0 {width} {height}"
 		role="img"
 		aria-label="Checkouts over time"
+		onpointerdown={onDown}
 		onpointermove={onMove}
 		onpointerleave={onLeave}
 	>
@@ -754,6 +800,11 @@
 		width: 100%;
 		height: auto;
 		overflow: visible;
+	}
+	/* Let a vertical swipe scroll the page as normal, but capture horizontal drags
+	   for scrubbing the tooltip; a plain tap pins it. */
+	.plot-svg {
+		touch-action: pan-y;
 	}
 
 	.area-path {
