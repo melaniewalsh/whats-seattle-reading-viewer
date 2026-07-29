@@ -471,7 +471,7 @@
 		</div>
 		<div class="gt-search">
 			<input type="search" class="gt-search-input" bind:value={genreFilter}
-				placeholder="Search genres or subject terms — e.g. vampire, cooking, memoir" aria-label="Search genres" />
+				placeholder="Search genres or subject terms" aria-label="Search genres" />
 			{#if genreFilter}<button class="gt-search-clear" onclick={() => (genreFilter = "")} aria-label="Clear search" title="Clear">×</button>{/if}
 		</div>
 

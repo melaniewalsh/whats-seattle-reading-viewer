@@ -1377,13 +1377,19 @@
 				const yp = singleIdxs.includes(y.idx) ? 1 : 0;
 				return yp - xp || y.total - x.total;
 			});
-			blocks.push({ key, name: w.name, editions, total: w.total, matchCount });
+			// "Primary" format = the format of the work's most-borrowed edition, used
+			// when sorting the table by format.
+			blocks.push({ key, name: w.name, editions, total: w.total, matchCount, primaryFormat: editions[0]?.format || "other" });
 		}
-		blocks.sort((a, b) =>
-				workOrder === "checkouts"
-						? b.total - a.total
-						: a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) || (a.key < b.key ? -1 : 1)
-		);
+		const FMT_ORDER = { print: 0, largeprint: 1, ebook: 2, audiobook: 3, other: 4 };
+		blocks.sort((a, b) => {
+			if (workOrder === "format") {
+				return (FMT_ORDER[a.primaryFormat] ?? 9) - (FMT_ORDER[b.primaryFormat] ?? 9) || b.total - a.total;
+			}
+			return workOrder === "checkouts"
+					? b.total - a.total
+					: a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) || (a.key < b.key ? -1 : 1);
+		});
 		return blocks;
 	});
 	const visibleWorkBlocks = $derived(workBlocks.slice(0, WORK_BLOCK_CAP));
@@ -1923,7 +1929,7 @@
 			{#if picks.length}
 				<div class="suggest-row">
 					<button class="suggest-btn" onclick={() => (suggestOpen = !suggestOpen)} aria-expanded={suggestOpen}>Suggestions <span class="suggest-caret" class:open={suggestOpen} aria-hidden="true">▾</span></button>
-					<button class="chip surprise-chip" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
+					<button class="suggest-btn" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
 				</div>
 				{#if suggestOpen}
 					<div class="top-authors suggest-pills">
@@ -1938,7 +1944,7 @@
 			{#if picks.length}
 				<div class="suggest-row">
 					<button class="suggest-btn" onclick={() => (suggestOpen = !suggestOpen)} aria-expanded={suggestOpen}>Suggestions <span class="suggest-caret" class:open={suggestOpen} aria-hidden="true">▾</span></button>
-					<button class="chip surprise-chip" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
+					<button class="suggest-btn" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
 				</div>
 				{#if suggestOpen}
 					<div class="top-authors suggest-pills">
@@ -2326,7 +2332,18 @@
 						<span class="tt-cell tt-edition" role="columnheader" aria-label="Edition">
 							<span class="col-resize" title="Drag to widen and see full titles" onpointerdown={(e) => startColResize(e, "edition")}></span>
 						</span>
-						<span class="tt-cell tt-format" role="columnheader">Format</span>
+						<span
+								class="tt-cell tt-format"
+								role="columnheader"
+								aria-sort={titleSort === "work" && workOrder === "format" ? "ascending" : "none"}
+						>
+							<button
+									class="col-sort"
+									class:active={titleSort === "work" && workOrder === "format"}
+									title="Group by work, ordered by format (print → ebook → audio)"
+									onclick={() => { titleSort = "work"; workOrder = "format"; }}
+							>Format{#if titleSort === "work" && workOrder === "format"}&nbsp;↓{/if}</button>
+						</span>
 						<span
 								class="tt-cell tt-count"
 								role="columnheader"
@@ -4851,6 +4868,8 @@
 
 		.groups-panel {
 			padding: 12px;
+			/* Give the panel room below the Download / Share row on phones. */
+			margin-top: var(--space-5);
 		}
 
 		.group-chip {
