@@ -244,7 +244,7 @@
 			ctx.textAlign = "right";
 			ctx.fillText(compactNumber(r[2]), numX, cy);
 			// data bar
-			ctx.fillStyle = "#7361b6";
+			ctx.fillStyle = "#3f88cc";
 			ctx.beginPath();
 			ctx.roundRect(barX0, cy - 13, Math.max((r[2] / max) * barTrackW, 4), 16, 3);
 			ctx.fill();
@@ -578,13 +578,13 @@
 	.ta-field select {
 		width: 100%;
 		font-family: var(--font-sans);
-		font-size: 0.95rem;
+		font-size: 0.9rem;
 		font-weight: 500;
 		text-transform: none;
 		letter-spacing: 0;
 		color: var(--color-fg);
-		padding: 8px 12px;
-		border: 1px solid var(--color-border);
+		padding: 7px 12px;
+		border: 1.5px solid var(--color-border);
 		border-radius: 8px;
 		background: var(--color-white);
 		cursor: pointer;
@@ -804,7 +804,7 @@
 	.gal-count {
 		font-size: 0.72rem;
 		font-weight: 700;
-		color: #7361b6;
+		color: #3f88cc;
 		margin-top: 4px;
 		font-variant-numeric: tabular-nums;
 	}
@@ -863,9 +863,10 @@
 		align-items: center;
 		gap: 6px;
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: 0.82rem;
 		font-weight: 600;
-		padding: 6px 12px;
+		line-height: 1;
+		padding: 6px 14px;
 		border: 1.5px solid var(--color-border);
 		border-radius: 999px;
 		background: var(--color-white);
@@ -935,7 +936,7 @@
 	.share-item.li .share-ic { background: #0a66c2; }
 	.share-item.img .share-ic { background: #2e7d32; }
 	.share-item.copyimg .share-ic { background: #444; }
-	.share-item.dl .share-ic { background: #357abd; }
+	.share-item.dl .share-ic { background: #3f88cc; }
 	.share-item.copy .share-ic { background: #666; }
 	.share-sep {
 		height: 1px;

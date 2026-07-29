@@ -3387,7 +3387,7 @@
 		font-family: var(--font-sans);
 		font-size: 0.85rem;
 		font-weight: 600;
-		color: #357abd;
+		color: #3f88cc;
 		text-decoration: none;
 	}
 	.lookup-menu a:hover {
@@ -4146,7 +4146,7 @@
 		color: #c2255c;
 	}
 	.works-why {
-		color: #357abd;
+		color: #3f88cc;
 		font-weight: 600;
 		text-decoration: none;
 		white-space: nowrap;
@@ -4163,7 +4163,7 @@
 		display: inline;
 		list-style: none;
 		cursor: pointer;
-		color: #357abd;
+		color: #3f88cc;
 		font-weight: 600;
 	}
 	.works-more > summary::-webkit-details-marker {

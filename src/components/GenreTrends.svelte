@@ -594,7 +594,7 @@
 
 	/* Share / download — identical to the "By author" tab. */
 	.chart-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin: 10px 0 4px; }
-	.chart-action { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-sans); font-size: 0.8rem; font-weight: 600; color: var(--color-fg); cursor: pointer; padding: 6px 12px; border: 1.5px solid var(--color-border); border-radius: 999px; background: var(--color-white); transition: background 0.12s, border-color 0.12s; }
+	.chart-action { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-sans); font-size: 0.82rem; font-weight: 600; line-height: 1; color: var(--color-fg); cursor: pointer; padding: 6px 14px; border: 1.5px solid var(--color-border); border-radius: 999px; background: var(--color-white); transition: background 0.12s, border-color 0.12s; }
 	.chart-action:hover { border-color: var(--color-fg-light); background: #f7f7f7; }
 	.chart-action span { opacity: 0.7; font-size: 0.95em; }
 	.share-msg { font-family: var(--font-sans); font-size: 0.8rem; font-weight: 600; color: #2e7d32; }

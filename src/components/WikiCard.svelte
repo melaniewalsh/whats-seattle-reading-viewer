@@ -138,7 +138,7 @@
 		font-family: var(--font-sans);
 		font-size: 0.82rem;
 		font-weight: 600;
-		color: #357abd;
+		color: #3f88cc;
 		text-decoration: none;
 	}
 	.wiki-wiki:hover {

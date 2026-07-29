@@ -614,7 +614,7 @@
 		color: var(--color-fg-light);
 		margin: 12px 0 0;
 	}
-	.byline a { color: #357abd; font-weight: 600; text-decoration: underline; }
+	.byline a { color: #3f88cc; font-weight: 600; text-decoration: underline; }
 	.featured {
 		max-width: 880px;
 		margin: 40px auto 10px;
@@ -771,7 +771,7 @@
 		color: var(--color-fg);
 	}
 	.hub-d { font-size: 0.92rem; line-height: 1.45; color: var(--color-fg-light); }
-	.hub-go { margin-top: 4px; font-size: 0.85rem; font-weight: 700; color: #357abd; }
+	.hub-go { margin-top: 4px; font-size: 0.85rem; font-weight: 700; color: #3f88cc; }
 	/* About page — project details, moved off the landing. */
 	.about-page {
 		max-width: 680px;
@@ -792,7 +792,7 @@
 		margin: 0 0 14px;
 	}
 	.about-page a {
-		color: #357abd;
+		color: #3f88cc;
 		font-weight: 600;
 		text-decoration: underline;
 	}
@@ -813,7 +813,7 @@
 		margin: 0 0 5px;
 		color: var(--color-fg);
 	}
-	.about-list a { color: #357abd; font-weight: 600; text-decoration: underline; }
+	.about-list a { color: #3f88cc; font-weight: 600; text-decoration: underline; }
 	.about-page .about-more {
 		font-size: 0.95rem;
 		color: var(--color-fg-light);
@@ -862,14 +862,14 @@
 		text-decoration: none;
 		margin-bottom: 5px;
 	}
-	.pub-title:hover { color: #357abd; text-decoration: underline; }
+	.pub-title:hover { color: #3f88cc; text-decoration: underline; }
 	.pub-cite {
 		font-size: 0.98rem;
 		line-height: 1.5;
 		color: var(--color-fg);
 		margin: 0 0 5px;
 	}
-	.pub-cite a, .pub-links a { color: #357abd; font-weight: 600; text-decoration: underline; }
+	.pub-cite a, .pub-links a { color: #3f88cc; font-weight: 600; text-decoration: underline; }
 	.pub-links {
 		font-size: 0.92rem;
 		margin: 0;
@@ -954,7 +954,7 @@
 		color: var(--color-fg);
 		margin: 0 0 16px;
 	}
-	.study a { color: #357abd; font-weight: 600; text-decoration: underline; }
+	.study a { color: #3f88cc; font-weight: 600; text-decoration: underline; }
 	.study-byline {
 		font-family: var(--font-sans);
 		font-size: 0.9rem;
@@ -1283,7 +1283,7 @@
 		margin: 0 4px;
 	}
 	.chart-footer a {
-		color: #357abd;
+		color: #3f88cc;
 		text-decoration: underline;
 	}
 	.chart-footer a:hover {

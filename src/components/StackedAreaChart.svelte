@@ -740,7 +740,7 @@
 		color: var(--color-fg, #1a1a1a);
 	}
 	.qmark-body strong { font-weight: 700; }
-	.qmark-body a { color: #357abd; font-weight: 600; text-decoration: underline; white-space: nowrap; }
+	.qmark-body a { color: #3f88cc; font-weight: 600; text-decoration: underline; white-space: nowrap; }
 	.qmark-body a:hover { color: #26597f; }
 
 	.chart-container {
