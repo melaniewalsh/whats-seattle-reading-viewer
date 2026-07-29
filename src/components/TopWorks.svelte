@@ -887,8 +887,8 @@
 	/* NYT-style masthead above the ranking controls. */
 	.rank-masthead {
 		border-bottom: 3px solid var(--color-fg);
-		padding-bottom: 12px;
-		margin: 34px 0 18px;
+		padding-bottom: var(--space-3);
+		margin: var(--space-6) 0 var(--space-5);
 	}
 	.rank-title {
 		font-family: var(--font-display, var(--font-serif));
@@ -899,17 +899,17 @@
 		margin: 0;
 	}
 	.rank-sub {
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 		line-height: 1.4;
 		color: var(--color-fg-light);
-		margin: 6px 0 0;
+		margin: var(--space-2) 0 0;
 	}
 	.ta-controls {
 		display: flex;
 		align-items: flex-end;
-		gap: 12px;
+		gap: var(--space-3);
 		flex-wrap: wrap;
-		margin: 8px 0 14px;
+		margin: var(--space-2) 0 var(--space-4);
 	}
 	.ta-field {
 		flex: 1;
@@ -976,10 +976,10 @@
 	}
 	.overall-back:hover { text-decoration: underline; }
 	.ta-caption {
-		font-size: 0.92rem;
+		font-size: var(--text-base);
 		line-height: 1.5;
 		color: var(--color-fg-light);
-		margin: 0 0 14px;
+		margin: 0 0 var(--space-4);
 	}
 	.ta-caption strong {
 		color: var(--color-fg);
