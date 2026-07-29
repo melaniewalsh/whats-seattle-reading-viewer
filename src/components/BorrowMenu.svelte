@@ -9,10 +9,16 @@
 	let { q = "", compact = false } = $props();
 	let open = $state(false);
 	let btnEl;
-	// The menu is position:fixed and placed under the button, so it escapes any
-	// clipping ancestor (e.g. the horizontally-scrolling mobile gallery strip,
-	// whose overflow would otherwise cut the dropdown off).
+	// The menu is position:fixed and placed under the button. On its own that
+	// escapes an overflow clip in most browsers, but iOS Safari still clips
+	// position:fixed descendants of a `-webkit-overflow-scrolling: touch` scroller
+	// (the mobile gallery swipe strip). So we also portal the popup out to <body>,
+	// removing it from that scroll container entirely — then nothing can clip it.
 	let menuPos = $state({ top: 0, left: 0 });
+	function portal(node) {
+		document.body.appendChild(node);
+		return { destroy() { node.remove(); } };
+	}
 	const links = $derived(lookupUrls(q));
 	function toggle() {
 		if (open) { open = false; return; }
@@ -42,20 +48,22 @@
 		Borrow <span class="borrow-caret" aria-hidden="true">▾</span>
 	</button>
 	{#if open}
-		<button class="borrow-backdrop" aria-label="Close" onclick={close}></button>
-		<div class="borrow-menu" role="menu" style="top:{menuPos.top}px; left:{menuPos.left}px;">
-			<a role="menuitem" href={links.spl} target="_blank" rel="noopener noreferrer" onclick={close}>
-				<img class="bm-ic" src="{base}/spl-logo.png" alt="" width="18" height="18" />
-				<span class="bm-text"><span class="bm-name">Seattle Public Library</span><span class="bm-sub">Borrow · the SPL catalog</span></span>
-			</a>
-			<a role="menuitem" href={links.worldcat} target="_blank" rel="noopener noreferrer" onclick={close}>
-				<span class="bm-ic bm-emoji" aria-hidden="true">🌍</span>
-				<span class="bm-text"><span class="bm-name">Your local library</span><span class="bm-sub">Borrow · find it on WorldCat</span></span>
-			</a>
-			<a role="menuitem" href={links.bookshop} target="_blank" rel="noopener noreferrer" onclick={close}>
-				<span class="bm-ic bm-emoji" aria-hidden="true">🛍️</span>
-				<span class="bm-text"><span class="bm-name">Bookshop.org</span><span class="bm-sub">Buy · supports local bookstores</span></span>
-			</a>
+		<div class="borrow-portal" use:portal>
+			<button class="borrow-backdrop" aria-label="Close" onclick={close}></button>
+			<div class="borrow-menu" role="menu" style="top:{menuPos.top}px; left:{menuPos.left}px;">
+				<a role="menuitem" href={links.spl} target="_blank" rel="noopener noreferrer" onclick={close}>
+					<img class="bm-ic" src="{base}/spl-logo.png" alt="" width="18" height="18" />
+					<span class="bm-text"><span class="bm-name">Seattle Public Library</span><span class="bm-sub">Borrow · the SPL catalog</span></span>
+				</a>
+				<a role="menuitem" href={links.worldcat} target="_blank" rel="noopener noreferrer" onclick={close}>
+					<span class="bm-ic bm-emoji" aria-hidden="true">🌍</span>
+					<span class="bm-text"><span class="bm-name">Your local library</span><span class="bm-sub">Borrow · find it on WorldCat</span></span>
+				</a>
+				<a role="menuitem" href={links.bookshop} target="_blank" rel="noopener noreferrer" onclick={close}>
+					<span class="bm-ic bm-emoji" aria-hidden="true">🛍️</span>
+					<span class="bm-text"><span class="bm-name">Bookshop.org</span><span class="bm-sub">Buy · supports local bookstores</span></span>
+				</a>
+			</div>
 		</div>
 	{/if}
 </span>
