@@ -90,6 +90,7 @@
 	let autoHidAuthorTotal = $state(false); // whether we've auto-hidden the author-total line for this author yet
 	let shareMsg = $state(""); // transient toast after copying a share link
 	let shareOpen = $state(false); // whether the share-platform popover is open
+	let downloadOpen = $state(false); // whether the Download (data / image) popover is open
 	let lookupOpen = $state(false); // whether the "Look up" (Wikipedia/etc.) popover is open
 	let suggestOpen = $state(false); // whether the "Suggestions" quick-pick dropdown is open
 
@@ -2007,7 +2008,7 @@
 			<div class="hdr-actions">
 					<BorrowMenu q={searchMode === "title" ? `${headingText} ${displayName(current.name)}` : headingText} />
 					<span class="lookup-wrap">
-						<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere">Learn more <span class="hdr-caret" aria-hidden="true">▾</span></button>
+						<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere">Learn <span class="hdr-caret" aria-hidden="true">▾</span></button>
 						{#if lookupOpen}
 							<button class="share-backdrop" aria-label="Close" onclick={() => (lookupOpen = false)}></button>
 							<div class="lookup-menu" role="menu">
@@ -2119,14 +2120,24 @@
 			{/if}
 
 			<div class="chart-actions">
-				{#if !isOverview}
-					<button class="chart-action" onclick={downloadData} title="Download this checkout data as a CSV spreadsheet">
-						<span aria-hidden="true">⤓</span> Download data
+				<div class="dl-wrap">
+					<button class="chart-action" onclick={() => (downloadOpen = !downloadOpen)} title="Download the data or the chart image" aria-haspopup="true" aria-expanded={downloadOpen}>
+						<span aria-hidden="true">⤓</span> Download <span class="dl-caret" aria-hidden="true">▾</span>
 					</button>
-				{/if}
-				<button class="chart-action" onclick={downloadChart} title="Download the chart as a PNG image">
-					<span aria-hidden="true">⤓</span> Download image
-				</button>
+					{#if downloadOpen}
+						<button class="share-backdrop" aria-label="Close download menu" onclick={() => (downloadOpen = false)}></button>
+						<div class="share-menu dl-menu" role="menu">
+							{#if !isOverview}
+								<button role="menuitem" class="share-item" onclick={() => { downloadData(); downloadOpen = false; }}>
+									<span class="share-ic dl-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 10h18M9 5v14"/></svg></span> Data <span class="dl-fmt">CSV</span>
+								</button>
+							{/if}
+							<button role="menuitem" class="share-item" onclick={() => { downloadChart(); downloadOpen = false; }}>
+								<span class="share-ic dl-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.5"/><circle cx="8.5" cy="10" r="1.4"/><path d="M21 16l-5-4-8 7"/></svg></span> Image <span class="dl-fmt">PNG</span>
+							</button>
+						</div>
+					{/if}
+				</div>
 				<div class="share-wrap">
 					<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
 						<span aria-hidden="true">↗</span> Share
@@ -2907,6 +2918,35 @@
 		opacity: 0.7;
 		font-size: 0.95em;
 	}
+	/* OWID-style "Download ▾" dropdown → Data (CSV) / Image (PNG). */
+	.dl-wrap {
+		position: relative;
+		display: inline-flex;
+	}
+	.dl-caret {
+		font-size: 0.7em;
+		opacity: 0.7;
+	}
+	.dl-menu {
+		left: 0;
+		right: auto;
+		min-width: 190px;
+	}
+	.dl-ic {
+		background: none !important;
+		color: var(--color-fg-light);
+	}
+	.dl-ic svg {
+		display: block;
+	}
+	.dl-fmt {
+		margin-left: auto;
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		color: var(--color-fg-light);
+		opacity: 0.8;
+	}
 	/* square icon-only buttons (download / share) */
 	.chart-action.square {
 		width: 34px;
@@ -3067,28 +3107,23 @@
 	}
 
 	@media (max-width: 860px) {
-		/* Download data / Download image / Share span the width evenly on phones
-		   instead of wrapping. (The "Add/edit titles" button is positioned absolutely
-		   here, so it's out of this flex flow.) */
+		/* On phones the two download buttons collapse to icon-only so the row fits
+		   comfortably and left-aligns with the rest of the controls. (The "Add/edit
+		   titles" button is positioned absolutely here, out of this flex flow.) */
 		.chart-actions {
-			flex-wrap: nowrap;
-			justify-content: stretch;
-			gap: 6px;
+			justify-content: flex-start;
+			gap: 8px;
 		}
-		.chart-actions > .chart-action,
-		.chart-actions > .share-wrap {
-			flex: 1 1 0;
-			min-width: 0;
+		/* On phones the work cover stacks above the heading so the title, byline
+		   (author · checkouts) and everything below all left-align to the page edge
+		   instead of being indented beside the cover. */
+		.split-main.has-work-cover .work-cover {
+			position: static;
+			margin: 0 0 8px;
 		}
-		.chart-actions > .chart-action,
-		.chart-actions .share-wrap > .chart-action {
-			justify-content: center;
-			padding: 8px 4px;
-			font-size: 0.74rem;
-			white-space: nowrap;
-		}
-		.chart-actions .share-wrap > .chart-action {
-			width: 100%;
+		.split-main.has-work-cover .hd-name,
+		.split-main.has-work-cover .hdr-line {
+			padding-left: 0;
 		}
 		.split {
 			display: block;
@@ -3265,18 +3300,29 @@
 		color: var(--color-fg-light);
 		opacity: 0.55;
 	}
+	/* "Learn" — a purple pill mirroring the blue "Borrow" button next to it. */
 	.hdr-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
 		font-family: var(--font-sans);
-		font-size: inherit;
+		font-size: 0.82rem;
 		font-weight: 600;
-		padding: 0;
+		padding: 5px 11px;
 		border: none;
-		background: none;
-		color: #357abd;
+		border-radius: 999px;
+		background: #6a4c93;
+		color: #fff;
 		cursor: pointer;
+		white-space: nowrap;
+		transition: background 0.12s;
 	}
 	.hdr-chip:hover {
-		text-decoration: underline;
+		background: #573d7a;
+	}
+	.hdr-caret {
+		font-size: 0.7em;
+		opacity: 0.85;
 	}
 	/* SPL catalog icon link, sitting just left of "Learn more". */
 	.hdr-spl {

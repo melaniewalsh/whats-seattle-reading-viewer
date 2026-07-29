@@ -91,6 +91,9 @@
 		display: flex;
 		flex-direction: column;
 		min-width: 232px;
+		/* Never wider than the viewport (with a small gutter) so it can't run off
+		   the edge on a phone. */
+		max-width: calc(100vw - 24px);
 		padding: 5px;
 		background: var(--color-white);
 		border: 1px solid var(--color-border);
@@ -135,12 +138,5 @@
 	.bm-sub {
 		font-size: 0.72rem;
 		color: var(--color-fg-light);
-	}
-	/* Right-align the menu on narrow screens so it doesn't run off-edge. */
-	@media (max-width: 599px) {
-		.borrow-menu {
-			left: auto;
-			right: 0;
-		}
 	}
 </style>
