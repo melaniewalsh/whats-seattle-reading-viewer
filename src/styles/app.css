@@ -41,10 +41,40 @@ body {
 	--radius-sm: 0.25rem;
 	--radius-md: 0.5rem;
 	--radius-lg: 1rem;
-	
+
+	/* ---- Type scale ---------------------------------------------------------
+	   One editorial scale used across the site instead of ad-hoc rem values.
+	   Body copy is serif (--font-body); UI, labels and meta are sans. */
+	--text-xs:   0.75rem;    /* 12px — tags, fine print, captions          */
+	--text-sm:   0.8125rem;  /* 13px — controls, meta, legends             */
+	--text-base: 0.9375rem;  /* 15px — secondary body, table cells         */
+	--text-lg:   1.0625rem;  /* 17px — lead-in / emphasized body           */
+	--text-xl:   1.25rem;    /* 20px — card titles, sub-sections           */
+	--text-2xl:  1.5rem;     /* 24px — section headings                    */
+	--text-3xl:  2rem;       /* 32px — view titles                         */
+	--text-display: clamp(1.9rem, 4.5vw, 3rem); /* page headline           */
+
+	/* ---- Spacing scale (4px rhythm) -----------------------------------------
+	   Vertical rhythm between blocks and gaps between controls. Prefer these
+	   over eyeballed px so pages share one rhythm. */
+	--space-1: 0.25rem;  /*  4px */
+	--space-2: 0.5rem;   /*  8px */
+	--space-3: 0.75rem;  /* 12px */
+	--space-4: 1rem;     /* 16px */
+	--space-5: 1.5rem;   /* 24px */
+	--space-6: 2rem;     /* 32px */
+	--space-7: 3rem;     /* 48px */
+	--space-8: 4rem;     /* 64px */
+
+	/* Single brand accent — color belongs to the data; this is the one UI pop. */
+	--accent: #3f88cc;
+	--accent-hover: #2f6ea8;
+
 	--color-bg: var(--color-white);
 	--color-fg: var(--color-gray-900);
-	--color-fg-light: var(--color-gray-900);
+	/* Muted secondary text (bylines, captions, meta) — a real lighter gray, not
+	   the same as --color-fg (it previously aliased gray-900, i.e. not light). */
+	--color-fg-light: var(--color-gray-600);
 	--color-primary: var(--color-black);
 	--color-link: var(--color-black);
 	--color-link-hover: var(--color-black);
