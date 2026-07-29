@@ -1162,6 +1162,11 @@
 			w.idxs.forEach((i) => releaseTitle(i));
 			// Name the group with the work's (short) title.
 			groups = [...groups, { id: ++groupIdCounter, name: w.name, idxs: [...w.idxs] }];
+			// Flip to the stacked "All titles" view so the newly-plotted work is
+			// actually visible — in "Total" (line) mode only the aggregate + clicked
+			// editions are drawn, so a ticked work would otherwise be invisible.
+			// (Mirrors toggleTitle's flip for individual editions.)
+			if (chartMode !== "area") chartMode = "area";
 		}
 	}
 
