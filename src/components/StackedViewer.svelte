@@ -1929,7 +1929,7 @@
 			{#if picks.length}
 				<div class="suggest-row">
 					<button class="suggest-btn" onclick={() => (suggestOpen = !suggestOpen)} aria-expanded={suggestOpen}>Suggestions <span class="suggest-caret" class:open={suggestOpen} aria-hidden="true">▾</span></button>
-					<button class="suggest-btn" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
+					<button class="suggest-btn surprise-btn" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
 				</div>
 				{#if suggestOpen}
 					<div class="top-authors suggest-pills">
@@ -1944,7 +1944,7 @@
 			{#if picks.length}
 				<div class="suggest-row">
 					<button class="suggest-btn" onclick={() => (suggestOpen = !suggestOpen)} aria-expanded={suggestOpen}>Suggestions <span class="suggest-caret" class:open={suggestOpen} aria-hidden="true">▾</span></button>
-					<button class="suggest-btn" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
+					<button class="suggest-btn surprise-btn" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
 				</div>
 				{#if suggestOpen}
 					<div class="top-authors suggest-pills">
@@ -3130,12 +3130,19 @@
 	}
 
 	@media (max-width: 860px) {
-		/* On phones the two download buttons collapse to icon-only so the row fits
-		   comfortably and left-aligns with the rest of the controls. (The "Add/edit
-		   titles" button is positioned absolutely here, out of this flex flow.) */
+		/* On phones Download and Share split the full width evenly. */
 		.chart-actions {
-			justify-content: flex-start;
 			gap: 8px;
+		}
+		.chart-actions > .dl-wrap,
+		.chart-actions > .share-wrap {
+			flex: 1 1 0;
+			min-width: 0;
+		}
+		.chart-actions > .dl-wrap > .chart-action,
+		.chart-actions > .share-wrap > .chart-action {
+			width: 100%;
+			justify-content: center;
 		}
 		/* On phones the work cover stacks above the heading so the title, byline
 		   (author · checkouts) and everything below all left-align to the page edge
@@ -3212,13 +3219,10 @@
 			color: var(--color-white);
 			cursor: pointer;
 		}
-		/* the "Add/edit titles" button floats in the top-right corner on mobile */
+		/* The floating "Add/edit titles" shortcut is removed on phones — the works
+		   table sits inline just below the chart, so the button was redundant clutter. */
 		.edit-titles-btn {
-			display: inline-flex;
-			position: absolute;
-			top: 0;
-			right: 0;
-			z-index: 3;
+			display: none;
 		}
 	}
 
@@ -3302,6 +3306,11 @@
 		flex-wrap: wrap;
 		gap: 8px;
 		margin: 0 0 14px;
+	}
+	/* With a book cover beside the heading, give the Borrow row room so it clears
+	   the cover instead of crowding right up against it. */
+	.split-main.has-work-cover .hdr-actions {
+		margin-top: var(--space-4);
 	}
 	/* Author name in the work heading — click to switch to that author's search. */
 	.author-link {
@@ -4030,6 +4039,15 @@
 	}
 	.suggest-btn:hover {
 		border-color: #b6c2ce;
+	}
+	/* "Surprise me" keeps its playful purple, but the same size/shape as Suggestions. */
+	.surprise-btn {
+		color: #6a4c93;
+	}
+	.surprise-btn:hover {
+		background: #6a4c93;
+		border-color: #6a4c93;
+		color: var(--color-white);
 	}
 	.suggest-caret {
 		font-size: var(--text-xs);
