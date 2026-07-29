@@ -428,7 +428,7 @@
 								<h3 class="gal-title">{sec.label}</h3>
 							{/if}
 						</div>
-						<div class="gal-row">
+						<div class="gal-row" onscroll={(e) => e.currentTarget.parentElement.classList.toggle("at-end", e.currentTarget.scrollLeft >= e.currentTarget.scrollWidth - e.currentTarget.clientWidth - 8)}>
 							{#each sec.authors as r, i (r[0] + r[1] + i)}
 								{@const k = authorKey(r)}
 								<article class="gal-card">
@@ -682,6 +682,36 @@
 	}
 	.gal-sec {
 		margin: 0 0 32px;
+		position: relative;
+	}
+	/* Swipe affordance (mobile): a translucent right-chevron over the strip that
+	   fades once you reach the end. */
+	.gal-sec::after {
+		content: "›";
+		position: absolute;
+		top: 120px;
+		right: 2px;
+		width: 32px;
+		height: 32px;
+		display: grid;
+		place-items: center;
+		padding-bottom: 3px;
+		border-radius: 50%;
+		background: rgba(20, 20, 20, 0.4);
+		color: #fff;
+		font: 700 1.5rem/1 var(--font-sans);
+		box-shadow: 0 1px 5px rgba(0, 0, 0, 0.25);
+		pointer-events: none;
+		opacity: 1;
+		transition: opacity 0.25s;
+	}
+	.gal-sec:global(.at-end)::after {
+		opacity: 0;
+	}
+	@media (min-width: 640px) {
+		.gal-sec::after {
+			display: none;
+		}
 	}
 	.gal-head {
 		display: flex;

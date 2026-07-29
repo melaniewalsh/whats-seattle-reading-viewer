@@ -510,7 +510,7 @@
 								<button class="gal-title gal-title-link" onclick={() => (overallList = true)} title="See the full top-10 overall">{sec.label}</button>
 							{/if}
 						</div>
-						<div class="gal-row">
+						<div class="gal-row" onscroll={(e) => e.currentTarget.parentElement.classList.toggle("at-end", e.currentTarget.scrollLeft >= e.currentTarget.scrollWidth - e.currentTarget.clientWidth - 8)}>
 							{#each sec.books as r, i (r[0] + r[2] + i)}
 								{@const k = coverKey(r)}
 								<article class="gal-card">
@@ -713,6 +713,36 @@
 	}
 	.gal-sec {
 		margin: 0 0 32px;
+		position: relative;
+	}
+	/* Swipe affordance (mobile): a translucent right-chevron floating over the
+	   strip's right edge, centered on the covers, that fades once you reach the end. */
+	.gal-sec::after {
+		content: "›";
+		position: absolute;
+		top: 137px;
+		right: 2px;
+		width: 32px;
+		height: 32px;
+		display: grid;
+		place-items: center;
+		padding-bottom: 3px;
+		border-radius: 50%;
+		background: rgba(20, 20, 20, 0.4);
+		color: #fff;
+		font: 700 1.5rem/1 var(--font-sans);
+		box-shadow: 0 1px 5px rgba(0, 0, 0, 0.25);
+		pointer-events: none;
+		opacity: 1;
+		transition: opacity 0.25s;
+	}
+	.gal-sec:global(.at-end)::after {
+		opacity: 0;
+	}
+	@media (min-width: 640px) {
+		.gal-sec::after {
+			display: none;
+		}
 	}
 	.gal-head {
 		display: flex;
