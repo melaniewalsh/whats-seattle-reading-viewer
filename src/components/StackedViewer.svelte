@@ -1004,6 +1004,13 @@
 	// reorders titles. Per-browser; a title renamed in a future rebuild is quietly
 	// dropped rather than misapplied.
 	let savedGrouping = $state(false); // this author has a saved custom grouping
+	let savedFlash = $state(false); // transient "✓ saved" confirmation (fades on its own)
+	let savedFlashTimer;
+	function flashSaved() {
+		savedFlash = true;
+		clearTimeout(savedFlashTimer);
+		savedFlashTimer = setTimeout(() => (savedFlash = false), 4000);
+	}
 	// Curator mode: a hidden "Export groupings" button for the maintainer only.
 	// Enable by visiting the site once with ?curate=1 (remembered per browser).
 	let curator = $state(false);
@@ -1046,6 +1053,7 @@
 		try {
 			localStorage.setItem(worksLSKey(currentSlug), JSON.stringify(currentClusters()));
 			savedGrouping = true;
+			flashSaved();
 			autoGroupNote = "Groupings saved — they'll be restored next time you open this author (in this browser).";
 		} catch {}
 	}
@@ -1086,6 +1094,7 @@
 		});
 		workAssign = assign;
 		savedGrouping = true;
+		flashSaved(); // brief reminder that this author's saved grouping is applied
 	}
 
 	// Map of workKey -> { idxs (all editions of the work), name }. Powers the
@@ -1355,8 +1364,10 @@
 				};
 			});
 			const matchCount = f ? editions.filter((e) => e.match).length : 0;
-			// While filtering, show a work only if it (or an edition) matches -- but
-			// still show ALL of its editions and its full count/total.
+			// While filtering, show a work only if it (or an edition) matches, and the
+			// expanded rows show ONLY the matching editions -- but the "N editions" badge
+			// and the checkout total stay the work's FULL numbers, so a search never
+			// makes a cluster look smaller than it is.
 			if (f && !nameMatch && matchCount === 0) continue;
 			// A plotted individual edition floats to the top of its work, so the one
 			// you're looking at is visually prioritized; otherwise by checkouts.
@@ -1879,7 +1890,7 @@
 						<li>
 							{#if searchMode === "title"}
 								<button onclick={() => selectTitle(a)}>
-									<span class="res-title">{a.title}</span>
+									<span class="res-title">{titleCase(a.title)}</span>
 									<span class="count res-author">{displayName(a.author)}</span>
 								</button>
 							{:else}
@@ -2281,7 +2292,7 @@
 						<button type="button" class="wa-btn" onclick={saveGroupings} title="Remember this author's grouping in your browser, so your fixes are here next time">💾 Save my groupings</button>
 						<button type="button" class="wa-btn wa-reset" onclick={clearGroupings} title="Discard custom grouping and go back to automatic clustering">↺ Reset to automatic</button>
 						{#if curator}<button type="button" class="wa-btn wa-export" onclick={exportGroupings} title="Copy this author's groupings to paste into work_overrides.json">⬇ Export groupings</button>{/if}
-						{#if savedGrouping}<span class="wa-saved" role="status">✓ custom grouping saved</span>{/if}
+						{#if savedFlash}<span class="wa-saved" role="status">✓ custom grouping saved</span>{/if}
 						{#if exportNote}<span class="wa-saved" role="status">{exportNote}</span>{/if}
 					</div>
 				{/if}
@@ -2457,7 +2468,7 @@
 									<span class="tt-cell tt-count" role="cell">{compactNumber(w.total)}</span>
 								</li>
 								{#if workOpen(w)}
-									{#each w.editions as t (t.idx)}
+									{#each (filtering ? w.editions.filter((e) => e.match) : w.editions) as t (t.idx)}
 										{@render editionRow(t, false, true)}
 									{/each}
 								{/if}
