@@ -119,6 +119,9 @@
 	.borrow-menu {
 		position: fixed;
 		z-index: calc(var(--z-modal) + 1);
+		/* Pin the UI sans — portaled to <body>, the menu would otherwise inherit the
+		   page's serif body font. */
+		font-family: var(--font-sans);
 		display: flex;
 		flex-direction: column;
 		min-width: 232px;
