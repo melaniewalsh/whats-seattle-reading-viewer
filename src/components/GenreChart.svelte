@@ -149,14 +149,14 @@
 		font-family: var(--font-serif, Georgia, serif); font-size: 1.05rem; font-weight: 600; color: #1a1a1a;
 	}
 	.gtip-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; align-self: center; }
-	.gtip-date { margin: 3px 0 8px 19px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #9a9a9a; }
+	.gtip-date { margin: 3px 0 8px 19px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-fg); }
 	.gtip-val { margin-left: 19px; font-size: 1.3rem; font-weight: 700; color: #1a1a1a; }
-	.gtip-unit { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #9a9a9a; margin-left: 4px; }
-	.gtip-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #9a9a9a; }
+	.gtip-unit { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg); margin-left: 4px; }
+	.gtip-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-fg); }
 	.gtip-terms { margin: 10px 0 0 19px; font-size: 12px; color: #444; line-height: 1.4; }
 	.gtip-terms .gtip-lbl { display: block; margin-bottom: 2px; }
 	.gtip-fic { color: #6a4c93; }
-	.gtip-fic em { color: #9a9a9a; font-size: 11px; }
+	.gtip-fic em { color: var(--color-fg); font-size: 11px; }
 	.gtip-lbl-ex { display: block; margin: 10px 0 3px 19px; }
 	.gtip-ex { margin: 0 0 0 19px; padding-left: 15px; list-style: disc; }
 	.gtip-ex li { font-size: 12px; color: #333; line-height: 1.45; }

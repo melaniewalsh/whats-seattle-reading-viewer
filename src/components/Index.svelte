@@ -1057,7 +1057,7 @@
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
-		color: #97a2ad;
+		color: var(--color-fg);
 		background: none;
 		border: none;
 		padding: 4px 2px;
@@ -1146,7 +1146,7 @@
 		font-weight: 800;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
-		color: #97a2ad;
+		color: var(--color-fg);
 		margin: 0 0 var(--space-2);
 	}
 	.menu-link {

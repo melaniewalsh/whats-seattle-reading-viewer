@@ -72,9 +72,9 @@ body {
 
 	--color-bg: var(--color-white);
 	--color-fg: var(--color-gray-900);
-	/* Muted secondary text (bylines, captions, meta) — a real lighter gray, not
-	   the same as --color-fg (it previously aliased gray-900, i.e. not light). */
-	--color-fg-light: var(--color-gray-600);
+	/* Secondary text (bylines, captions, meta). Kept equal to --color-fg so all
+	   copy reads in the same near-black — no gray body text anywhere. */
+	--color-fg-light: var(--color-fg);
 	--color-primary: var(--color-black);
 	--color-link: var(--color-black);
 	--color-link-hover: var(--color-black);

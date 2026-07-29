@@ -856,7 +856,7 @@
 		font-weight: 700;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
-		color: #9a9a9a;
+		color: var(--color-fg);
 	}
 	.tt-value {
 		display: flex;
@@ -893,7 +893,7 @@
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
-		color: #9a9a9a;
+		color: var(--color-fg);
 	}
 
 	/* medium pills, one per edition of the hovered work (area mode) */
@@ -942,7 +942,7 @@
 		padding-top: 8px;
 		font-size: 12px;
 		font-weight: 600;
-		color: #808080;
+		color: var(--color-fg);
 	}
 	.tooltip-total.accent {
 		border-top: 1px dashed #ddd;

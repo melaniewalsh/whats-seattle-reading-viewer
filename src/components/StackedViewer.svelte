@@ -1881,7 +1881,7 @@
 				</select>
 			</label>
 			<label class="ta-field grow">
-				<span>Find {searchMode === "title" ? "a work" : "an author"}</span>
+				<span>Find {searchMode === "title" ? "a work" : "an author"}{#if searchMode === "title"}<span class="nf-hint" tabindex="0" role="note" aria-label="Only the most-borrowed titles are searchable here — search By author to find any title">?<span class="th-pop nf-pop" role="tooltip"><strong>Only the most-borrowed works are searchable here</strong>{#if titleMinLabel} — those with at least ~{titleMinLabel} all-time checkouts{/if}. To find any work, search <strong>By&nbsp;author</strong> instead.</span></span>{/if}</span>
 				<div class="search">
 					<input
 							id="author-search"
@@ -1915,13 +1915,6 @@
 				</div>
 			</label>
 		</div>
-
-		{#if searchMode === "title"}
-			<span class="title-hint" tabindex="0" role="note" aria-label="Only the most-borrowed titles are searchable here — search By author to find any title">
-				<span class="th-ic" aria-hidden="true">ⓘ</span> Not finding a work?
-				<span class="th-pop" role="tooltip"><strong>Only the most-borrowed works are searchable here</strong>{#if titleMinLabel} — those with at least ~{titleMinLabel} all-time checkouts{/if}. To find any work, search <strong>By&nbsp;author</strong> instead.</span>
-			</span>
-		{/if}
 
 		<!-- quick-pick: a varied mix (recent, classic, romance, nonfiction), tucked in a dropdown -->
 		{#if searchMode === "title"}
@@ -4005,6 +3998,42 @@
 	.th-pop strong {
 		font-weight: 700;
 	}
+	/* "?" help badge next to the "Find a work" label — carries the old
+	   "Not finding a work?" explanation as a hover/focus tooltip. */
+	.nf-hint {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 15px;
+		height: 15px;
+		margin-left: 5px;
+		border: 1.5px solid var(--color-border);
+		border-radius: 50%;
+		font-size: 0.62rem;
+		font-weight: 700;
+		line-height: 1;
+		color: var(--color-fg);
+		cursor: help;
+		vertical-align: middle;
+		text-transform: none;
+		letter-spacing: 0;
+		outline: none;
+	}
+	.nf-hint:hover {
+		border-color: var(--color-fg-light);
+	}
+	.nf-hint:hover .th-pop,
+	.nf-hint:focus .th-pop,
+	.nf-hint:focus-within .th-pop {
+		display: block;
+	}
+	/* the tooltip sits inside the uppercase label — reset it to normal text */
+	.nf-pop {
+		font-weight: 400;
+		text-transform: none;
+		letter-spacing: 0;
+	}
 	/* top-author quick-pick chips (under the search box) */
 	.top-authors {
 		display: flex;
@@ -4449,7 +4478,7 @@
 		border-radius: 999px;
 	}
 	.ed-single {
-		color: var(--color-gray-400, #b0b0b0);
+		color: var(--color-fg);
 		font-size: var(--text-sm);
 		font-style: italic;
 	}
