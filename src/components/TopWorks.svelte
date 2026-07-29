@@ -743,14 +743,36 @@
 		text-decoration: underline;
 		text-decoration-thickness: 1.5px;
 	}
+	/* Mobile: a horizontal swipe strip — all of a genre's picks in one row you
+	   scroll sideways, with the next card peeking to show there's more. On wider
+	   screens it becomes the usual 3- then 5-up grid. */
 	.gal-row {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 24px 20px;
+		display: flex;
+		align-items: flex-start;
+		gap: 16px;
+		overflow-x: auto;
+		scroll-snap-type: x proximity;
+		-webkit-overflow-scrolling: touch;
+		padding-bottom: 8px;
+		scrollbar-width: thin;
+	}
+	.gal-row > .gal-card {
+		flex: 0 0 auto;
+		width: 42vw;
+		max-width: 180px;
+		scroll-snap-align: start;
 	}
 	@media (min-width: 640px) {
 		.gal-row {
+			display: grid;
 			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 24px 20px;
+			overflow: visible;
+			padding-bottom: 0;
+		}
+		.gal-row > .gal-card {
+			width: auto;
+			max-width: none;
 		}
 	}
 	@media (min-width: 920px) {
