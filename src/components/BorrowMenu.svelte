@@ -8,15 +8,33 @@
 	// (e.g. "The Odyssey Homer"); `compact` shrinks it for dense table rows.
 	let { q = "", compact = false } = $props();
 	let open = $state(false);
+	let btnEl;
+	// The menu is position:fixed and placed under the button, so it escapes any
+	// clipping ancestor (e.g. the horizontally-scrolling mobile gallery strip,
+	// whose overflow would otherwise cut the dropdown off).
+	let menuPos = $state({ top: 0, left: 0 });
 	const links = $derived(lookupUrls(q));
+	function toggle() {
+		if (open) { open = false; return; }
+		if (btnEl) {
+			const r = btnEl.getBoundingClientRect();
+			const W = 236;
+			menuPos = {
+				top: Math.round(r.bottom + 6),
+				left: Math.round(Math.max(8, Math.min(r.left, window.innerWidth - W - 8)))
+			};
+		}
+		open = true;
+	}
 	function close() { open = false; }
 </script>
 
 <span class="borrow-wrap">
 	<button
+			bind:this={btnEl}
 			class="borrow-btn"
 			class:compact
-			onclick={() => (open = !open)}
+			onclick={toggle}
 			aria-haspopup="true"
 			aria-expanded={open}
 			title="Where to borrow or buy this book"
@@ -25,7 +43,7 @@
 	</button>
 	{#if open}
 		<button class="borrow-backdrop" aria-label="Close" onclick={close}></button>
-		<div class="borrow-menu" role="menu">
+		<div class="borrow-menu" role="menu" style="top:{menuPos.top}px; left:{menuPos.left}px;">
 			<a role="menuitem" href={links.spl} target="_blank" rel="noopener noreferrer" onclick={close}>
 				<img class="bm-ic" src="{base}/spl-logo.png" alt="" width="18" height="18" />
 				<span class="bm-text"><span class="bm-name">Seattle Public Library</span><span class="bm-sub">Borrow · the SPL catalog</span></span>
@@ -82,16 +100,17 @@
 	.borrow-backdrop {
 		position: fixed;
 		inset: 0;
-		z-index: 40;
+		z-index: var(--z-modal);
 		background: none;
 		border: none;
 		cursor: default;
 	}
+	/* position:fixed (coordinates set inline from the button's rect) so the menu
+	   escapes any clipping/scrolling ancestor — e.g. the horizontal swipe strip in
+	   the mobile gallery, whose overflow would otherwise cut the dropdown off. */
 	.borrow-menu {
-		position: absolute;
-		top: calc(100% + 6px);
-		left: 0;
-		z-index: 41;
+		position: fixed;
+		z-index: calc(var(--z-modal) + 1);
 		display: flex;
 		flex-direction: column;
 		min-width: 232px;
