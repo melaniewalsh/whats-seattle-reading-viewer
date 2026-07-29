@@ -55,7 +55,7 @@
 		align-items: center;
 		gap: 5px;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		line-height: 1;
 		padding: 6px 14px;
@@ -71,7 +71,7 @@
 		background: #2f6ea8;
 	}
 	.borrow-btn.compact {
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		padding: 3px 9px;
 	}
 	.borrow-caret {
@@ -126,7 +126,7 @@
 		object-fit: contain;
 	}
 	.bm-emoji {
-		font-size: 1.05rem;
+		font-size: var(--text-lg);
 		line-height: 1;
 	}
 	.bm-text {
@@ -136,11 +136,11 @@
 	}
 	.bm-name {
 		font-family: var(--font-sans);
-		font-size: 0.86rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 	}
 	.bm-sub {
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		color: var(--color-fg-light);
 	}
 </style>

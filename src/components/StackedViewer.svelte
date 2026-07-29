@@ -2557,7 +2557,7 @@
 		flex-direction: column;
 		gap: 4px;
 		font-family: var(--font-sans);
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
@@ -2569,7 +2569,7 @@
 	.ta-field select {
 		width: 100%;
 		font-family: var(--font-sans);
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 		font-weight: 500;
 		text-transform: none;
 		letter-spacing: 0;
@@ -2591,7 +2591,7 @@
 		box-sizing: border-box;
 		padding: 9px 12px;
 		font-family: var(--font-sans);
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 		background: var(--color-white);
 		color: var(--color-fg);
 		border: 1px solid var(--color-border);
@@ -2630,7 +2630,7 @@
 		border: none;
 		border-radius: var(--radius-sm);
 		font-family: var(--font-sans);
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 		text-align: left;
 		cursor: pointer;
 		color: var(--color-fg);
@@ -2656,7 +2656,7 @@
 		background: none;
 		border: none;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--color-fg-light);
 		cursor: pointer;
@@ -2704,7 +2704,7 @@
 	}
 	.genre-rank {
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 		font-weight: 500;
 		color: var(--color-fg);
 		background: var(--color-gray-100);
@@ -2726,7 +2726,7 @@
 	/* Subject-tag pills next to the genre-rank badges, near the top. */
 	.subj-pill {
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 		font-weight: 500;
 		color: var(--color-fg-light);
 		background: var(--color-white);
@@ -2760,7 +2760,7 @@
 		font-family: var(--font-sans);
 	}
 	.st-label {
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--color-fg-light);
 		letter-spacing: 0.01em;
@@ -2781,7 +2781,7 @@
 		background: #efe9f5;
 		color: #6a4c93;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		line-height: 1.5;
 		white-space: nowrap;
 	}
@@ -2802,7 +2802,7 @@
 		gap: 18px;
 		margin: 10px 0 2px;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--color-fg);
 	}
@@ -2884,7 +2884,7 @@
 		padding: 3px 12px;
 		border-radius: 999px;
 		font-family: var(--font-sans);
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--color-fg);
 		cursor: pointer;
@@ -2906,7 +2906,7 @@
 		align-items: center;
 		gap: 6px;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		line-height: 1;
 		padding: 6px 14px;
@@ -2961,7 +2961,7 @@
 		padding: 0;
 		justify-content: center;
 		border-radius: 8px;
-		font-size: 1.05rem;
+		font-size: var(--text-lg);
 	}
 	.chart-action.square span {
 		opacity: 0.85;
@@ -2972,7 +2972,7 @@
 	}
 	.share-msg {
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: #2e7d32;
 	}
@@ -3012,7 +3012,7 @@
 		border-radius: 7px;
 		background: none;
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--color-fg);
 		cursor: pointer;
@@ -3029,7 +3029,7 @@
 		height: 22px;
 		flex: none;
 		border-radius: 5px;
-		font-size: 0.75rem;
+		font-size: var(--text-xs);
 		font-weight: 700;
 		color: #fff;
 		font-style: normal;
@@ -3066,7 +3066,7 @@
 	}
 	.sdh-label {
 		font-family: var(--font-sans);
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		font-weight: 700;
 		color: var(--color-fg-light);
 		text-transform: uppercase;
@@ -3171,7 +3171,7 @@
 			border-bottom: 1px solid var(--color-border);
 			font-family: var(--font-sans);
 			font-weight: 700;
-			font-size: 0.95rem;
+			font-size: var(--text-base);
 		}
 		/* ...inline, the same small-uppercase toggle as desktop (matching the "On
 		   the chart" panel); the underline only appears once the table is open. */
@@ -3188,7 +3188,7 @@
 		.side-close {
 			font-family: var(--font-sans);
 			font-weight: 700;
-			font-size: 0.85rem;
+			font-size: var(--text-sm);
 			padding: 6px 18px;
 			border: none;
 			border-radius: 999px;
@@ -3208,7 +3208,7 @@
 
 	.author h2 {
 		font-family: var(--font-serif);
-		font-size: 2rem;
+		font-size: var(--text-3xl);
 		line-height: 1.1;
 		margin: 0;
 	}
@@ -3314,7 +3314,7 @@
 		align-items: center;
 		gap: 5px;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		line-height: 1;
 		padding: 6px 14px;
@@ -3357,7 +3357,7 @@
 		flex: none;
 	}
 	.hdr-caret {
-		font-size: 0.7rem;
+		font-size: var(--text-xs);
 	}
 	.lookup-wrap {
 		position: relative;
@@ -3385,7 +3385,7 @@
 		padding: 8px 10px;
 		border-radius: 7px;
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: #3f88cc;
 		text-decoration: none;
@@ -3398,7 +3398,7 @@
 	}
 	.lookup-menu a span {
 		color: var(--color-fg-light);
-		font-size: 0.75rem;
+		font-size: var(--text-xs);
 	}
 
 	/* Small (i) next to the author name: hover/focus shows the name-variants popover. */
@@ -3417,7 +3417,7 @@
 		font-family: var(--font-sans);
 		font-style: normal;
 		font-weight: 600;
-		font-size: 0.7rem;
+		font-size: var(--text-xs);
 		line-height: 1;
 		cursor: help;
 		vertical-align: 0.35em;
@@ -3466,7 +3466,7 @@
 	}
 	.name-info-pop li {
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		line-height: 1.5;
 		color: var(--color-fg);
 	}
@@ -3474,7 +3474,7 @@
 		display: block;
 		margin-top: 8px;
 		font-family: var(--font-sans);
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		line-height: 1.45;
 		color: var(--color-fg-light);
 	}
@@ -3496,7 +3496,7 @@
 		margin: 12px 0 0;
 		padding: 0;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 	}
 
 	.legend li {
@@ -3534,7 +3534,7 @@
 	.only-btn {
 		flex: none;
 		font-family: var(--font-sans);
-		font-size: 0.7rem;
+		font-size: var(--text-xs);
 		font-weight: 600;
 		padding: 2px 8px;
 		border-radius: 999px;
@@ -3557,7 +3557,7 @@
 
 	.show-all-btn {
 		font-family: var(--font-sans);
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		font-weight: 600;
 		padding: 3px 12px;
 		border-radius: 999px;
@@ -3573,7 +3573,7 @@
 
 	.compare-hint {
 		font-family: var(--font-sans);
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		color: var(--color-fg-light);
 		margin: 6px 2px 0;
 	}
@@ -3592,14 +3592,14 @@
 	.editing-text {
 		flex: 1;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		color: var(--color-fg);
 	}
 
 	.done-btn {
 		flex: none;
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		padding: 6px 18px;
 		border-radius: 999px;
@@ -3636,7 +3636,7 @@
 		gap: 10px;
 		margin: 18px 0 14px;
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 	}
 
 	.bundle-name {
@@ -3645,7 +3645,7 @@
 		gap: 10px;
 		margin: 12px 0 0;
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 	}
 
 	.bundle-name label {
@@ -3658,7 +3658,7 @@
 		min-width: 0;
 		padding: 8px 12px;
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		background: var(--color-input-bg);
 		border: 1.5px solid var(--color-border);
 		border-radius: var(--radius-sm);
@@ -3686,7 +3686,7 @@
 
 	.groups-label {
 		font-family: var(--font-sans);
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		font-weight: 700;
 		color: var(--color-fg-light);
 		text-transform: uppercase;
@@ -3701,7 +3701,7 @@
 
 	.new-group {
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		padding: 6px 14px;
 		border-radius: 999px;
@@ -3717,7 +3717,7 @@
 
 	.auto-group {
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		padding: 6px 14px;
 		border-radius: 999px;
@@ -3733,7 +3733,7 @@
 
 	.auto-group-note {
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 		color: var(--color-fg-light);
 		margin: 10px 0 0;
 	}
@@ -3767,7 +3767,7 @@
 		align-items: center;
 		gap: 7px;
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 		padding: 6px 12px 6px 8px;
 		border-radius: 999px;
 		border: 1.5px solid var(--color-border);
@@ -3847,7 +3847,7 @@
 		border-radius: 50%;
 		background: none;
 		color: var(--color-fg-light);
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 		line-height: 1;
 		cursor: pointer;
 		transition: background 0.12s, color 0.12s;
@@ -3889,7 +3889,7 @@
 		display: flex;
 		align-items: center;
 		font-family: var(--font-sans);
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		font-weight: 600;
 		padding: 0 10px;
 		border: 1.5px solid var(--color-border);
@@ -3917,7 +3917,7 @@
 
 	.editing-hint {
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		color: var(--color-fg-light);
 		margin: 12px 0 0;
 	}
@@ -3940,7 +3940,7 @@
 		display: inline-block;
 		margin: 10px 0 0;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		color: var(--color-fg-light);
 		cursor: help;
 		outline: none;
@@ -3961,7 +3961,7 @@
 		border: 1px solid var(--color-border);
 		border-radius: 10px;
 		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		line-height: 1.5;
 		color: var(--color-fg);
 		cursor: default;
@@ -3997,7 +3997,7 @@
 		align-items: center;
 		gap: 5px;
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		font-weight: 500;
 		color: var(--color-fg);
 		padding: 7px 14px;
@@ -4010,7 +4010,7 @@
 		border-color: #b6c2ce;
 	}
 	.suggest-caret {
-		font-size: 0.7rem;
+		font-size: var(--text-xs);
 		transition: transform 0.15s ease;
 	}
 	.suggest-caret.open {
@@ -4021,14 +4021,14 @@
 	}
 
 	.quick-label {
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--color-fg-light);
 	}
 
 	.chip {
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		padding: 4px 12px;
 		border-radius: 999px;
 		border: 1px solid var(--color-border);
@@ -4078,7 +4078,7 @@
 	}
 	.top-works-btn {
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		padding: 6px 14px;
 		border-radius: 999px;
@@ -4108,7 +4108,7 @@
 		align-items: center;
 		gap: 6px;
 		padding: 6px 14px;
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		line-height: 1;
 		background: var(--color-white);
@@ -4135,7 +4135,7 @@
 	/* title list */
 	.works-min-note {
 		font-family: var(--font-sans);
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		line-height: 1.4;
 		color: var(--color-fg-light);
 		margin: 0 0 10px;
@@ -4197,7 +4197,7 @@
 		min-width: 180px;
 		padding: 9px 12px;
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		background: var(--color-input-bg);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-sm);
@@ -4208,7 +4208,7 @@
 		align-items: center;
 		gap: 6px;
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 	}
 
 	.sort-label {
@@ -4217,7 +4217,7 @@
 
 	.sort-toggle button {
 		padding: 5px 10px;
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 		background: var(--color-white);
 		border: 1px solid var(--color-border);
 		border-radius: 999px;
@@ -4260,7 +4260,7 @@
 		grid-template-columns: 26px minmax(110px, 300px) minmax(0, 1fr) auto minmax(92px, auto);
 		gap: 9px;
 		padding: 7px 9px;
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 	}
 	/* keep the Checkouts header/value on one line, right-aligned, and a touch
 	   smaller so its (auto-sized) column doesn't get too wide */
@@ -4312,7 +4312,7 @@
 	/* one row per work; click to expand its editions */
 	.work-header {
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		font-weight: 500;
 		cursor: pointer;
 		/* white rows on the gray panel; multi-edition ".cluster" rows tint over this */
@@ -4356,7 +4356,7 @@
 
 	.exclude-btn {
 		font-family: var(--font-sans);
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		padding: 2px 9px;
 		border-radius: 999px;
 		border: 1px solid var(--color-border);
@@ -4373,7 +4373,7 @@
 		background: none;
 		border: none;
 		cursor: pointer;
-		font-size: 1.05rem;
+		font-size: var(--text-lg);
 		line-height: 1;
 		color: #6a4c93;
 		padding: 0 6px 0 0;
@@ -4393,7 +4393,7 @@
 		border: none;
 		cursor: pointer;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		color: var(--color-fg-light);
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -4404,13 +4404,13 @@
 		background: #efe7f7;
 		color: #6a4c93;
 		font-weight: 600;
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		padding: 1px 8px;
 		border-radius: 999px;
 	}
 	.ed-single {
 		color: var(--color-gray-400, #b0b0b0);
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 		font-style: italic;
 	}
 	/* format column can show several badges for a multi-format work -- stacked
@@ -4436,7 +4436,7 @@
 		top: 0;
 		z-index: 1;
 		font-family: var(--font-sans);
-		font-size: 0.7rem;
+		font-size: var(--text-xs);
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
@@ -4524,7 +4524,7 @@
 	.tt-row {
 		cursor: pointer;
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		background: var(--color-white);
 	}
 
@@ -4689,14 +4689,14 @@
 
 	.titles-more {
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 		color: var(--color-fg-light);
 		margin: 8px 2px 0;
 	}
 
 	.table-hint {
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 		color: var(--color-fg-light);
 		margin: 0 2px 8px;
 	}
@@ -4713,7 +4713,7 @@
 		align-items: center;
 		gap: 5px;
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		line-height: 1;
 		padding: 6px 14px;
@@ -4728,7 +4728,7 @@
 	.wa-reset { color: var(--color-fg-light); }
 	.wa-saved {
 		font-family: var(--font-sans);
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: #1f7a4d;
 	}
@@ -4754,7 +4754,7 @@
 		background: var(--color-fg);
 		color: var(--color-white);
 		font-family: var(--font-sans);
-		font-size: 0.82rem;
+		font-size: var(--text-sm);
 		line-height: 1.35;
 		border-radius: 6px;
 		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
@@ -4764,7 +4764,7 @@
 
 	.load-error {
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		color: #b00020;
 		background: #fdecef;
 		border: 1px solid #f5c2cb;
@@ -4788,7 +4788,7 @@
 
 	.no-results {
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		color: var(--color-fg-light);
 		margin: 8px 4px 0;
 	}

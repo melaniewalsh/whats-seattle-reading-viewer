@@ -610,7 +610,7 @@
 	}
 	.byline {
 		font-family: var(--font-sans);
-		font-size: 0.92rem;
+		font-size: var(--text-base);
 		color: var(--color-fg-light);
 		margin: 12px 0 0;
 	}
@@ -625,7 +625,7 @@
 	}
 	.featured-eyebrow {
 		font-family: var(--font-sans);
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		font-weight: 700;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
@@ -664,7 +664,7 @@
 	}
 	.featured-by {
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		font-weight: 500;
 		color: var(--color-fg-light);
 	}
@@ -685,7 +685,7 @@
 	}
 	.featured-sub {
 		font-family: var(--font-sans);
-		font-size: 0.92rem;
+		font-size: var(--text-base);
 		color: var(--color-fg-light);
 		margin: 0 0 14px;
 	}
@@ -694,7 +694,7 @@
 	}
 	.featured-cta {
 		font-family: var(--font-sans);
-		font-size: 0.92rem;
+		font-size: var(--text-base);
 		font-weight: 600;
 		color: #3f88cc;
 		background: none;
@@ -717,7 +717,7 @@
 		align-items: center;
 		gap: 6px;
 		font-family: var(--font-sans);
-		font-size: 0.92rem;
+		font-size: var(--text-base);
 		font-weight: 600;
 		color: var(--color-fg-light);
 		text-decoration: none;
@@ -770,8 +770,8 @@
 		font-weight: 700;
 		color: var(--color-fg);
 	}
-	.hub-d { font-size: 0.92rem; line-height: 1.45; color: var(--color-fg-light); }
-	.hub-go { margin-top: 4px; font-size: 0.85rem; font-weight: 700; color: #3f88cc; }
+	.hub-d { font-size: var(--text-base); line-height: 1.45; color: var(--color-fg-light); }
+	.hub-go { margin-top: 4px; font-size: var(--text-sm); font-weight: 700; color: #3f88cc; }
 	/* About page — project details, moved off the landing. */
 	.about-page {
 		max-width: 680px;
@@ -786,7 +786,7 @@
 		margin: 0 0 18px;
 	}
 	.about-page p {
-		font-size: 1.05rem;
+		font-size: var(--text-lg);
 		line-height: 1.6;
 		color: var(--color-fg);
 		margin: 0 0 14px;
@@ -815,7 +815,7 @@
 	}
 	.about-list a { color: #3f88cc; font-weight: 600; text-decoration: underline; }
 	.about-page .about-more {
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 		color: var(--color-fg-light);
 		margin-top: 22px;
 	}
@@ -826,14 +826,14 @@
 		font-family: var(--font-sans);
 	}
 	.pubs-intro {
-		font-size: 1.05rem;
+		font-size: var(--text-lg);
 		line-height: 1.5;
 		color: var(--color-fg-light);
 		margin: 0 0 8px;
 	}
 	.pub-year {
 		font-family: var(--font-display, var(--font-serif));
-		font-size: 1.5rem;
+		font-size: var(--text-2xl);
 		font-weight: 700;
 		color: var(--color-fg);
 		margin: 30px 0 4px;
@@ -842,7 +842,7 @@
 	}
 	.pub-month {
 		font-family: var(--font-sans);
-		font-size: 0.75rem;
+		font-size: var(--text-xs);
 		font-weight: 800;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
@@ -871,13 +871,13 @@
 	}
 	.pub-cite a, .pub-links a { color: #3f88cc; font-weight: 600; text-decoration: underline; }
 	.pub-links {
-		font-size: 0.92rem;
+		font-size: var(--text-base);
 		margin: 0;
 	}
 	.pub-sep { color: var(--color-fg-light); }
 	.pub-bib {
 		margin-top: 8px;
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 	}
 	.pub-bib summary {
 		cursor: pointer;
@@ -892,7 +892,7 @@
 		top: 8px;
 		right: 8px;
 		font-family: var(--font-sans);
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		font-weight: 600;
 		color: var(--color-fg);
 		background: var(--color-white);
@@ -910,7 +910,7 @@
 		border-radius: 8px;
 		overflow-x: auto;
 		font-family: var(--font-mono, monospace);
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		line-height: 1.5;
 		color: var(--color-fg);
 		white-space: pre;
@@ -923,7 +923,7 @@
 	}
 	.study-kicker {
 		font-family: var(--font-sans);
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		font-weight: 800;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
@@ -940,7 +940,7 @@
 	}
 	.study-h {
 		font-family: var(--font-display, var(--font-serif));
-		font-size: 1.5rem;
+		font-size: var(--text-2xl);
 		font-weight: 700;
 		color: var(--color-fg);
 		margin: 32px 0 4px;
@@ -949,7 +949,7 @@
 	}
 	.study-p {
 		font-family: var(--font-sans);
-		font-size: 1.05rem;
+		font-size: var(--text-lg);
 		line-height: 1.65;
 		color: var(--color-fg);
 		margin: 0 0 16px;
@@ -957,13 +957,13 @@
 	.study a { color: #3f88cc; font-weight: 600; text-decoration: underline; }
 	.study-byline {
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		color: var(--color-fg-light);
 		margin: 0 0 16px;
 	}
 	.study-callout {
 		font-family: var(--font-sans);
-		font-size: 0.92rem;
+		font-size: var(--text-base);
 		line-height: 1.5;
 		color: var(--color-fg-light);
 		background: var(--color-gray-100);
@@ -985,7 +985,7 @@
 	}
 	.study-fig figcaption {
 		font-family: var(--font-sans);
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		line-height: 1.5;
 		color: var(--color-fg-light);
 		margin: 8px 2px 0;
@@ -1038,7 +1038,7 @@
 	.mast-title {
 		font-family: var(--font-sans);
 		font-weight: 800;
-		font-size: 0.92rem;
+		font-size: var(--text-base);
 		line-height: 1;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
@@ -1053,7 +1053,7 @@
 	}
 	.mast-metalink {
 		font-family: var(--font-sans);
-		font-size: 0.72rem;
+		font-size: var(--text-xs);
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
@@ -1130,7 +1130,7 @@
 		right: 16px;
 		width: 34px;
 		height: 34px;
-		font-size: 1.5rem;
+		font-size: var(--text-2xl);
 		line-height: 1;
 		color: var(--color-fg-light);
 		background: none;
@@ -1142,7 +1142,7 @@
 	.menu-group { margin-bottom: 22px; }
 	.menu-h {
 		font-family: var(--font-sans);
-		font-size: 0.7rem;
+		font-size: var(--text-xs);
 		font-weight: 800;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
@@ -1154,7 +1154,7 @@
 		width: 100%;
 		text-align: left;
 		font-family: var(--font-display, var(--font-serif));
-		font-size: 1.25rem;
+		font-size: var(--text-xl);
 		font-weight: 600;
 		color: var(--color-fg);
 		background: none;
@@ -1166,7 +1166,7 @@
 	.menu-link:hover { color: #3f88cc; }
 	@media (max-width: 600px) {
 		.masthead-top { padding: 6px 14px 0; }
-		.mast-title { font-size: 0.82rem; }
+		.mast-title { font-size: var(--text-sm); }
 		/* About is in the hamburger menu on phones — drop the standalone link so the
 		   wordmark has room. */
 		.mast-metalink { display: none; }
@@ -1179,7 +1179,7 @@
 	}
 	.back-rankings {
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--color-fg);
 		background: none;
@@ -1208,7 +1208,7 @@
 	}
 	.sec-sub {
 		font-family: var(--font-sans);
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 		line-height: 1.4;
 		color: var(--color-fg-light);
 		margin: 6px 0 0;
@@ -1221,7 +1221,7 @@
 		display: inline-flex;
 		flex-direction: column;
 		gap: 4px;
-		font-size: 0.78rem;
+		font-size: var(--text-sm);
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
@@ -1229,7 +1229,7 @@
 	}
 	.filter-field select {
 		font-family: var(--font-sans);
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 		font-weight: 500;
 		text-transform: none;
 		letter-spacing: 0;
@@ -1251,7 +1251,7 @@
 	}
 	.subtab {
 		font-family: var(--font-sans);
-		font-size: 0.85rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		padding: 5px 18px;
 		border: none;
@@ -1269,7 +1269,7 @@
 	.chart-footer {
 		margin: 40px 0 0;
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: var(--text-sm);
 		line-height: 1.5;
 		color: var(--color-fg-light);
 	}
@@ -1303,7 +1303,7 @@
 		cursor: pointer;
 		padding: 8px 0;
 		font-weight: 600;
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 		color: var(--color-fg-light);
 		list-style-position: inside;
 	}
@@ -1318,7 +1318,7 @@
 		padding: 0 0 16px;
 	}
 	.about-body p {
-		font-size: 0.9rem;
+		font-size: var(--text-base);
 		line-height: 1.55;
 		color: var(--color-fg);
 		margin: 0 0 12px;
@@ -1328,7 +1328,7 @@
 	}
 	.about-body h3 {
 		font-family: var(--font-sans);
-		font-size: 0.92rem;
+		font-size: var(--text-base);
 		font-weight: 700;
 		color: var(--color-fg);
 		margin: 18px 0 6px;
