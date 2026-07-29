@@ -2286,7 +2286,7 @@
 					/>
 				</div>
 				<div class="titles">
-				<p class="works-min-note">Every title associated with this author is listed here. We automatically cluster related titles into “Works”—attempting to gather ebooks, audiobooks, and print editions into one category. There may be incorrect or missing titles, especially with series. You can drag and drop titles into the correct Work, or exclude ones that don't belong. <a class="works-why" href="#method-clustering">Why is clustering by work so hard?</a></p>
+				<div class="works-min-note">Every title associated with this author is listed here. Drag and drop titles into the correct Work, exclude ones that don't belong, or make your own.<details class="works-more"><summary>How does this work?</summary><span class="works-more-body">We automatically cluster related titles into “Works”—attempting to gather ebooks, audiobooks, and print editions into one category. There may be incorrect or missing titles, especially with series. <a class="works-why" href="#method-clustering">Why is clustering works so hard?</a></span></details></div>
 				{#if titleSort === "work"}
 					<div class="works-actions">
 						<button type="button" class="wa-btn" onclick={saveGroupings} title="Remember this author's grouping in your browser, so your fixes are here next time">💾 Save my groupings</button>
@@ -4065,6 +4065,35 @@
 	}
 	.works-why:hover {
 		text-decoration: underline;
+	}
+	/* "How does this work?" — a subtle inline see-more disclosure. */
+	.works-more {
+		display: inline;
+		margin-left: 4px;
+	}
+	.works-more > summary {
+		display: inline;
+		list-style: none;
+		cursor: pointer;
+		color: #357abd;
+		font-weight: 600;
+	}
+	.works-more > summary::-webkit-details-marker {
+		display: none;
+	}
+	.works-more > summary::after {
+		content: " ▾";
+		font-size: 0.85em;
+	}
+	.works-more[open] > summary::after {
+		content: " ▴";
+	}
+	.works-more > summary:hover {
+		text-decoration: underline;
+	}
+	.works-more-body {
+		display: block;
+		margin-top: 5px;
 	}
 
 	.titles-header {
