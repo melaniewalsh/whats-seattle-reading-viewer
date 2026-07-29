@@ -2223,17 +2223,18 @@
 									>{groupLabel(g)}</span>
 								</button>
 								<button
-										class="chip-edit"
+										class="chip-icon chip-edit"
 										class:on={g.id === activeGroupId}
-										title="Edit which editions are in this work"
+										aria-label={g.id === activeGroupId ? "Done editing this work" : "Edit which editions are in this work"}
+										title={g.id === activeGroupId ? "Done editing" : "Edit which editions are in this work"}
 										onclick={() => {
 											const editing = activeGroupId !== g.id;
 											activeGroupId = editing ? g.id : null;
 											// Opening "Edit" should reveal the works table you're editing in.
 											if (editing) tableCollapsed = false;
 										}}
-								>{g.id === activeGroupId ? "Done" : "Edit"}</button>
-								<button class="chip-remove" title="Remove from the chart" onclick={() => removeGroup(g.id)}>×</button>
+								>{g.id === activeGroupId ? "✓" : "✎"}</button>
+								<button class="chip-icon chip-remove" aria-label="Remove from the chart" title="Remove from the chart" onclick={() => removeGroup(g.id)}>×</button>
 							</li>
 						{/each}
 						{#each singleIdxs as idx, i (idx)}
@@ -2308,7 +2309,7 @@
 				{/if}
 				<div class="title-table" role="table" aria-label="Titles, grouped by work" style="--work-w:{workColW}px; --edition-w:{editionColW}px">
 					<div class="tt-head" role="row">
-						<span class="tt-cell tt-plot" role="columnheader" class:editing={activeGroup} title={activeGroup ? `Tick to add editions to “${groupLabel(activeGroup)}”` : "Tick to plot a title on the chart"}>{activeGroup ? "Add to work" : ""}</span>
+						<span class="tt-cell tt-plot" role="columnheader" class:editing={activeGroup} title={activeGroup ? `Tick to add editions to “${groupLabel(activeGroup)}”` : "Tick to plot a title on the chart"}></span>
 						<span
 								class="tt-cell tt-work"
 								role="columnheader"
@@ -3748,26 +3749,28 @@
 
 	.group-chip-row {
 		display: flex;
-		align-items: stretch;
+		align-items: center;
+		gap: 3px;
 	}
 
-	/* linked highlight (see .work-header.hl): ring the whole pill when its work
+	/* linked highlight (see .work-header.hl): ring the name pill when its work
 	   row is hovered, and vice versa */
-	.group-chip-row.hl {
-		border-radius: 999px;
+	.group-chip-row.hl .group-chip {
 		box-shadow: 0 0 0 2px #e58a00;
+		border-color: #e58a00;
 	}
 
+	/* The name is a self-contained rounded pill; Edit (✎) and × are separate ghost
+	   icon buttons that sit just after it — no heavy segment dividers. */
 	.group-chip {
 		display: flex;
 		align-items: center;
 		gap: 7px;
 		font-family: var(--font-sans);
 		font-size: 0.85rem;
-		padding: 6px 10px 6px 8px;
-		border-radius: 999px 0 0 999px;
+		padding: 6px 12px 6px 8px;
+		border-radius: 999px;
 		border: 1.5px solid var(--color-border);
-		border-right: none;
 		background: var(--color-white);
 		color: var(--color-fg);
 		cursor: pointer;
@@ -3831,21 +3834,40 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	.chip-remove {
-		font-family: var(--font-sans);
+	/* Ghost icon buttons after the name pill (Edit ✎, remove ×). */
+	.chip-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 27px;
+		height: 27px;
+		flex: none;
+		padding: 0;
+		border: none;
+		border-radius: 50%;
+		background: none;
+		color: var(--color-fg-light);
 		font-size: 0.95rem;
 		line-height: 1;
-		padding: 0 10px;
-		border: 1.5px solid var(--color-border);
-		border-radius: 0 999px 999px 0;
-		background: var(--color-white);
-		color: var(--color-fg-light);
 		cursor: pointer;
+		transition: background 0.12s, color 0.12s;
 	}
-
+	.chip-icon:hover {
+		background: var(--color-gray-100);
+		color: var(--color-fg);
+	}
 	.chip-remove:hover {
 		color: #e3120b;
-		border-color: #e3120b;
+		background: rgba(227, 18, 11, 0.1);
+	}
+	/* Edit toggled on: filled in the work's colour so it's clearly "editing". */
+	.chip-edit.on {
+		background: var(--chip-color, var(--color-fg));
+		color: var(--color-white);
+	}
+	.chip-edit.on:hover {
+		background: var(--chip-color, var(--color-fg));
+		color: var(--color-white);
 	}
 
 	/* row dims when another line is isolated / the author total is hidden */
@@ -3891,29 +3913,6 @@
 	.chip-only.end {
 		border-right: 1.5px solid var(--color-border);
 		border-radius: 0 999px 999px 0;
-	}
-
-	/* the "Edit" segment in a group pill (sits between the name and "Only") */
-	.chip-edit {
-		display: flex;
-		align-items: center;
-		font-family: var(--font-sans);
-		font-size: 0.72rem;
-		font-weight: 600;
-		padding: 0 10px;
-		border: 1.5px solid var(--color-border);
-		border-right: none;
-		background: var(--color-white);
-		color: var(--color-fg-light);
-		cursor: pointer;
-	}
-	.chip-edit:hover {
-		color: var(--color-fg);
-	}
-	.chip-edit.on {
-		background: var(--color-fg);
-		border-color: var(--color-fg);
-		color: var(--color-white);
 	}
 
 	.editing-hint {
@@ -4708,18 +4707,24 @@
 		gap: 8px;
 		margin: 0 2px 10px;
 	}
+	/* Save / Reset / Make a custom work — the shared neutral control box. */
 	.wa-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
 		font-family: var(--font-sans);
-		font-size: 0.8rem;
+		font-size: 0.82rem;
 		font-weight: 600;
-		padding: 5px 12px;
-		border: 1px solid var(--color-border);
+		line-height: 1;
+		padding: 6px 14px;
+		border: 1.5px solid var(--color-border);
 		border-radius: 999px;
 		background: var(--color-white);
 		color: var(--color-fg);
 		cursor: pointer;
+		transition: border-color 0.12s, background 0.12s;
 	}
-	.wa-btn:hover { background: var(--color-gray-100); }
+	.wa-btn:hover { border-color: var(--color-fg-light); background: #f7f7f7; }
 	.wa-reset { color: var(--color-fg-light); }
 	.wa-saved {
 		font-family: var(--font-sans);
