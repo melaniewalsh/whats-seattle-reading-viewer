@@ -3861,10 +3861,14 @@
 	}
 
 	.chip-name {
-		/* show the full title -- wrap instead of truncating */
-		white-space: normal;
-		overflow-wrap: anywhere;
-		word-break: break-word;
+		/* One line with an ellipsis so every pill stays the same tidy height. Long
+		   titles used to wrap to 2-3 lines, making tall lopsided pills and stretching
+		   the pencil segment. The full title still shows on hover (hoverTip) and in
+		   the works table below. */
+		max-width: 230px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.chip-count {
