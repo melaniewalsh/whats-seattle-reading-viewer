@@ -585,7 +585,7 @@
 		justify-content: center;
 		flex-wrap: wrap;
 		gap: 16px;
-		margin: 0 0 14px;
+		margin: 0 0 var(--space-4);
 	}
 	.hero-logo {
 		flex: none;
@@ -687,10 +687,10 @@
 		font-family: var(--font-sans);
 		font-size: var(--text-base);
 		color: var(--color-fg-light);
-		margin: 0 0 14px;
+		margin: 0 0 var(--space-4);
 	}
 	.featured-chart {
-		margin: 0 0 8px;
+		margin: 0 0 var(--space-2);
 	}
 	.featured-cta {
 		font-family: var(--font-sans);
@@ -783,13 +783,13 @@
 		font-weight: 700;
 		font-size: clamp(1.7rem, 3.4vw, 2.5rem);
 		color: var(--color-fg);
-		margin: 0 0 18px;
+		margin: 0 0 var(--space-5);
 	}
 	.about-page p {
 		font-size: var(--text-lg);
 		line-height: 1.6;
 		color: var(--color-fg);
-		margin: 0 0 14px;
+		margin: 0 0 var(--space-4);
 	}
 	.about-page a {
 		color: #3f88cc;
@@ -804,7 +804,7 @@
 		margin: 26px 0 8px;
 	}
 	.about-list {
-		margin: 0 0 14px;
+		margin: 0 0 var(--space-4);
 		padding-left: 20px;
 	}
 	.about-list li {
@@ -829,7 +829,7 @@
 		font-size: var(--text-lg);
 		line-height: 1.5;
 		color: var(--color-fg-light);
-		margin: 0 0 8px;
+		margin: 0 0 var(--space-2);
 	}
 	.pub-year {
 		font-family: var(--font-display, var(--font-serif));
@@ -928,7 +928,7 @@
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
 		color: #3f88cc;
-		margin: 0 0 8px;
+		margin: 0 0 var(--space-2);
 	}
 	.study-title {
 		font-family: var(--font-display, var(--font-serif));
@@ -1147,7 +1147,7 @@
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
 		color: #97a2ad;
-		margin: 0 0 8px;
+		margin: 0 0 var(--space-2);
 	}
 	.menu-link {
 		display: block;

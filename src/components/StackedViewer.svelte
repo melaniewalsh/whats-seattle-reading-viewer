@@ -2699,8 +2699,8 @@
 	.genre-ranks {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 6px;
-		margin: 16px 0 18px;
+		gap: var(--space-2);
+		margin: var(--space-4) 0 var(--space-5);
 	}
 	.genre-rank {
 		font-family: var(--font-sans);
@@ -2745,8 +2745,8 @@
 		flex-wrap: wrap;
 		align-items: center;
 		justify-content: flex-end; /* download / share sit at the right, OWID-style */
-		gap: 8px;
-		margin: 10px 0 4px;
+		gap: var(--space-2);
+		margin: var(--space-3) 0 var(--space-1);
 	}
 
 	/* top subject-heading terms for the current author / title, just under the
@@ -3670,8 +3670,8 @@
 	}
 
 	.groups-panel {
-		margin: 4px 0 18px;
-		padding: 14px 16px;
+		margin: var(--space-1) 0 var(--space-5);
+		padding: var(--space-4);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-md);
 		background: var(--color-gray-100);
@@ -4069,9 +4069,9 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 12px;
+		gap: var(--space-3);
 		flex-wrap: wrap;
-		margin: 0 0 14px;
+		margin: 0 0 var(--space-4);
 	}
 	.plot-toolbar .mode-toggle {
 		margin: 0;
