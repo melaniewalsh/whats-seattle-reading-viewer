@@ -21,7 +21,7 @@
 			aria-expanded={open}
 			title="Where to borrow or buy this book"
 	>
-		<span class="borrow-ic" aria-hidden="true">↓</span> Borrow <span class="borrow-caret" aria-hidden="true">▾</span>
+		Borrow <span class="borrow-caret" aria-hidden="true">▾</span>
 	</button>
 	{#if open}
 		<button class="borrow-backdrop" aria-label="Close" onclick={close}></button>
@@ -69,9 +69,6 @@
 	.borrow-btn.compact {
 		font-size: 0.78rem;
 		padding: 3px 9px;
-	}
-	.borrow-ic {
-		font-weight: 700;
 	}
 	.borrow-caret {
 		font-size: 0.7em;

@@ -528,7 +528,7 @@
 									<div class="gal-by">by {displayName(r[1])}</div>
 									<div class="gal-count">{compactNumber(r[3])} checkouts</div>
 									{#if k in summaries}
-										<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links">{#if wikiUrls[k]}<a class="icon-link" href={wikiUrls[k]} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a>{/if}<BorrowMenu q={`${r[0]} ${displayName(r[1])}`} compact /></span></p>
+										<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[k] || lookupUrls(`${r[0]} ${displayName(r[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={`${r[0]} ${displayName(r[1])}`} compact /></span></p>
 									{:else}
 										<p class="gal-sum gal-sum-ph"></p>
 									{/if}
@@ -576,7 +576,7 @@
 										</span>
 										<span class="tw-by">by {displayName(row[1])}</span>
 											{#if coverKey(row) in summaries}
-												<p class="row-sum">{#if summaries[coverKey(row)]}{blurb(summaries[coverKey(row)])} {/if}<span class="src-links">{#if wikiUrls[coverKey(row)]}<a class="icon-link" href={wikiUrls[coverKey(row)]} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a>{/if}<BorrowMenu q={`${row[0]} ${displayName(row[1])}`} compact /></span></p>
+												<p class="row-sum">{#if summaries[coverKey(row)]}{blurb(summaries[coverKey(row)])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[coverKey(row)] || lookupUrls(`${row[0]} ${displayName(row[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={`${row[0]} ${displayName(row[1])}`} compact /></span></p>
 											{/if}
 									</span>
 								</div>

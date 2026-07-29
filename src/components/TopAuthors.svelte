@@ -445,7 +445,7 @@
 									<button class="gal-booktitle" onclick={() => openAuthor(r[0])}>{displayName(r[1])}</button>
 									<div class="gal-count">{compactNumber(r[2])} checkouts</div>
 									{#if k in summaries}
-										<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links">{#if wikiUrls[k]}<a class="icon-link" href={wikiUrls[k]} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a>{/if}<BorrowMenu q={displayName(r[1])} compact /></span></p>
+										<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[k] || lookupUrls(displayName(r[1])).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={displayName(r[1])} compact /></span></p>
 									{:else}
 										<p class="gal-sum gal-sum-ph"></p>
 									{/if}
@@ -491,7 +491,7 @@
 												{/if}
 											</span>
 											{#if authorKey(row) in summaries}
-												<p class="row-sum">{#if summaries[authorKey(row)]}{blurb(summaries[authorKey(row)])} {/if}<span class="src-links">{#if wikiUrls[authorKey(row)]}<a class="icon-link" href={wikiUrls[authorKey(row)]} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a>{/if}<BorrowMenu q={displayName(row[1])} compact /></span></p>
+												<p class="row-sum">{#if summaries[authorKey(row)]}{blurb(summaries[authorKey(row)])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[authorKey(row)] || lookupUrls(displayName(row[1])).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={displayName(row[1])} compact /></span></p>
 											{/if}
 										{:else}
 											{displayName(row[1])}
