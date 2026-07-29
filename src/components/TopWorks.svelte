@@ -725,18 +725,18 @@
 	.gal-sec::after {
 		content: "›";
 		position: absolute;
-		top: 137px;
-		right: 2px;
-		width: 32px;
-		height: 32px;
+		top: 190px;
+		right: 4px;
+		width: 46px;
+		height: 46px;
 		display: grid;
 		place-items: center;
-		padding-bottom: 3px;
+		padding-bottom: 4px;
 		border-radius: 50%;
-		background: rgba(20, 20, 20, 0.4);
+		background: rgba(20, 20, 20, 0.46);
 		color: #fff;
-		font: 700 1.5rem/1 var(--font-sans);
-		box-shadow: 0 1px 5px rgba(0, 0, 0, 0.25);
+		font: 700 2.1rem/1 var(--font-sans);
+		box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
 		pointer-events: none;
 		opacity: 1;
 		transition: opacity 0.25s;

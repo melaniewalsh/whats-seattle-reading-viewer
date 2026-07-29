@@ -1370,14 +1370,13 @@
 				};
 			});
 			const matchCount = f ? editions.filter((e) => e.match).length : 0;
-			// While filtering, show a work only if it (or an edition) matches, and the
-			// expanded rows show ONLY the matching editions -- but the "N editions" badge
-			// and the checkout total stay the work's FULL numbers, so a search never
-			// makes a cluster look smaller than it is.
-			// EXCEPTION: while dragging a title or work, keep every work visible so any
-			// of them can be a drop target -- otherwise you can't drag a matched title
-			// INTO a work that doesn't itself match the current filter.
-			if (f && !nameMatch && matchCount === 0 && dragIdx === null && dragWorkKey === null) continue;
+			// While filtering, a work is "filtered out" unless it (or an edition)
+			// matches. We DON'T drop it from the list -- it stays rendered but hidden
+			// via CSS (.work-header.filtered-hidden). That way starting a drag can
+			// reveal every work as a drop target by just un-hiding them, WITHOUT
+			// inserting DOM nodes mid-drag (node insertion moves the dragged row and
+			// cancels the native drag). The badge/total keep the work's FULL numbers.
+			const filteredOut = !!f && !nameMatch && matchCount === 0;
 			// A plotted individual edition floats to the top of its work, so the one
 			// you're looking at is visually prioritized; otherwise by checkouts.
 			editions.sort((x, y) => {
@@ -1387,10 +1386,14 @@
 			});
 			// "Primary" format = the format of the work's most-borrowed edition, used
 			// when sorting the table by format.
-			blocks.push({ key, name: w.name, editions, total: w.total, matchCount, primaryFormat: editions[0]?.format || "other" });
+			blocks.push({ key, name: w.name, editions, total: w.total, matchCount, primaryFormat: editions[0]?.format || "other", filteredOut });
 		}
 		const FMT_ORDER = { print: 0, largeprint: 1, ebook: 2, audiobook: 3, other: 4 };
 		blocks.sort((a, b) => {
+			// While filtering, matches sort first (and so stay within the display cap);
+			// filtered-out works trail behind, hidden until a drag reveals them below
+			// the matches. No effect when not filtering (filteredOut is false for all).
+			if (a.filteredOut !== b.filteredOut) return a.filteredOut ? 1 : -1;
 			if (workOrder === "format") {
 				return (FMT_ORDER[a.primaryFormat] ?? 9) - (FMT_ORDER[b.primaryFormat] ?? 9) || b.total - a.total;
 			}
@@ -1408,6 +1411,9 @@
 	// While a filter is active, auto-expand any work with a matching edition so the
 	// highlighted rows are visible without a manual click.
 	const filtering = $derived(!!titleFilter.trim());
+	// A drag (a title or a whole work) is in progress -> reveal the filtered-out
+	// works so any of them can be a drop target.
+	const dragActive = $derived(dragIdx !== null || dragWorkKey !== null);
 	const workOpen = (w) => isExpanded(w.key) || (filtering && w.matchCount > 0);
 	function toggleExpand(key) {
 		expandedWorks = isExpanded(key) ? expandedWorks.filter((k) => k !== key) : [...expandedWorks, key];
@@ -2452,6 +2458,7 @@
 										class:expanded={workOpen(w)}
 										class:plotted={!!wColor}
 										class:work-drop={dragOverWorkKey === w.key}
+										class:filtered-hidden={w.filteredOut && !dragActive}
 										class:hl={hlWorkKey === w.key}
 										style={wColor ? `--chip-color:${wColor}` : ""}
 										draggable="true"
@@ -4412,6 +4419,11 @@
 	}
 	.work-header:hover {
 		background: var(--color-gray-100);
+	}
+	/* Works that don't match the active filter: kept in the DOM (so a drag can
+	   reveal them without inserting nodes mid-drag) but hidden until then. */
+	.work-header.filtered-hidden {
+		display: none;
 	}
 
 	/* a real work cluster (2+ editions) -- highlight it with an accent bar + tint
