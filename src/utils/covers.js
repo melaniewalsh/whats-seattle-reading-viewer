@@ -17,6 +17,29 @@ function keyOf(title, author) {
 	return `cover10:${(title || "").toLowerCase()}|${(author || "").toLowerCase()}`;
 }
 
+// Manual cover overrides — for works whose Open Library match is wrong, foreign,
+// or ugly. Keyed by the title normalized to lowercase words (accents folded,
+// punctuation dropped, a leading article removed), so any catalog spelling of the
+// same work resolves to the chosen cover. These win over both the runtime lookup
+// and the build-time baked cover.
+const COVER_OVERRIDES = {
+	"pride and prejudice": "https://images2.penguinrandomhouse.com/cover/9780141439518",
+	"wuthering heights": "https://images2.penguinrandomhouse.com/cover/9780141439556",
+};
+function normOverrideKey(title) {
+	return (title || "")
+		.toLowerCase()
+		.normalize("NFD").replace(/[̀-ͯ]/g, "")
+		.replace(/\s*[:/].*$/, "")   // drop subtitle / statement of responsibility
+		.replace(/\([^)]*\)/g, " ")  // drop "(unabridged)" and other parentheticals
+		.replace(/[^a-z0-9]+/g, " ")
+		.replace(/^(a|an|the)\s+/, "")
+		.trim();
+}
+export function coverOverride(title) {
+	return COVER_OVERRIDES[normOverrideKey(title)] || null;
+}
+
 const TITLE_STOP = new Set(["a", "an", "the", "and", "or", "of", "to", "in", "for", "is"]);
 function titleTokens(s) {
 	return (s || "")
@@ -185,6 +208,8 @@ async function resolve(title, author) {
 
 // Returns a Promise<string|null> (the cover URL, or null if none / on error).
 export function coverUrl(title, author) {
+	const ov = coverOverride(title);
+	if (ov) return Promise.resolve(ov);
 	const k = keyOf(title, author);
 	if (mem.has(k)) return mem.get(k);
 

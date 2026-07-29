@@ -2208,7 +2208,7 @@
 							>
 								<button
 										type="button"
-										class="group-chip"
+										class="group-chip work-chip"
 										class:active={g.id === activeGroupId}
 										class:drag-over={dragOverId === g.id}
 										style="--chip-color: {groupColorFor(g)}"
@@ -2229,7 +2229,7 @@
 									>{groupLabel(g)}</span>
 								</button>
 								<button
-										class="chip-icon chip-edit"
+										class="chip-edit"
 										class:on={g.id === activeGroupId}
 										aria-label={g.id === activeGroupId ? "Done editing this work" : "Edit which editions are in this work"}
 										title={g.id === activeGroupId ? "Done editing" : "Edit which editions are in this work"}
@@ -2240,7 +2240,6 @@
 											if (editing) tableCollapsed = false;
 										}}
 								>{g.id === activeGroupId ? "✓" : "✎"}</button>
-								<button class="chip-icon chip-remove" aria-label="Remove from the chart" title="Remove from the chart" onclick={() => removeGroup(g.id)}>×</button>
 							</li>
 						{/each}
 						{#each singleIdxs as idx, i (idx)}
@@ -3767,7 +3766,7 @@
 	.group-chip-row {
 		display: flex;
 		align-items: center;
-		gap: 3px;
+		gap: 0;
 	}
 
 	/* linked highlight (see .work-header.hl): ring the name pill when its work
@@ -3851,39 +3850,45 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	/* Ghost icon buttons after the name pill (Edit ✎, remove ×). */
-	.chip-icon {
+	/* Work chip: the name and the pencil form ONE seamless pill — the name is the
+	   left segment (rounded left, no right border), the pencil the right segment
+	   (rounded right, no left border), so nothing floats separately beside it. */
+	.group-chip.work-chip {
+		border-radius: 999px 0 0 999px;
+		border-right: none;
+		padding-right: 3px;
+	}
+	.chip-edit {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 27px;
-		height: 27px;
+		width: 30px;
+		align-self: stretch;
 		flex: none;
 		padding: 0;
-		border: none;
-		border-radius: 50%;
-		background: none;
+		border: 1.5px solid var(--color-border);
+		border-left: none;
+		border-radius: 0 999px 999px 0;
+		background: var(--color-white);
 		color: var(--color-fg-light);
 		font-size: var(--text-base);
 		line-height: 1;
 		cursor: pointer;
-		transition: background 0.12s, color 0.12s;
+		transition: background 0.12s, color 0.12s, border-color 0.12s;
 	}
-	.chip-icon:hover {
+	.group-chip.work-chip:hover,
+	.group-chip.work-chip:hover + .chip-edit {
+		border-color: var(--chip-color, var(--color-fg-light));
+	}
+	.chip-edit:hover {
 		background: var(--color-gray-100);
 		color: var(--color-fg);
 	}
-	.chip-remove:hover {
-		color: #e3120b;
-		background: rgba(227, 18, 11, 0.1);
-	}
-	/* Edit toggled on: filled in the work's colour so it's clearly "editing". */
+	/* Editing: the whole pill fills with the work's colour. */
+	.group-chip.work-chip.active + .chip-edit,
 	.chip-edit.on {
 		background: var(--chip-color, var(--color-fg));
-		color: var(--color-white);
-	}
-	.chip-edit.on:hover {
-		background: var(--chip-color, var(--color-fg));
+		border-color: var(--chip-color, var(--color-fg));
 		color: var(--color-white);
 	}
 

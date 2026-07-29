@@ -3,7 +3,7 @@
 	import { base } from "$app/paths";
 	import { getTopWorks, getGenreTerms } from "$components/db.js";
 	import { displayName } from "$utils/displayName.js";
-	import { coverUrl } from "$utils/covers.js";
+	import { coverUrl, coverOverride } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { wikiWork } from "$utils/wiki.js";
 	import { compactNumber } from "$utils/format.js";
@@ -125,11 +125,13 @@
 			const k = coverKey(r);
 			if (k in covers || coverInflight.has(k)) continue;
 			coverInflight.add(k);
-			// r[4] = cover baked in at build time: a real URL string is used as-is.
-			// Anything else (null from an old failed bake, or no 5th column) resolves
-			// at runtime — the improved lookup catches covers the bake missed.
+			// A manual override (covers.js) wins over everything. Otherwise r[4] = the
+			// cover baked at build time; anything else resolves at runtime.
+			const ov = coverOverride(r[0]);
 			const baked = r[4];
-			if (typeof baked === "string" && baked) {
+			if (ov) {
+				covers = { ...covers, [k]: ov };
+			} else if (typeof baked === "string" && baked) {
 				covers = { ...covers, [k]: baked };
 			} else {
 				coverUrl(r[0], displayName(r[1])).then((u) => {
@@ -196,8 +198,11 @@
 		const k = coverKey(r);
 		if (!(k in covers) && !coverInflight.has(k)) {
 			coverInflight.add(k);
+			const ov = coverOverride(r[0]);
 			const baked = r[4];
-			if (typeof baked === "string" && baked) {
+			if (ov) {
+				covers = { ...covers, [k]: ov };
+			} else if (typeof baked === "string" && baked) {
 				covers = { ...covers, [k]: baked };
 			} else {
 				coverUrl(r[0], displayName(r[1])).then((u) => {
