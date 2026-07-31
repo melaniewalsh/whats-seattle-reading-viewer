@@ -303,6 +303,45 @@ export async function searchTitles(query, limit = 20) {
 	return out;
 }
 
+// How well `text` matches the query `needle` (both lowercased), used to rank
+// authors and works together in the unified search box: exact > prefix >
+// word-boundary > substring. Popularity (total) only breaks ties within a tier,
+// so a good textual match always outranks a merely-more-popular weak one.
+function matchTier(text, needle) {
+	const t = (text || "").toLowerCase();
+	if (t === needle) return 4;
+	if (t.startsWith(needle)) return 3;
+	const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	if (new RegExp("\\b" + esc).test(t)) return 2;
+	if (t.includes(needle)) return 1;
+	return 0;
+}
+
+/**
+ * Unified search over BOTH authors and works for the single search box. Returns a
+ * merged, relevance-ranked list where each item carries a `kind` ("author" or
+ * "work") so the caller can label it and route the click to the right view.
+ * Works come from the popularity-limited title index (same as searchTitles); an
+ * obscure work is still reachable via its author.
+ */
+export async function searchAll(query, limit = 60) {
+	const needle = (query ?? "").trim().toLowerCase();
+	if (needle.length < 2) return [];
+	const [authors, titles] = await Promise.all([
+		searchAuthors(query, limit),
+		searchTitles(query, limit),
+	]);
+	const merged = [
+		...authors.map((a) => ({ kind: "author", slug: a.slug, name: a.name, total: a.total, tier: matchTier(a.name, needle) })),
+		...titles.map((t) => ({ kind: "work", slug: t.slug, title: t.title, author: t.author, total: t.total, tier: matchTier(t.title, needle) })),
+	];
+	// Best textual match first; popularity only breaks ties. A stable interleave
+	// isn't needed — with tier-then-total, a well-matched work sits alongside a
+	// well-matched author regardless of the author's larger raw total.
+	merged.sort((a, b) => b.tier - a.tier || (b.total || 0) - (a.total || 0));
+	return merged.slice(0, limit);
+}
+
 /**
  * Load one author's full drilldown in a single fetch: their own sparse series
  * plus every qualifying title's sparse series. Same shape the old

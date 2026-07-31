@@ -14,7 +14,7 @@
 	import WikiCard from "$components/WikiCard.svelte";
 	import BorrowMenu from "$components/BorrowMenu.svelte";
 	import Switch from "$components/ui/Switch.svelte";
-	import { getMonths, searchAuthors, searchTitles, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks } from "$components/db.js";
+	import { getMonths, searchAuthors, searchTitles, searchAll, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks } from "$components/db.js";
 
 	// "author" (default): search authors. "title": reverse lookup — search a title,
 	// resolve to its author, open the author's drilldown with that work highlighted.
@@ -257,9 +257,9 @@
 			results = [];
 			return;
 		}
-		results = searchMode === "title"
-			? await searchTitles(needle, 75)
-			: await searchAuthors(needle, 75);
+		// One box searches BOTH authors and works; each result carries a `kind` so
+		// the click routes to the right view (no Author/Title toggle).
+		results = await searchAll(needle, 60);
 	}, 120);
 	$effect(() => runSearch(query));
 
@@ -416,6 +416,22 @@
 		} catch {}
 		await tick();
 		if (scroll) (titleEl || chartWrap)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+	}
+
+	// Unified-search click: a result is either an author or a work. Set the view
+	// mode to match (kept internal now that the toggle is gone) and load it.
+	async function pickResult(res) {
+		query = "";
+		results = [];
+		if (res.kind === "work") {
+			// Suppress the auto-default-title effect so it can't clobber this pick.
+			titleDefaultLoaded = true;
+			if (searchMode !== "title") { setSearchKind("title"); await tick(); }
+			await selectTitle({ slug: res.slug, title: res.title, author: res.author });
+		} else {
+			if (searchMode !== "author") { setSearchKind("author"); await tick(); }
+			await selectAuthor({ slug: res.slug, name: res.name });
+		}
 	}
 
 	// When you overlay an individual edition on the "Total" line chart, auto-hide the
@@ -1887,21 +1903,14 @@
 <div class="viewer">
 	{#snippet authorPicker()}
 		<div class="search-row">
-			<label class="ta-field">
-				<span>Search by</span>
-				<select value={searchMode} onchange={(e) => setSearchKind(e.currentTarget.value)}>
-					<option value="author">Author</option>
-					<option value="title">Work</option>
-				</select>
-			</label>
 			<label class="ta-field grow">
-				<span>Find {searchMode === "title" ? "a work" : "an author"}{#if searchMode === "title"}<span class="nf-hint" tabindex="0" role="note" aria-label="Only the most-borrowed titles are searchable here — search By author to find any title">?<span class="th-pop nf-pop" role="tooltip"><strong>Only the most-borrowed works are searchable here</strong>{#if titleMinLabel} — those with at least ~{titleMinLabel} all-time checkouts{/if}. To find any work, search <strong>By&nbsp;author</strong> instead.</span></span>{/if}</span>
+				<span>Search</span>
 				<div class="search">
 					<input
 							id="author-search"
 							type="search"
-							placeholder={searchMode === "title" ? "Search a work" : "Search an author"}
-							aria-label={searchMode === "title" ? "Search for a work" : "Search for an author"}
+							placeholder="Search authors or books"
+							aria-label="Search authors or books"
 							bind:value={query}
 							autocomplete="off"
 					/>
@@ -1909,14 +1918,14 @@
 				<ul class="results">
 					{#each results as a}
 						<li>
-							{#if searchMode === "title"}
-								<button onclick={() => selectTitle(a)}>
-									<span class="res-title">{titleCase(a.title)}</span>
+							{#if a.kind === "work"}
+								<button onclick={() => pickResult(a)}>
+									<span class="res-line"><span class="res-title">{titleCase(a.title)}</span><span class="res-kind kind-book">Book</span></span>
 									<span class="count res-author">{displayName(a.author)}</span>
 								</button>
 							{:else}
-								<button onclick={() => selectAuthor(a)}>
-									<span>{displayName(a.name)}</span>
+								<button onclick={() => pickResult(a)}>
+									<span class="res-line"><span>{displayName(a.name)}</span><span class="res-kind kind-author">Author</span></span>
 									<span class="count">{a.total.toLocaleString()}</span>
 								</button>
 							{/if}
@@ -1924,7 +1933,7 @@
 					{/each}
 				</ul>
 				{:else if query.trim().length >= 2}
-					<p class="no-results">No {searchMode === "title" ? "works" : "authors"} found for “{query.trim()}”.</p>
+					<p class="no-results">Nothing found for “{query.trim()}”.</p>
 				{/if}
 				</div>
 			</label>
@@ -2667,6 +2676,38 @@
 	.results .count {
 		color: var(--color-fg-light);
 		font-variant-numeric: tabular-nums;
+		flex: none;
+	}
+	/* Unified results: name/title + a small "Author"/"Book" tag on one line. */
+	.res-line {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 8px;
+		min-width: 0;
+		flex: 1 1 auto;
+	}
+	.res-line > :first-child {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.res-kind {
+		flex: none;
+		font-size: 0.6rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		padding: 1px 6px;
+		border-radius: 999px;
+		line-height: 1.5;
+	}
+	.kind-book {
+		background: #eaf2fb;
+		color: #2f6ea8;
+	}
+	.kind-author {
+		background: var(--color-gray-100);
+		color: var(--color-fg-light);
 	}
 
 	.author {
