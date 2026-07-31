@@ -462,10 +462,12 @@
 				<button class="gal-booktitle" onclick={() => openTitle(r[0])}>{titleCase(cleanWorkTitle(r[0]))}</button>
 				<div class="gal-by">by {displayName(r[1])}</div>
 				<div class="gal-count">{compactNumber(r[3])} checkouts</div>
-				{#if k in summaries}
-					<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[k] || lookupUrls(`${r[0]} ${displayName(r[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={`${r[0]} ${displayName(r[1])}`} compact /></span></p>
-				{:else}
-					<p class="gal-sum gal-sum-ph"></p>
+				{#if !embedded}
+					{#if k in summaries}
+						<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[k] || lookupUrls(`${r[0]} ${displayName(r[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={`${r[0]} ${displayName(r[1])}`} compact /></span></p>
+					{:else}
+						<p class="gal-sum gal-sum-ph"></p>
+					{/if}
 				{/if}
 			</article>
 		{/snippet}
@@ -479,7 +481,7 @@
 	{#if embedded}
 		<section class="gal-sec home-tw">
 			<div class="home-tw-head">
-				<h2 class="home-tw-title">Seattle's most-borrowed books last&nbsp;month</h2>
+				<h2 class="home-tw-title">Most borrowed last&nbsp;month</h2>
 				<button class="home-tw-more" onclick={onSeeAll}>See all Most&nbsp;Borrowed →</button>
 			</div>
 			{@render galRow(overallBooks)}
@@ -784,7 +786,11 @@
 		padding-bottom: 8px;
 		border-bottom: 2px solid var(--color-border);
 	}
-	/* Embedded (home-page) strip: heading + "See all" link over the overall row. */
+	/* Embedded (home-page) strip: heading + "See all" link over the overall row.
+	   Lives inside a bordered card, so no outer section margin and a lighter rule. */
+	.gal-sec.home-tw {
+		margin: 0;
+	}
 	.home-tw-head {
 		display: flex;
 		align-items: baseline;
@@ -792,7 +798,7 @@
 		gap: 12px;
 		margin: 0 0 16px;
 		padding-bottom: 8px;
-		border-bottom: 3px solid var(--color-fg);
+		border-bottom: 2px solid var(--color-border);
 	}
 	.home-tw-title {
 		font-family: var(--font-display, var(--font-serif));

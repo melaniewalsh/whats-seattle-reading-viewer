@@ -743,10 +743,15 @@
 		color: #3f88cc;
 		text-decoration: underline;
 	}
-	/* Home "most borrowed last month" strip, above the hub cards. */
+	/* Home "most borrowed last month" strip, above the hub cards — boxed like the
+	   featured-trend card. */
 	.home-topworks {
 		max-width: 880px;
-		margin: 40px auto 8px;
+		margin: 40px auto 10px;
+		padding: 22px 24px 24px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md, 12px);
+		background: var(--color-white);
 	}
 	.hub {
 		max-width: 880px;
