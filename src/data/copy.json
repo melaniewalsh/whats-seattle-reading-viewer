@@ -3,6 +3,6 @@
 	"description": "Explore millions of Seattle Public Library checkouts. Search any author or title, and browse top 10 rankings.",
 	"url": "https://melaniewalsh.github.io/whats-seattle-reading-viewer",
 	"keywords": "seattle public library, books, checkouts, data, authors, titles, genres",
-	"dek": "Explore millions of checkouts from the Seattle Public Library",
+	"dek": "Explore over 120 million checkouts from the Seattle Public Library",
 	"note": "Based on a sample of SPL open checkout data, 2018–2022."
 }
