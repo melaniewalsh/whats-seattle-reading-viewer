@@ -324,22 +324,40 @@ function matchTier(text, needle) {
  * Works come from the popularity-limited title index (same as searchTitles); an
  * obscure work is still reachable via its author.
  */
+// The bare title without its subtitle / "/ statement of responsibility", so a
+// catalog title like "James : a novel / Percival Everett." matches "james" as an
+// exact hit rather than a mere prefix.
+function bareTitle(title) {
+	return (title || "").toLowerCase().split(/\s*[:/]/)[0].replace(/[^a-z0-9 ]+/g, " ").trim();
+}
+
 export async function searchAll(query, limit = 60) {
 	const needle = (query ?? "").trim().toLowerCase();
 	if (needle.length < 2) return [];
-	const [authors, titles] = await Promise.all([
+	const [authorRows, titleRows] = await Promise.all([
 		searchAuthors(query, limit),
 		searchTitles(query, limit),
 	]);
-	const merged = [
-		...authors.map((a) => ({ kind: "author", slug: a.slug, name: a.name, total: a.total, tier: matchTier(a.name, needle) })),
-		...titles.map((t) => ({ kind: "work", slug: t.slug, title: t.title, author: t.author, total: t.total, tier: matchTier(t.title, needle) })),
-	];
-	// Best textual match first; popularity only breaks ties. A stable interleave
-	// isn't needed — with tier-then-total, a well-matched work sits alongside a
-	// well-matched author regardless of the author's larger raw total.
-	merged.sort((a, b) => b.tier - a.tier || (b.total || 0) - (a.total || 0));
-	return merged.slice(0, limit);
+	const byTierThenTotal = (a, b) => b.tier - a.tier || (b.total || 0) - (a.total || 0);
+	const authors = authorRows
+		.map((a) => ({ kind: "author", slug: a.slug, name: a.name, total: a.total, tier: matchTier(a.name, needle) }))
+		.sort(byTierThenTotal);
+	const works = titleRows
+		.map((t) => ({ kind: "work", slug: t.slug, title: t.title, author: t.author, total: t.total, tier: Math.max(matchTier(t.title, needle), matchTier(bareTitle(t.title), needle)) }))
+		.sort(byTierThenTotal);
+	// Merge by match tier; within an equal tier, alternate author/work so a popular
+	// author (whose raw total dwarfs any single book) never buries an equally-good
+	// title match, and vice versa.
+	const out = [];
+	let ai = 0, wi = 0, turn = 0;
+	while ((ai < authors.length || wi < works.length) && out.length < limit) {
+		const a = authors[ai], w = works[wi];
+		if (!w || (a && a.tier > w.tier)) { out.push(a); ai++; }
+		else if (!a || w.tier > a.tier) { out.push(w); wi++; }
+		else if (turn++ % 2 === 0) { out.push(a); ai++; }
+		else { out.push(w); wi++; }
+	}
+	return out;
 }
 
 /**
