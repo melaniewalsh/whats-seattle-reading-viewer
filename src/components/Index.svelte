@@ -7,10 +7,13 @@
 	import TopWorks from "$components/TopWorks.svelte";
 	import NortonExplorer from "$components/NortonExplorer.svelte";
 	import LineChart from "$components/StackedAreaChart.svelte";
-	import { getMonths, getAuthor, searchTitles, densify } from "$components/db.js";
+	import { getMonths, getAuthor, searchTitles, searchAll, densify } from "$components/db.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { compactNumber } from "$utils/format.js";
+	import { titleCase } from "$utils/titleCase.js";
+	import { cleanWorkTitle } from "$utils/cleanTitle.js";
+	import { displayName } from "$utils/displayName.js";
 	import { publications } from "$data/publications.js";
 
 	const copy = getContext("copy");
@@ -236,6 +239,12 @@
 		if (tab !== "search") rankReturn = null;
 	});
 
+	// Bumped on every openAuthor/openTitle so the search Viewer (keyed on it) remounts
+	// and re-reads the URL — needed when you're ALREADY on the search view and pick a
+	// new author/work (e.g. from the header search), since the Viewer only reads
+	// ?author/?title on mount.
+	let searchNonce = $state(0);
+
 	// Clicking an author (from Rankings, or a card's "See checkout trend") opens the
 	// Search view with that author loaded (Viewer reads ?author on mount).
 	function openAuthor(slug) {
@@ -247,6 +256,7 @@
 			window.history.pushState({}, "", url);
 		} catch {}
 		searchKind = "author";
+		searchNonce++;
 		tab = "search";
 	}
 
@@ -260,7 +270,35 @@
 			window.history.pushState({}, "", url);
 		} catch {}
 		searchKind = "title";
+		searchNonce++;
 		tab = "search";
+	}
+
+	// --- Header search box (a real autocomplete over authors + works) ---------
+	let hq = $state("");           // header query text
+	let hResults = $state([]);     // unified searchAll results
+	let hOpen = $state(false);     // dropdown visible
+	let hTimer;
+	function onHeaderInput() {
+		hOpen = true;
+		clearTimeout(hTimer);
+		const q = hq;
+		hTimer = setTimeout(async () => {
+			const needle = q.trim();
+			if (needle.length < 2) { hResults = []; return; }
+			try { hResults = await searchAll(needle, 8); } catch { hResults = []; }
+		}, 140);
+	}
+	function pickHeader(res) {
+		hOpen = false;
+		hq = "";
+		hResults = [];
+		if (res.kind === "work") openTitle(res.title);
+		else openAuthor(res.slug);
+	}
+	function onHeaderKey(e) {
+		if (e.key === "Enter" && hResults.length) { e.preventDefault(); pickHeader(hResults[0]); }
+		else if (e.key === "Escape") { hOpen = false; }
 	}
 
 	// Open the Most Borrowed works ranking filtered to a genre, all-time (used by
@@ -288,14 +326,39 @@
 					<img class="mast-logo" src="{base}/favicon.png" alt="" width="30" height="30" />
 					<span class="mast-title">{copy.title}</span>
 				</button>
-				<!-- Header shortcut to the Search view; behaves like a search field but
-				     just navigates there on click (the real search box lives on the page). -->
-				<button class="mast-search" onclick={() => go("search")} aria-label="Search authors or titles">
+				<!-- Real header search: a live autocomplete over authors AND works. -->
+				<div class="mast-search">
 					<svg class="mast-search-ic" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
 						<circle cx="9" cy="9" r="6" /><line x1="13.5" y1="13.5" x2="18" y2="18" />
 					</svg>
-					<span class="mast-search-ph">Search authors or titles</span>
-				</button>
+					<input
+							class="mast-search-input"
+							type="search"
+							placeholder="Search authors or books"
+							aria-label="Search authors or books"
+							autocomplete="off"
+							bind:value={hq}
+							oninput={onHeaderInput}
+							onfocus={() => (hOpen = true)}
+							onkeydown={onHeaderKey}
+					/>
+					{#if hOpen && (hResults.length || hq.trim().length >= 2)}
+						<button class="mast-search-backdrop" aria-label="Close search" onclick={() => (hOpen = false)}></button>
+						<ul class="mast-results" role="listbox">
+							{#each hResults as r}
+								<li>
+									<button class="mast-result" onclick={() => pickHeader(r)}>
+										<span class="mast-result-name">{r.kind === "work" ? titleCase(cleanWorkTitle(r.title)) : displayName(r.name)}</span>
+										<span class="mast-result-kind {r.kind === 'work' ? 'kind-book' : 'kind-author'}">{r.kind === "work" ? "Book" : "Author"}</span>
+									</button>
+								</li>
+							{/each}
+							{#if !hResults.length}
+								<li><p class="mast-noresults">Nothing found for “{hq.trim()}”.</p></li>
+							{/if}
+						</ul>
+					{/if}
+				</div>
 				<nav class="mast-meta" aria-label="Site">
 					<button class="mast-metalink" class:active={tab === "about"} aria-current={tab === "about" ? "page" : undefined} onclick={() => go("about")}>About</button>
 					<button class="mast-burger" aria-label="Open menu" aria-expanded={menuOpen} aria-controls="site-menu" onclick={() => (menuOpen = true)}>
@@ -511,7 +574,7 @@
 				<p class="study-more"><a href="https://melaniewalsh.github.io/whats-seattle-reading/posts/spl-500-novels/index.html" target="_blank" rel="noopener noreferrer">Read the full data essay →</a> with the interactive explorer, the complete dataset browser, and reproducible code.</p>
 			</article>
 		{:else}
-			{#key searchKind}
+			{#key `${searchKind}-${searchNonce}`}
 				<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} />
 			{/key}
 		{/if}
@@ -1068,10 +1131,10 @@
 		color: #3f88cc;
 		white-space: nowrap;
 	}
-	/* Search shortcut — styled like an input, acts as a link to the Search view.
-	   margin-left:auto shoves it to the right so it sits next to About + the menu
-	   (rather than floating in the middle). */
+	/* Real header search box (pill wrapper around an input + autocomplete dropdown).
+	   margin-left:auto keeps it next to About + the menu. */
 	.mast-search {
+		position: relative;
 		flex: 0 1 320px;
 		margin-left: auto;
 		max-width: 340px;
@@ -1083,19 +1146,12 @@
 		background: var(--color-gray-100);
 		border: 1px solid var(--color-border);
 		border-radius: 999px;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		color: var(--color-fg);
-		cursor: pointer;
 		transition: border-color 0.12s, background 0.12s;
 	}
-	.mast-search:hover {
+	.mast-search:hover,
+	.mast-search:focus-within {
 		border-color: #3f88cc;
 		background: #fff;
-	}
-	.mast-search:focus-visible {
-		outline: 2px solid rgba(63, 136, 204, 0.5);
-		outline-offset: 2px;
 	}
 	.mast-search-ic {
 		width: 16px;
@@ -1103,10 +1159,93 @@
 		flex: none;
 		color: #3f88cc;
 	}
-	.mast-search-ph {
-		white-space: nowrap;
+	.mast-search-input {
+		flex: 1 1 auto;
+		min-width: 0;
+		border: none;
+		background: none;
+		outline: none;
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		color: var(--color-fg);
+	}
+	.mast-search-input::placeholder {
+		color: var(--color-placeholder);
+	}
+	/* Autocomplete dropdown under the header search. */
+	.mast-search-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 60;
+		background: none;
+		border: none;
+		cursor: default;
+	}
+	.mast-results {
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 0;
+		right: 0;
+		z-index: 61;
+		list-style: none;
+		margin: 0;
+		padding: 6px;
+		max-height: min(60vh, 420px);
+		overflow-y: auto;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 12px;
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+	}
+	.mast-result {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		padding: 8px 10px;
+		border: none;
+		border-radius: 7px;
+		background: none;
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		text-align: left;
+		color: var(--color-fg);
+		cursor: pointer;
+	}
+	.mast-result:hover {
+		background: var(--color-gray-100);
+	}
+	.mast-result-name {
+		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.mast-result-kind {
+		flex: none;
+		font-size: 0.6rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		padding: 1px 6px;
+		border-radius: 999px;
+		line-height: 1.5;
+	}
+	.mast-result-kind.kind-book {
+		background: #eaf2fb;
+		color: #2f6ea8;
+	}
+	.mast-result-kind.kind-author {
+		background: var(--color-gray-100);
+		color: var(--color-fg-light);
+	}
+	.mast-noresults {
+		margin: 0;
+		padding: 8px 10px;
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		color: var(--color-fg-light);
 	}
 	/* Top-right meta links (About, …) — small and understated. */
 	.mast-meta {
