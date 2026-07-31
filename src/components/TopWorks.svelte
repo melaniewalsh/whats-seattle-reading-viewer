@@ -16,7 +16,10 @@
 	// openAuthor(slug) / openTitle(title) are provided by Index.svelte: jump to the
 	// By-author / By-title views. rankKind / setRankKind drive the Type dropdown that
 	// swaps between the Works and Authors rankings.
-	let { openAuthor, openTitle, rankKind = "works", setRankKind = () => {} } = $props();
+	// embedded: render ONLY the "Most borrowed overall (last month)" gallery strip
+	// (no masthead / controls / table) for the home page. onSeeAll links to the full
+	// Most Borrowed view.
+	let { openAuthor, openTitle, rankKind = "works", setRankKind = () => {}, embedded = false, onSeeAll = () => {} } = $props();
 
 	let data = $state(null);
 	let genre = $state("All genres");
@@ -62,10 +65,11 @@
 		try {
 			isTouch = window.matchMedia("(hover: none)").matches;
 		} catch {}
+		let yearFromUrl = false;
 		try {
 			const p = new URLSearchParams(window.location.search);
 			if (p.get("genre")) genre = p.get("genre");
-			if (p.get("year")) year = p.get("year");
+			if (p.get("year")) { year = p.get("year"); yearFromUrl = true; }
 		} catch {}
 		getGenreTerms().then((m) => (termsMap = m));
 		const d = await getTopWorks();
@@ -77,6 +81,9 @@
 		}
 		data = d;
 		if (!data.genres.includes(genre)) genre = "All genres";
+		// Default to last month's ranking (the freshest, most timely view) when the
+		// data has it, unless the URL asked for a specific period.
+		if (!yearFromUrl && data.latestMonth) year = "month";
 		if (year === "month") { if (!data.latestMonth) year = "all"; }
 		else if (year !== "all" && !data.years.includes(Number(year))) year = "all";
 	});
@@ -165,6 +172,9 @@
 		return secs;
 	});
 	const galleryBooks = $derived(gallerySections.flatMap((s) => s.books));
+	// The overall (all-genre) top 5 for the current period — used by the embedded
+	// home strip.
+	const overallBooks = $derived(data ? (data.data["All genres"]?.[year] || []).slice(0, 5) : []);
 
 	// The single freshest month of data (from the build), e.g. "2026-07", shown as
 	// its own "this month" ranking. Only present once the data has been rebuilt with
@@ -222,7 +232,7 @@
 	}
 	// Load blurbs for whatever's on screen — the gallery cards or the ranking rows.
 	$effect(() => {
-		const list = galleryMode ? galleryBooks : rows;
+		const list = embedded ? overallBooks : galleryMode ? galleryBooks : rows;
 		for (const r of list) loadCard(r);
 	});
 	// Trim a Wikipedia extract to a short blurb, breaking on a word boundary.
@@ -436,6 +446,45 @@
 	{:else if loadError}
 		<p class="ta-status ta-error">{loadError}</p>
 	{:else if data}
+		{#snippet galCard(r, i)}
+			{@const k = coverKey(r)}
+			<article class="gal-card">
+				<div class="gal-top">
+					<span class="gal-rank">{i + 1}</span>
+					<button class="gal-cover" class:has-img={!!covers[k]} onclick={() => openTitle(r[0])} title="See borrowing trend">
+						{#if covers[k]}
+							<img src={covers[k]} alt="" loading="lazy" onerror={() => fillFromWiki(r)} />
+						{:else}
+							<span class="gal-cover-ph" aria-hidden="true">📖</span>
+						{/if}
+					</button>
+				</div>
+				<button class="gal-booktitle" onclick={() => openTitle(r[0])}>{titleCase(cleanWorkTitle(r[0]))}</button>
+				<div class="gal-by">by {displayName(r[1])}</div>
+				<div class="gal-count">{compactNumber(r[3])} checkouts</div>
+				{#if k in summaries}
+					<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[k] || lookupUrls(`${r[0]} ${displayName(r[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={`${r[0]} ${displayName(r[1])}`} compact /></span></p>
+				{:else}
+					<p class="gal-sum gal-sum-ph"></p>
+				{/if}
+			</article>
+		{/snippet}
+		{#snippet galRow(books)}
+			<div class="gal-row" onscroll={(e) => e.currentTarget.parentElement.classList.toggle("at-end", e.currentTarget.scrollLeft >= e.currentTarget.scrollWidth - e.currentTarget.clientWidth - 8)}>
+				{#each books as r, i (r[0] + r[2] + i)}
+					{@render galCard(r, i)}
+				{/each}
+			</div>
+		{/snippet}
+	{#if embedded}
+		<section class="gal-sec home-tw">
+			<div class="home-tw-head">
+				<h2 class="home-tw-title">Seattle's most-borrowed books last&nbsp;month</h2>
+				<button class="home-tw-more" onclick={onSeeAll}>See all Most&nbsp;Borrowed →</button>
+			</div>
+			{@render galRow(overallBooks)}
+		</section>
+	{:else}
 			<header class="rank-masthead">
 				<h2 class="rank-title">{genre === "All genres" ? "Seattle's Most-Borrowed Books" : `Most-Borrowed ${genreLabel(genre)} Books`}</h2>
 				<p class="rank-sub">Ranked by checkouts at the Seattle Public Library.</p>
@@ -466,7 +515,7 @@
 			<label class="ta-field">
 				<span>Year</span>
 				<select bind:value={year}>
-					{#if latestMonth}<option value="month">This month ({monthLabel})</option>{/if}
+					{#if latestMonth}<option value="month">Last month ({monthLabel})</option>{/if}
 					<option value="all">All time</option>
 					{#each [...data.years].reverse() as y}
 						<option value={String(y)}>{y}</option>
@@ -491,7 +540,7 @@
 
 		<div class="gal-yearnav">
 			<button class="gal-arrow" onclick={() => stepYear(1)} disabled={yearIdx >= yearSeq.length - 1} aria-label="Earlier year">‹</button>
-			<span class="gal-yearlabel">{year === "all" ? "All time" : year === "month" ? "This month" : year}</span>
+			<span class="gal-yearlabel">{year === "all" ? "All time" : year === "month" ? "Last month" : year}</span>
 			<button class="gal-arrow" onclick={() => stepYear(-1)} disabled={yearIdx <= 0} aria-label="More recent">›</button>
 		</div>
 		{#if !galleryMode}
@@ -515,31 +564,7 @@
 								<button class="gal-title gal-title-link" onclick={() => (overallList = true)} title="See the full top-10 overall">{sec.label}</button>
 							{/if}
 						</div>
-						<div class="gal-row" onscroll={(e) => e.currentTarget.parentElement.classList.toggle("at-end", e.currentTarget.scrollLeft >= e.currentTarget.scrollWidth - e.currentTarget.clientWidth - 8)}>
-							{#each sec.books as r, i (r[0] + r[2] + i)}
-								{@const k = coverKey(r)}
-								<article class="gal-card">
-									<div class="gal-top">
-										<span class="gal-rank">{i + 1}</span>
-										<button class="gal-cover" class:has-img={!!covers[k]} onclick={() => openTitle(r[0])} title="See borrowing trend">
-											{#if covers[k]}
-												<img src={covers[k]} alt="" loading="lazy" onerror={() => fillFromWiki(r)} />
-											{:else}
-												<span class="gal-cover-ph" aria-hidden="true">📖</span>
-											{/if}
-										</button>
-									</div>
-									<button class="gal-booktitle" onclick={() => openTitle(r[0])}>{titleCase(cleanWorkTitle(r[0]))}</button>
-									<div class="gal-by">by {displayName(r[1])}</div>
-									<div class="gal-count">{compactNumber(r[3])} checkouts</div>
-									{#if k in summaries}
-										<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[k] || lookupUrls(`${r[0]} ${displayName(r[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={`${r[0]} ${displayName(r[1])}`} compact /></span></p>
-									{:else}
-										<p class="gal-sum gal-sum-ph"></p>
-									{/if}
-								</article>
-							{/each}
-						</div>
+						{@render galRow(sec.books)}
 					</section>
 				{/each}
 			</div>
@@ -611,6 +636,7 @@
 					</div>
 				</aside>
 			</div>
+		{/if}
 		{/if}
 	{/if}
 
@@ -757,6 +783,40 @@
 		margin: 0 0 16px;
 		padding-bottom: 8px;
 		border-bottom: 2px solid var(--color-border);
+	}
+	/* Embedded (home-page) strip: heading + "See all" link over the overall row. */
+	.home-tw-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 12px;
+		margin: 0 0 16px;
+		padding-bottom: 8px;
+		border-bottom: 3px solid var(--color-fg);
+	}
+	.home-tw-title {
+		font-family: var(--font-display, var(--font-serif));
+		font-size: clamp(1.35rem, 3.2vw, 1.9rem);
+		font-weight: 700;
+		line-height: 1.05;
+		color: var(--color-fg);
+		margin: 0;
+	}
+	.home-tw-more {
+		flex: none;
+		padding: 0;
+		background: none;
+		border: none;
+		font-family: var(--font-sans);
+		font-size: 0.85rem;
+		font-weight: 700;
+		color: #3f88cc;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.home-tw-more:hover {
+		text-decoration: underline;
+		text-underline-offset: 3px;
 	}
 	.gal-title {
 		font-family: var(--font-serif);

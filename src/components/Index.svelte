@@ -364,6 +364,11 @@
 				<p class="dek">{copy.dek}</p>
 				<p class="byline">By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project</p>
 			</header>
+			<!-- The most eye-catching thing up top: what Seattle borrowed most last
+			     month, with a link into the full Most Borrowed view. -->
+			<section class="home-topworks" aria-label="Most borrowed last month">
+				<TopWorks {openAuthor} {openTitle} embedded onSeeAll={() => go("rankings")} />
+			</section>
 			<nav class="hub" aria-label="Explore">
 				<button class="hub-card" onclick={goOverview}>
 					<img class="hub-emoji hub-img" src="{base}/hub-overview.png" alt="" width="34" height="34" />
@@ -738,9 +743,14 @@
 		color: #3f88cc;
 		text-decoration: underline;
 	}
+	/* Home "most borrowed last month" strip, above the hub cards. */
+	.home-topworks {
+		max-width: 880px;
+		margin: 40px auto 8px;
+	}
 	.hub {
 		max-width: 880px;
-		margin: 36px auto 10px;
+		margin: 28px auto 10px;
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
 		gap: 16px;
