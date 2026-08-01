@@ -44,24 +44,7 @@ Key files:
 2. Look up the author's `slug` there.
 3. Fetch `authors/<first-two-characters-of-slug>/<slug>.json`.
 
-```python
-import requests
-
-BASE = "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev"
-
-months = requests.get(f"{BASE}/meta.json").json()["months"]  # shared x-axis: ["2005-04", ...]
-index  = requests.get(f"{BASE}/search-index.json").json()     # [[slug, name, total], ...]
-
-slug   = next(s for s, name, total in index if "james baldwin" in name)  # -> "james-baldwin-1924"
-author = requests.get(f"{BASE}/authors/{slug[:2]}/{slug}.json").json()
-
-# `series` is sparse [[monthIndex, count], ...] — expand it against `months`
-counts = [0] * len(months)
-for i, c in author["series"]:
-    counts[i] = c
-```
-
-Each author file also has `titles` (per-title breakdown, same sparse encoding), `variants` (the raw name spellings merged into this author), and `subjects`.
+A runnable version of this is in [`examples/fetch_author.py`](examples/fetch_author.py) — it fetches the month axis and index, resolves an author's slug, downloads their file, and expands the sparse series. Each author file also has `titles` (per-title breakdown, same sparse encoding), `variants` (the raw name spellings merged into this author), and `subjects`.
 
 **Whole dataset (bulk download).** Rather than fetch ~350k files one by one, download the full corpus as a single tarball from the [**Releases**](https://github.com/melaniewalsh/whats-seattle-reading-viewer/releases) page. A dated snapshot (`data-YYYY-MM`) is published automatically each month; it holds the same files described above and doubles as a fixed, citable version.
 
