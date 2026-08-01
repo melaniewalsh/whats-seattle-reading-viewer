@@ -38,14 +38,32 @@ Key files:
 | `authors/<shard>/<slug>.json` | One file per author: total monthly series + per-title breakdown, sparsely encoded as `[monthIndex, count]` pairs, with format and subject tags. `<shard>` is the first two characters of the slug. |
 | `title-index.json`, `overview.json` | Supporting search/landing indexes used by the viewer. |
 
-**Fetching an author's data.** The bucket has no directory listing and slugs are normalized (and may carry a disambiguating year), so you can't guess filenames — get them from the index:
+**Fetching one author's data.** The bucket has no directory listing and slugs are normalized (and may carry a disambiguating year, e.g. `james-baldwin-1924`), so you can't guess filenames — get them from the index:
 
 1. Download `search-index.json` — an array of `[slug, name, total]` for every author.
 2. Look up the author's `slug` there.
 3. Fetch `authors/<first-two-characters-of-slug>/<slug>.json`.
 
-For example, James Baldwin's slug is `james-baldwin-1924`, so his file is
-`…r2.dev/authors/ja/james-baldwin-1924.json`. To pull the whole dataset, iterate over the slugs in `search-index.json`.
+```python
+import requests
+
+BASE = "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev"
+
+months = requests.get(f"{BASE}/meta.json").json()["months"]  # shared x-axis: ["2005-04", ...]
+index  = requests.get(f"{BASE}/search-index.json").json()     # [[slug, name, total], ...]
+
+slug   = next(s for s, name, total in index if "james baldwin" in name)  # -> "james-baldwin-1924"
+author = requests.get(f"{BASE}/authors/{slug[:2]}/{slug}.json").json()
+
+# `series` is sparse [[monthIndex, count], ...] — expand it against `months`
+counts = [0] * len(months)
+for i, c in author["series"]:
+    counts[i] = c
+```
+
+Each author file also has `titles` (per-title breakdown, same sparse encoding), `variants` (the raw name spellings merged into this author), and `subjects`.
+
+**Whole dataset (bulk download).** Rather than fetch ~350k files one by one, download the full corpus as a single tarball from the [**Releases**](https://github.com/melaniewalsh/whats-seattle-reading-viewer/releases) page. A dated snapshot (`data-YYYY-MM`) is published automatically each month; it holds the same files described above and doubles as a fixed, citable version.
 
 The **raw source** is the Seattle Public Library's "Checkouts by Title" open dataset, updated monthly: <https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6>.
 
@@ -100,6 +118,8 @@ Released under the **MIT License** (see [LICENSE](LICENSE)). The underlying chec
 If you use this resource, please cite the project (an accompanying paper is under review — a full citation will be added here once it is published):
 
 > *What's Seattle Reading? An Interactive Viewer and Open Data Pipeline for Two Decades of Public Library Circulation.* <https://github.com/melaniewalsh/whats-seattle-reading-viewer>
+
+For a reproducible reference to the data, cite the specific monthly snapshot you used from the [Releases](https://github.com/melaniewalsh/whats-seattle-reading-viewer/releases) page (e.g. `data-2026-06`).
 
 ---
 

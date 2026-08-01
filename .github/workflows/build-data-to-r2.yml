@@ -155,3 +155,26 @@ jobs:
             --exclude "library.sqlite3" \
             --stats 30s --stats-one-line
           echo "Uploaded meta.json + search-index.json + author files to r2://${R2_DB_BUCKET}/"
+
+      # Bundle the whole derived dataset into one tarball and publish it as a
+      # dated GitHub Release -- a stable, citable, single-file snapshot for anyone
+      # who wants the full corpus without fetching ~350k files from R2 one by one.
+      # Tagged by the freshest data month (e.g. data-2026-06); re-runs update the
+      # same release's asset. Supplementary to the live R2 copy, so a hiccup here
+      # doesn't fail the build.
+      - name: Publish monthly dataset snapshot (GitHub Release)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MONTH=$(python3 -c "import json; print(json.load(open('static/data/meta.json'))['months'][-1])")
+          TAG="data-${MONTH}"
+          TARBALL="whats-seattle-reading-data-${MONTH}.tar.gz"
+          # Raw per-author JSON + indexes + month axis (drop the legacy sqlite blob).
+          tar czf "$TARBALL" -C static --exclude='data/library.sqlite3' data
+          echo "Built $TARBALL ($(du -h "$TARBALL" | cut -f1))"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
+            --latest \
+            --title "Data snapshot ${MONTH}" \
+            --notes "Clustered Seattle Public Library checkout data through ${MONTH}: per-author JSON time series, the author and title search indexes, and the shared month axis. These are the same files served live from the R2 bucket, bundled for bulk download. See the repository README for the file layout and a fetch example."
+          gh release upload "$TAG" "$TARBALL" --clobber

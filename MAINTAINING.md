@@ -11,7 +11,7 @@ Internal notes for maintainers: deployment, the monthly data rebuild, the full p
 The website is free static hosting on **GitHub Pages**. The data (a few hundred MB of small JSON files) is too much to keep in the repo, so it lives on **Cloudflare R2** and the site fetches from there. Three GitHub Actions run the whole thing on autopilot:
 
 1. **Pull fresh checkouts (monthly)** — `.github/workflows/update.yml` runs an R script that grabs the newest month of SPL data and drops it in the **raw** R2 bucket.
-2. **Rebuild the site data (monthly)** — `.github/workflows/build-data-to-r2.yml` runs `data-prep/build_data.py` (per-author files, with author merges + subject terms) then `data-prep/build_title_index.py` (the "By title" index), and uploads them to the **public** R2 bucket. Scheduled a few hours after the pull; also triggerable by hand from **Actions → Run workflow**. *The genre data (`static/genres.json`) is built separately by `build_partition.py` and committed — it is not part of this workflow.*
+2. **Rebuild the site data (monthly)** — `.github/workflows/build-data-to-r2.yml` runs `data-prep/build_data.py` (per-author files, with author merges + subject terms) then `data-prep/build_title_index.py` (the "By title" index), uploads them to the **public** R2 bucket, and finally bundles the whole dataset into a tarball published as a dated **GitHub Release** (`data-YYYY-MM`, tagged by the freshest data month) for bulk/citable download. Scheduled a few hours after the pull; also triggerable by hand from **Actions → Run workflow**. *The genre data (`static/genres.json`) is built separately by `build_partition.py` and committed — it is not part of this workflow.*
 3. **Redeploy the website (every push)** — `.github/workflows/deploy.yml` rebuilds and redeploys the SvelteKit site to GitHub Pages. Fast (a minute or two) because it never rebuilds the data — it just points at the copy already on R2.
 
 So: push code and the site updates in a minute; the data refreshes on its own once a month.
@@ -139,7 +139,6 @@ With the three Butlers merged, her total becomes **12,570** (10,630 + 1,637 + 30
 - Tune `MIN_TITLE_CHECKOUTS` / `TITLE_MIN_CHECKOUTS` as the index grows.
 - Add more raw fields to the per-author files (publication year, more subjects).
 - Attach a custom domain on R2 for edge caching and to escape the `r2.dev` rate limit.
-- Archive a versioned snapshot of the clustered data (e.g. Zenodo) for a citable DOI.
 
 ---
 
