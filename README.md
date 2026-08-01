@@ -38,7 +38,16 @@ Key files:
 | `authors/<shard>/<slug>.json` | One file per author: total monthly series + per-title breakdown, sparsely encoded as `[monthIndex, count]` pairs, with format and subject tags. `<shard>` is the first two characters of the slug. |
 | `title-index.json`, `overview.json` | Supporting search/landing indexes used by the viewer. |
 
-The R2 bucket has no directory listing — fetch specific keys (an author's slug matches its `search-index.json` entry). The **raw source** is the Seattle Public Library's "Checkouts by Title" open dataset, updated monthly: <https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6>.
+**Fetching an author's data.** The bucket has no directory listing and slugs are normalized (and may carry a disambiguating year), so you can't guess filenames — get them from the index:
+
+1. Download `search-index.json` — an array of `[slug, name, total]` for every author.
+2. Look up the author's `slug` there.
+3. Fetch `authors/<first-two-characters-of-slug>/<slug>.json`.
+
+For example, James Baldwin's slug is `james-baldwin-1924`, so his file is
+`…r2.dev/authors/ja/james-baldwin-1924.json`. To pull the whole dataset, iterate over the slugs in `search-index.json`.
+
+The **raw source** is the Seattle Public Library's "Checkouts by Title" open dataset, updated monthly: <https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6>.
 
 ---
 
@@ -88,9 +97,9 @@ docs/          algorithm documentation
 
 Released under the **MIT License** (see [LICENSE](LICENSE)). The underlying checkout data is published as open data by the Seattle Public Library.
 
-If you use this resource, please cite the accompanying paper:
+If you use this resource, please cite the project (an accompanying paper is under review — a full citation will be added here once it is published):
 
-> *What's Seattle Reading? An Interactive Viewer and Open Data Pipeline for Two Decades of Public Library Circulation.* (JCDL 2026.)
+> *What's Seattle Reading? An Interactive Viewer and Open Data Pipeline for Two Decades of Public Library Circulation.* <https://github.com/melaniewalsh/whats-seattle-reading-viewer>
 
 ---
 
