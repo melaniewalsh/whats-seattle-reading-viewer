@@ -20,7 +20,7 @@
 	// resolve to its author, open the author's drilldown with that work highlighted.
 	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
 	// (the "By author" tab -> open straight to the search box).
-	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {} } = $props();
+	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {} } = $props();
 
 	// Colors for title lines.
 	// Palette for the stacked "All titles" bands. Leads with the site blue so the
@@ -418,20 +418,16 @@
 		if (scroll) (titleEl || chartWrap)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
 	}
 
-	// Unified-search click: a result is either an author or a work. Set the view
-	// mode to match (kept internal now that the toggle is gone) and load it.
-	async function pickResult(res) {
+	// Unified-search click: a result is either an author or a work. Route through the
+	// parent's openTitle/openAuthor, which set ?title/?author BEFORE the search view
+	// remounts — so the fresh instance loads exactly this pick. (Loading on THIS
+	// instance instead raced the remount's default-title loader, which sometimes
+	// won and flashed "The Fire Next Time".)
+	function pickResult(res) {
 		query = "";
 		results = [];
-		if (res.kind === "work") {
-			// Suppress the auto-default-title effect so it can't clobber this pick.
-			titleDefaultLoaded = true;
-			if (searchMode !== "title") { setSearchKind("title"); await tick(); }
-			await selectTitle({ slug: res.slug, title: res.title, author: res.author });
-		} else {
-			if (searchMode !== "author") { setSearchKind("author"); await tick(); }
-			await selectAuthor({ slug: res.slug, name: res.name });
-		}
+		if (res.kind === "work") openTitle(res.title);
+		else openAuthor(res.slug);
 	}
 
 	// When you overlay an individual edition on the "Total" line chart, auto-hide the

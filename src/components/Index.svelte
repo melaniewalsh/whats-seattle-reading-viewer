@@ -575,7 +575,7 @@
 			</article>
 		{:else}
 			{#key `${searchKind}-${searchNonce}`}
-				<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} />
+				<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} {openTitle} />
 			{/key}
 		{/if}
 
