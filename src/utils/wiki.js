@@ -252,10 +252,51 @@ function mentionsAuthor(s, author) {
 	return hay.includes(last);
 }
 
-// Work preview: an author-constrained title search first (trusted), then Wikidata
-// and a plain-title lookup — both of which are verified to actually name the author
-// so a same-titled book by someone else never sneaks through.
+// Manual summary overrides for works whose Wikipedia match fails — recent or niche
+// books with no article (e.g. new poetry collections). Same shape as a Wikipedia
+// summary ({ extract, url }) so callers use it unchanged. Keyed by the bare title
+// (subtitle / "/ author" stripped), matched exactly or as a leading word-run so the
+// catalog's subtitle doesn't matter.
+const WORK_SUMMARY_OVERRIDES = {
+	"you are here": {
+		extract:
+			"Edited by U.S. Poet Laureate Ada Limón, this anthology gathers fifty original poems on our relationship to the natural world by leading contemporary poets — published by Milkweed Editions in association with the Library of Congress.",
+		url: "https://www.goodreads.com/book/show/192723639-you-are-here",
+	},
+	"water water": {
+		extract:
+			"A 2024 collection of sixty new poems by former U.S. Poet Laureate Billy Collins, finding wit, tenderness, and a whiff of mystery in the beauties and ironies of everyday life.",
+		url: "https://www.penguinrandomhouse.com/books/743538/water-water-by-billy-collins/",
+	},
+};
+function normSummaryKey(title) {
+	return (title || "")
+		.toLowerCase()
+		.normalize("NFD").replace(/[̀-ͯ]/g, "")
+		.replace(/\s*[:/].*$/, "")   // drop subtitle / statement of responsibility
+		.replace(/\([^)]*\)/g, " ")
+		.replace(/[^a-z0-9]+/g, " ")
+		.replace(/^(a|an|the)\s+/, "")
+		.trim();
+}
+function summaryOverrideFor(title) {
+	const norm = normSummaryKey(title);
+	if (!norm) return null;
+	for (const key in WORK_SUMMARY_OVERRIDES) {
+		if (norm === key || norm.startsWith(key + " ")) return WORK_SUMMARY_OVERRIDES[key];
+	}
+	return null;
+}
+
+// Work preview: a manual override first, then an author-constrained title search
+// (trusted), then Wikidata and a plain-title lookup — both verified to actually name
+// the author so a same-titled book by someone else never sneaks through.
 export function wikiWork(title, author) {
+	const ov = summaryOverrideFor(title);
+	if (ov) return Promise.resolve(ov);
+	return wikiWorkResolved(title, author);
+}
+function wikiWorkResolved(title, author) {
 	const key = `wikiwork4:${(title || "").trim().toLowerCase()}|${(author || "").trim().toLowerCase()}`;
 	return cached(key, async () => {
 		const en = await enwikiTitleForWork(title, author);

@@ -25,6 +25,7 @@ function keyOf(title, author) {
 const COVER_OVERRIDES = {
 	"pride and prejudice": "https://images2.penguinrandomhouse.com/cover/9780141439518",
 	"wuthering heights": "https://images2.penguinrandomhouse.com/cover/9780141439556",
+	"water water": "https://images2.penguinrandomhouse.com/cover/9780593731024",
 };
 function normOverrideKey(title) {
 	return (title || "")
