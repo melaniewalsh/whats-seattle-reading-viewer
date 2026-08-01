@@ -1,295 +1,101 @@
-# What Is Seattle Reading? — a checkout-trends viewer
+# What's Seattle Reading?
 
-Search any author and explore their Seattle Public Library checkout trends over time — see their total borrows as a line, break it down title-by-title as a stacked area, group related editions together, and isolate one line at a time. Built with [SvelteKit](https://kit.svelte.dev/) on [The Pudding's svelte-starter](https://github.com/the-pudding/svelte-starter), with a Python + [DuckDB](https://duckdb.org/) data pipeline and static data hosted on [Cloudflare R2](https://developers.cloudflare.com/r2/).
+**An interactive viewer and open data pipeline for two decades of Seattle Public Library circulation.**
 
-**Live site:** https://melaniewalsh.github.io/whats-seattle-reading-viewer/ *(updates automatically on every push to `main`)*
+🔗 **Live site:** <https://melaniewalsh.github.io/whats-seattle-reading-viewer/>
 
-------------------------------------------------------------------------
+The Seattle Public Library openly publishes anonymized checkout counts by title — **over 120 million checkouts** across print, e-book, and audiobook formats, from 2005 to the present. *What's Seattle Reading?* makes this dataset usable: it clusters the raw records by author and work, reduces them to compact per-author time series, and serves them through a free interactive viewer where anyone can search and explore borrowing trends over time.
 
-## Contents
+Built with [SvelteKit](https://kit.svelte.dev/) and [D3](https://d3js.org/), a Python + [DuckDB](https://duckdb.org/) data pipeline, and static data hosted on [Cloudflare R2](https://developers.cloudflare.com/r2/). All code is MIT-licensed, and the system rebuilds itself automatically each month.
 
--   [The short version](#short-version)
--   [Quick start](#quick-start)
--   [How it's deployed](#how-its-deployed)
--   [Updating the data after a change](#updating-data)
--   [How the data pipeline works](#how-the-data-pipeline-works)
--   [Project structure](#project-structure)
--   [HDSSI projects](#hdssi) ← **HDSSI**
--   [What the viewer can do](#what-the-viewer-can-do)
--   [Grouping editions into works](#works-clustering)
--   [Learning resources](#learning-resources)
+---
 
-------------------------------------------------------------------------
+## The resource
 
-## The short version {#short-version}
+This repository provides three things:
 
-The Seattle Public Library publishes ~50 million checkout rows. We can't ship all of that to a browser, so the work is split in two:
+1. **Interactive viewer** — a static web app for searching any author, work, or genre and exploring checkout trends over time. Users can group editions into a single "work," correct clusters by hand, and download the underlying data.
+   → <https://melaniewalsh.github.io/whats-seattle-reading-viewer/>
+2. **Clustered circulation data** — the full SPL checkout dataset, clustered by author and work and reduced to compact JSON time series (one file per author), publicly hosted and rebuilt monthly.
+3. **Data & clustering pipeline** — a reproducible pipeline with rule-based author- and work-clustering algorithms that transform tens of millions of raw rows into the files above.
 
-1.  **Ahead of time (Python + DuckDB):** `data-prep/build_data.py` crunches the raw checkouts down into a pile of tiny static files — **one small JSON file per author** — plus a compact search index.
-2.  **In the browser (SvelteKit):** the site loads the search index once, then fetches **just one little file** for whichever author you click. Those files live on Cloudflare R2 (cheap, no egress fees) and the site itself is free static hosting on GitHub Pages.
+---
 
-That's the whole trick: precompute small per-author files, host them on a CDN, fetch one at a time.
+## Data access
 
-> **A bit of history:** an earlier version packed everything into one ~500 MB SQLite database and had the browser read slices of it over the network (via `sql.js-httpvfs`). It worked, but a single author took dozens of scattered range requests and was slow enough to hang the tab. One-file-per-author is simpler and much faster — each author is a single cached fetch. The old approach is preserved on the `sqlite-httpvfs-version` branch if you're curious.
+The derived, clustered data is publicly hosted on Cloudflare R2:
 
-------------------------------------------------------------------------
+```
+https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/<file>
+```
 
-## Quick start {#quick-start}
+Key files:
 
-You need **Node 22+** and **Python 3**.
+| File | Contents |
+|------|----------|
+| `meta.json` | The shared month axis (2005–present). |
+| `search-index.json` | `[[slug, name, total], …]` for every author, most-borrowed first. |
+| `authors/<shard>/<slug>.json` | One file per author: total monthly series + per-title breakdown, sparsely encoded as `[monthIndex, count]` pairs, with format and subject tags. `<shard>` is the first two characters of the slug. |
+| `title-index.json`, `overview.json` | Supporting search/landing indexes used by the viewer. |
 
-``` bash
-# 1. clone
+The R2 bucket has no directory listing — fetch specific keys (an author's slug matches its `search-index.json` entry). The **raw source** is the Seattle Public Library's "Checkouts by Title" open dataset, updated monthly: <https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6>.
+
+---
+
+## Run it locally
+
+Requires **Node 22+** and **Python 3**.
+
+```bash
 git clone https://github.com/melaniewalsh/whats-seattle-reading-viewer.git
 cd whats-seattle-reading-viewer
-
-# 2. install front-end deps (the Pudding starter requires Node 22)
-nvm install 22 && nvm use 22      # if you use nvm
 npm install
-
-# 3. run the dev server
 npm run dev        # then open the URL it prints
 ```
 
-**About the data in dev.** The generated data (`static/data/`) is **not** committed — it's built by the pipeline and uploaded to R2 (see below). In dev the site reads from your local `static/data/`, so a fresh clone has nothing to show until you put data there. Two options:
+The generated data (`static/data/`) is not committed. For local development, either point `DATA_BASE` in `src/components/db.js` at the R2 URL (`R2_BASE`) to load the full live data, or build it yourself — see [MAINTAINING.md](MAINTAINING.md).
 
--   **Easiest — borrow the live data:** in `src/components/db.js`, temporarily point `DATA_BASE` at the live R2 URL (`R2_BASE`) instead of `${base}/data`. Now `npm run dev` shows the real, full data. (Don't commit that change.)
--   **Build it yourself:** `pip install duckdb boto3 orjson pyarrow`, then `python3 data-prep/build_data.py`. With Cloudflare R2 credentials set (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) it pulls the monthly checkout files and builds the full dataset into `static/data/`; without them it just builds from whatever monthly files you already have in `data/raw/`.
+---
 
-------------------------------------------------------------------------
+## How it works
 
-## How it's deployed {#how-its-deployed}
+The SPL dataset (~50 million rows) is too large to ship to a browser, so the work is split in two:
 
-The website is free static hosting on **GitHub Pages**. The data (a few hundred MB of small JSON files) is too much to keep in the repo, so it lives on **Cloudflare R2** and the site fetches from there. Three GitHub Actions run the whole thing on autopilot:
+- **Precompute (Python + DuckDB).** `data-prep/build_data.py` aggregates the raw checkouts into one small JSON file per author, plus a search index. **Authors are resolved first** — many raw name spellings (e.g. "Octavia E. Butler," "Butler, Octavia E.," "Octavia Butler") are merged into one canonical author using text-normalization rules and title-overlap evidence. **Works are clustered second, *within* each resolved author**, by normalizing catalog titles (stripping statements of responsibility, edition/format boilerplate, accents, punctuation) to a deterministic "work key" and grouping matching keys.
+- **Explore (SvelteKit).** The viewer loads the search index once, then fetches a single per-author file on demand. Every machine-proposed cluster is a *suggestion* the reader can revise in the browser — drag titles between works, split editions out, and more.
 
-1.  **Pull fresh checkouts (monthly)** — `.github/workflows/update.yml` runs an R script that grabs the newest month of SPL data and drops it in the **raw** R2 bucket.
-2.  **Rebuild the site data (monthly)** — `.github/workflows/build-data-to-r2.yml` runs `data-prep/build_data.py` (per-author files, with author merges + subject terms) and then `data-prep/build_title_index.py` (the "By title" search index), and uploads them to the **public** R2 bucket. (Scheduled a few hours after the pull so it always has the newest data. You can also trigger it by hand from the **Actions** tab → **Run workflow**.) *The "By genre" data (`static/genres.json`) is built separately by `build_partition.py` and committed to the repo — it is not part of this workflow.*
-3.  **Redeploy the website (every push)** — `.github/workflows/deploy.yml` rebuilds and redeploys the SvelteKit site to GitHub Pages. This is fast — a minute or two — because it never rebuilds the data; it just points at the copy already on R2.
+Resolving authors before works keeps the problem tractable and eliminates spurious cross-author matches. The whole system rebuilds monthly via scheduled GitHub Actions and deploys for free on GitHub Pages + Cloudflare R2.
 
-So: push code and the site updates in a minute; the data refreshes on its own once a month.
+For the work-clustering algorithm and its design decisions, see **[docs/title-clustering.md](docs/title-clustering.md)**. For deployment, data-rebuild, and maintenance details, see **[MAINTAINING.md](MAINTAINING.md)**.
 
-### Setting up R2 (you only do this once)
+---
 
-The data lives in a **public** R2 bucket so the browser is allowed to read it. In the Cloudflare dashboard → **R2**:
-
-1.  **Two buckets.** `spl-checkouts` holds the raw monthly CSVs (keep it **private**). `spl-checkouts-public` holds the generated per-author files (this one is public).
-2.  **Turn on public access** for `spl-checkouts-public`: bucket → **Settings** → **Public Access** → allow the **r2.dev** subdomain. Cloudflare gives you a URL like `https://pub-xxxx.r2.dev`.
-3.  **Add this CORS rule** (same Settings page) so the browser can fetch the files from our site:
-
-```json
-[
-  {
-    "AllowedOrigins": ["https://melaniewalsh.github.io"],
-    "AllowedMethods": ["GET", "HEAD"],
-    "AllowedHeaders": ["*"],
-    "ExposeHeaders": ["content-length", "etag"]
-  }
-]
-```
-
-4.  **Point the site at your bucket:** put the public URL in `R2_BASE` at the top of `src/components/db.js`.
-
-Two more one-time things:
-
--   The build workflow needs to *write* to the buckets, so make sure the R2 keys in the repo's GitHub secrets (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`) have access.
--   In the repo's **Settings → Pages**, set **Source = GitHub Actions**.
-
-------------------------------------------------------------------------
-
-## Updating the data after a change {#updating-data}
-
-Say you refined the author clustering (`author_map.json`), changed `MIN_TITLE_CHECKOUTS`, or edited anything else in `data-prep/`. The data only refreshes on its own once a month — here's how to push your change to the live site now.
-
-The rebuild happens in the cloud (it reads ~50M rows, which is too much for a laptop), so you **don't** rebuild the whole thing locally. You commit your change, then click one button to run the build on GitHub's servers.
-
-**The steps:**
-
-1.  **Make your change and check it in.** For clustering, that means running `python3 data-prep/cluster_authors.py` to (re)generate `data-prep/author_map.json`, then committing it:
-
-    ``` bash
-    python3 data-prep/cluster_authors.py     # writes data-prep/author_map.json
-    git add data-prep/author_map.json         # (plus any code you changed)
-    git commit -m "Refine author clustering"
-    git push
-    ```
-
-    > ⚠️ **`author_map.json` must be committed and pushed.** The cloud build reads it straight from the repo — if it's only on your laptop, the rebuild won't see your merges.
-
-2.  **Run the build.** Go to the repo's **Actions** tab → **"Build full database and upload to R2"** → **Run workflow** (leave the branch on `main`) → **Run workflow**. This reruns `data-prep/build_data.py` with your changes and uploads the fresh per-author files to R2.
-
-3.  **Wait ~30–40 minutes.** The full dataset is big. When the run goes green, it's done — the new files (with `NA` gone, your merges applied, etc.) are on R2, and the **old ones are automatically cleaned up** (the upload mirrors the build, so author files whose spellings got merged away are removed).
-
-4.  **Refresh the live site.** That's it — **no site redeploy needed.** The data lives on R2 separately from the website, so a data change shows up as soon as the build finishes (a hard-refresh, ⌘⇧R, clears any cached files).
-
-**Preview locally before you push (recommended).** Before triggering the 40-minute cloud build, it's worth confirming your change looks right on a smaller scale:
-
-``` bash
-python3 data-prep/build_data.py   # builds into static/data/ (see Quick start for data sources)
-npm run dev                        # check that the merge / change looks correct
-```
-
-Then do steps 1–2 above to push it live.
-
-------------------------------------------------------------------------
-
-## How the data pipeline works {#how-the-data-pipeline-works}
-
-The pipeline turns tens of millions of raw checkout rows into a handful of small static files the browser loads piecemeal. The website never touches the raw data. Everything is precomputed by scripts in `data-prep/`.
-
-### The main build — `build_data.py`
-
-Reads all the raw monthly checkouts and writes the per-author files. In order:
-
-1.  **Load + filter (DuckDB).** Pull the monthly checkout files, keep only the book formats — print, large print, ebook, audiobook (music CDs, songs, video/DVD, maps, etc. are dropped) — and drop placeholder "authors" the catalog uses for missing names (`NA`, `Unknown`, `Various`, …) — `NA` alone is ~48M checkouts across 132k titles and would swamp everything. Trailing life-dates on the creator field (`, 1979-`) are stripped here. DuckDB does all the crunching as SQL and spills to disk instead of blowing up memory, so it runs on a normal GitHub Actions runner.
-2.  **Author clustering, pass 1 — `author_map.json`.** Fold the many raw name spellings into one canonical name per author, using the map produced by `cluster_authors.py` (see the `CLUSTERING HOOK` comment).
-3.  **Author clustering, pass 2 — the token-set merge (`name_variant_remap`).** A cheap, exact backstop that runs on *every* build. It reduces each canonical author name to a **"bag of words"** — lowercased, with birth/death years stripped (the birth year is set aside for a safety check) — and buckets together any names with the **same set of words**, regardless of order or case. So `Mandel, Emily St. John` and `emily st john mandel, 1979` land in the same bucket, and each bucket is merged into its **most-borrowed** form. **Safety check:** if a bucket's members carry *conflicting* birth years it's left alone — that signals two different people who happen to share a name (`george michael, 1963` vs `michael george, 1947`); only ~15 buckets in the whole dataset hit this. *Why have this if pass 1's `normalize()` already flips `Lastname, First`?* Because `author_map.json` is a committed file that can lag behind the clustering code — this pass re-derives the exact-token merges from scratch on every build, so the ~20k split authors (Pilkey, King, Christie, Mandel…) stay merged even when the map is stale. The rule lives with the rest of the clustering logic in `cluster_authors.py`; `build_data.py` imports and applies it here.
-4.  **Aggregate (DuckDB).** Sum each author's monthly checkouts, and each title's, as **sparse** `[[monthIndex, count], ...]` series — only the months something was actually borrowed, not a mostly-zero array. Titles below `MIN_TITLE_CHECKOUTS` (25) are dropped from an author's title list — the author's total and trend line still count everything; this just trims the long tail so files stay small.
-5.  **Write the output files** (below).
-6.  **Subject terms — `annotate_subjects()`.** A post-pass that folds each author's — and each title's — most-common **subject-heading terms** into the JSON. Terms come from the raw `subjects` field, split and weighted by checkouts; umbrella terms (`Fiction`, `Nonfiction`, `Literature`, …) are dropped so specific headings surface. They're stored **with weights** so the browser can pool a work's editions and re-rank — a book's ebook record is often just "Fiction, Literature" while its print record carries the real headings (`Young men`, `Loss`, `Artists`), and pooling surfaces the latter. Wrapped in try/except, so a failure here can't sink an otherwise-complete build.
-
-**The output files:**
-
--   `meta.json` — the shared month axis (written **once**; the browser fills the zeros back in when it draws a chart).
--   `search-index.json` — `[[slug, name, total], ...]` for every author, most-borrowed first. Loaded once (gzipped), searched in memory.
--   `authors/<shard>/<slug>.json` — one file per author: their total series, every qualifying title's series (with a format badge + subject terms), and the author's own top subject terms. `<shard>` is the first two slug characters, so ~350k files land in ~1k tidy folders instead of one giant one.
-
-### The other build scripts
-
--   **`build_title_index.py`** → `title-index.json`, powering the **"By title"** reverse-lookup tab. Walks the per-author files and emits `[[title, slug, author, total], ...]` for every distinct work above `TITLE_MIN_CHECKOUTS` (**500** all-time checkouts, set in the workflow), deduped so each title appears once and resolves to its author. Kept small so the browser can load + substring-search it in memory. Runs right after `build_data.py` in the cloud build.
--   **`build_partition.py`** → `genres.json`, powering the **"By genre"** tab. Classifies checkouts into a 50-genre taxonomy **two ways**: *overlap* (each genre = checkouts matching any of its subject terms — genres overlap, and because tagging densified over time everything drifts upward) and *partition* (each checkout assigned to the **first** genre it matches in priority order, rest → "Other", so shares sum to 100% and real declines become visible). Queries Seattle's open-data API directly, year by year. **Run by hand**; the result (`static/genres.json`) is committed — it is *not* part of the monthly cloud build.
--   **`build_overview.py`** → `overview.json`, the precomputed "All Seattle Public Library checkouts" landing chart, so the default view loads instantly instead of waiting on a live API aggregation.
--   **`cluster_authors.py`** → `author_map.json`, the pass-1 author name map consumed by `build_data.py` above.
--   **`build_genres.py`** — shared helpers (`load_months`, the book-universe filter) reused by the genre scripts.
-
-**Tuning knobs:**
-
--   `MIN_TITLE_CHECKOUTS` in `build_data.py` (default **25**) — the smallest title that appears in an author's title breakdown.
--   `TITLE_MIN_CHECKOUTS` in the build workflow (default **500**) — the smallest title that's searchable in the "By title" tab. Lower = more titles findable but a bigger in-browser index. The UI note reads this threshold back from the data, so it stays accurate automatically.
--   The genre taxonomy — the `TAXONOMY` list at the top of `build_partition.py` (name, include terms, exclude terms, and optional fiction-gated terms per genre).
-
-------------------------------------------------------------------------
-
-## Project structure {#project-structure}
+## Repository structure
 
 ```
-whats-seattle-reading-viewer/
-├── data-prep/
-│   ├── build_data.py         DuckDB: raw checkouts -> per-author JSON files
-│   │                           (author merges + subject terms baked in)
-│   ├── cluster_authors.py    builds author_map.json (pass-1 name clustering)
-│   ├── build_title_index.py  title-index.json for the "By title" tab
-│   ├── build_partition.py    genres.json for the "By genre" tab (run by hand)
-│   ├── build_genres.py       shared helpers for the genre scripts
-│   ├── build_overview.py     overview.json — the fast landing-chart file
-│   └── author_map.json       committed pass-1 name map (used by build_data.py)
-├── data/raw/                 raw SPL checkout files (not committed)
-├── static/
-│   ├── genres.json           the "By genre" data (committed; from build_partition.py)
-│   ├── overview.json         the landing "all checkouts" chart (committed)
-│   └── data/                 generated per-author JSON (NOT committed; built + hosted on R2)
-│       ├── meta.json             the shared month axis
-│       ├── search-index.json     [[slug, name, total], ...] the author search index
-│       ├── title-index.json      [[title, slug, author, total], ...] the title search index
-│       └── authors/<shard>/<slug>.json   one file per author (+ titles, subjects)
-├── src/
-│   ├── routes/+page.svelte   the page
-│   └── components/
-│       ├── Index.svelte           headline + the three tabs (By author / By title / By genre)
-│       ├── StackedViewer.svelte   By author + By title: search, charts, works, subjects  ← start here
-│       ├── StackedAreaChart.svelte  the d3 chart (line + stacked-area modes)
-│       ├── GenreTrends.svelte     the By-genre tab (partition/overlap, genre search)
-│       ├── GenreChart.svelte      the genre line chart
-│       ├── YearBrush.svelte       the time-window slider under the charts
-│       └── db.js                  the data layer (fetches the JSON files above)
-├── .github/workflows/
-│   ├── update.yml              pulls new monthly checkouts into R2 (R script)
-│   ├── build-data-to-r2.yml    builds per-author files + title index -> R2
-│   └── deploy.yml              builds + deploys the site to GitHub Pages
-└── svelte.config.js
+data-prep/     Python + DuckDB pipeline (aggregation, author & work clustering)
+src/           SvelteKit viewer
+  components/    Index, StackedViewer, StackedAreaChart, GenreTrends, db.js (data layer)
+  routes/        the page
+static/        committed data (genres, overview) + generated per-author data (hosted on R2)
+.github/       scheduled workflows (pull data → rebuild → deploy)
+docs/          algorithm documentation
 ```
 
-*(A few older components — `Viewer.svelte`, `LineChart.svelte` — are leftovers from the first version and aren't used; the live viewer is `Index → StackedViewer / GenreTrends → StackedAreaChart / GenreChart`.)*
+---
 
-------------------------------------------------------------------------
+## Citation & license
 
-## HDSSI {#hdssi}
+Released under the **MIT License** (see [LICENSE](LICENSE)). The underlying checkout data is published as open data by the Seattle Public Library.
 
-Things we can work on for HDSSI.
+If you use this resource, please cite the accompanying paper:
 
-### 1. ✅ Done: full dataset + monthly auto-update
+> *What's Seattle Reading? An Interactive Viewer and Open Data Pipeline for Two Decades of Public Library Circulation.* (JCDL 2026.)
 
-The site now runs on the **full** SPL checkout dataset, rebuilt automatically once a month (see [How it's deployed](#how-its-deployed)). Possible follow-ons: tune `MIN_TITLE_CHECKOUTS`, add more of the raw fields (subjects, publication year), or add a custom domain on R2 for edge caching.
+---
 
-### 2. Merge duplicate authors (entity resolution)
+## Acknowledgments
 
-The raw data spells names inconsistently, so the same person appears multiple times. Search "Octavia Butler" and you'll see **three** of her:
+Thanks to the Seattle Public Library and David Christensen for stewarding the open checkout data.
 
-| name               | checkouts |
-|--------------------|-----------|
-| Octavia E. Butler  | 10,630    |
-| Butler, Octavia E. | 1,637     |
-| Octavia Butler     | 303       |
-
-**Two passes handle this now, doing clearly different jobs:**
-
-- **Pass 1 — `cluster_authors.py` → `author_map.json` (fuzzy).** `normalize()` builds a match key (lowercase, flip `Lastname, First` → `First Lastname`, strip dates and `(qualifiers)`) and clusters names that share it, plus fuzzier matching (middle-initial differences like `Octavia Butler` vs `Octavia E. Butler`, typos, nicknames, name changes). This is the hard part, and it's committed as a map the build reads in.
-- **Pass 2 — `name_variant_remap()` (exact, at build time).** Re-merges by exact **bag-of-words** as a backstop (see [the pipeline section](#how-the-data-pipeline-works)).
-
-Why both? Of the current map's ~450k merges, **~92% are exact-token merges** (order flip / date / case) that Pass 2 would catch on its own, and **~8% are genuinely fuzzy** ones only `cluster_authors.py` can do. So Pass 2 guarantees the mechanical 92% on every build (even if the committed map is stale), and Pass 1 remains essential for the fuzzy 8%. See the **`CLUSTERING HOOK`** comment in `build_data.py`.
-
-``` bash
-python3 data-prep/cluster_authors.py   # writes data-prep/author_map.json
-python3 data-prep/build_data.py        # rebuilds the site data, now merged
-```
-
-Verified example: with a map merging the three Butlers, her total becomes **12,570** (10,630 + 1,637 + 303).
-
-------------------------------------------------------------------------
-
-## What the viewer can do {#what-the-viewer-can-do}
-
--   **Search** any author, or click one of the **most-borrowed** quick-picks.
--   **Line view (default):** the author's total checkouts per month as one line.
--   **Stacked-area view (toggle):** the total broken down title-by-title. For prolific authors it shows the top titles and rolls the rest into an "Other titles" band so it stays fast.
--   **Tick titles** (with a filter box, sortable by *most borrowed* or *A–Z*) to add each as its own line; each shows a format **badge** (ebook / audio / print).
--   **Groups:** bundle related titles (editions, a series) into a **single aggregated line**. Make a group from the titles you've ticked, **name** it, and **drag** more titles onto it. In the stacked view a group's titles cluster together.
--   **Only / isolate:** hit **Only** on any group or title to show just that one line; its name becomes the chart title.
--   Hover the chart for a **tooltip** with the month and per-line counts.
--   **Top subjects.** Under the chart, the author's (or the selected title's) most-common subject-heading terms, pooled across a work's editions so the specific print headings show through the generic ebook ones.
-
-Three tabs across the top:
-
--   **By author** (above) — the main view.
--   **By title** — search a title, and it resolves to its author and plots that book (gathering its editions into one line). Only the most-borrowed titles are searchable (see `TITLE_MIN_CHECKOUTS`); the note in the tab always reflects the current threshold.
--   **By genre** — 50 genres over 20 years, as a share of all checkouts. Toggle **partition** (each checkout counted once, in its first-matching genre — so declines are real) vs **overlap** (every genre a book is tagged with). Search genres by name or subject term, expand any genre to see its terms + top titles.
-
-------------------------------------------------------------------------
-
-## Grouping editions into works {#works-clustering}
-
-The same book appears in the catalog many times — print, ebook, audiobook,
-reprints, translations — each as a separate title. The viewer can **cluster
-those editions into a single "work"** so you chart one line for "Sorcerer's
-Stone" instead of four.
-
-It works by stripping the predictable catalog boilerplate (the `/ by Author …`
-credit, `: … Book 1` series subtitles, `(unabridged)` tags, accents, articles,
-punctuation) down to a normalized **work key**, then grouping titles that share
-it. It runs **in your browser, per author**, so it's instant and — importantly —
-**you can correct it**: hit **"✨ Show top work groups"** to auto-plot the 5
-most-borrowed works, use the **"add whole work"** button in the title table, and
-drag titles between groups to fix any mistake.
-
-This is **separate** from the author-name merging done in the data pipeline
-(`cluster_authors.py`). For the full algorithm and every design decision, see
-[**docs/title-clustering.md**](docs/title-clustering.md).
-
-------------------------------------------------------------------------
-
-## Learning resources {#learning-resources}
-
-New to Svelte or DuckDB? [**LEARNING.md**](LEARNING.md) has a curated, ordered list of tutorials and docs for both — flagged where they match this project's stack (Svelte 5 runes, DuckDB's Python API), plus SQL basics and a table mapping each technology to the files that use it.
-
-------------------------------------------------------------------------
-
-Visual style adapted from The Pudding's svelte-starter.
+*Visual style adapted from [The Pudding's svelte-starter](https://github.com/the-pudding/svelte-starter).*
