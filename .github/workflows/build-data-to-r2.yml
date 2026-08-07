@@ -11,7 +11,7 @@ name: Build full database and upload to R2
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 12 5 * *" # 5th, 12:00 UTC (after update.yml's 06:00 data pull)
+    - cron: "0 12 7 * *" # 5th, 12:00 UTC (after update.yml's 06:00 data pull)
 
 permissions:
   contents: write # push the regenerated author_map.json back to the repo
