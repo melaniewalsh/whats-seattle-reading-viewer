@@ -2,7 +2,7 @@ name: Monthly SPL Data Pull
 
 on:
   schedule:
-    - cron: "0 6 5 * *"
+    - cron: "0 6 7 * *"
   workflow_dispatch:
 
 jobs:
