@@ -27,7 +27,7 @@ env:
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 500
     steps:
       - uses: actions/checkout@v4
 
