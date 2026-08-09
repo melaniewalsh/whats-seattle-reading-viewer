@@ -296,6 +296,17 @@
 		if (res.kind === "work") openTitle(res.title);
 		else openAuthor(res.slug);
 	}
+	// Clear the header search. We render our own × (the native one on
+	// <input type="search"> fires a `search` event, not `input`, so bind:value
+	// never updated and the dropdown kept showing stale results).
+	let hInputEl;
+	function clearHeader() {
+		clearTimeout(hTimer);
+		hq = "";
+		hResults = [];
+		hOpen = false;
+		hInputEl?.focus();
+	}
 	function onHeaderKey(e) {
 		if (e.key === "Enter" && hResults.length) { e.preventDefault(); pickHeader(hResults[0]); }
 		else if (e.key === "Escape") { hOpen = false; }
@@ -332,6 +343,7 @@
 						<circle cx="9" cy="9" r="6" /><line x1="13.5" y1="13.5" x2="18" y2="18" />
 					</svg>
 					<input
+							bind:this={hInputEl}
 							class="mast-search-input"
 							type="search"
 							placeholder="Search authors or books"
@@ -342,6 +354,9 @@
 							onfocus={() => (hOpen = true)}
 							onkeydown={onHeaderKey}
 					/>
+					{#if hq}
+						<button class="mast-search-clear" aria-label="Clear search" onclick={clearHeader}>×</button>
+					{/if}
 					{#if hOpen && (hResults.length || hq.trim().length >= 2)}
 						<button class="mast-search-backdrop" aria-label="Close search" onclick={() => (hOpen = false)}></button>
 						<ul class="mast-results" role="listbox">
@@ -1171,6 +1186,33 @@
 	}
 	.mast-search-input::placeholder {
 		color: var(--color-placeholder);
+	}
+	/* Hide the browser's built-in clear button — it fires a `search` event rather
+	   than `input`, so it cleared the text without clearing our state/results. We
+	   render our own × (.mast-search-clear) instead. */
+	.mast-search-input::-webkit-search-cancel-button,
+	.mast-search-input::-webkit-search-decoration {
+		-webkit-appearance: none;
+		appearance: none;
+	}
+	.mast-search-clear {
+		flex: none;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		border: none;
+		border-radius: 50%;
+		background: var(--color-gray-300);
+		color: var(--color-white);
+		font-size: 13px;
+		line-height: 1;
+		cursor: pointer;
+	}
+	.mast-search-clear:hover {
+		background: var(--color-fg-light);
 	}
 	/* Autocomplete dropdown under the header search. */
 	.mast-search-backdrop {

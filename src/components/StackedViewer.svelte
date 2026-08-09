@@ -1909,6 +1909,7 @@
 							aria-label="Search authors or books"
 							bind:value={query}
 							autocomplete="off"
+							onsearch={(e) => (query = e.currentTarget.value)}
 					/>
 			{#if results.length}
 				<ul class="results">
