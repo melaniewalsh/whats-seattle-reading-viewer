@@ -81,13 +81,24 @@ jobs:
             echo "author_map.json unchanged -- nothing to commit"
           else
             git commit -m "CI: regenerate author_map.json"
-            # The full build runs ~1h, so other commits are likely to have
-            # landed on the branch meanwhile -- rebase (retrying) before pushing.
+            # The full build runs ~2h, so other commits usually land on the branch
+            # meanwhile. Rebase before pushing, but:
+            #   * `-X theirs` -> keep OUR freshly regenerated map on conflict (it's
+            #     the authoritative artifact; the 21 MB file never auto-merges), so
+            #     the rebase resolves cleanly instead of stalling.
+            #   * `git rebase --abort` on ANY failure -> never leave conflict markers
+            #     in author_map.json. A stray marker would make it invalid JSON and
+            #     crash the build_data step that reads it next (this used to happen).
             for i in 1 2 3; do
-              git pull --rebase origin ${{ github.ref_name }} \
-                && git push origin HEAD:${{ github.ref_name }} && break
+              if git pull --rebase -X theirs origin ${{ github.ref_name }} \
+                 && git push origin HEAD:${{ github.ref_name }}; then
+                break
+              fi
+              git rebase --abort 2>/dev/null || true
               echo "push race, retry $i" && sleep 3
             done
+            # Whether or not the push landed, the working tree now holds the clean
+            # regenerated author_map.json for the build step below.
           fi
 
       - name: Build per-author JSON files from R2

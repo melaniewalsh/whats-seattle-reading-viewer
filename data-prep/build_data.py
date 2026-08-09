@@ -1472,7 +1472,17 @@ def main():
     author_map = {}
     map_path = PROJECT_DIR / "data-prep" / "author_map.json"
     if map_path.exists():
-        author_map = json.loads(map_path.read_text(encoding="utf-8"))
+        try:
+            author_map = json.loads(map_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            # A failed CI rebase can leave git conflict markers in the map, making
+            # it invalid JSON. Fail fast with an actionable message instead of a
+            # bare traceback (or a silently unmerged build).
+            raise SystemExit(
+                f"ERROR: data-prep/author_map.json is not valid JSON: {e}\n"
+                "(A failed rebase can leave git conflict markers in it.) Regenerate "
+                "it with `python data-prep/cluster_authors.py` or restore a clean copy."
+            )
 
     # Invert the map: canonical author -> the raw catalog spellings merged into
     # it. Surfaced in the site's "name variants" dropdown so readers can see
