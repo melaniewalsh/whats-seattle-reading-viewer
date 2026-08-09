@@ -64,7 +64,7 @@ The rebuild happens in the cloud (it reads ~50M rows, too much for a laptop), so
    > ⚠️ **`author_map.json` must be committed and pushed** — the cloud build reads it straight from the repo. If it's only on your laptop, the rebuild won't see your merges.
 
 2. **Run the build.** Repo **Actions** tab → **"Build full database and upload to R2"** → **Run workflow** (branch `main`).
-3. **Wait ~30–40 minutes.** When the run goes green, the fresh per-author files are on R2, and **old ones are automatically cleaned up** (the upload mirrors the build).
+3. **Wait ~2 hours.** The full build reads ~50M rows and writes ~350k files, so it's slow — a green run is normal at ~2h+, not a hang. When it goes green, the fresh per-author files are on R2, and **old ones are automatically cleaned up** (the upload mirrors the build).
 4. **Refresh the live site.** No site redeploy needed — the data lives on R2 separately from the website (hard-refresh, ⌘⇧R, clears cached files).
 
 **Preview locally first (recommended):**
