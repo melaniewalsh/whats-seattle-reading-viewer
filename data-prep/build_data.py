@@ -1023,9 +1023,17 @@ def clean_title_for_display(title):
 
 
 def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
-    """Top-N clustered WORKS per genre per year, by checkouts of genre-tagged
-    editions. Parallels build_top_authors but ranks works (editions clustered by
-    normalize_work_key) instead of authors. Writes out_dir/top-works.json:
+    """Top-N clustered WORKS per genre per year. Parallels build_top_authors but
+    ranks works (editions clustered by normalize_work_key) instead of authors.
+
+    GENRE MEMBERSHIP is per-work, not per-edition: if ANY edition of a work
+    carries a genre's subject terms, the whole work counts as that genre. The
+    checkouts reported (and ranked on) are then the work's TRUE total across every
+    edition -- the same number its trend chart shows. Counting only the tagged
+    editions instead would report a smaller number in genre lists than on the
+    work's own chart, which reads as a bug.
+
+    Writes out_dir/top-works.json:
       {years, genres, data:{genre:{"<year>":[[title,author,slug,co],...],"all":[...]}}}"""
     import sys as _sys
     _sys.path.insert(0, str(PROJECT_DIR / "data-prep"))
@@ -1120,16 +1128,30 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     clauses = [("All genres", None)] + [
         (n, c) for n, c in overlap_clauses() if n not in GENRE_EXCLUDE
     ]
+    # A work's TRUE total per period -- every edition, however each is tagged.
+    # These are the numbers reported and ranked on below, so a work's checkout
+    # count is identical in the rankings and on its own trend chart.
+    full_year, full_all, full_month = {}, {}, {}
+    for wk, year, c in con.execute(
+        "SELECT wk, year, CAST(sum(c) AS BIGINT) FROM cw GROUP BY wk, year"
+    ).fetchall():
+        full_year[(wk, year)] = c
+        full_all[wk] = full_all.get(wk, 0) + c
+    for wk, c in con.execute(
+        "SELECT wk, CAST(sum(c) AS BIGINT) FROM cwm GROUP BY wk"
+    ).fetchall():
+        full_month[wk] = c
+
     genres_out, data = [], {}
     for name, clause in clauses:
         where = f"WHERE {clause}" if clause else ""
-        rows = con.execute(
-            f"SELECT wk, year, CAST(sum(c) AS BIGINT) AS c FROM cw {where} GROUP BY wk, year"
-        ).fetchall()
-        per_year, all_time = {}, {}
-        for wk, year, c in rows:
-            per_year.setdefault(year, []).append((wk, c))
-            all_time[wk] = all_time.get(wk, 0) + c
+        # Membership only: which works have ANY edition tagged with this genre in
+        # this period. The genre clause decides *inclusion*, never the count.
+        year_members = {}
+        for wk, year in con.execute(f"SELECT DISTINCT wk, year FROM cw {where}").fetchall():
+            year_members.setdefault(year, set()).add(wk)
+        all_members = [wk for (wk,) in con.execute(f"SELECT DISTINCT wk FROM cw {where}").fetchall()]
+        month_members = [wk for (wk,) in con.execute(f"SELECT DISTINCT wk FROM cwm {where}").fetchall()]
 
         def topn(pairs):
             top = sorted(pairs, key=lambda p: -p[1])[:top_n]
@@ -1139,12 +1161,12 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
                 out.append([title, author, slug_by_author.get(author, ""), c])
             return out
 
-        gdata = {str(y): topn(per_year.get(y, [])) for y in years}
-        gdata["all"] = topn(list(all_time.items()))
-        month_rows = con.execute(
-            f"SELECT wk, CAST(sum(c) AS BIGINT) AS c FROM cwm {where} GROUP BY wk"
-        ).fetchall()
-        gdata["month"] = topn([(wk, c) for wk, c in month_rows])
+        gdata = {
+            str(y): topn([(wk, full_year.get((wk, y), 0)) for wk in year_members.get(y, ())])
+            for y in years
+        }
+        gdata["all"] = topn([(wk, full_all.get(wk, 0)) for wk in all_members])
+        gdata["month"] = topn([(wk, full_month.get(wk, 0)) for wk in month_members])
         data[name] = gdata
         genres_out.append(name)
 
