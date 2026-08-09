@@ -1041,11 +1041,19 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
 
     years = sorted({int(m[:4]) for m in months})
 
-    # title -> work key, computed once over the DISTINCT titles (far fewer than
-    # the 50M checkout rows).
-    titles = [r[0] for r in con.execute("SELECT DISTINCT title FROM clean WHERE title IS NOT NULL").fetchall()]
+    # (author, title) -> work key, computed once over the DISTINCT pairs (far
+    # fewer than the 50M checkout rows).
+    #
+    # The key is AUTHOR-SCOPED, matching the viewer: works are clustered *within*
+    # each resolved author, never across authors. Keying on the title alone would
+    # collapse every book sharing a title into one cluster -- e.g. Michelle
+    # Obama's "Becoming" merging with unrelated novels of the same name, which
+    # then credits her checkouts to their genres and vice versa.
+    pairs = con.execute(
+        "SELECT DISTINCT author, title FROM clean WHERE title IS NOT NULL"
+    ).fetchall()
     con.execute("DROP TABLE IF EXISTS titlework")
-    con.execute("CREATE TABLE titlework(title VARCHAR, wk VARCHAR)")
+    con.execute("CREATE TABLE titlework(author VARCHAR, title VARCHAR, wk VARCHAR)")
 
     # Curated groupings (src/data/work-overrides.json) win over the automatic
     # normalize_work_key, so Most Borrowed clusters the same way the site's
@@ -1059,15 +1067,25 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
             for i, cluster in enumerate(clusters or []):
                 key = f"ovr:{slug}:{i}"
                 for t in (cluster or []):
-                    override_wk[t] = key
+                    # Keyed by (slug, title) so an override only applies to the
+                    # author it was curated for, not to any book sharing a title.
+                    override_wk[(slug, t)] = key
         print(f"  applied {len(override_wk)} curated title overrides "
               f"across {len(ov)} authors")
     except Exception as e:  # pragma: no cover - overrides are optional
         print(f"  (no work overrides applied: {e})")
 
     con.executemany(
-        "INSERT INTO titlework VALUES (?, ?)",
-        [(t, override_wk.get(t) or normalize_work_key(t)) for t in titles],
+        "INSERT INTO titlework VALUES (?, ?, ?)",
+        [
+            (
+                a,
+                t,
+                override_wk.get((slug_by_author.get(a, ""), t))
+                or f"{a}|{normalize_work_key(t)}",
+            )
+            for a, t in pairs
+        ],
     )
 
     # Best display title + author for each work (the highest-checkout edition).
@@ -1077,11 +1095,11 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         CREATE TABLE workmeta AS
         WITH wt AS (
             SELECT tw.wk AS wk, c.title AS title, CAST(sum(c.checkouts) AS BIGINT) AS co
-            FROM clean c JOIN titlework tw ON c.title = tw.title
+            FROM clean c JOIN titlework tw ON c.title = tw.title AND c.author = tw.author
             WHERE tw.wk <> '' GROUP BY 1, 2),
         wa AS (
             SELECT tw.wk AS wk, c.author AS author, CAST(sum(c.checkouts) AS BIGINT) AS co
-            FROM clean c JOIN titlework tw ON c.title = tw.title
+            FROM clean c JOIN titlework tw ON c.title = tw.title AND c.author = tw.author
             WHERE tw.wk <> '' GROUP BY 1, 2),
         t AS (SELECT wk, arg_max(title, co) AS disp_title FROM wt GROUP BY wk),
         a AS (SELECT wk, arg_max(author, co) AS disp_author FROM wa GROUP BY wk)
@@ -1100,7 +1118,7 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         CREATE TABLE cw AS
         SELECT tw.wk AS wk, ((c.mi + {lo}) // 12) AS year, c.subjects AS subjects,
                CAST(sum(c.checkouts) AS BIGINT) AS c
-        FROM clean c JOIN titlework tw ON c.title = tw.title
+        FROM clean c JOIN titlework tw ON c.title = tw.title AND c.author = tw.author
         WHERE tw.wk <> ''
         GROUP BY wk, year, subjects
         """
@@ -1115,7 +1133,7 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         CREATE TABLE cwm AS
         SELECT tw.wk AS wk, c.subjects AS subjects,
                CAST(sum(c.checkouts) AS BIGINT) AS c
-        FROM clean c JOIN titlework tw ON c.title = tw.title
+        FROM clean c JOIN titlework tw ON c.title = tw.title AND c.author = tw.author
         WHERE tw.wk <> '' AND c.mi = {int(max_mi)}
         GROUP BY wk, subjects
         """
