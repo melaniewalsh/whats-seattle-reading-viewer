@@ -115,7 +115,7 @@ jobs:
           # think there's nothing to sync. Reset the ledger so the build re-syncs
           # the raw data from R2 as usual.
           rm -f data-prep/processed_files.csv
-          python3 data-prep/build_data.py
+          python3 -u data-prep/build_data.py
           echo "author files: $(find static/data/authors -type f | wc -l)"
           ls -lh static/data/meta.json static/data/search-index.json
           # Title reverse-lookup index for the "By title" tab. High threshold so
