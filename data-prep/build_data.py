@@ -117,7 +117,7 @@ import shutil
 import sqlite3
 from pathlib import Path
 from time import perf_counter
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import csv
 
 from dotenv import load_dotenv
@@ -549,7 +549,8 @@ def annotate_subjects(con, out_dir, slug_by_author):
     # Per-author top terms -- one small row per author, so a dict is fine to hold.
     # Stored WITH weights ([term, checkouts]) so the frontend can pool a work's
     # editions and re-rank; author terms are already pooled across everything.
-    print("  [subjects] aggregating author terms ...")
+    print("  [subjects] aggregating author terms ...", flush=True)
+    t0 = perf_counter()
     author_terms = {}
     for author, terms in con.execute(
         f"""
@@ -571,10 +572,12 @@ def annotate_subjects(con, out_dir, slug_by_author):
     ).fetchall():
         if terms:
             author_terms[author] = [[e["t"], int(e["n"])] for e in terms]
+    print(f"  [subjects] {len(author_terms):,} authors' terms aggregated ({perf_counter() - t0:.2f}s)", flush=True)
 
     # Per-(author, title) top terms, streamed ORDER BY author so we hold only one
     # author's titles in memory at a time and patch that author's file in one go.
-    print("  [subjects] aggregating per-title terms + patching files ...")
+    print("  [subjects] aggregating per-title terms + patching files ...", flush=True)
+    t0 = perf_counter()
     cur = con.execute(
         f"""
         WITH exploded AS (
@@ -625,6 +628,9 @@ def annotate_subjects(con, out_dir, slug_by_author):
                 t["subjects"] = [[e["t"], int(e["n"])] for e in tt]
         path.write_bytes(_dumps(data))
         n_patched[0] += 1
+        if n_patched[0] % 20000 == 0:
+            print(f"    [subjects] patched {n_patched[0]:,} files so far "
+                  f"({perf_counter() - t0:.2f}s elapsed)", flush=True)
 
     for batch in reader:
         for row in batch.to_pylist():
@@ -633,7 +639,7 @@ def annotate_subjects(con, out_dir, slug_by_author):
                 state["author"] = row["author"]
             state["titles"][row["title"]] = row["terms"]
     flush()
-    print(f"  [subjects] patched {n_patched[0]:,} author files")
+    print(f"  [subjects] patched {n_patched[0]:,} author files ({perf_counter() - t0:.2f}s)", flush=True)
 
 
 def build_sqlite(db_path, months, record_stream, counters):
@@ -828,14 +834,16 @@ def sync_new_files_from_r2():
 
     # list_objects_v2 only returns up to 1000 keys per call. Paginating so
     # this doesn't stop scanning once the bucket grows past that.
+    t0 = perf_counter()
     all_keys = []
     paginator = s3.get_paginator("list_objects_v2")
     for page in paginator.paginate(Bucket=R2_BUCKET, Prefix=R2_PREFIX):
         for obj in page.get("Contents", []):
             all_keys.append(obj["Key"])
+    print(f"  listed {len(all_keys):,} keys ({perf_counter() - t0:.2f}s)", flush=True)
 
     new_keys = [k for k in all_keys if k not in already_processed]
-    print(f"  {len(all_keys):,} files in bucket, {len(new_keys):,} not yet processed")
+    print(f"  {len(all_keys):,} files in bucket, {len(new_keys):,} not yet processed", flush=True)
     if not new_keys:
         return []
 
@@ -846,12 +854,23 @@ def sync_new_files_from_r2():
     # time. Order of `downloaded` doesn't matter; every shard is read together.
     def _download(key):
         local_path = MONTHLY_RAW_DIR / key.rsplit("/", 1)[-1]
+        t_file = perf_counter()
         s3.download_file(R2_BUCKET, key, str(local_path))
-        print(f"    downloaded {key}")
-        return (key, local_path)
+        return (key, local_path, perf_counter() - t_file)
 
+    print(f"  downloading {len(new_keys):,} files (8 parallel workers) ...", flush=True)
+    t_dl = perf_counter()
+    downloaded = []
     with ThreadPoolExecutor(max_workers=8) as pool:
-        downloaded = list(pool.map(_download, new_keys))
+        futures = {pool.submit(_download, key): key for key in new_keys}
+        for i, fut in enumerate(as_completed(futures), 1):
+            key, local_path, dt = fut.result()
+            downloaded.append((key, local_path))
+            # Every file (not just every Nth) since a single stalled/slow
+            # download is exactly the kind of thing we're trying to catch --
+            # flush=True so this shows up immediately, not buffered for hours.
+            print(f"    [{i}/{len(new_keys)}] downloaded {key} ({dt:.2f}s)", flush=True)
+    print(f"  download phase done: {len(downloaded):,} files ({perf_counter() - t_dl:.2f}s)", flush=True)
     return downloaded
 
 
@@ -911,6 +930,7 @@ def build_top_authors(con, out_dir, slug_by_author, months, lo, top_n=20):
 
     # Pre-aggregate to (author, year, subjects) once so each genre pass filters a
     # much smaller table instead of re-scanning every raw checkout row.
+    t0 = perf_counter()
     con.execute("DROP TABLE IF EXISTS ays")
     con.execute(
         f"""
@@ -921,6 +941,7 @@ def build_top_authors(con, out_dir, slug_by_author, months, lo, top_n=20):
         GROUP BY author, year, subjects
         """
     )
+    print(f"  ays table built ({perf_counter() - t0:.2f}s)", flush=True)
 
     # Broad structural catch-all buckets from the partition taxonomy that aren't
     # meaningful "top authors by genre" categories -- drop them from this tab so
@@ -933,6 +954,7 @@ def build_top_authors(con, out_dir, slug_by_author, months, lo, top_n=20):
     clauses = [("All genres", None)] + [
         (n, c) for n, c in overlap_clauses() if n not in GENRE_EXCLUDE
     ]
+    t0 = perf_counter()
     genres_out, data = [], {}
     for name, clause in clauses:
         where = f"WHERE {clause}" if clause else ""
@@ -953,12 +975,13 @@ def build_top_authors(con, out_dir, slug_by_author, months, lo, top_n=20):
         gdata["all"] = topn(list(all_time.items()))
         data[name] = gdata
         genres_out.append(name)
+    print(f"  per-genre rankings built for {len(genres_out)} genres ({perf_counter() - t0:.2f}s)", flush=True)
 
     con.execute("DROP TABLE IF EXISTS ays")
     (out_dir / "top-authors.json").write_bytes(
         _dumps({"years": years, "genres": genres_out, "data": data})
     )
-    print(f"  wrote top-authors.json ({len(genres_out)} genres x {len(years)} years)")
+    print(f"  wrote top-authors.json ({len(genres_out)} genres x {len(years)} years)", flush=True)
 
 
 # --- work clustering (Python port of StackedViewer.svelte normalizeWorkKey) ---
@@ -1049,9 +1072,11 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     # collapse every book sharing a title into one cluster -- e.g. Michelle
     # Obama's "Becoming" merging with unrelated novels of the same name, which
     # then credits her checkouts to their genres and vice versa.
+    t0 = perf_counter()
     pairs = con.execute(
         "SELECT DISTINCT author, title FROM clean WHERE title IS NOT NULL"
     ).fetchall()
+    print(f"  {len(pairs):,} distinct (author, title) pairs ({perf_counter() - t0:.2f}s)", flush=True)
     con.execute("DROP TABLE IF EXISTS titlework")
     con.execute("CREATE TABLE titlework(author VARCHAR, title VARCHAR, wk VARCHAR)")
 
@@ -1071,24 +1096,32 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
                     # author it was curated for, not to any book sharing a title.
                     override_wk[(slug, t)] = key
         print(f"  applied {len(override_wk)} curated title overrides "
-              f"across {len(ov)} authors")
+              f"across {len(ov)} authors", flush=True)
     except Exception as e:  # pragma: no cover - overrides are optional
-        print(f"  (no work overrides applied: {e})")
+        print(f"  (no work overrides applied: {e})", flush=True)
 
-    con.executemany(
-        "INSERT INTO titlework VALUES (?, ?, ?)",
-        [
-            (
-                a,
-                t,
-                override_wk.get((slug_by_author.get(a, ""), t))
-                or f"{a}|{normalize_work_key(t)}",
-            )
-            for a, t in pairs
-        ],
-    )
+    # Materialized as its own step (rather than inline in executemany's arg
+    # list) so its cost is visible separately from the SQL insert below --
+    # this is a pure-Python, single-threaded regex loop over every distinct
+    # pair, not SQL, so it doesn't benefit from DuckDB's parallelism at all.
+    t0 = perf_counter()
+    titlework_rows = [
+        (
+            a,
+            t,
+            override_wk.get((slug_by_author.get(a, ""), t))
+            or f"{a}|{normalize_work_key(t)}",
+        )
+        for a, t in pairs
+    ]
+    print(f"  {len(titlework_rows):,} work keys computed ({perf_counter() - t0:.2f}s)", flush=True)
+
+    t0 = perf_counter()
+    con.executemany("INSERT INTO titlework VALUES (?, ?, ?)", titlework_rows)
+    print(f"  titlework inserted ({perf_counter() - t0:.2f}s)", flush=True)
 
     # Best display title + author for each work (the highest-checkout edition).
+    t0 = perf_counter()
     con.execute("DROP TABLE IF EXISTS workmeta")
     con.execute(
         """
@@ -1110,8 +1143,10 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         wk: (clean_title_for_display(dt), au)
         for wk, dt, au in con.execute("SELECT wk, disp_title, disp_author FROM workmeta").fetchall()
     }
+    print(f"  workmeta built: {len(meta):,} works ({perf_counter() - t0:.2f}s)", flush=True)
 
     # Pre-aggregate (work, year, subjects) once; each genre pass filters this.
+    t0 = perf_counter()
     con.execute("DROP TABLE IF EXISTS cw")
     con.execute(
         f"""
@@ -1123,10 +1158,12 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         GROUP BY wk, year, subjects
         """
     )
+    print(f"  cw built ({perf_counter() - t0:.2f}s)", flush=True)
 
     # The freshest slice: the single most recent month of data, per (work, subjects),
     # for a "most borrowed this month" ranking. `mi` is the month index, so its max
     # is the latest month (months[-1]).
+    t0 = perf_counter()
     max_mi = con.execute("SELECT max(mi) FROM clean").fetchone()[0]
     con.execute(
         f"""
@@ -1138,6 +1175,7 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         GROUP BY wk, subjects
         """
     )
+    print(f"  cwm built ({perf_counter() - t0:.2f}s)", flush=True)
 
     GENRE_EXCLUDE = {
         "Fiction", "Nonfiction", "Art", "Illustrated Works", "Informational Works",
@@ -1160,6 +1198,7 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     ).fetchall():
         full_month[wk] = c
 
+    t0 = perf_counter()
     genres_out, data = [], {}
     for name, clause in clauses:
         where = f"WHERE {clause}" if clause else ""
@@ -1187,6 +1226,7 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         gdata["month"] = topn([(wk, full_month.get(wk, 0)) for wk in month_members])
         data[name] = gdata
         genres_out.append(name)
+    print(f"  per-genre rankings built for {len(genres_out)} genres ({perf_counter() - t0:.2f}s)", flush=True)
 
     for tbl in ("cw", "cwm", "workmeta", "titlework"):
         con.execute(f"DROP TABLE IF EXISTS {tbl}")
@@ -1196,15 +1236,17 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     # column [title, author, slug, checkouts, cover|null]; the site keeps a runtime
     # Wikipedia fallback for the ones Open Library misses (null). Best-effort: any
     # failure just leaves 4-column rows and the site resolves covers as before.
+    t0 = perf_counter()
     try:
         _bake_work_covers(data)
+        print(f"  cover baking done ({perf_counter() - t0:.2f}s)", flush=True)
     except Exception as e:  # pragma: no cover - network dependent
-        print(f"  WARNING: cover baking failed ({e}); site will resolve covers at runtime")
+        print(f"  WARNING: cover baking failed ({e}); site will resolve covers at runtime", flush=True)
 
     (out_dir / "top-works.json").write_bytes(
         _dumps({"years": years, "genres": genres_out, "latestMonth": months[-1], "data": data})
     )
-    print(f"  wrote top-works.json ({len(genres_out)} genres x {len(years)} years; latest month {months[-1]})")
+    print(f"  wrote top-works.json ({len(genres_out)} genres x {len(years)} years; latest month {months[-1]})", flush=True)
 
 
 _TITLE_STOP = {"a", "an", "the", "and", "or", "of", "to", "in", "for", "is"}
@@ -1363,7 +1405,7 @@ def _search_cover(title, author, query_author=True):
 def _bake_work_covers(data):
     """Resolve one cover per unique (title, author) across every top-works row and
     append it (or None) as a 5th element on each row, in place."""
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     uniq = []
     seen = set()
     for gdata in data.values():
@@ -1373,12 +1415,21 @@ def _bake_work_covers(data):
                 if k not in seen:
                     seen.add(k)
                     uniq.append(k)
-    print(f"  resolving {len(uniq)} unique work covers via Open Library...")
+    print(f"  resolving {len(uniq)} unique work covers via Open Library...", flush=True)
+    t0 = perf_counter()
+    covers = {}
     with ThreadPoolExecutor(max_workers=5) as ex:
-        results = list(ex.map(lambda k: _resolve_ol_cover(k[0], k[1]), uniq))
-    covers = dict(zip(uniq, results))
-    hit = sum(1 for v in results if v)
-    print(f"  resolved {hit}/{len(uniq)} covers")
+        futures = {ex.submit(_resolve_ol_cover, k[0], k[1]): k for k in uniq}
+        for i, fut in enumerate(as_completed(futures), 1):
+            k = futures[fut]
+            covers[k] = fut.result()
+            # Progress only, not per-item, since there can be tens of thousands of
+            # these -- but frequent enough to show whether this is crawling
+            # (e.g. Open Library throttling the runner's IP) vs. just working.
+            if i % 200 == 0 or i == len(uniq):
+                print(f"    [{i}/{len(uniq)}] covers resolved ({perf_counter() - t0:.2f}s elapsed)", flush=True)
+    hit = sum(1 for v in covers.values() if v)
+    print(f"  resolved {hit}/{len(uniq)} covers ({perf_counter() - t0:.2f}s)", flush=True)
     for gdata in data.values():
         for lst in gdata.values():
             for row in lst:
@@ -1400,21 +1451,24 @@ def main():
     con.execute(f"SET temp_directory='{DUCKDB_SPILL_DIR}'")
     con.execute("PRAGMA max_temp_directory_size='40GiB'")
 
-    print(f"[json backend: {_JSON_BACKEND}] [workers: {N_WORKERS}]")
+    print(f"[json backend: {_JSON_BACKEND}] [workers: {N_WORKERS}]", flush=True)
 
     # -- Pull any new monthly files down from R2 before reading anything ----
-    print("Checking R2 bucket for new monthly files ...")
+    print("Checking R2 bucket for new monthly files ...", flush=True)
+    t_sync = perf_counter()
     new_files = sync_new_files_from_r2()  # [(key, local_csv_path), ...]
+    print(f"  R2 sync phase done ({perf_counter() - t_sync:.2f}s)", flush=True)
 
     # Cache each newly-downloaded monthly CSV to its own Parquet shard right
     # away, same reasoning as the one-time bulk cache below: smaller on
     # disk, faster to re-scan on every subsequent run.
     if new_files:
         MONTHLY_PARQUET_DIR.mkdir(parents=True, exist_ok=True)
-        print(f"Caching {len(new_files)} new monthly file(s) as Parquet ...")
+        print(f"Caching {len(new_files)} new monthly file(s) as Parquet ...", flush=True)
         t0 = perf_counter()
-        for _key, local_csv in new_files:
+        for i, (_key, local_csv) in enumerate(new_files, 1):
             shard_path = MONTHLY_PARQUET_DIR / (local_csv.stem + ".parquet")
+            t_file = perf_counter()
             con.execute(
                 f"""
                 COPY (SELECT * FROM read_csv_auto(?, ignore_errors=true))
@@ -1427,15 +1481,16 @@ def main():
             # DuckDB's spill files overruns a CI runner's disk. Parquet is the
             # source of truth from here on, so the CSV is safe to drop.
             local_csv.unlink(missing_ok=True)
-        print(f"  cached  ({perf_counter() - t0:.2f}s)")
+            print(f"    [{i}/{len(new_files)}] cached {shard_path.name} ({perf_counter() - t_file:.2f}s)", flush=True)
+        print(f"  cached  ({perf_counter() - t0:.2f}s)", flush=True)
 
     # cache the original bulk CSV as Parquet once, then always read from that
     if RAW_PARQUET.exists():
-        print(f"Using cached Parquet at {RAW_PARQUET}")
+        print(f"Using cached Parquet at {RAW_PARQUET}", flush=True)
     elif RAW_CSV.exists():
-        print(f"Caching {RAW_CSV} as Parquet ({RAW_PARQUET}) ...")
+        print(f"Caching {RAW_CSV} as Parquet ({RAW_PARQUET}) ...", flush=True)
         t0 = perf_counter()
-        # `COPY ... TO <dest>` can't be a bound (?)  
+        # `COPY ... TO <dest>` can't be a bound (?)
         con.execute(
             f"""
             COPY (SELECT * FROM read_csv_auto(?, ignore_errors=true))
@@ -1443,9 +1498,9 @@ def main():
             """,
             [str(RAW_CSV)],
         )
-        print(f"  cached  ({perf_counter() - t0:.2f}s)")
+        print(f"  cached  ({perf_counter() - t0:.2f}s)", flush=True)
     else:
-        print(f"  no bulk CSV at {RAW_CSV}. building from R2-synced monthly files only")
+        print(f"  no bulk CSV at {RAW_CSV}. building from R2-synced monthly files only", flush=True)
 
     # `raw` is every Parquet shard we have. The one-time bulk cache plus
     # every monthly file synced from R2 so far (this run's and all past
@@ -1461,23 +1516,24 @@ def main():
             "No data to build from: no cached bulk Parquet and nothing synced from R2."
         )
     parquet_list_literal = "[" + ", ".join(_sql_literal(p) for p in parquet_paths) + "]"
-    print(f"Reading {len(parquet_paths)} Parquet file(s) with DuckDB ...")
+    print(f"Reading {len(parquet_paths)} Parquet file(s) with DuckDB ...", flush=True)
     t0 = perf_counter()
     con.execute(f"CREATE OR REPLACE VIEW raw AS SELECT * FROM read_parquet({parquet_list_literal})")
     n_rows = con.execute("SELECT count(*) FROM raw").fetchone()[0]
-    print(f"  {n_rows:,} rows  ({perf_counter() - t0:.2f}s)")
+    print(f"  {n_rows:,} rows  ({perf_counter() - t0:.2f}s)", flush=True)
 
     # -- Build the shared month axis -----------------------------------------
+    t0 = perf_counter()
     lo, hi = con.execute(
         """
         SELECT min(CheckoutYear * 12 + (CheckoutMonth - 1)),
                max(CheckoutYear * 12 + (CheckoutMonth - 1))
         FROM raw WHERE Creator IS NOT NULL
-        AND CheckoutYear BETWEEN 2005 AND 2030 
+        AND CheckoutYear BETWEEN 2005 AND 2030
         """
     ).fetchone()
     months = [f"{k // 12}-{k % 12 + 1:02d}" for k in range(lo, hi + 1)]
-    print(f"  {len(months)} months: {months[0]} … {months[-1]}")
+    print(f"  {len(months)} months: {months[0]} … {months[-1]} ({perf_counter() - t0:.2f}s)", flush=True)
 
     # -- Clean: one tidy table with author, title, month-index, format -------
     # Built directly from `raw` in a single materialization 
@@ -1534,15 +1590,16 @@ def main():
 
    
    # returning to table usage since its saved on the disk now
+    t0 = perf_counter()
     if author_map:
-        print(f"  applying author_map.json ({len(author_map):,} merges)")
+        print(f"  applying author_map.json ({len(author_map):,} merges)", flush=True)
         con.execute("DROP TABLE IF EXISTS amap") # Clean up amap too
         con.execute("CREATE TABLE amap(raw VARCHAR, canonical VARCHAR)")
         con.executemany("INSERT INTO amap VALUES (?, ?)", list(author_map.items()))
-        
+
         # Explicitly clear any existing view or table named 'clean' to prevent conflicts
         con.execute("DROP TABLE IF EXISTS clean")
-        
+
         # if a map is always found (base select author and map's raw author match),
         # the author name used from the base select (b.author) wont make it into
         # #the clean table and the canonical name will be used instead if it exists
@@ -1559,8 +1616,9 @@ def main():
     else:
         # Explicitly clear any existing view or table named 'clean' here as well
         con.execute("DROP TABLE IF EXISTS clean")
-        
+
         con.execute(f"CREATE TABLE clean AS {BASE_SELECT}")
+    print(f"  clean table built ({perf_counter() - t0:.2f}s)", flush=True)
     # ------------------------------------------------------------------------
 
     # Second-pass reconciliation: fold together author records the map left split
@@ -1569,7 +1627,7 @@ def main():
     #merge_name_variants(con)
 
    # -- Reshaping -----------------------------------------------------------
-    print("Aggregating author totals in SQL ...")
+    print("Aggregating author totals in SQL ...", flush=True)
     t0 = perf_counter()
     # This standard aggregation safely spills to disk under memory pressure
     author_totals_rows = con.execute(
@@ -1580,9 +1638,9 @@ def main():
         ORDER BY total DESC
         """
     ).fetchall()
-    print(f"  {len(author_totals_rows):,} authors tallied ({perf_counter() - t0:.2f}s)")
+    print(f"  {len(author_totals_rows):,} authors tallied ({perf_counter() - t0:.2f}s)", flush=True)
 
-    print("Streaming flat author series from SQL ...")
+    print("Streaming flat author series from SQL ...", flush=True)
     t0 = perf_counter()
     # Fetch flat rows sorted by author so we can build lists linearly in Python
     author_series_cursor = con.execute(
@@ -1610,9 +1668,9 @@ def main():
         for author, total in author_totals_rows
     ]
     del author_series_map  # Free up temporary map memory
-    print(f"  Author series mapped ({perf_counter() - t0:.2f}s)")
+    print(f"  Author series mapped ({perf_counter() - t0:.2f}s)", flush=True)
 
-    print("Aggregating title series in SQL ...")
+    print("Aggregating title series in SQL ...", flush=True)
     t0 = perf_counter()
     # Remove the internal list(...) aggregation here too to prevent a second OOM
     title_cursor = con.execute(
@@ -1653,6 +1711,8 @@ def main():
         """,
         [MIN_TITLE_CHECKOUTS, MIN_TITLE_CHECKOUTS],
     )
+    print(f"  title series query issued ({perf_counter() - t0:.2f}s; DuckDB streams "
+          f"lazily, so the real cost may show up in the write-files timing below)", flush=True)
 
     # fetch_record_batch() streams the result as Arrow RecordBatches instead
     # of going through the DB-API cursor. fetchmany() unpacks one row at a
@@ -1677,34 +1737,43 @@ def main():
     # into the db as they arrive, so at most one insert-batch's worth of
     # nested payloads exists in memory at a time so not every author's
     # title list sitting in memory simultaneously before writing starts.
-    print(f"Writing per-author JSON files into {OUT_DIR} ...")
+    print(f"Writing per-author JSON files into {OUT_DIR} ...", flush=True)
     t0 = perf_counter()
     counters = {"n_titles": 0}
     record_stream = stream_author_records(
         record_batch_reader, author_rows, slug_by_author, meta_by_author, counters
     )
     n_authors = write_author_files(OUT_DIR, months, record_stream, counters, variants_by_author)
-    print(f"  {n_authors:,} authors, {counters['n_titles']:,} qualifying titles")
-    print(f"  ({perf_counter() - t0:.2f}s)")
+    print(f"  {n_authors:,} authors, {counters['n_titles']:,} qualifying titles", flush=True)
+    print(f"  ({perf_counter() - t0:.2f}s)", flush=True)
 
     # Fold top subject-heading terms into the author files (isolated post-pass;
     # a failure here must not sink an otherwise-complete build).
+    print("Annotating subjects ...", flush=True)
+    t0 = perf_counter()
     try:
         annotate_subjects(con, OUT_DIR, slug_by_author)
+        print(f"  subjects done ({perf_counter() - t0:.2f}s)", flush=True)
     except Exception as e:  # noqa: BLE001
-        print(f"  WARNING: subject annotation failed ({e}); files written without subjects")
+        print(f"  WARNING: subject annotation failed ({e}); files written without subjects", flush=True)
 
     # Top authors per genre per year (isolated post-pass, same as subjects).
+    print("Building top-authors.json ...", flush=True)
+    t0 = perf_counter()
     try:
         build_top_authors(con, OUT_DIR, slug_by_author, months, lo)
+        print(f"  top-authors done ({perf_counter() - t0:.2f}s)", flush=True)
     except Exception as e:  # noqa: BLE001
-        print(f"  WARNING: top-authors build failed ({e}); Top authors tab will be empty")
+        print(f"  WARNING: top-authors build failed ({e}); Top authors tab will be empty", flush=True)
 
     # Top works per genre per year (isolated post-pass).
+    print("Building top-works.json ...", flush=True)
+    t0 = perf_counter()
     try:
         build_top_works(con, OUT_DIR, slug_by_author, months, lo)
+        print(f"  top-works done ({perf_counter() - t0:.2f}s)", flush=True)
     except Exception as e:  # noqa: BLE001
-        print(f"  WARNING: top-works build failed ({e}); Top works tab will be empty")
+        print(f"  WARNING: top-works build failed ({e}); Top works tab will be empty", flush=True)
 
     # Only mark this run's R2 files as processed once library.sqlite3 has
     # actually been rebuilt successfully. 
