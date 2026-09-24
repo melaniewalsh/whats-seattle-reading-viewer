@@ -1362,6 +1362,16 @@ def _author_matches(requested, names):
     return any(_author_tokens(n) & R for n in (names or []))
 
 
+# Tally of Open Library failures during cover baking, keyed by exception/HTTP
+# status. Printed once at the end so throttling (429) or outages (5xx) are
+# visible in the build log instead of silently becoming "no cover".
+_COVER_ERRORS = {}
+
+def _note_cover_error(e):
+    key = f"HTTP {e.code}" if hasattr(e, "code") else type(e).__name__
+    _COVER_ERRORS[key] = _COVER_ERRORS.get(key, 0) + 1
+
+
 def _english_cover(work_key, default_cover, language):
     """A work's default cover_i can be a foreign-language edition even when
     English ones exist (e.g. Game Changer's cover is the French "Sortie de
@@ -1379,7 +1389,8 @@ def _english_cover(work_key, default_cover, language):
         )
         with _u.urlopen(req, timeout=25) as r:
             entries = (_j.loads(r.read()) or {}).get("entries") or []
-    except Exception:
+    except Exception as e:
+        _note_cover_error(e)
         return default_cover
     owner_langs = None
     eng_covers = []
@@ -1447,7 +1458,8 @@ def _search_cover(title, author, query_author=True):
         )
         with _u.urlopen(req, timeout=25) as r:
             docs = (_j.loads(r.read()) or {}).get("docs") or []
-    except Exception:
+    except Exception as e:
+        _note_cover_error(e)
         return None
     docs = [d for d in docs if d.get("cover_i") is not None and not _is_junk(d)]
     title_gated = [d for d in docs if _title_containment(title, d.get("title")) >= 0.6]
@@ -1466,9 +1478,23 @@ def _search_cover(title, author, query_author=True):
     return pool[0]
 
 
+# Cover results persist across builds here (committed to the repo by the build
+# workflow, like author_map.json). The set of top works barely changes month to
+# month, so after the first run only the handful of new works hit Open Library:
+# ~100 min of network calls becomes ~1 min. Misses are cached too (as null) so
+# they are not retried every month; set COVER_CACHE_RETRY_MISSES=1 to re-attempt
+# them (e.g. twice a year, since Open Library gains covers over time).
+COVER_CACHE = PROJECT_DIR / "data-prep" / "cover_cache.json"
+
+
+def _cover_cache_key(title, author):
+    return f"{title}\t{author or ''}"
+
+
 def _bake_work_covers(data):
     """Resolve one cover per unique (title, author) across every top-works row and
     append it (or None) as a 5th element on each row, in place."""
+    import json as _j
     from concurrent.futures import ThreadPoolExecutor, as_completed
     uniq = []
     seen = set()
@@ -1479,21 +1505,47 @@ def _bake_work_covers(data):
                 if k not in seen:
                     seen.add(k)
                     uniq.append(k)
-    print(f"  resolving {len(uniq)} unique work covers via Open Library...", flush=True)
-    t0 = perf_counter()
+
+    cache = {}
+    if COVER_CACHE.exists():
+        try:
+            cache = _j.loads(COVER_CACHE.read_text(encoding="utf-8"))
+        except Exception as e:  # pragma: no cover - a corrupt cache just means a slow build
+            print(f"  WARNING: could not read {COVER_CACHE.name} ({e}); resolving all covers", flush=True)
+    retry_misses = os.environ.get("COVER_CACHE_RETRY_MISSES") == "1"
     covers = {}
+    todo = []
+    for k in uniq:
+        ck = _cover_cache_key(*k)
+        if ck in cache and (cache[ck] is not None or not retry_misses):
+            covers[k] = cache[ck]
+        else:
+            todo.append(k)
+    print(f"  {len(uniq)} unique works: {len(uniq) - len(todo)} covers from cache, "
+          f"resolving {len(todo)} via Open Library...", flush=True)
+
+    t0 = perf_counter()
+    _COVER_ERRORS.clear()
     with ThreadPoolExecutor(max_workers=5) as ex:
-        futures = {ex.submit(_resolve_ol_cover, k[0], k[1]): k for k in uniq}
+        futures = {ex.submit(_resolve_ol_cover, k[0], k[1]): k for k in todo}
         for i, fut in enumerate(as_completed(futures), 1):
             k = futures[fut]
             covers[k] = fut.result()
-            # Progress only, not per-item, since there can be tens of thousands of
-            # these -- but frequent enough to show whether this is crawling
-            # (e.g. Open Library throttling the runner's IP) vs. just working.
-            if i % 200 == 0 or i == len(uniq):
-                print(f"    [{i}/{len(uniq)}] covers resolved ({perf_counter() - t0:.2f}s elapsed)", flush=True)
+            cache[_cover_cache_key(*k)] = covers[k]
+            if i % 200 == 0 or i == len(todo):
+                print(f"    [{i}/{len(todo)}] covers resolved ({perf_counter() - t0:.2f}s elapsed)", flush=True)
     hit = sum(1 for v in covers.values() if v)
-    print(f"  resolved {hit}/{len(uniq)} covers ({perf_counter() - t0:.2f}s)", flush=True)
+    print(f"  resolved {hit}/{len(uniq)} covers ({perf_counter() - t0:.2f}s; "
+          f"{len(todo)} network lookups)", flush=True)
+    if _COVER_ERRORS:
+        print(f"  Open Library errors during cover lookups: {_COVER_ERRORS}", flush=True)
+
+    try:
+        COVER_CACHE.write_text(_j.dumps(cache, ensure_ascii=False, indent=0, sort_keys=True), encoding="utf-8")
+        print(f"  wrote {COVER_CACHE.name} ({len(cache):,} entries)", flush=True)
+    except Exception as e:  # pragma: no cover
+        print(f"  WARNING: could not write {COVER_CACHE.name} ({e})", flush=True)
+
     for gdata in data.values():
         for lst in gdata.values():
             for row in lst:

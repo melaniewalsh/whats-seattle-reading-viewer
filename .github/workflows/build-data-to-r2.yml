@@ -159,6 +159,29 @@ jobs:
             done
           fi
 
+      # build_data.py resolves book covers via Open Library and caches the results
+      # in data-prep/cover_cache.json so the next build only looks up NEW works
+      # (~1 min instead of ~100 min). Commit the refreshed cache back to the
+      # branch, same rebase-and-retry dance as the author map above.
+      - name: Commit refreshed cover cache
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data-prep/cover_cache.json
+          if git diff --cached --quiet; then
+            echo "cover_cache.json unchanged -- nothing to commit"
+          else
+            git commit -m "CI: refresh cover_cache.json"
+            for i in 1 2 3; do
+              if git pull --rebase -X theirs origin ${{ github.ref_name }} \
+                 && git push origin HEAD:${{ github.ref_name }}; then
+                break
+              fi
+              git rebase --abort 2>/dev/null || true
+              echo "push race, retry $i" && sleep 3
+            done
+          fi
+
       - name: Upload data files to the public R2 bucket
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
