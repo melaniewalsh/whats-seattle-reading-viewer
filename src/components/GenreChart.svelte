@@ -53,8 +53,19 @@
 		for (let v = 0; v <= yMax + 1e-9; v += step) out.push(Number(v.toFixed(dp)));
 		return out;
 	});
-	// one tick per January, thinned to ~one label per 60px
+	// One tick per January, thinned to ~one label per 60px. When the year
+	// brush narrows the window to a few years (<= 48 months), years alone are
+	// too coarse, so switch to month ticks spaced 1/2/3/4/6 months apart, with
+	// the year shown on each January (same rule as the line charts).
 	const xTicks = $derived.by(() => {
+		if (months.length && months.length <= 48) {
+			const maxLabels = Math.max(2, Math.floor(innerW / 56));
+			const step = [1, 2, 3, 4, 6].find((st) => Math.ceil(months.length / st) <= maxLabels) || 12;
+			return months
+				.map((m, i) => ({ i, year: m.slice(0, 4), mo: Number(m.slice(5, 7)) }))
+				.filter((d) => (d.mo - 1) % step === 0)
+				.map((d) => ({ i: d.i, y: d.mo === 1 || step === 12 ? `${MONTH_NAMES[d.mo - 1]} ${d.year}` : MONTH_NAMES[d.mo - 1] }));
+		}
 		const jans = months.map((m, i) => ({ y: m.slice(0, 4), i })).filter((_, i) => months[i].endsWith("-01"));
 		const step = Math.max(1, Math.ceil(jans.length / Math.max(2, Math.floor(innerW / 60))));
 		return jans.filter((_, i) => i % step === 0);

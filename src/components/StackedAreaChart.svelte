@@ -271,15 +271,28 @@
 		if (a >= 1e3) { const v = n / 1e3; return (Number.isInteger(v) ? v : v.toFixed(1)) + "k"; }
 		return String(n);
 	}
-	// One tick per January, thinned so year labels never collide on a
-	// narrow screen (~44px per label).
+	// X-axis ticks. Over a long window: one tick per January, thinned so year
+	// labels never collide on a narrow screen (~44px per label). Once the year
+	// brush narrows the window to a few years, years alone are too coarse (a
+	// two-year window would get two labels), so switch to month ticks, spaced
+	// 1/2/3/4/6 months apart to fit, with the year shown on each January.
+	const MONTH_MODE_MAX = 48; // months; up to ~4 years gets month ticks
 	const xTicks = $derived.by(() => {
+		const innerW = width - margin.left - margin.right;
+		if (months.length && months.length <= MONTH_MODE_MAX) {
+			const maxLabels = Math.max(2, Math.floor(innerW / 56));
+			const step = [1, 2, 3, 4, 6].find((st) => Math.ceil(months.length / st) <= maxLabels) || 12;
+			return months
+				.map((m, i) => ({ i, year: m.slice(0, 4), mo: Number(m.slice(5, 7)) }))
+				.filter((d) => (d.mo - 1) % step === 0)
+				.map((d) => ({ i: d.i, year: d.year, label: d.mo === 1 || step === 12 ? `${MONTH_NAMES[d.mo - 1].slice(0, 3)} ${d.year}` : MONTH_NAMES[d.mo - 1].slice(0, 3) }));
+		}
 		const all = months
 			.map((m, i) => ({ i, year: m.slice(0, 4), isJan: m.endsWith('-01') }))
 			.filter((d) => d.isJan);
-		const maxLabels = Math.max(2, Math.floor((width - margin.left - margin.right) / 44));
+		const maxLabels = Math.max(2, Math.floor(innerW / 44));
 		const step = Math.ceil(all.length / maxLabels);
-		return all.filter((_, i) => i % step === 0);
+		return all.filter((_, i) => i % step === 0).map((d) => ({ ...d, label: d.year }));
 	});
 
 	let hoverIndex = $state(null);
@@ -572,7 +585,7 @@
 		{#each xTicks as tick}
 			<g class="tick x-tick" transform="translate({x(tick.i)}, 0)">
 				<line y1={margin.top} y2={height - margin.bottom} stroke="#eee" stroke-dasharray="2 2" />
-				<text y={height - margin.bottom + 16} text-anchor="middle">{tick.year}</text>
+				<text y={height - margin.bottom + 16} text-anchor="middle">{tick.label}</text>
 			</g>
 		{/each}
 
