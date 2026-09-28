@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from "svelte";
 	import LineChart from "$components/StackedAreaChart.svelte";
+	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import { getNortonData } from "$utils/nortonData.js";
 	import { titleCase } from "$utils/titleCase.js";
 	import { compactNumber } from "$utils/format.js";
@@ -65,7 +66,7 @@
 			<div class="ne-chartblock" bind:this={chartWrap}>
 				<h3 class="ne-heading">{heading}</h3>
 				<p class="ne-sub">{subhead}</p>
-				<LineChart months={data.months} {series} mode="line" />
+				<LineChart months={data.months} {series} mode="line" annotations={EVENT_ANNOTATIONS} />
 			</div>
 		{/if}
 

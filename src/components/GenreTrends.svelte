@@ -12,6 +12,7 @@
 	import { base } from "$app/paths";
 	import { compactNumber } from "$utils/format.js";
 	import GenreChart from "$components/GenreChart.svelte";
+	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
 
 	// Which table section each genre belongs to.
@@ -429,7 +430,7 @@
 		</p>
 
 		<div class="chartwrap" bind:this={chartWrap}>
-			<GenreChart months={viewMonths} {series} {isolatedKeys} />
+			<GenreChart months={viewMonths} {series} {isolatedKeys} annotations={EVENT_ANNOTATIONS} />
 		</div>
 		<YearBrush months={data.months} values={data.total} bind:lo bind:hi />
 

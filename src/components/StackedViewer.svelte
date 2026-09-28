@@ -10,6 +10,7 @@
 	import { compactNumber } from "$utils/format.js";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
+	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
 	import WikiCard from "$components/WikiCard.svelte";
 	import BorrowMenu from "$components/BorrowMenu.svelte";
@@ -79,12 +80,6 @@
 	let yearHi = $state(0); // last month index shown (inclusive)
 	let currentSlug = $state(null); // slug of the selected author (for shareable URLs)
 	let isOverview = $state(false); // true when showing the library-wide "all checkouts" landing view (no per-title data)
-	// The two big dips on the library-wide overview chart — a "?" marker sits above
-	// each one, and hovering it reveals the explanation.
-	const OVERVIEW_DROPS = [
-		{ month: "2020-03", year: 2020, label: "COVID-19 closure", blurb: "Seattle closed all physical library branches in March 2020 to slow the spread of COVID-19, so in-person checkouts dropped sharply (digital borrowing kept going).", url: "https://web.archive.org/web/20241209044138/https://www.spl.org/about-us/library-impact/2020-impact-report/a-look-back" },
-		{ month: "2024-05", year: 2024, label: "Ransomware attack", blurb: "A May 2024 ransomware attack knocked the library's systems offline for months — including the systems that record checkouts — so this drop partly reflects lost tracking, not just lost borrowing.", url: "https://www.kuow.org/stories/seattle-public-library-goes-low-tech-after-cyberattack-knocks-out-most-digital-services" },
-	];
 	let mobileTableOpen = $state(false); // on narrow screens the title table opens as a drawer
 	let tableCollapsed = $state(true); // the works table starts collapsed; opened via its header or "Make a custom work"
 	let autoHidAuthorTotal = $state(false); // whether we've auto-hidden the author-total line for this author yet
@@ -2100,7 +2095,7 @@
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={isOverview ? OVERVIEW_DROPS : []} legendHoverKey={legendHoverKey}/>
+				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
 			</div>
 
 			{#if legendItems.length >= 2}

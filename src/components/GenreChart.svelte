@@ -9,7 +9,8 @@
 	//   months  : string[]                       "YYYY-MM" x-axis
 	//   series  : [{ key, name, color, values }] values aligned to `months`, in %
 	//   isolatedKeys : string[]                  when non-empty, only these stay bold
-	let { months = [], series = [], isolatedKeys = [] } = $props();
+	//   annotations  : [{ month, label, blurb, url }]  a "?" marker above each event
+	let { months = [], series = [], isolatedKeys = [], annotations = [] } = $props();
 
 	const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 	function fmtMonth(ym) {
@@ -61,6 +62,28 @@
 
 	const pathOf = (s) => s.values.map((v, i) => `${i ? "L" : "M"} ${xOf(i)} ${yOf(v)}`).join(" ");
 
+	// "?" markers for the event dips (COVID, ransomware), same as the line
+	// charts: resolve each to an x position, and anchor the popover away from
+	// whichever edge it's near so it can't run off a narrow chart.
+	const annotationMarks = $derived.by(() => {
+		if (!annotations?.length || months.length < 2) return [];
+		return annotations
+			.map((a) => {
+				const i = months.findIndex((m) => m === a.month || m.startsWith(a.month));
+				if (i < 0) return null;
+				const px = xOf(i);
+				const align = px > width * 0.62 ? "end" : px < width * 0.38 ? "start" : "center";
+				const pad = 8;
+				const avail =
+					align === "end" ? px + 10 - pad
+					: align === "start" ? width - (px - 10) - pad
+					: 2 * Math.min(px, width - px) - 2 * pad;
+				const maxw = Math.max(180, Math.min(320, Math.round(avail)));
+				return { ...a, x: px, align, maxw };
+			})
+			.filter(Boolean);
+	});
+
 	let hoverI = $state(null);
 	let hoverKey = $state(null);
 	function onMove(e) {
@@ -108,6 +131,15 @@
 			<circle cx={xOf(hoverI)} cy={yOf(hovered.values[hoverI])} r="4.5" fill={hovered.color} stroke="#fff" stroke-width="2" />
 		{/if}
 	</svg>
+	<!-- "?" markers above the event dips; hover/focus for the explanation -->
+	{#each annotationMarks as a}
+		<div class="qmark-wrap align-{a.align}" style="left: {a.x}px;">
+			<button class="qmark" aria-label="Why the drop here?">?</button>
+			<div class="qmark-pop" role="tooltip" style="max-width: {a.maxw}px;">
+				<p class="qmark-body"><strong>{a.label}.</strong> {a.blurb} <a href={a.url} target="_blank" rel="noopener noreferrer">Read more</a></p>
+			</div>
+		</div>
+	{/each}
 
 	{#if hoverI !== null && hovered}
 		<div class="gtip" style="left:{tipX}px; top:{tipY}px; transform: translate({tipTX}, {tipTY});">
@@ -127,6 +159,66 @@
 
 <style>
 	.gchart { position: relative; width: 100%; }
+	.qmark-wrap {
+		position: absolute;
+		top: 4px;
+		z-index: 7;
+	}
+	.qmark-wrap.align-center { transform: translateX(-50%); }
+	.qmark-wrap.align-end { transform: translateX(-50%); }
+	.qmark-wrap.align-start { transform: translateX(-50%); }
+	.qmark {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
+		font-family: var(--font-sans, system-ui, sans-serif);
+		font-size: 0.78rem;
+		font-weight: 700;
+		color: var(--color-fg-light, #667);
+		background: rgba(255, 255, 255, 0.95);
+		border: 1.5px solid var(--color-border, #d5d9e0);
+		border-radius: 50%;
+		cursor: help;
+		padding: 0;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+	}
+	.qmark-wrap:hover .qmark,
+	.qmark-wrap:focus-within .qmark {
+		color: #fff;
+		background: #3f88cc;
+		border-color: #3f88cc;
+	}
+	.qmark-pop {
+		display: none;
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 8;
+		width: max-content;
+		padding: 12px 14px;
+		background: var(--color-white, #fff);
+		border: 1px solid var(--color-border, #d5d9e0);
+		border-radius: 10px;
+		box-shadow: 0 8px 26px rgba(0, 0, 0, 0.16);
+	}
+	/* keep the near-edge popovers from overflowing the chart */
+	.qmark-wrap.align-end .qmark-pop { left: auto; right: 0; transform: none; }
+	.qmark-wrap.align-start .qmark-pop { left: 0; transform: none; }
+	.qmark-wrap:hover .qmark-pop,
+	.qmark-wrap:focus-within .qmark-pop { display: block; }
+	.qmark-body {
+		margin: 0;
+		font-family: var(--font-sans, system-ui, sans-serif);
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg, #1a1a1a);
+	}
+	.qmark-body strong { font-weight: 700; }
+	.qmark-body a { color: #3f88cc; font-weight: 600; text-decoration: underline; white-space: nowrap; }
+	.qmark-body a:hover { color: #26597f; }
 	svg { display: block; width: 100%; height: auto; overflow: visible; }
 	.grid { stroke: #eee; stroke-width: 1; }
 	.grid.zero { stroke: #bbb; }

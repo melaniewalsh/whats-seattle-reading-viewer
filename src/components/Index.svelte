@@ -15,6 +15,7 @@
 	import { cleanWorkTitle } from "$utils/cleanTitle.js";
 	import { displayName } from "$utils/displayName.js";
 	import { publications } from "$data/publications.js";
+	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 
 	const copy = getContext("copy");
 	// Four top-level views. "search" and "rankings" carry a sub-kind toggle.
@@ -496,7 +497,7 @@
 						</div>
 					</div>
 					<div class="featured-chart">
-						<LineChart months={featured.months} series={featured.series} mode="area" peak={featured.peak} />
+						<LineChart months={featured.months} series={featured.series} mode="area" peak={featured.peak} annotations={EVENT_ANNOTATIONS} />
 					</div>
 					<div class="featured-actions">
 						<button class="featured-cta" onclick={() => openTitle(featured.title)}>Explore the full trend →</button>
