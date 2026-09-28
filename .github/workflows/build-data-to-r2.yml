@@ -121,6 +121,32 @@ jobs:
           # Title reverse-lookup index for the "By title" tab. High threshold so
           # only well-borrowed titles are searchable -> the index stays small.
           TITLE_MIN_CHECKOUTS=500 python3 data-prep/build_title_index.py
+          # The library-wide overview series for the landing chart, aligned to
+          # the month axis just built. Incremental (only the newest months are
+          # fetched from Socrata). Without this the site falls back to a live
+          # aggregation of ~51M rows that takes minutes. Writes
+          # static/data/overview.json (uploaded to R2 below) and a copy at
+          # static/overview.json (bundled with the site; committed below).
+          python3 data-prep/build_overview.py
+
+      # Keep the bundled fallback copy of the overview current in the repo so
+      # the next Pages deploy ships it too.
+      - name: Commit refreshed overview.json
+        run: |
+          git add static/overview.json
+          if git diff --cached --quiet; then
+            echo "overview.json unchanged -- nothing to commit"
+          else
+            git commit -m "CI: refresh overview.json"
+            for i in 1 2 3; do
+              if git pull --rebase -X theirs origin ${{ github.ref_name }} \
+                 && git push origin HEAD:${{ github.ref_name }}; then
+                break
+              fi
+              git rebase --abort 2>/dev/null || true
+              echo "push race, retry $i" && sleep 3
+            done
+          fi
 
       - name: Upload data files to the public R2 bucket
         env:

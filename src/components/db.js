@@ -136,41 +136,98 @@ export async function queryGenreMonthly(includeTerms, excludeTerms, months) {
  * Book/ebook/audiobook checkouts per month, aligned to getMonths(). Returns
  * both the grand total (for the default line) and a per-format breakdown (for
  * the stacked-area view): { total: [...], print: [...], ebook: [...],
- * audiobook: [...] }.
+ * audiobook: [...] }. Served from the precomputed overview.json; only months
+ * that file doesn't cover yet are aggregated live.
  */
+// Live Socrata aggregation of book/ebook/audiobook checkouts by month and
+// format. Over the whole dataset this is ~51M rows and takes MINUTES (it
+// regularly exceeds two minutes and times out), so callers restrict it to the
+// handful of months the precomputed file doesn't cover yet.
+async function fetchCheckoutsLive(months, onlyMonths = null) {
+	let where = "materialtype in('BOOK','EBOOK','AUDIOBOOK')";
+	if (onlyMonths) {
+		const parts = onlyMonths.map((m) => {
+			const [y, mo] = m.split('-');
+			return `(checkoutyear=${Number(y)} AND checkoutmonth=${Number(mo)})`;
+		});
+		where += ` AND (${parts.join(' OR ')})`;
+	}
+	const params = new URLSearchParams({
+		'$select': 'checkoutyear,checkoutmonth,materialtype,sum(checkouts) as total',
+		'$where': where,
+		'$group': 'checkoutyear,checkoutmonth,materialtype',
+		'$limit': '50000',
+		'$$app_token': SODA_APP_TOKEN
+	});
+	const res = await fetch(`${SODA_RESOURCE}?${params}`);
+	if (!res.ok) throw new Error(`SODA request failed: ${res.status}`);
+	const rows = await res.json();
+	const idx = new Map(months.map((m, i) => [m, i]));
+	const zero = () => new Array(months.length).fill(0);
+	const out = { total: zero(), print: zero(), ebook: zero(), audiobook: zero() };
+	for (const r of rows) {
+		const key = `${r.checkoutyear}-${String(r.checkoutmonth).padStart(2, '0')}`;
+		const i = idx.get(key);
+		if (i === undefined) continue;
+		const bucket = FMT_BUCKET[r.materialtype];
+		const v = Number(r.total) || 0;
+		if (bucket) out[bucket][i] += v;
+		out.total[i] += v;
+	}
+	return out;
+}
+
+// The precomputed overview (data-prep/build_overview.py): built by the monthly
+// data workflow and uploaded to R2 next to meta.json, with a copy bundled into
+// the site as a fallback. Returns null if neither is available.
+async function fetchPrecomputedOverview() {
+	for (const url of [`${DATA_BASE}/overview.json`, `${base}/overview.json`]) {
+		try {
+			const pre = await fetch(url).then((r) => (r.ok ? r.json() : null));
+			if (pre && Array.isArray(pre.total) && pre.total.length) return pre;
+		} catch { /* try the next source */ }
+	}
+	return null;
+}
+
 export async function getAllCheckouts() {
 	if (!allCheckoutsPromise) {
 		allCheckoutsPromise = (async () => {
 			const months = await getMonths();
-			// Fast path: a tiny precomputed file (data-prep/build_overview.py),
-			// served from the app's own origin -- loads instantly instead of
-			// waiting seconds for the live API to aggregate ~51M rows.
-			try {
-				const pre = await fetch(`${base}/overview.json`).then((r) => (r.ok ? r.json() : null));
-				if (pre && Array.isArray(pre.total) && pre.total.length === months.length) return pre;
-			} catch { /* fall through to the live API */ }
-			// Fallback: live Socrata aggregation (works before the file is built).
-			const params = new URLSearchParams({
-				'$select': 'checkoutyear,checkoutmonth,materialtype,sum(checkouts) as total',
-				'$where': "materialtype in('BOOK','EBOOK','AUDIOBOOK')",
-				'$group': 'checkoutyear,checkoutmonth,materialtype',
-				'$limit': '50000',
-				'$$app_token': SODA_APP_TOKEN
+			const keys = ['total', 'print', 'ebook', 'audiobook'];
+			const pre = await fetchPrecomputedOverview();
+			if (!pre) {
+				// No precomputed file at all (a fresh checkout before any build):
+				// the slow full aggregation is the only option.
+				return fetchCheckoutsLive(months);
+			}
+			// Align the file to the month axis by month key. Older files have
+			// no "months" list; they were built as a prefix of the axis.
+			const preMonths = Array.isArray(pre.months) && pre.months.length === pre.total.length
+				? pre.months
+				: months.slice(0, pre.total.length);
+			const at = new Map(preMonths.map((m, i) => [m, i]));
+			const out = {};
+			for (const k of keys) out[k] = new Array(months.length).fill(0);
+			const missing = [];
+			months.forEach((m, i) => {
+				const j = at.get(m);
+				if (j === undefined) { missing.push(m); return; }
+				for (const k of keys) out[k][i] = Number(pre[k]?.[j]) || 0;
 			});
-			const res = await fetch(`${SODA_RESOURCE}?${params}`);
-			if (!res.ok) throw new Error(`SODA request failed: ${res.status}`);
-			const rows = await res.json();
-			const idx = new Map(months.map((m, i) => [m, i]));
-			const zero = () => new Array(months.length).fill(0);
-			const out = { total: zero(), print: zero(), ebook: zero(), audiobook: zero() };
-			for (const r of rows) {
-				const key = `${r.checkoutyear}-${String(r.checkoutmonth).padStart(2, '0')}`;
-				const i = idx.get(key);
-				if (i === undefined) continue;
-				const bucket = FMT_BUCKET[r.materialtype];
-				const v = Number(r.total) || 0;
-				if (bucket) out[bucket][i] += v;
-				out.total[i] += v;
+			// The data build can add a month before the overview file catches
+			// up. Fill just that gap live (seconds) rather than redoing all of
+			// it (minutes); if even that fails, show what we have.
+			if (missing.length) {
+				try {
+					const tail = await fetchCheckoutsLive(months, missing);
+					for (const m of missing) {
+						const i = months.indexOf(m);
+						for (const k of keys) out[k][i] = tail[k][i];
+					}
+				} catch (e) {
+					console.warn('overview: could not fill missing months live', missing, e);
+				}
 			}
 			return out;
 		})();
