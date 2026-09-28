@@ -346,10 +346,25 @@
 	async function loadDefaultTitle() {
 		// A ?title=<work> link (e.g. from Top works) loads that title; otherwise the
 		// tab lands on a well-known default, The Fire Next Time.
-		let want = null;
-		try { want = new URLSearchParams(window.location.search).get("title"); } catch {}
+		let want = null, wantAuthor = null;
 		try {
-			const r = (await searchTitles(want || "The Fire Next Time", 5))[0];
+			const sp = new URLSearchParams(window.location.search);
+			want = sp.get("title");
+			wantAuthor = sp.get("author");
+		} catch {}
+		try {
+			const q = want || "The Fire Next Time";
+			const hits = await searchTitles(q, 50);
+			// searchTitles is a substring match over a popularity-sorted index, so
+			// the FIRST hit for "Whistler" is Grisham's "The Whistler", not
+			// Patchett's "Whistler". Prefer, in order: an exact title by the linked
+			// author, any title by that author, an exact title, then the top hit.
+			const ql = q.trim().toLowerCase();
+			const exact = (h) => (h.title || "").trim().toLowerCase() === ql;
+			const r = (wantAuthor && hits.find((h) => h.slug === wantAuthor && exact(h)))
+				|| (wantAuthor && hits.find((h) => h.slug === wantAuthor))
+				|| hits.find(exact)
+				|| hits[0];
 			// Scroll to the plot title only when a specific ?title was requested (a
 			// click from Most Borrowed / shared link), not for the blank-tab default.
 			if (r) await selectTitle(r, { scroll: !!want });
@@ -444,7 +459,7 @@
 	function pickResult(res) {
 		query = "";
 		results = [];
-		if (res.kind === "work") openTitle(res.title);
+		if (res.kind === "work") openTitle(res.title, res.slug);
 		else openAuthor(res.slug);
 	}
 

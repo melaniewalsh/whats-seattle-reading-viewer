@@ -16,7 +16,7 @@
 	import WikiCard from "$components/WikiCard.svelte";
 	import BorrowMenu from "$components/BorrowMenu.svelte";
 
-	// openAuthor(slug) / openTitle(title) are provided by Index.svelte: jump to the
+	// openAuthor(slug) / openTitle(title, slug) are provided by Index.svelte: jump to the
 	// By-author / By-title views. rankKind / setRankKind drive the Type dropdown that
 	// swaps between the Works and Authors rankings.
 	// embedded: render ONLY the "Most borrowed overall (last month)" gallery strip
@@ -456,7 +456,7 @@
 			<article class="gal-card">
 				<div class="gal-top">
 					<span class="gal-rank">{i + 1}</span>
-					<button class="gal-cover" class:has-img={!!covers[k]} onclick={() => openTitle(r[0])} title="See borrowing trend">
+					<button class="gal-cover" class:has-img={!!covers[k]} onclick={() => openTitle(r[0], r[2])} title="See borrowing trend">
 						{#if covers[k]}
 							<img src={covers[k]} alt="" loading="lazy" onerror={() => fillFromWiki(r)} />
 						{:else}
@@ -464,7 +464,7 @@
 						{/if}
 					</button>
 				</div>
-				<button class="gal-booktitle" onclick={() => openTitle(r[0])}>{titleCase(cleanWorkTitle(r[0]))}</button>
+				<button class="gal-booktitle" onclick={() => openTitle(r[0], r[2])}>{titleCase(cleanWorkTitle(r[0]))}</button>
 				<div class="gal-by">by {displayName(r[1])}</div>
 				<div class="gal-count">{compactNumber(r[3])} checkouts</div>
 				{#if !embedded}
@@ -597,7 +597,7 @@
 							<td class="ta-rank">{i + 1}</td>
 							<td class="ta-name">
 								<div class="tw-cell">
-									<button class="tw-cover" class:has-img={!!covers[coverKey(row)]} onclick={() => openTitle(row[0])} title="See borrowing trend">
+									<button class="tw-cover" class:has-img={!!covers[coverKey(row)]} onclick={() => openTitle(row[0], row[2])} title="See borrowing trend">
 										{#if covers[coverKey(row)]}
 											<img src={covers[coverKey(row)]} alt="" loading="lazy" onerror={() => fillFromWiki(row)} />
 										{:else}
@@ -608,7 +608,7 @@
 										<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
 											<button class="tw-title tw-titlelink" aria-haspopup="dialog" onclick={() => activateName(key)}>{titleCase(cleanWorkTitle(row[0]))}</button>
 											{#if hoverKey === key || pinnedKey === key}
-												<span class="wiki-pop"><WikiCard query={row[0]} author={displayName(row[1])} kind="work" links={u} onTrend={() => openTitle(row[0])} /></span>
+												<span class="wiki-pop"><WikiCard query={row[0]} author={displayName(row[1])} kind="work" links={u} onTrend={() => openTitle(row[0], row[2])} /></span>
 											{/if}
 										</span>
 										<span class="tw-by">by {displayName(row[1])}</span>

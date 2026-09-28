@@ -262,12 +262,16 @@
 	}
 
 	// Clicking a work title opens the Search view for that title (reads ?title).
-	function openTitle(title) {
+	// authorSlug (optional) pins the title to its author, so a work whose name is
+	// shared with (or contained in) a more-borrowed book — Patchett's "Whistler"
+	// vs Grisham's "The Whistler" — opens the right one.
+	function openTitle(title, authorSlug = null) {
 		rememberRankings();
 		try {
 			const url = new URL(window.location);
 			url.searchParams.set("title", title);
 			["tab", "kind", "genre", "year", "author"].forEach((k) => url.searchParams.delete(k));
+			if (authorSlug) url.searchParams.set("author", authorSlug);
 			window.history.pushState({}, "", url);
 		} catch {}
 		searchKind = "title";
@@ -294,7 +298,7 @@
 		hOpen = false;
 		hq = "";
 		hResults = [];
-		if (res.kind === "work") openTitle(res.title);
+		if (res.kind === "work") openTitle(res.title, res.slug);
 		else openAuthor(res.slug);
 	}
 	// Clear the header search. We render our own × (the native one on
@@ -484,13 +488,13 @@
 					<p class="featured-eyebrow">Featured trend of the month</p>
 					<div class="featured-head">
 						{#if featured.cover}
-							<button class="featured-cover" onclick={() => openTitle(featured.title)} title="See the full trend">
+							<button class="featured-cover" onclick={() => openTitle(featured.title, featured.authorSlug)} title="See the full trend">
 								<img src={featured.cover} alt="The Odyssey" loading="lazy" />
 							</button>
 						{/if}
 						<div class="featured-headtext">
 							<h2 class="featured-title">
-								<button class="flink" onclick={() => openTitle(featured.title)}>The Odyssey</button>
+								<button class="flink" onclick={() => openTitle(featured.title, featured.authorSlug)}>The Odyssey</button>
 								<span class="featured-by">by <button class="flink" onclick={() => openAuthor(featured.authorSlug)}>Homer</button></span>
 							</h2>
 							<p class="featured-sub">{compactNumber(featured.checkouts)} checkouts at the Seattle Public Library, 2006–2026</p>
@@ -500,7 +504,7 @@
 						<LineChart months={featured.months} series={featured.series} mode="area" peak={featured.peak} annotations={EVENT_ANNOTATIONS} />
 					</div>
 					<div class="featured-actions">
-						<button class="featured-cta" onclick={() => openTitle(featured.title)}>Explore the full trend →</button>
+						<button class="featured-cta" onclick={() => openTitle(featured.title, featured.authorSlug)}>Explore the full trend →</button>
 						<a class="featured-spl" href={lookupUrls("The Odyssey Homer").spl} target="_blank" rel="noopener noreferrer" title="Find The Odyssey in the Seattle Public Library catalog"><img src="{base}/spl-logo.png" alt="" width="18" height="18" /> Find at SPL</a>
 					</div>
 				</section>
