@@ -9,6 +9,9 @@
 	// Showing both side-by-side is the point: you can see why "share of checkouts"
 	// looks like everything's rising until you make it a true partition.
 	import { onMount } from "svelte";
+	import ImageIcon from "@lucide/svelte/icons/image";
+	import LinkIcon from "@lucide/svelte/icons/link";
+	import ShareIcon from "@lucide/svelte/icons/share-2";
 	import { base } from "$app/paths";
 	import { compactNumber } from "$utils/format.js";
 	import GenreChart from "$components/GenreChart.svelte";
@@ -451,14 +454,14 @@
 			</button>
 			<div class="share-wrap">
 				<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
-					<span aria-hidden="true">↗</span> Share
+					<ShareIcon size={14} strokeWidth={2.2} aria-hidden="true" /> Share
 				</button>
 				{#if shareOpen}
 					<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
 					<div class="share-menu" role="menu">
-						<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true">⧉</span> Copy image</button>
-						<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true">🔗</span> Copy link</button>
-						<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true">↗</span> Share via…</button>
+						<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true"><ImageIcon size={14} strokeWidth={2.2} /></span> Copy image</button>
+						<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true"><LinkIcon size={14} strokeWidth={2.2} /></span> Copy link</button>
+						<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true"><ShareIcon size={14} strokeWidth={2.2} /></span> Share via…</button>
 					</div>
 				{/if}
 			</div>
