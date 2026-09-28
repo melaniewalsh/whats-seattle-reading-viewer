@@ -21,10 +21,11 @@
 
 	let width = $state(760);
 	const height = 380;
-	const margin = { top: 12, right: 16, bottom: 28, left: 42 };
+	const monthTickMode = $derived(months.length > 0 && months.length <= 48);
+	const margin = $derived({ top: 12, right: 16, bottom: monthTickMode ? 42 : 28, left: 42 });
 
 	const innerW = $derived(Math.max(1, width - margin.left - margin.right));
-	const innerH = height - margin.top - margin.bottom;
+	const innerH = $derived(height - margin.top - margin.bottom);
 
 	const n = $derived(Math.max(months.length - 1, 1));
 	const xOf = (i) => margin.left + (i / n) * innerW;
@@ -58,17 +59,17 @@
 	// too coarse, so switch to month ticks spaced 1/2/3/4/6 months apart, with
 	// the year shown on each January (same rule as the line charts).
 	const xTicks = $derived.by(() => {
-		if (months.length && months.length <= 48) {
-			const maxLabels = Math.max(2, Math.floor(innerW / 56));
+		if (monthTickMode) {
+			const maxLabels = Math.max(2, Math.floor(innerW / 40));
 			const step = [1, 2, 3, 4, 6].find((st) => Math.ceil(months.length / st) <= maxLabels) || 12;
-			return months
+			const ticks = months
 				.map((m, i) => ({ i, year: m.slice(0, 4), mo: Number(m.slice(5, 7)) }))
-				.filter((d) => (d.mo - 1) % step === 0)
-				.map((d) => ({ i: d.i, y: d.mo === 1 || step === 12 ? `${MONTH_NAMES[d.mo - 1]} ${d.year}` : MONTH_NAMES[d.mo - 1] }));
+				.filter((d) => (d.mo - 1) % step === 0);
+			return ticks.map((d, k) => ({ i: d.i, y: MONTH_NAMES[d.mo - 1], yearLabel: d.mo === 1 || k === 0 ? d.year : null }));
 		}
 		const jans = months.map((m, i) => ({ y: m.slice(0, 4), i })).filter((_, i) => months[i].endsWith("-01"));
 		const step = Math.max(1, Math.ceil(jans.length / Math.max(2, Math.floor(innerW / 60))));
-		return jans.filter((_, i) => i % step === 0);
+		return jans.filter((_, i) => i % step === 0).map((d) => ({ ...d, yearLabel: null }));
 	});
 
 	const pathOf = (s) => s.values.map((v, i) => `${i ? "L" : "M"} ${xOf(i)} ${yOf(v)}`).join(" ");
@@ -131,7 +132,10 @@
 			<text class="ylabel" x={margin.left - 6} y={yOf(t)} dy="0.32em" text-anchor="end">{t}%</text>
 		{/each}
 		{#each xTicks as t}
-			<text class="xlabel" x={xOf(t.i)} y={height - 8} text-anchor="middle">{t.y}</text>
+			<text class="xlabel" x={xOf(t.i)} y={height - margin.bottom + 16} text-anchor="middle">{t.y}</text>
+			{#if t.yearLabel}
+				<text class="xlabel x-year" x={xOf(t.i)} y={height - margin.bottom + 30} text-anchor="middle">{t.yearLabel}</text>
+			{/if}
 		{/each}
 		{#each series as s (s.key)}
 			{#if isActive(s.key)}
@@ -234,6 +238,7 @@
 	.grid { stroke: #eee; stroke-width: 1; }
 	.grid.zero { stroke: #bbb; }
 	.ylabel, .xlabel { font-family: var(--font-sans, sans-serif); font-size: 11px; fill: #888; }
+	.xlabel.x-year { font-weight: 600; fill: #555; }
 	.gline { stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; transition: opacity 0.12s; }
 	.gline.hot { stroke-width: 3.2; opacity: 1; }
 	.gtip {

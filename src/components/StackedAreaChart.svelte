@@ -26,7 +26,10 @@
 	// whole page sideways on phones.
 	let width = $state(720);
 	const height = $derived(width < 520 ? 300 : 380);
-	const margin = { top: 16, right: 16, bottom: 28, left: 44 };
+	// Month-tick mode (narrow year window) draws a second axis row for the
+	// year, so it needs a little more room at the bottom.
+	const monthTickMode = $derived(months.length > 0 && months.length <= 48);
+	const margin = $derived({ top: 16, right: 16, bottom: monthTickMode ? 42 : 28, left: 44 });
 
 	const PALETTE = [
 		'#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
@@ -276,23 +279,28 @@
 	// brush narrows the window to a few years, years alone are too coarse (a
 	// two-year window would get two labels), so switch to month ticks, spaced
 	// 1/2/3/4/6 months apart to fit, with the year shown on each January.
-	const MONTH_MODE_MAX = 48; // months; up to ~4 years gets month ticks
 	const xTicks = $derived.by(() => {
 		const innerW = width - margin.left - margin.right;
-		if (months.length && months.length <= MONTH_MODE_MAX) {
-			const maxLabels = Math.max(2, Math.floor(innerW / 56));
+		if (monthTickMode) {
+			const maxLabels = Math.max(2, Math.floor(innerW / 40));
 			const step = [1, 2, 3, 4, 6].find((st) => Math.ceil(months.length / st) <= maxLabels) || 12;
-			return months
+			const ticks = months
 				.map((m, i) => ({ i, year: m.slice(0, 4), mo: Number(m.slice(5, 7)) }))
-				.filter((d) => (d.mo - 1) % step === 0)
-				.map((d) => ({ i: d.i, year: d.year, label: d.mo === 1 || step === 12 ? `${MONTH_NAMES[d.mo - 1].slice(0, 3)} ${d.year}` : MONTH_NAMES[d.mo - 1].slice(0, 3) }));
+				.filter((d) => (d.mo - 1) % step === 0);
+			// Month on the first row; the year on a second row under each January
+			// (and under the first tick, so the year is never off-screen).
+			return ticks.map((d, k) => ({
+				i: d.i,
+				label: MONTH_NAMES[d.mo - 1].slice(0, 3),
+				yearLabel: d.mo === 1 || k === 0 ? d.year : null
+			}));
 		}
 		const all = months
 			.map((m, i) => ({ i, year: m.slice(0, 4), isJan: m.endsWith('-01') }))
 			.filter((d) => d.isJan);
 		const maxLabels = Math.max(2, Math.floor(innerW / 44));
 		const step = Math.ceil(all.length / maxLabels);
-		return all.filter((_, i) => i % step === 0).map((d) => ({ ...d, label: d.year }));
+		return all.filter((_, i) => i % step === 0).map((d) => ({ i: d.i, label: d.year, yearLabel: null }));
 	});
 
 	let hoverIndex = $state(null);
@@ -586,6 +594,9 @@
 			<g class="tick x-tick" transform="translate({x(tick.i)}, 0)">
 				<line y1={margin.top} y2={height - margin.bottom} stroke="#eee" stroke-dasharray="2 2" />
 				<text y={height - margin.bottom + 16} text-anchor="middle">{tick.label}</text>
+				{#if tick.yearLabel}
+					<text class="x-year" y={height - margin.bottom + 30} text-anchor="middle">{tick.yearLabel}</text>
+				{/if}
 			</g>
 		{/each}
 
@@ -854,6 +865,7 @@
 			y1 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 	}
 
+	.tick text.x-year { font-weight: 600; fill: #555; }
 	.tick text {
 		font-size: 11px;
 		fill: #666;
