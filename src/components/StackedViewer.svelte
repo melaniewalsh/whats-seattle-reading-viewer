@@ -226,6 +226,18 @@
 		loading = false;
 	}
 
+	// Default start of the year window for a freshly loaded series: the January
+	// of the first year with any checkouts, so an author whose first book came
+	// out in 2017 opens on 2017-present instead of a decade of flat zero. The
+	// YearBrush still shows the whole history, so the user can drag back.
+	function firstActiveMonth(values) {
+		const i = (values || []).findIndex((v) => v > 0);
+		if (i <= 0) return 0;
+		const yr = months[i]?.slice(0, 4);
+		const jan = months.findIndex((m) => m.slice(0, 4) === yr);
+		return Math.max(0, jan);
+	}
+
 	// Expand a sparse series ([[monthIndex, count], ...]) into a full array of
 	// length months.length, filling the gaps with 0.
 	function densify(sparse) {
@@ -405,6 +417,14 @@
 		groups = [...groups, { id: ++groupIdCounter, name, idxs }];
 		hlWorkKey = `g${groupIdCounter}`;
 		searchedWork = { name, idxs: [...idxs] };
+		// Open on the years this work has actually circulated (it may be much
+		// newer than the author's other books).
+		{
+			const sum = new Array(months.length).fill(0);
+			for (const i of idxs) current.titles[i].series.forEach((v, k) => { sum[k] += v; });
+			yearLo = firstActiveMonth(sum);
+			yearHi = Math.max(months.length - 1, 0);
+		}
 		// Reflect the opened title in the URL so it updates as you pick new works
 		// (selectAuthor, called above, cleared the previous ?title).
 		try {
@@ -487,7 +507,7 @@
 		workOrder = "checkouts";
 		expandedWorks = [];
 		workAssign = {};
-		yearLo = 0;
+		yearLo = firstActiveMonth(data.series);
 		yearHi = Math.max(months.length - 1, 0);
 		query = "";
 		results = [];
