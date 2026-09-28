@@ -184,6 +184,8 @@
 	// it; older data just omits the option.
 	const latestMonth = $derived(data?.latestMonth || null);
 	const monthLabel = $derived(latestMonth ? fmtMonth(latestMonth) : "");
+	// Short form ("Aug 2026") for the compact labels next to "Last month".
+	const monthShort = $derived(monthLabel ? monthLabel.replace(/^(\w{3})\w*/, "$1") : "");
 	function fmtMonth(ym) {
 		const [y, m] = (ym || "").split("-");
 		const names = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -484,7 +486,7 @@
 	{#if embedded}
 		<section class="gal-sec home-tw">
 			<div class="home-tw-head">
-				<h2 class="home-tw-title">Most borrowed last&nbsp;month</h2>
+				<h2 class="home-tw-title">Most borrowed last&nbsp;month{#if monthLabel} <span class="home-tw-month">({monthShort})</span>{/if}</h2>
 				<button class="home-tw-more" onclick={onSeeAll}>See all Most&nbsp;Borrowed →</button>
 			</div>
 			{@render galRow(overallBooks)}
@@ -520,7 +522,7 @@
 			<label class="ta-field">
 				<span>Year</span>
 				<select bind:value={year}>
-					{#if latestMonth}<option value="month">Last month ({monthLabel})</option>{/if}
+					{#if latestMonth}<option value="month">Last month ({monthShort})</option>{/if}
 					<option value="all">All time</option>
 					{#each [...data.years].reverse() as y}
 						<option value={String(y)}>{y}</option>
@@ -545,7 +547,7 @@
 
 		<div class="gal-yearnav">
 			<button class="gal-arrow" onclick={() => stepYear(1)} disabled={yearIdx >= yearSeq.length - 1} aria-label="Earlier year">‹</button>
-			<span class="gal-yearlabel">{year === "all" ? "All time" : year === "month" ? "Last month" : year}</span>
+			<span class="gal-yearlabel">{year === "all" ? "All time" : year === "month" ? `Last month (${monthShort})` : year}</span>
 			<button class="gal-arrow" onclick={() => stepYear(-1)} disabled={yearIdx <= 0} aria-label="More recent">›</button>
 		</div>
 		{#if !galleryMode}
@@ -803,6 +805,7 @@
 		padding-bottom: 8px;
 		border-bottom: 2px solid var(--color-border);
 	}
+	.home-tw-title .home-tw-month { font-weight: 400; color: var(--color-fg-light, #667); white-space: nowrap; }
 	.home-tw-title {
 		font-family: var(--font-display, var(--font-serif));
 		font-size: clamp(1.35rem, 3.2vw, 1.9rem);
