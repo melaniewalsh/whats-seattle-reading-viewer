@@ -119,8 +119,10 @@ TAXONOMY = [
     # Note: the bare "novels" form tag was dropped — it's applied so generically
     # (incl. manga/graphic-novel series like Pokémon) that it swept non-literary
     # books in here. Classics tagged ONLY "Novels" now fall to General Fiction.
-    ("Literary & Classic Fiction", ["literary fiction", "domestic fiction", "psychological fiction",
-        "short stories", "classic literature"], []),
+    # "domestic fiction" and "psychological fiction" were dropped too (2026-09):
+    # both are broad form tags that pull in plenty of commercial fiction
+    # (thrillers, book-club and family sagas), not specifically literary work.
+    ("Literary & Classic Fiction", ["literary fiction", "short stories", "classic literature"], []),
     # The broad BISAC "Literature" tag = contemporary general / book-club fiction
     # (Demon Copperhead, Lessons in Chemistry) — NOT the same as literary fiction,
     # so it gets its own bucket, just after the specific one claims the classics.
