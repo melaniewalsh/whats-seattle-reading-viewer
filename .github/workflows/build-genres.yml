@@ -15,7 +15,9 @@ permissions:
 jobs:
   build-genres:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # The year-by-year subject scans take ~4-5 min per year when the city API
+    # is slow (a 2026-09 run was cancelled at 90 min with 5 years still to go).
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
 
