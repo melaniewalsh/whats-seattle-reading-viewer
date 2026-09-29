@@ -128,16 +128,20 @@ jobs:
           # static/data/overview.json (uploaded to R2 below) and a copy at
           # static/overview.json (bundled with the site; committed below).
           python3 data-prep/build_overview.py
+          # "Backlist Boomers": works whose checkouts jumped years after they
+          # first circulated (data-prep/build_backlist.py). ~10 s. Writes
+          # static/data/backlist.json (-> R2) and static/backlist.json (bundled).
+          python3 data-prep/build_backlist.py
 
       # Keep the bundled fallback copy of the overview current in the repo so
       # the next Pages deploy ships it too.
-      - name: Commit refreshed overview.json
+      - name: Commit refreshed overview.json and backlist.json
         run: |
-          git add static/overview.json
+          git add static/overview.json static/backlist.json
           if git diff --cached --quiet; then
-            echo "overview.json unchanged -- nothing to commit"
+            echo "overview.json / backlist.json unchanged -- nothing to commit"
           else
-            git commit -m "CI: refresh overview.json"
+            git commit -m "CI: refresh overview.json and backlist.json"
             for i in 1 2 3; do
               if git pull --rebase -X theirs origin ${{ github.ref_name }} \
                  && git push origin HEAD:${{ github.ref_name }}; then

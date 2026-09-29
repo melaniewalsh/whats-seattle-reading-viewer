@@ -47,6 +47,26 @@ export function getTopAuthors() {
 	return topAuthorsPromise;
 }
 
+// The "Backlist Boomers" dataset (data-prep/build_backlist.py): works whose
+// checkouts jumped years after they first circulated, by boom year. Built by
+// the monthly data workflow and uploaded to R2; a copy is bundled with the
+// site as a fallback. Missing everywhere -> null.
+let backlistPromise = null;
+export function getBacklist() {
+	if (!backlistPromise) {
+		backlistPromise = (async () => {
+			for (const url of [`${DATA_BASE}/backlist.json`, `${base}/backlist.json`]) {
+				try {
+					const r = await fetch(url);
+					if (r.ok) return await r.json();
+				} catch { /* try the next source */ }
+			}
+			return null;
+		})();
+	}
+	return backlistPromise;
+}
+
 // The "Top works" tab dataset: top-N clustered works per genre per year.
 // { years, genres, data:{ genre:{ "<year>":[[title,author,slug,co],...], "all":[...] } } }
 let topWorksPromise = null;

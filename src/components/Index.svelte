@@ -6,6 +6,8 @@
 	import TopAuthors from "$components/TopAuthors.svelte";
 	import TopWorks from "$components/TopWorks.svelte";
 	import NortonExplorer from "$components/NortonExplorer.svelte";
+	import BacklistBoomers from "$components/BacklistBoomers.svelte";
+	import TrendingUp from "@lucide/svelte/icons/trending-up";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import { getMonths, getAuthor, searchTitles, searchAll, densify } from "$components/db.js";
 	import { coverUrl } from "$utils/covers.js";
@@ -149,6 +151,7 @@
 			else if (t === "publications") tab = "publications";
 			else if (t === "norton") tab = "norton";
 			else if (t === "spl500") tab = "spl500";
+			else if (t === "backlist" || t === "boomers") tab = "backlist";
 			else if (t === "overview" || t === "all") tab = "overview";
 			else tab = "home";
 		} catch {}
@@ -400,6 +403,7 @@
 				<button class="menu-link" onclick={goHome}>Home</button>
 				<button class="menu-link" onclick={goOverview}>Overview</button>
 				<button class="menu-link" onclick={() => go("rankings")}>Most Borrowed</button>
+				<button class="menu-link" onclick={() => go("backlist")}>Backlist Boomers</button>
 				<button class="menu-link" onclick={() => go("search")}>Search</button>
 				<button class="menu-link" onclick={() => go("genres")}>Genres</button>
 			</div>
@@ -438,6 +442,8 @@
 			{:else}
 				<TopAuthors {openAuthor} {rankKind} {setRankKind} />
 			{/if}
+		{:else if tab === "backlist"}
+			<BacklistBoomers {openAuthor} {openTitle} />
 		{:else if tab === "home"}
 			<header class="hero">
 				<div class="hero-title">
@@ -463,6 +469,12 @@
 					<img class="hub-emoji hub-img" src="{base}/hub-borrowed.png" alt="" width="34" height="34" />
 					<span class="hub-h">Most Borrowed</span>
 					<span class="hub-d">The books and authors checked out most — all-time and year by year, by genre.</span>
+					<span class="hub-go">Explore →</span>
+				</button>
+				<button class="hub-card" onclick={() => go("backlist")}>
+					<span class="hub-emoji hub-lucide" aria-hidden="true"><TrendingUp size={32} strokeWidth={2.2} /></span>
+					<span class="hub-h">Backlist Boomers</span>
+					<span class="hub-d">Books that sat quietly for years, then suddenly took off — adaptations, BookTok, the news.</span>
 					<span class="hub-go">Explore →</span>
 				</button>
 				<button class="hub-card" onclick={() => go("genres")}>
@@ -843,6 +855,8 @@
 		grid-template-columns: repeat(2, 1fr);
 		gap: 16px;
 	}
+	/* With an odd number of cards, let the last one span the row. */
+	.hub-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
 	@media (max-width: 620px) {
 		.hub { grid-template-columns: 1fr; }
 	}
@@ -866,6 +880,7 @@
 		transform: translateY(-2px);
 	}
 	.hub-emoji { font-size: 1.7rem; line-height: 1; }
+	.hub-lucide { display: inline-flex; color: #e3120b; }
 	.hub-img { width: 2rem; height: 2rem; object-fit: contain; }
 	.hub-icons { display: inline-flex; align-items: center; gap: 0.35rem; }
 	.hub-img-sm { width: 1.4rem; height: 1.4rem; }
