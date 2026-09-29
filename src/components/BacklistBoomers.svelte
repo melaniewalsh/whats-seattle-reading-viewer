@@ -74,7 +74,7 @@
 
 <header class="rank-masthead">
 	<h2 class="rank-title">Backlist Boomers</h2>
-	<p class="rank-sub">Books that had a quiet, settled readership at the Seattle Public Library and then, years later, suddenly took off.</p>
+	<p class="rank-sub">Books that became popular long after their debut.</p>
 </header>
 
 {#if loading}
