@@ -1,0 +1,85 @@
+name: Refresh derived indexes (title search + Backlist Boomerangs)
+
+# Rebuilds the small files that are DERIVED from the per-author data --
+# title-index.json (the "By title" search) and backlist.json (Backlist
+# Boomerangs) -- from the latest monthly data snapshot (the data-YYYY-MM GitHub
+# Release that build-data-to-r2.yml publishes), and uploads them to R2.
+#
+# Use it after changing data-prep/build_title_index.py or build_backlist.py, so
+# the fix goes live in a few minutes instead of waiting for (or re-running) the
+# ~3-hour full data build. The monthly build regenerates both files anyway.
+#
+# TRIGGER: manual only.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # push the refreshed bundled static/backlist.json
+
+env:
+  R2_DB_BUCKET: spl-checkouts-public
+  R2_ENDPOINT_URL: https://dd55a988a4598a3425259692fe6f7ba1.r2.cloudflarestorage.com
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install python-dotenv
+
+      - name: Download the latest data snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(gh release list --limit 20 --json tagName --jq '[.[] | select(.tagName | startswith("data-"))][0].tagName')
+          echo "snapshot: $TAG"
+          gh release download "$TAG" --pattern "*.tar.gz" --dir /tmp/snap
+          tar xzf /tmp/snap/*.tar.gz -C static
+          echo "author files: $(find static/data/authors -type f | wc -l)"
+          python3 -c "import json; m=json.load(open('static/data/meta.json'))['months']; print('months', m[0], '..', m[-1])"
+
+      - name: Rebuild title index and Backlist Boomerangs
+        run: |
+          TITLE_MIN_CHECKOUTS=500 python3 data-prep/build_title_index.py
+          python3 data-prep/build_backlist.py
+
+      - name: Upload to the public R2 bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          # Same treatment as build-data-to-r2.yml: the title index is stored
+          # gzipped with Content-Encoding so browsers decompress it transparently.
+          gzip -9 -c static/data/title-index.json > /tmp/title-index.json.gz
+          aws s3 cp /tmp/title-index.json.gz "s3://${R2_DB_BUCKET}/title-index.json" \
+            --endpoint-url "$R2_ENDPOINT_URL" --content-type application/json \
+            --content-encoding gzip --only-show-errors
+          aws s3 cp static/data/backlist.json "s3://${R2_DB_BUCKET}/backlist.json" \
+            --endpoint-url "$R2_ENDPOINT_URL" --content-type application/json \
+            --only-show-errors
+          echo "uploaded title-index.json and backlist.json"
+
+      - name: Commit refreshed bundled backlist.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add static/backlist.json
+          if git diff --cached --quiet; then
+            echo "backlist.json unchanged -- nothing to commit"
+          else
+            git commit -m "CI: refresh backlist.json"
+            for i in 1 2 3; do
+              if git pull --rebase -X theirs origin ${{ github.ref_name }} \
+                 && git push origin HEAD:${{ github.ref_name }}; then
+                break
+              fi
+              git rebase --abort 2>/dev/null || true
+              echo "push race, retry $i" && sleep 3
+            done
+          fi
