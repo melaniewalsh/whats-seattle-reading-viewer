@@ -7,9 +7,10 @@ news event.
 For every work (an author's editions clustered with the same normalize_work_key
 the site uses), look at each calendar year that is at least MIN_AGE_YEARS after
 the work's first checkout and compare that year's mean monthly checkouts with
-the mean of the preceding BASELINE_MONTHS (skipping the COVID closure / lost-
-tracking months, which would otherwise make 2021 look like a comeback for
-everything). The work is a "boomer" in the year of its biggest jump if
+the mean of the preceding BASELINE_MONTHS, skipping the months when checkouts
+were artificially low library-wide -- the 2020 COVID closures and the May-July
+2024 ransomware outage -- which would otherwise make the following year look
+like a comeback for everything. The work is a "boomer" in the year of its biggest jump if
 
     peak_mean - base_mean >= MIN_DELTA   (checkouts per month)
     peak_mean >= MIN_RATIO * base_mean
@@ -48,7 +49,10 @@ MIN_RATIO = float(os.environ.get("BACKLIST_MIN_RATIO", 5))      # peak mean vs b
 MIN_PEAK_TOTAL = 150      # checkouts in the boom year
 MIN_AGE_YEARS = 3         # the boom must come >= 3 calendar years after the first checkout
 BASELINE_MONTHS = 24
-COVID_LO, COVID_HI = "2020-03", "2021-06"   # branch closures + the tracking gap
+# Months skipped in both the baseline and the boom-year mean: the 2020 branch
+# closures / tracking gap, and the 2024 ransomware outage (May-July 2024, when
+# recorded checkouts fell to a fraction of normal).
+SKIP_RANGES = [("2020-03", "2021-06"), ("2024-05", "2024-07")]
 PER_YEAR = 100            # keep the top N per boom year
 
 # The site's work clustering lives in build_data.py, which imports duckdb/dotenv
@@ -70,7 +74,7 @@ from build_data import normalize_work_key, clean_title_for_display  # noqa: E402
 months = json.load(open(DATA_DIR / "meta.json"))["months"]
 N = len(months)
 YEAR = [int(m[:4]) for m in months]
-COVID = {i for i, m in enumerate(months) if COVID_LO <= m <= COVID_HI}
+SKIP = {i for i, m in enumerate(months) if any(lo <= m <= hi for lo, hi in SKIP_RANGES)}
 YEAR_IDX = defaultdict(list)
 for i, y in enumerate(YEAR):
     YEAR_IDX[y].append(i)
@@ -104,14 +108,16 @@ def analyze(path):
         best = None
         for y in range(first_year + MIN_AGE_YEARS, LAST_FULL_YEAR + 1):
             idx = YEAR_IDX[y]
-            # The BASELINE_MONTHS most recent non-COVID months before the year
-            # (reaching further back when the closure gap is in the way, so 2022
-            # still gets a pre-pandemic baseline).
-            base_idx = [i for i in range(idx[0] - 1, -1, -1) if i not in COVID][:BASELINE_MONTHS]
-            if len(base_idx) < 12:
+            # The BASELINE_MONTHS most recent non-skipped months before the year
+            # (reaching further back when a gap is in the way, so 2022 still gets
+            # a pre-pandemic baseline). The boom year's mean also leaves out the
+            # skipped months, so 2024's rate isn't dragged down by the outage.
+            base_idx = [i for i in range(idx[0] - 1, -1, -1) if i not in SKIP][:BASELINE_MONTHS]
+            cur_idx = [i for i in idx if i not in SKIP]
+            if len(base_idx) < 12 or len(cur_idx) < 6:
                 continue
             base = statistics.mean(s[i] for i in base_idx)
-            cur = statistics.mean(s[i] for i in idx)
+            cur = statistics.mean(s[i] for i in cur_idx)
             delta = cur - base
             if delta >= MIN_DELTA and cur >= MIN_RATIO * max(base, 0.5) and sum(s[i] for i in idx) >= MIN_PEAK_TOTAL:
                 if best is None or delta > best[0]:
@@ -155,7 +161,7 @@ def main():
         "years": sorted(by_year),
         "rules": {"minDelta": MIN_DELTA, "minRatio": MIN_RATIO, "minPeakTotal": MIN_PEAK_TOTAL,
                   "minAgeYears": MIN_AGE_YEARS, "baselineMonths": BASELINE_MONTHS,
-                  "covidSkipped": [COVID_LO, COVID_HI]},
+                  "skipped": SKIP_RANGES},
         "data": data,
     }
     text = json.dumps(out, separators=(",", ":"), ensure_ascii=False)
