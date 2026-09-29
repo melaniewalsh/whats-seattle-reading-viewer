@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-"Backlist Boomers": works that had a modest, settled readership and then, years
+"Backlist Boomerangs": works that had a modest, settled readership and then, years
 later, suddenly took off -- an adaptation, a BookTok wave, an author's death, a
 news event.
 
@@ -47,7 +47,7 @@ OUT_STATIC = PROJECT / "static" / "backlist.json"
 MIN_DELTA = float(os.environ.get("BACKLIST_MIN_DELTA", 10))     # checkouts / month
 MIN_RATIO = float(os.environ.get("BACKLIST_MIN_RATIO", 5))      # peak mean vs baseline mean
 MIN_PEAK_TOTAL = 150      # checkouts in the boom year
-MIN_AGE_YEARS = 3         # the boom must come >= 3 calendar years after the first checkout
+MIN_AGE_YEARS = 2         # the boom must come >= 2 calendar years after the first checkout
 BASELINE_MONTHS = 24
 # Months skipped in both the baseline and the boom-year mean: the 2020 branch
 # closures / tracking gap, and the 2024 ransomware outage (May-July 2024, when
@@ -126,6 +126,11 @@ def analyze(path):
             continue
         delta, y, base, cur = best
         yearly = [[yy, sum(s[i] for i in YEAR_IDX[yy])] for yy in sorted(YEAR_IDX)]
+        # Monthly rate in the year it was first borrowed, counting from the
+        # first checkout month (so a December debut isn't averaged over 11
+        # empty months). Shown as "N x more than when first borrowed in YYYY".
+        first_months = [i for i in YEAR_IDX[first_year] if i >= first]
+        first_rate = statistics.mean(s[i] for i in first_months) if first_months else 0
         out.append({
             "t": clean_title_for_display(best_title[k][0]) or best_title[k][0],
             "a": d.get("name", ""),
@@ -136,6 +141,8 @@ def analyze(path):
             "peak": round(cur),
             "delta": round(delta),
             "ratio": round(cur / max(base, 0.5), 1),
+            "firstRate": round(first_rate, 1),
+            "firstRatio": round(cur / max(first_rate, 0.5), 1),
             "total": sum(s),
             "yr": yearly,
         })

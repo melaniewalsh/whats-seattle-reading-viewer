@@ -6,7 +6,7 @@
 	import TopAuthors from "$components/TopAuthors.svelte";
 	import TopWorks from "$components/TopWorks.svelte";
 	import NortonExplorer from "$components/NortonExplorer.svelte";
-	import BacklistBoomers from "$components/BacklistBoomers.svelte";
+	import BacklistBoomerangs from "$components/BacklistBoomerangs.svelte";
 	import TrendingUp from "@lucide/svelte/icons/trending-up";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import { getMonths, getAuthor, searchTitles, searchAll, densify } from "$components/db.js";
@@ -151,7 +151,7 @@
 			else if (t === "publications") tab = "publications";
 			else if (t === "norton") tab = "norton";
 			else if (t === "spl500") tab = "spl500";
-			else if (t === "backlist" || t === "boomers") tab = "backlist";
+			else if (t === "backlist" || t === "boomers" || t === "boomerangs") tab = "backlist";
 			else if (t === "overview" || t === "all") tab = "overview";
 			else tab = "home";
 		} catch {}
@@ -403,7 +403,7 @@
 				<button class="menu-link" onclick={goHome}>Home</button>
 				<button class="menu-link" onclick={goOverview}>Overview</button>
 				<button class="menu-link" onclick={() => go("rankings")}>Most Borrowed</button>
-				<button class="menu-link" onclick={() => go("backlist")}>Backlist Boomers</button>
+				<button class="menu-link" onclick={() => go("backlist")}>Backlist Boomerangs</button>
 				<button class="menu-link" onclick={() => go("search")}>Search</button>
 				<button class="menu-link" onclick={() => go("genres")}>Genres</button>
 			</div>
@@ -443,7 +443,7 @@
 				<TopAuthors {openAuthor} {rankKind} {setRankKind} />
 			{/if}
 		{:else if tab === "backlist"}
-			<BacklistBoomers {openAuthor} {openTitle} />
+			<BacklistBoomerangs {openAuthor} {openTitle} />
 		{:else if tab === "home"}
 			<header class="hero">
 				<div class="hero-title">
@@ -473,7 +473,7 @@
 				</button>
 				<button class="hub-card" onclick={() => go("backlist")}>
 					<span class="hub-emoji hub-lucide" aria-hidden="true"><TrendingUp size={32} strokeWidth={2.2} /></span>
-					<span class="hub-h">Backlist Boomers</span>
+					<span class="hub-h">Backlist Boomerangs</span>
 					<span class="hub-d">Books that sat quietly for years, then suddenly took off — adaptations, BookTok, the news.</span>
 					<span class="hub-go">Explore →</span>
 				</button>

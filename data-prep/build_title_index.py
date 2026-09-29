@@ -50,7 +50,7 @@ def main():
         author = d.get("name", "")
         for t in d.get("titles", []):
             tot = int(t.get("total", 0) or 0)
-            if tot < THRESHOLD:
+            if tot <= 0:
                 continue
             disp = clean(t.get("title", ""))
             if not disp:
@@ -60,7 +60,11 @@ def main():
             e["total"] += tot
             if e["best"] is None or tot > e["best"][0]:
                 e["best"] = (tot, disp, slug, author)
-    rows = [[e["best"][1], e["best"][2], e["best"][3], e["total"]] for e in agg.values()]
+    # Apply the threshold to the MERGED total, not per edition: a book whose
+    # checkouts are split across print / ebook / audiobook (e.g. 317 + 201 + 161
+    # + 88) must still be searchable even if no single edition reaches it.
+    rows = [[e["best"][1], e["best"][2], e["best"][3], e["total"]]
+            for e in agg.values() if e["total"] >= THRESHOLD]
     rows.sort(key=lambda r: -r[3])
     OUT.write_text(json.dumps(rows, separators=(",", ":")))
     print(f"Wrote {OUT}: {len(rows):,} titles (>= {THRESHOLD} checkouts), "

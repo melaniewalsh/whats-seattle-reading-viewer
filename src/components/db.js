@@ -47,7 +47,7 @@ export function getTopAuthors() {
 	return topAuthorsPromise;
 }
 
-// The "Backlist Boomers" dataset (data-prep/build_backlist.py): works whose
+// The "Backlist Boomerangs" dataset (data-prep/build_backlist.py): works whose
 // checkouts jumped years after they first circulated, by boom year. Built by
 // the monthly data workflow and uploaded to R2; a copy is bundled with the
 // site as a fallback. Missing everywhere -> null.

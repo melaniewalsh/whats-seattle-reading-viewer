@@ -1,6 +1,6 @@
 <script>
-	// BacklistBoomers.svelte
-	// =====================
+	// BacklistBoomerangs.svelte
+	// ========================
 	// Books that had a quiet, settled readership at SPL and then, years later,
 	// suddenly took off -- an adaptation, a BookTok wave, an author's death, a
 	// news event. The list is precomputed by data-prep/build_backlist.py (see
@@ -11,6 +11,7 @@
 	import { displayName } from "$utils/displayName.js";
 	import { titleCase } from "$utils/titleCase.js";
 	import { compactNumber } from "$utils/format.js";
+	import { coverUrl, coverOverride } from "$utils/covers.js";
 
 	let { openAuthor = () => {}, openTitle = () => {} } = $props();
 
@@ -29,6 +30,21 @@
 	});
 
 	const rows = $derived(data && year ? data.data[String(year)] || [] : []);
+
+	// Covers: a hand-picked override if there is one, else Open Library (cached
+	// in localStorage by covers.js). Resolved lazily for the rows on screen.
+	let covers = $state({});
+	const coverKey = (r) => `${r.t}|${r.s}`;
+	$effect(() => {
+		for (const r of rows) {
+			const k = coverKey(r);
+			if (k in covers) continue;
+			covers[k] = null;
+			const ov = coverOverride(r.t);
+			if (ov) { covers[k] = ov; continue; }
+			coverUrl(r.t, displayName(r.a)).then((u) => { covers[k] = u || null; }).catch(() => {});
+		}
+	});
 	const yearIdx = $derived(data ? data.years.indexOf(year) : -1);
 	const rules = $derived(data?.rules || {});
 
@@ -55,8 +71,8 @@
 	const fmtRate = (n) => (n < 10 ? Number(n).toFixed(1) : Math.round(n).toLocaleString());
 	const fmtRatio = (x) => (x >= 100 ? `${Math.round(x)}×` : `${Number(x).toFixed(x >= 10 ? 0 : 1)}×`);
 
-	// Tiny bar chart of the work's yearly totals, boom year highlighted.
-	const SPARK_W = 132, SPARK_H = 30;
+	// Small bar chart of the work's yearly totals, boom year highlighted.
+	const SPARK_W = 180, SPARK_H = 46;
 	function spark(r) {
 		const yrs = r.yr || [];
 		const max = Math.max(1, ...yrs.map((d) => d[1]));
@@ -73,8 +89,8 @@
 </script>
 
 <header class="rank-masthead">
-	<h2 class="rank-title">Backlist Boomers</h2>
-	<p class="rank-sub">Books that became popular long after their debut.</p>
+	<h2 class="rank-title">Backlist Boomerangs</h2>
+	<p class="rank-sub">Books that became popular again or for the first time, typically years after their debut.</p>
 </header>
 
 {#if loading}
@@ -109,22 +125,26 @@
 		{#each rows as r, i (r.s + r.t)}
 			<li class="bb-row">
 				<span class="bb-rank">{i + 1}</span>
-				<svg class="bb-spark" viewBox="0 0 {SPARK_W} {SPARK_H}" width={SPARK_W} height={SPARK_H} aria-hidden="true">
+				<button class="bb-cover" class:has-img={!!covers[coverKey(r)]} onclick={() => open(r)} aria-label="See the trend for {titleCase(r.t)}">
+					{#if covers[coverKey(r)]}
+						<img src={covers[coverKey(r)]} alt="" loading="lazy" />
+					{/if}
+				</button>
+				<div class="bb-main">
+					<button class="bb-title" onclick={() => open(r)}>{titleCase(r.t)}</button>
+					<span class="bb-by">by <button class="bb-author" onclick={() => openAuthor(r.s)}>{displayName(r.a)}</button></span>
+					<p class="bb-stats">
+						Average checkouts per month in {r.year} were <strong>{fmtRate(r.peak)}</strong>—<span class="bb-ratio">{fmtRatio(r.ratio)}</span> more than the two years before.
+						First borrowed in {r.first} · {compactNumber(r.total)} all-time
+					</p>
+				</div>
+				<svg class="bb-spark" viewBox="0 0 {SPARK_W} {SPARK_H}" width={SPARK_W} height={SPARK_H} role="img" aria-label="Checkouts per year, {r.yr[0]?.[0]}–{r.yr[r.yr.length - 1]?.[0]}">
 					{#each spark(r) as b}
 						<rect x={b.x} y={SPARK_H - b.h} width={b.w} height={b.h} class:boom={b.boom}>
 							<title>{b.year}: {b.v.toLocaleString()} checkouts</title>
 						</rect>
 					{/each}
 				</svg>
-				<div class="bb-main">
-					<button class="bb-title" onclick={() => open(r)}>{titleCase(r.t)}</button>
-					<span class="bb-by">by <button class="bb-author" onclick={() => openAuthor(r.s)}>{displayName(r.a)}</button></span>
-					<div class="bb-stats">
-						<span class="bb-jump">{fmtRate(r.base)} → <strong>{fmtRate(r.peak)}</strong> checkouts a month</span>
-						<span class="bb-ratio">{fmtRatio(r.ratio)}</span>
-						<span class="bb-first">first borrowed {r.first} · {compactNumber(r.total)} all-time</span>
-					</div>
-				</div>
 			</li>
 		{/each}
 	</ol>
@@ -239,8 +259,8 @@
 	}
 	.bb-row {
 		display: grid;
-		grid-template-columns: 2.2rem 132px 1fr;
-		gap: 14px;
+		grid-template-columns: 2rem 54px 1fr 180px;
+		gap: 16px;
 		align-items: center;
 		padding: 12px 0;
 		border-bottom: 1px solid var(--color-border);
@@ -253,7 +273,20 @@
 		color: var(--color-fg-light);
 		text-align: right;
 	}
-	.bb-spark { display: block; }
+	.bb-cover {
+		width: 54px;
+		aspect-ratio: 2 / 3;
+		padding: 0;
+		border: none;
+		border-radius: 3px;
+		overflow: hidden;
+		background: var(--color-gray-100, #eef0f3);
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+		cursor: pointer;
+	}
+	.bb-cover:hover { box-shadow: 0 3px 10px rgba(0, 0, 0, 0.26); }
+	.bb-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+	.bb-spark { display: block; justify-self: end; }
 	.bb-spark rect { fill: #c9d6e6; }
 	.bb-spark rect.boom { fill: #e3120b; }
 	.bb-main { min-width: 0; }
@@ -281,14 +314,12 @@
 	}
 	.bb-author:hover { color: #3f88cc; text-decoration: underline; }
 	.bb-stats {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px 12px;
-		margin-top: 4px;
+		margin: 4px 0 0;
 		font-size: var(--text-sm);
+		line-height: 1.45;
 		color: var(--color-fg-light);
 	}
-	.bb-jump strong { color: var(--color-fg); }
+	.bb-stats strong { color: var(--color-fg); }
 	.bb-ratio {
 		font-weight: 700;
 		color: #e3120b;
@@ -302,9 +333,9 @@
 	}
 	.bb-method summary { cursor: pointer; font-weight: 700; color: var(--color-fg); }
 	.bb-method p { margin: 8px 0 0; }
-	@media (max-width: 560px) {
-		.bb-row { grid-template-columns: 1.6rem 1fr; }
-		.bb-spark { grid-column: 2; order: 3; width: 100%; height: 24px; }
-		.bb-main { grid-column: 2; }
+	@media (max-width: 640px) {
+		.bb-row { grid-template-columns: 1.4rem 46px 1fr; gap: 12px; align-items: start; }
+		.bb-cover { width: 46px; }
+		.bb-spark { grid-column: 2 / -1; justify-self: stretch; width: 100%; height: 34px; }
 	}
 </style>
