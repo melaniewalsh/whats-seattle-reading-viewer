@@ -132,6 +132,8 @@ jobs:
           # first circulated (data-prep/build_backlist.py). ~10 s. Writes
           # static/data/backlist.json (-> R2) and static/backlist.json (bundled).
           python3 data-prep/build_backlist.py
+          # Copy its cover thumbnails to R2 (see data-prep/host_covers.py).
+          python3 data-prep/host_covers.py
 
       # Keep the bundled fallback copy of the overview current in the repo so
       # the next Pages deploy ships it too.
@@ -183,6 +185,15 @@ jobs:
           # and high concurrency. `sync` mirrors the build, dropping files for
           # authors that were merged/removed; we exclude the separately-uploaded
           # search index and keep the old library.sqlite3 warm fallback.
+          # Backlist Boomerangs cover thumbnails (data-prep/host_covers.py). They
+          # live OUTSIDE static/data, and covers/** is excluded from the sync
+          # below, so the mirror never deletes previously hosted thumbnails.
+          if [ -d static/cover-thumbs ] && [ -n "$(ls -A static/cover-thumbs)" ]; then
+            aws s3 cp static/cover-thumbs/ "s3://${R2_DB_BUCKET}/covers/" --recursive \
+              --endpoint-url "$R2_ENDPOINT_URL" --content-type image/jpeg \
+              --cache-control "public, max-age=31536000, immutable" --only-show-errors
+          fi
+
           curl -fsSL https://rclone.org/install.sh | sudo bash
           export RCLONE_CONFIG_R2_TYPE=s3
           export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
@@ -194,6 +205,7 @@ jobs:
             --exclude "search-index.json" \
             --exclude "title-index.json" \
             --exclude "library.sqlite3" \
+            --exclude "covers/**" \
             --stats 30s --stats-one-line
           echo "Uploaded meta.json + search-index.json + author files to r2://${R2_DB_BUCKET}/"
 

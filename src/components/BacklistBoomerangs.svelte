@@ -143,7 +143,7 @@
 				<span class="bb-rank">{i + 1}</span>
 				<button class="bb-cover" class:has-img={!!covers[coverKey(r)]} onclick={() => open(r)} aria-label="See the trend for {titleCase(r.t)}">
 					{#if covers[coverKey(r)]}
-						<img src={covers[coverKey(r)]} alt="" loading="lazy" />
+						<img src={covers[coverKey(r)]} alt="" loading="lazy" decoding="async" width="54" height="81" />
 					{/if}
 				</button>
 				<div class="bb-main">

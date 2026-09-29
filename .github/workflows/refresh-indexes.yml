@@ -49,6 +49,8 @@ jobs:
         run: |
           TITLE_MIN_CHECKOUTS=500 python3 data-prep/build_title_index.py
           python3 data-prep/build_backlist.py
+          # Copy cover thumbnails to R2 (Open Library's image server is slow).
+          python3 data-prep/host_covers.py
 
       - name: Upload to the public R2 bucket
         env:
@@ -61,6 +63,14 @@ jobs:
           aws s3 cp /tmp/title-index.json.gz "s3://${R2_DB_BUCKET}/title-index.json" \
             --endpoint-url "$R2_ENDPOINT_URL" --content-type application/json \
             --content-encoding gzip --only-show-errors
+          # Cover thumbnails first (immutable: a cover id's image never changes),
+          # so backlist.json never points at a file that isn't there yet.
+          if [ -d static/cover-thumbs ] && [ -n "$(ls -A static/cover-thumbs)" ]; then
+            aws s3 cp static/cover-thumbs/ "s3://${R2_DB_BUCKET}/covers/" --recursive \
+              --endpoint-url "$R2_ENDPOINT_URL" --content-type image/jpeg \
+              --cache-control "public, max-age=31536000, immutable" --only-show-errors
+            echo "uploaded $(ls static/cover-thumbs | wc -l) cover thumbnails"
+          fi
           aws s3 cp static/data/backlist.json "s3://${R2_DB_BUCKET}/backlist.json" \
             --endpoint-url "$R2_ENDPOINT_URL" --content-type application/json \
             --only-show-errors
