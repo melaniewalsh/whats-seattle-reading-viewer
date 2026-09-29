@@ -25,6 +25,14 @@ import { base } from '$app/paths';
 const R2_BASE = 'https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev';
 const DATA_BASE = import.meta.env.PROD ? R2_BASE : `${base}/data`;
 
+// The index files (month axis, search indexes, rankings, overview, Backlist
+// Boomerangs) are replaced in place every month. R2 serves them with no
+// Cache-Control header, so browsers otherwise guess a freshness window from
+// Last-Modified -- often many hours -- and keep showing last month's index.
+// "no-cache" makes the browser revalidate with the ETag on every load: a
+// ~100-byte 304 when nothing changed, the new file when it did.
+const FRESH = { cache: 'no-cache' };
+
 // authors/<shard>/<slug>.json, where <shard> is the first two slug chars --
 // must match write_author_files() in build_data.py.
 function shardFor(slug) {
@@ -40,7 +48,7 @@ let monthsPromise = null;
 let topAuthorsPromise = null;
 export function getTopAuthors() {
 	if (!topAuthorsPromise) {
-		topAuthorsPromise = fetch(`${DATA_BASE}/top-authors.json`)
+		topAuthorsPromise = fetch(`${DATA_BASE}/top-authors.json`, FRESH)
 			.then((r) => (r.ok ? r.json() : null))
 			.catch(() => null);
 	}
@@ -57,7 +65,7 @@ export function getBacklist() {
 		backlistPromise = (async () => {
 			for (const url of [`${DATA_BASE}/backlist.json`, `${base}/backlist.json`]) {
 				try {
-					const r = await fetch(url);
+					const r = await fetch(url, FRESH);
 					if (r.ok) return await r.json();
 				} catch { /* try the next source */ }
 			}
@@ -72,7 +80,7 @@ export function getBacklist() {
 let topWorksPromise = null;
 export function getTopWorks() {
 	if (!topWorksPromise) {
-		topWorksPromise = fetch(`${DATA_BASE}/top-works.json`)
+		topWorksPromise = fetch(`${DATA_BASE}/top-works.json`, FRESH)
 			.then((r) => (r.ok ? r.json() : null))
 			.catch(() => null);
 	}
@@ -84,7 +92,7 @@ export function getTopWorks() {
 let genreTermsPromise = null;
 export function getGenreTerms() {
 	if (!genreTermsPromise) {
-		genreTermsPromise = fetch(`${base}/genres.json`)
+		genreTermsPromise = fetch(`${base}/genres.json`, FRESH)
 			.then((r) => (r.ok ? r.json() : null))
 			.then((g) => {
 				const m = {};
@@ -98,7 +106,7 @@ export function getGenreTerms() {
 
 export async function getMonths() {
 	if (!monthsPromise) {
-		monthsPromise = fetch(`${DATA_BASE}/meta.json`)
+		monthsPromise = fetch(`${DATA_BASE}/meta.json`, FRESH)
 			.then((r) => r.json())
 			.then((m) => m.months);
 	}
@@ -203,7 +211,7 @@ async function fetchCheckoutsLive(months, onlyMonths = null) {
 async function fetchPrecomputedOverview() {
 	for (const url of [`${DATA_BASE}/overview.json`, `${base}/overview.json`]) {
 		try {
-			const pre = await fetch(url).then((r) => (r.ok ? r.json() : null));
+			const pre = await fetch(url, FRESH).then((r) => (r.ok ? r.json() : null));
 			if (pre && Array.isArray(pre.total) && pre.total.length) return pre;
 		} catch { /* try the next source */ }
 	}
@@ -271,7 +279,7 @@ const JUNK_AUTHOR_NAMES = new Set(['', 'NA', 'N/A', 'Unknown', 'unknown', 'Vario
 let indexPromise = null;
 function getIndex() {
 	if (!indexPromise) {
-		indexPromise = fetch(`${DATA_BASE}/search-index.json`)
+		indexPromise = fetch(`${DATA_BASE}/search-index.json`, FRESH)
 			.then((r) => r.json())
 			.then((all) => {
 				const rows = all.filter((r) => !JUNK_AUTHOR_NAMES.has(r[1]));
@@ -347,7 +355,7 @@ export async function searchAuthors(query, limit = 20) {
 let titleIndexPromise = null;
 function getTitleIndex() {
 	if (!titleIndexPromise) {
-		titleIndexPromise = fetch(`${DATA_BASE}/title-index.json`)
+		titleIndexPromise = fetch(`${DATA_BASE}/title-index.json`, FRESH)
 			.then((r) => (r.ok ? r.json() : []))
 			.then((rows) => ({ rows, lower: rows.map((r) => r[0].toLowerCase()) }))
 			.catch(() => ({ rows: [], lower: [] }));
