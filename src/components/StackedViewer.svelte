@@ -1,6 +1,7 @@
 <script>
 	// StackedViewer.svelte
 	import { onMount, tick } from "svelte";
+	import { searchTitle as coreTitle } from "$utils/cleanTitle.js";
 	import ImageIcon from "@lucide/svelte/icons/image";
 	import LinkIcon from "@lucide/svelte/icons/link";
 	import ShareIcon from "@lucide/svelte/icons/share-2";
@@ -359,8 +360,11 @@
 			// the FIRST hit for "Whistler" is Grisham's "The Whistler", not
 			// Patchett's "Whistler". Prefer, in order: an exact title by the linked
 			// author, any title by that author, an exact title, then the top hit.
-			const ql = q.trim().toLowerCase();
-			const exact = (h) => (h.title || "").trim().toLowerCase() === ql;
+			// Compare core titles (subtitle after ":" stripped), so "Whistler" is an
+			// exact match for "Whistler : a novel" but not "The Whistler: A Novel".
+			const norm = (t) => coreTitle(t || "").toLowerCase();
+			const ql = norm(q);
+			const exact = (h) => norm(h.title) === ql;
 			const r = (wantAuthor && hits.find((h) => h.slug === wantAuthor && exact(h)))
 				|| (wantAuthor && hits.find((h) => h.slug === wantAuthor))
 				|| hits.find(exact)
