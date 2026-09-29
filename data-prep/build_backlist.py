@@ -30,6 +30,7 @@ Env: BACKLIST_DATA_DIR (default static/data), BACKLIST_MIN_RATIO, BACKLIST_MIN_D
 """
 import json
 import os
+import re
 import sys
 import glob
 import types
@@ -48,6 +49,10 @@ MIN_DELTA = float(os.environ.get("BACKLIST_MIN_DELTA", 10))     # checkouts / mo
 MIN_RATIO = float(os.environ.get("BACKLIST_MIN_RATIO", 5))      # peak mean vs baseline mean
 MIN_PEAK_TOTAL = 150      # checkouts in the boom year
 MIN_AGE_YEARS = 2         # the boom must come >= 2 calendar years after the first checkout
+# The data starts in 2006 and its first two years look incomplete (children's
+# print titles "boom" in 2008 against a thin 2006-07 baseline), so the earliest
+# boom year listed is 2009.
+EARLIEST_BOOM_YEAR = 2009
 BASELINE_MONTHS = 24
 # Months skipped in both the baseline and the boom-year mean: the 2020 branch
 # closures / tracking gap, and the 2024 ransomware outage (May-July 2024, when
@@ -69,7 +74,7 @@ try:
     import dotenv  # noqa: F401
 except ImportError:
     _d = types.ModuleType("dotenv"); _d.load_dotenv = lambda *a, **k: None; sys.modules["dotenv"] = _d
-from build_data import normalize_work_key, clean_title_for_display  # noqa: E402
+from build_data import normalize_work_key, clean_title_for_display, _resolve_ol_cover  # noqa: E402
 
 months = json.load(open(DATA_DIR / "meta.json"))["months"]
 N = len(months)
@@ -106,7 +111,7 @@ def analyze(path):
             continue
         first_year = YEAR[first]
         best = None
-        for y in range(first_year + MIN_AGE_YEARS, LAST_FULL_YEAR + 1):
+        for y in range(max(first_year + MIN_AGE_YEARS, EARLIEST_BOOM_YEAR), LAST_FULL_YEAR + 1):
             idx = YEAR_IDX[y]
             # The BASELINE_MONTHS most recent non-skipped months before the year
             # (reaching further back when a gap is in the way, so 2022 still gets
@@ -149,6 +154,64 @@ def analyze(path):
     return out
 
 
+def _cover_key(title, slug):
+    return (normalize_work_key(title), slug)
+
+
+def _plain_author(name):
+    """'emily bronte, 1818' -> 'emily bronte' (Open Library search chokes on dates)."""
+    return re.sub(r",?\s*\d{4}.*$", "", name or "").strip()
+
+
+def bake_covers(rows):
+    """Attach a cover URL ("c") to every listed work, so the page doesn't have to
+    fire a burst of Open Library searches (which get throttled: most of them
+    failed and the lower rows showed no cover). Reuse, in order: last run's
+    backlist.json, the covers Most Borrowed already baked into top-works.json,
+    then resolve the rest via Open Library with the same matcher Most Borrowed
+    uses (build_data._resolve_ol_cover), 5 at a time."""
+    known = {}
+    for path in (DATA_DIR / "top-works.json",):
+        try:
+            tw = json.loads(path.read_text())
+            for years in tw.get("data", {}).values():
+                for lst in years.values():
+                    for r in lst:
+                        if len(r) > 4 and r[4]:
+                            known.setdefault(_cover_key(r[0], r[2]), r[4])
+        except Exception:
+            pass
+    for path in (OUT_DATA, OUT_STATIC):
+        try:
+            prev = json.loads(path.read_text())
+            for lst in prev.get("data", {}).values():
+                for r in lst:
+                    if r.get("c"):
+                        known.setdefault(_cover_key(r["t"], r["s"]), r["c"])
+        except Exception:
+            pass
+    todo = {}
+    for r in rows:
+        k = _cover_key(r["t"], r["s"])
+        if known.get(k):
+            r["c"] = known[k]
+        else:
+            todo.setdefault(k, (r["t"], _plain_author(r["a"])))
+    print(f"covers: {len(rows) - sum(1 for r in rows if _cover_key(r['t'], r['s']) in todo)} reused, "
+          f"{len(todo)} to look up on Open Library", flush=True)
+    found = {}
+    if todo:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=5) as ex:
+            for k, url in zip(todo, ex.map(lambda ta: _resolve_ol_cover(*ta), todo.values())):
+                found[k] = url
+    for r in rows:
+        k = _cover_key(r["t"], r["s"])
+        if "c" not in r:
+            r["c"] = found.get(k)
+    print(f"covers: {sum(1 for r in rows if r.get('c'))}/{len(rows)} works have one", flush=True)
+
+
 def main():
     files = glob.glob(str(DATA_DIR / "authors" / "*" / "*.json"))
     print(f"scanning {len(files):,} author files in {DATA_DIR} (months through {months[-1]})")
@@ -163,10 +226,13 @@ def main():
     for y in sorted(by_year):
         lst = sorted(by_year[y], key=lambda r: -r["delta"])[:PER_YEAR]
         data[str(y)] = lst
+    if os.environ.get("BACKLIST_SKIP_COVERS") != "1":
+        bake_covers([r for lst in data.values() for r in lst])
     out = {
         "through": months[-1],
         "years": sorted(by_year),
         "rules": {"minDelta": MIN_DELTA, "minRatio": MIN_RATIO, "minPeakTotal": MIN_PEAK_TOTAL,
+                  "earliestBoomYear": EARLIEST_BOOM_YEAR,
                   "minAgeYears": MIN_AGE_YEARS, "baselineMonths": BASELINE_MONTHS,
                   "skipped": SKIP_RANGES},
         "data": data,

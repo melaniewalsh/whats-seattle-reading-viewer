@@ -31,19 +31,35 @@
 
 	const rows = $derived(data && year ? data.data[String(year)] || [] : []);
 
-	// Covers: a hand-picked override if there is one, else Open Library (cached
-	// in localStorage by covers.js). Resolved lazily for the rows on screen.
+	// Covers: a hand-picked override if there is one, else the cover baked into
+	// backlist.json at build time (r.c). Only works the build couldn't match fall
+	// back to a live Open Library lookup, two at a time -- firing them all at once
+	// got most of them throttled, which left the lower rows without covers.
 	let covers = $state({});
 	const coverKey = (r) => `${r.t}|${r.s}`;
+	let queue = [];
+	let active = 0;
+	function pump() {
+		while (active < 2 && queue.length) {
+			const r = queue.shift();
+			const k = coverKey(r);
+			active++;
+			coverUrl(r.t, displayName(r.a))
+				.then((u) => { covers[k] = u || null; })
+				.catch(() => {})
+				.finally(() => { active--; pump(); });
+		}
+	}
 	$effect(() => {
+		queue = [];
 		for (const r of rows) {
 			const k = coverKey(r);
 			if (k in covers) continue;
-			covers[k] = null;
-			const ov = coverOverride(r.t);
-			if (ov) { covers[k] = ov; continue; }
-			coverUrl(r.t, displayName(r.a)).then((u) => { covers[k] = u || null; }).catch(() => {});
+			const ov = coverOverride(r.t) || r.c;
+			covers[k] = ov || null;
+			if (!ov) queue.push(r);
 		}
+		pump();
 	});
 	const yearIdx = $derived(data ? data.years.indexOf(year) : -1);
 	const rules = $derived(data?.rules || {});
