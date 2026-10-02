@@ -4612,7 +4612,7 @@
 	.books-more:hover { color: var(--color-fg); }
 	/* per-book trend line, inside the checkouts cell */
 	.work-header .tt-count { display: inline-flex; align-items: center; justify-content: flex-end; gap: 10px; white-space: nowrap; }
-	.row-spark { flex: none; display: block; }
+	.work-header .tt-count .row-spark { flex: none; display: block; width: 78px; height: 18px; max-width: none; }
 	/* view mode: the table is part of the page, not its own scroll box */
 	.split-side .title-table.flow { max-height: none; overflow: visible; border: 0; border-top: 1px solid var(--color-border); border-radius: 0; }
 	.row-spark path { fill: none; stroke-width: 1.5; stroke-linejoin: round; }
