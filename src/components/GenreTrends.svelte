@@ -681,7 +681,8 @@
 	.bk-btn { font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; padding: 7px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white); color: var(--color-fg); cursor: pointer; white-space: nowrap; }
 	.bk-btn:hover { border-color: var(--color-fg-light); }
 	.bk-list { list-style: none; margin: 0; padding: 0; }
-	.bk-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) 84px 64px; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--color-gray-100, #eee); }
+	.bk-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) 84px 64px; gap: 12px; align-items: center; padding: 9px 8px; border-top: 1px solid var(--color-gray-100, #eee); }
+	.bk-row:not(.bk-colhead):hover { background: #f6f6f4; }
 	.bk-colhead { padding: 0 0 6px; border-top: 0; border-bottom: 1px solid var(--color-border); font-size: 12px; color: var(--color-fg-light); }
 	.bk-check { margin: 0; width: 16px; height: 16px; accent-color: var(--color-fg); appearance: auto; -webkit-appearance: auto; cursor: pointer; }
 	.bk-name-cell { min-width: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -701,11 +702,11 @@
 
 	/* Section rows: Fiction / Kids & Young Adult / Nonfiction */
 	.g-group { border-top: 1px solid var(--color-border); }
-	.g-group button { display: flex; align-items: center; gap: 6px; width: 100%; padding: 14px 0 6px; background: none; border: 0; font: inherit; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-fg); text-align: left; cursor: pointer; }
+	.g-group button { display: flex; align-items: center; gap: 6px; width: 100%; padding: 14px 8px 6px; background: none; border: 0; font: inherit; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-fg); text-align: left; cursor: pointer; }
 	.g-group .bk-count { letter-spacing: 0; }
 	.g-group .bk-caret { color: var(--color-fg-light); }
 
-	.g-detail { padding: 2px 0 12px 34px; }
+	.g-detail { padding: 10px 8px 12px 42px; background: #f8f7f3; }
 	.g-detail-terms { font-size: var(--text-sm); line-height: 1.6; color: var(--color-fg-light); margin: 0 0 8px; }
 	.g-lbl { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg-light); margin: 0 0 4px; }
 	.g-fic { color: var(--color-fg-light); }
@@ -724,6 +725,6 @@
 		.bk-row .bk-sp { display: none; }
 		.bk-filter { width: 150px; }
 		.g-ex { columns: 1; }
-		.g-detail { padding-left: 22px; }
+		.g-detail { padding-left: 30px; }
 	}
 </style>

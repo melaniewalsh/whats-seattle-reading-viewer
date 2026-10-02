@@ -4619,9 +4619,11 @@
 		grid-template-columns: 22px minmax(0, 1fr) 150px 84px 76px;
 		gap: 12px;
 		align-items: center;
-		padding: 9px 0;
+		padding: 9px 8px;
 		border-top: 1px solid var(--color-gray-100, #eee);
 	}
+	/* Hover lights the row, to help trace a title across to its numbers. */
+	.bk-book:hover { background: #f6f6f4; }
 	.bk-colhead {
 		padding: 0 0 6px;
 		border-top: 0;
@@ -4665,7 +4667,10 @@
 	.bk-num { text-align: right; font-size: var(--text-sm); font-variant-numeric: tabular-nums; color: var(--color-fg); white-space: nowrap; }
 	.bk-colhead .bk-num, .bk-colhead .bk-sp { color: var(--color-fg-light); }
 	/* editions under an open book */
-	.bk-ed { grid-template-columns: 22px minmax(0, 1fr) 76px; padding: 5px 0 5px 22px; border-top: 0; font-size: var(--text-sm); color: var(--color-fg-light); }
+	/* An open book's editions sit on a faint warm panel, so they read as
+	   belonging to that book. */
+	.bk-ed { grid-template-columns: 22px minmax(0, 1fr) 76px; padding: 5px 8px 5px 30px; border-top: 0; font-size: var(--text-sm); color: var(--color-fg-light); background: #f8f7f3; }
+	.bk-ed:hover { background: #f0efea; }
 	.bk-ed.editing { grid-template-columns: 22px minmax(0, 1fr) auto 76px; }
 	.bk-ed .bk-num { color: var(--color-fg-light); }
 	.bk-ed-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
