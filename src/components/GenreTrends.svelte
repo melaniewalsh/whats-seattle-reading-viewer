@@ -476,7 +476,30 @@
 			<div class="tb-left">
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 			</div>
-			<div class="tb-right">
+		</div>
+
+		<div class="chartwrap" bind:this={chartWrap}>
+			<LineChart months={viewMonths} series={chartSeries} mode="line" percent unit="of book checkouts"
+				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={(k) => toggleIsolate(k)} />
+		</div>
+
+		{#if series.length >= 2}
+			<div class="glegend">
+				{#each series as s (s.key)}
+					<button class="gleg-btn" class:on={isIsolated(s.key)} class:dim={isolatedKeys.length && !isIsolated(s.key)}
+							title="Show only this — click again to bring the others back" onclick={() => toggleIsolate(s.key)}
+							onmouseenter={() => (legendHoverKey = s.key)} onmouseleave={() => (legendHoverKey = null)}
+					><span class="gleg-sw" style="background:{s.color}"></span>{s.name}</button>
+				{/each}
+				{#if isolatedKeys.length}<button class="gleg-showall" onclick={() => (isolatedKeys = [])}>Show all</button>{/if}
+			</div>
+		{/if}
+
+		<YearBrush months={data.months} values={data.total} bind:lo bind:hi />
+		<!-- Source on the left; Download and Share as small links on the right -->
+		<div class="chart-foot">
+			<p class="chart-source">Source: Seattle Public Library open data. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap.</p>
+			<div class="tb-right foot-actions">
 				<div class="dl-wrap">
 					<button class="tb-btn" onclick={() => (dlOpen = !dlOpen)} aria-haspopup="true" aria-expanded={dlOpen} title="Download the data or the chart">
 						<DownloadIcon size={15} strokeWidth={2} aria-hidden="true" /> Download <ChevronDownIcon size={14} strokeWidth={2} aria-hidden="true" />
@@ -505,26 +528,6 @@
 				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 			</div>
 		</div>
-
-		<div class="chartwrap" bind:this={chartWrap}>
-			<LineChart months={viewMonths} series={chartSeries} mode="line" percent unit="of book checkouts"
-				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={(k) => toggleIsolate(k)} />
-		</div>
-
-		{#if series.length >= 2}
-			<div class="glegend">
-				{#each series as s (s.key)}
-					<button class="gleg-btn" class:on={isIsolated(s.key)} class:dim={isolatedKeys.length && !isIsolated(s.key)}
-							title="Show only this — click again to bring the others back" onclick={() => toggleIsolate(s.key)}
-							onmouseenter={() => (legendHoverKey = s.key)} onmouseleave={() => (legendHoverKey = null)}
-					><span class="gleg-sw" style="background:{s.color}"></span>{s.name}</button>
-				{/each}
-				{#if isolatedKeys.length}<button class="gleg-showall" onclick={() => (isolatedKeys = [])}>Show all</button>{/if}
-			</div>
-		{/if}
-
-		<YearBrush months={data.months} values={data.total} bind:lo bind:hi />
-		<p class="chart-source">Source: Seattle Public Library open data. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap.</p>
 
 		<!-- Genres table, styled like the author page's Books table -->
 		<section class="books">
@@ -669,7 +672,13 @@
 	.gleg-btn.on { background: var(--color-gray-100); box-shadow: inset 0 0 0 1px var(--color-border); }
 	.gleg-sw { width: 12px; height: 3px; border-radius: 2px; flex: none; }
 	.gleg-showall { border: 1px solid var(--color-border); background: var(--color-white); padding: 3px 10px; border-radius: 8px; font: inherit; color: var(--color-fg); cursor: pointer; }
-	.chart-source { font-size: 12px; color: #8a8a8a; margin: 6px 0 0; }
+	.chart-source { font-size: 12px; color: #8a8a8a; margin: 0; flex: 1 1 260px; }
+	.chart-foot { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px 16px; flex-wrap: wrap; margin: 6px 0 0; }
+	.chart-foot .foot-actions { gap: 14px; flex: none; }
+	.chart-foot .tb-btn { padding: 0; border: 0; background: none; font-size: 12px; color: #6f6f6f; gap: 4px; }
+	.chart-foot .tb-btn:hover { color: var(--color-fg); text-decoration: underline; text-underline-offset: 3px; }
+	.chart-foot .tb-btn :global(svg) { width: 13px; height: 13px; color: currentColor; }
+	@media (max-width: 640px) { .chart-foot .share-menu { left: 0; right: auto; } }
 
 	/* Genres table — same look as the author page's Books table. */
 	.books { margin: var(--space-6) 0 var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }

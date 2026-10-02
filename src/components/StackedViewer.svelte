@@ -2351,43 +2351,6 @@
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 			{/if}
 					</div>
-					<div class="tb-right">
-			<div class="chart-actions tb-actions">
-				<div class="dl-wrap">
-					<button class="tb-btn" onclick={() => (downloadOpen = !downloadOpen)} title="Download the data or the chart image" aria-haspopup="true" aria-expanded={downloadOpen}>
-						<DownloadIcon size={15} strokeWidth={2} aria-hidden="true" /> Download <ChevronDownIcon size={14} strokeWidth={2} aria-hidden="true" />
-					</button>
-					{#if downloadOpen}
-						<button class="share-backdrop" aria-label="Close download menu" onclick={() => (downloadOpen = false)}></button>
-						<div class="share-menu dl-menu" role="menu">
-							{#if !isOverview}
-								<button role="menuitem" class="share-item" onclick={() => { downloadData(); downloadOpen = false; }}>
-									<span class="share-ic dl-ic" aria-hidden="true"><TableIcon size={15} strokeWidth={2} /></span> Data <span class="dl-fmt">CSV</span>
-								</button>
-							{/if}
-							<button role="menuitem" class="share-item" onclick={() => { downloadChart(); downloadOpen = false; }}>
-								<span class="share-ic dl-ic" aria-hidden="true"><ImageIcon size={15} strokeWidth={2} /></span> Image <span class="dl-fmt">PNG</span>
-							</button>
-						</div>
-					{/if}
-				</div>
-				<div class="share-wrap">
-					<button class="tb-btn" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
-						<ShareIcon size={15} strokeWidth={2} aria-hidden="true" /> Share
-					</button>
-					{#if shareOpen}
-						<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
-						<div class="share-menu" role="menu">
-							<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true"><ImageIcon size={15} strokeWidth={2} /></span> Copy image</button>
-							<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true"><LinkIcon size={15} strokeWidth={2} /></span> Copy link</button>
-							<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true"><ShareIcon size={15} strokeWidth={2} /></span> Share via…</button>
-						</div>
-					{/if}
-				</div>
-				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
-			</div>
-
-					</div>
 					</div>
 					<div class="chart-wrap" bind:this={chartWrap}>
 				{#if plotTitle && searchMode !== "title"}
@@ -2431,7 +2394,44 @@
 				<YearBrush {months} values={brushValues} start={brushStart} bind:lo={yearLo} bind:hi={yearHi} />
 			{/if}
 
+			<!-- Source on the left; Download and Share as small links on the right -->
+			<div class="chart-foot">
 			<p class="chart-source">Source: Seattle Public Library open data.{#if bookMarkers.length && chartLineMode === "line"}{" "}Book labels mark the month each title was first checked out at SPL.{/if}</p>
+			<div class="chart-actions tb-actions foot-actions">
+				<div class="dl-wrap">
+					<button class="tb-btn" onclick={() => (downloadOpen = !downloadOpen)} title="Download the data or the chart image" aria-haspopup="true" aria-expanded={downloadOpen}>
+						<DownloadIcon size={15} strokeWidth={2} aria-hidden="true" /> Download <ChevronDownIcon size={14} strokeWidth={2} aria-hidden="true" />
+					</button>
+					{#if downloadOpen}
+						<button class="share-backdrop" aria-label="Close download menu" onclick={() => (downloadOpen = false)}></button>
+						<div class="share-menu dl-menu" role="menu">
+							{#if !isOverview}
+								<button role="menuitem" class="share-item" onclick={() => { downloadData(); downloadOpen = false; }}>
+									<span class="share-ic dl-ic" aria-hidden="true"><TableIcon size={15} strokeWidth={2} /></span> Data <span class="dl-fmt">CSV</span>
+								</button>
+							{/if}
+							<button role="menuitem" class="share-item" onclick={() => { downloadChart(); downloadOpen = false; }}>
+								<span class="share-ic dl-ic" aria-hidden="true"><ImageIcon size={15} strokeWidth={2} /></span> Image <span class="dl-fmt">PNG</span>
+							</button>
+						</div>
+					{/if}
+				</div>
+				<div class="share-wrap">
+					<button class="tb-btn" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
+						<ShareIcon size={15} strokeWidth={2} aria-hidden="true" /> Share
+					</button>
+					{#if shareOpen}
+						<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
+						<div class="share-menu" role="menu">
+							<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true"><ImageIcon size={15} strokeWidth={2} /></span> Copy image</button>
+							<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true"><LinkIcon size={15} strokeWidth={2} /></span> Copy link</button>
+							<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true"><ShareIcon size={15} strokeWidth={2} /></span> Share via…</button>
+						</div>
+					{/if}
+				</div>
+				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
+			</div>
+			</div>
 
 
 
@@ -4491,6 +4491,16 @@
 		user-select: none;
 	}
 	.smooth-toggle input { margin: 0; accent-color: var(--color-fg); }
+	.chart-foot { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px 16px; flex-wrap: wrap; margin: 6px 0 0; }
+	.chart-foot .chart-source { margin: 0; flex: 1 1 260px; }
+	.chart-foot .foot-actions { display: flex; gap: 14px; align-items: center; flex: none; }
+	.chart-foot .tb-btn { padding: 0; border: 0; background: none; font-size: 12px; color: #6f6f6f; gap: 4px; }
+	.chart-foot .tb-btn:hover { color: var(--color-fg); text-decoration: underline; text-underline-offset: 3px; }
+	.chart-foot .tb-btn :global(svg) { width: 13px; height: 13px; color: currentColor; }
+	.chart-foot .tb-btn :global(svg.lucide-chevron-down) { width: 12px; height: 12px; }
+	.chart-foot .share-menu { left: auto; right: 0; }
+	/* On a phone the links wrap under the source, at the left: open menus rightward. */
+	@media (max-width: 640px) { .chart-foot .share-menu { left: 0; right: auto; } }
 	.chart-source {
 		font-family: var(--font-sans);
 		font-size: 12px;
