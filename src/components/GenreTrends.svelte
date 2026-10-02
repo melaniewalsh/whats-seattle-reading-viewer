@@ -507,7 +507,7 @@
 		<!-- No legend on the page: the lines are named at their right ends (the
 		     exported image still draws one). -->
 
-		<YearBrush months={data.months} values={data.total} bind:lo bind:hi />
+		<YearBrush months={data.months} values={data.total} inset={plotInset} bind:lo bind:hi />
 		<!-- Source on the left; Download and Share as small links on the right -->
 		<div class="chart-foot" style="padding-right: {Math.max(0, plotInset - 2)}px">
 			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap. <DataInfo first={data.months[0]} last={data.months[data.months.length - 1]} genres />.</p>

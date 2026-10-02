@@ -2446,7 +2446,7 @@
 			{/if}
 
 			{#if months.length - brushStart >= 24}
-				<YearBrush {months} values={brushValues} start={brushStart} bind:lo={yearLo} bind:hi={yearHi} />
+				<YearBrush {months} values={brushValues} start={brushStart} inset={plotInset} bind:lo={yearLo} bind:hi={yearHi} />
 			{/if}
 
 			<!-- Source on the left; Download and Share as small links on the right -->

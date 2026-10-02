@@ -14,7 +14,8 @@
 	//   lo, hi : bindable month indices of the selected window (inclusive)
 	//   start  : first month index the slider covers (skips the empty years
 	//            before a book or author first circulated)
-	let { months = [], values = [], start = 0, lo = $bindable(0), hi = $bindable(0) } = $props();
+	//   inset  : the chart's right margin, so the slider stops at the plot's edge
+	let { months = [], values = [], start = 0, inset = 0, lo = $bindable(0), hi = $bindable(0) } = $props();
 
 	const uid = $props.id();
 
@@ -130,7 +131,7 @@
 	}
 </script>
 
-<div class="brush" class:zoomed={isFiltered} class:active={drag !== null}>
+<div class="brush" class:zoomed={isFiltered} class:active={drag !== null} style="padding-right: {Math.max(0, inset - 6)}px">
 	<div class="brush-track" bind:clientWidth={width} title="Drag to choose which years the chart shows">
 		<svg
 			viewBox="0 0 {width} {height}"
@@ -172,7 +173,8 @@
 </div>
 
 <style>
-	.brush { margin: 18px 0 0; font-family: var(--font-sans); }
+	/* Tucked right under the chart's axis labels. */
+	.brush { margin: 2px 0 0; font-family: var(--font-sans); }
 	.brush-reset {
 		display: block;
 		margin: 4px 0 0 auto;
