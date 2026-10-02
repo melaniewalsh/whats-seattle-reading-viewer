@@ -182,21 +182,13 @@
 					|| (await searchAuthors(wantSlug.replace(/-/g, " "), 8)).find((x) => x.slug === wantSlug);
 			// Arrived with an explicit ?author (a click from Most Borrowed, or a
 			// shared link): scroll the plot's title into view so the user lands on it.
-			if (a) { await selectAuthor(a, { scroll: true }); return; }
+			if (a) { await selectAuthor(a, { scroll: false }); return; }
 		}
-		// Search mode lands on a default example — James Baldwin (author mode) or The
-		// Fire Next Time (title mode, via the effect below) — rather than a blank box,
-		// so there's always something on the plot. The search box stays above it.
+		// Search with nothing picked yet starts blank: the header search box gets
+		// the cursor (Index.svelte) and the suggestions open as starting points.
 		if (landing === "search") {
-			if (searchMode !== "title") {
-				let a = null;
-				try { a = (await searchAuthors("James Baldwin", 6)).find((x) => /baldwin/i.test(displayName(x.name))); } catch {}
-				a = a || authors[0];
-				if (a) await selectAuthor(a, { scroll: false });
-				else loading = false;
-			} else {
-				loading = false;
-			}
+			loading = false;
+			if (searchMode !== "title") suggestOpen = true;
 			return;
 		}
 		await loadOverview();
@@ -363,13 +355,15 @@
 			want = sp.get("title");
 			wantAuthor = sp.get("author");
 		} catch {}
+		// No ?title: start blank, like the author search (see onMount).
+		if (!want) { suggestOpen = true; return; }
 		try {
 			// A link that names the author (a book name in the Books table, a
 			// ranking) goes straight to that author's own titles: the search index
 			// below only holds books with 500+ checkouts, so smaller ones would
 			// never be found there.
 			if (want && wantAuthor) {
-				await selectTitle({ slug: wantAuthor, title: want, author: "" }, { scroll: true });
+				await selectTitle({ slug: wantAuthor, title: want, author: "" }, { scroll: false });
 				if (searchedWork) return;
 			}
 			const q = want || "The Fire Next Time";
@@ -389,7 +383,7 @@
 				|| hits[0];
 			// Scroll to the plot title only when a specific ?title was requested (a
 			// click from Most Borrowed / shared link), not for the blank-tab default.
-			if (r) await selectTitle(r, { scroll: !!want });
+			if (r) await selectTitle(r, { scroll: false });
 		} catch {}
 	}
 
@@ -2004,7 +1998,10 @@
 	const displaySeries = $derived.by(() => {
 		if (!current) return [];
 		if (isOverview) {
-			return chartMode === "area" ? overviewAreaSeries : [authorLine].filter(Boolean);
+			if (chartMode !== "area") return [authorLine].filter(Boolean);
+			// "By format": click a format (legend or line label) to show it alone.
+			const only = overviewAreaSeries.filter((s) => isolatedKeys.includes(s.key));
+			return only.length ? only : overviewAreaSeries;
 		}
 		if (chartMode === "line") {
 			// "Total" = a filled total area, plus any editions you clicked (overlaid
@@ -2058,7 +2055,7 @@
 	const legendItems = $derived.by(() => {
 		if (!current) return [];
 		if (isOverview) {
-			return chartMode === "area" ? [...OVERVIEW_FORMATS].reverse().map((f) => ({ label: f.label, color: f.color, key: null })) : [];
+			return chartMode === "area" ? [...OVERVIEW_FORMATS].reverse().map((f) => ({ label: f.label, color: f.color, key: f.key })) : [];
 		}
 		// Build from the full PLOTTED set (not the isolation-filtered displaySeries)
 		// so the legend stays put while isolating -- the isolated entry just lights
@@ -2132,7 +2129,10 @@
 			});
 	});
 
-	const chartLineMode = $derived(isOverview && chartMode === "area" ? "area" : "line");
+	// Every chart is drawn as lines now. The overview's "By format" used to be a
+	// stacked area, but only its bottom band (print) could be read accurately:
+	// ebook and audiobook rode on print's swings. One line per format from zero.
+	const chartLineMode = "line";
 </script>
 
 <div class="viewer">
@@ -2345,7 +2345,7 @@
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" && !isOverview ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
+				<LineChart months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
 			</div>
 
 			{#if legendItems.length >= 2}
@@ -2606,8 +2606,6 @@
 			{/if}
 			</div><!-- /.split -->
 		</div>
-	{:else if landing === "search"}
-		<p class="hint">Search for {searchMode === "title" ? "a title" : "an author"} above to begin.</p>
 	{/if}
 
 	{#if hoverTip}

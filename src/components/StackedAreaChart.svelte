@@ -24,8 +24,27 @@
 		                  // values of the main series as faint bars behind
 		markers = [],     // [{ month, label, sub }] — labelled moments on the main line
 		endLabels = true, // line mode: label each line at its right end
-		onSeriesClick = null // click an end label: (key) => … (e.g. isolate that line)
+		onSeriesClick = null, // click an end label: (key) => … (e.g. isolate that line)
+		percent = false   // values are percentages (the genre shares), not counts
 	} = $props();
+
+	// Numbers on the axis, end labels and tooltip: counts ("1,200") or, with
+	// `percent`, shares with just enough decimals ("12%", "2.5%", "0.15%").
+	function fmtVal(v) {
+		if (!percent) return Math.round(v).toLocaleString();
+		const a = Math.abs(v);
+		return `${parseFloat(v.toFixed(a < 1 ? 2 : a < 10 ? 1 : 0))}%`;
+	}
+	// End labels: big counts abbreviated ("289k"), so they stay short.
+	function fmtEnd(v) {
+		if (percent || Math.abs(v) < 10000) return fmtVal(v);
+		const k = v / 1000;
+		return `${k >= 100 ? Math.round(k) : parseFloat(k.toFixed(1))}k`;
+	}
+	const fmtTick = (t) => (percent ? fmtVal(t) : t.toLocaleString());
+	// The unit after the top y label; a phone gets only its first word ("1,200
+	// checkouts"), or none for a percentage ("12%").
+	const unitText = (w) => (!unit ? '' : w >= 560 ? unit : percent ? '' : unit.split(' ')[0]);
 
 	// Measured from the container (bind:clientWidth) so the chart fits any
 	// screen -- without this the SVG renders at a fixed 720px and pushes the
@@ -45,7 +64,7 @@
 		if (shown.length <= 1 && (shown[0]?.isAggregate || !shown.length)) return 64;
 		// Several named lines: labels wrap onto two lines, so the margin only
 		// needs to fit about half the longest name (wider charts get more room).
-		const longest = Math.max(...shown.map((s) => fullName(s.label).length + 5));
+		const longest = Math.max(...shown.map((s) => fullName(s.label).length + 1));
 		const cap = width < 520 ? 124 : 200;
 		return Math.min(cap, Math.max(84, Math.round(Math.min(longest, longest / 2 + 6) * 6.6 + 34)));
 	});
@@ -229,13 +248,13 @@
 				// month", drawn at the left edge), drop it just below that label.
 				const lw = Math.max(...(a.short || [a.label]).map((t) => t.length)) * 6.2;
 				const [la, lb] = anchor === 'end' ? [lx - lw, lx] : [lx, lx + lw];
-				const topTxt = yTopTick != null ? `${yTopTick.toLocaleString()}${unit ? ' ' + (width >= 560 ? unit : unit.split(' ')[0]) : ''}` : '';
+				const topTxt = yTopTick != null ? `${fmtTick(yTopTick)}${unitText(width) ? ' ' + unitText(width) : ''}` : '';
 				const unitR = margin.left + topTxt.length * 6.6 + 8;
 				const ty = yTopTick != null ? y(yTopTick) : margin.top;
 				const clash = la < unitR && lb > margin.left && ty - 18 < margin.top + 22;
 				const top = clash ? ty + 4 : margin.top - 10;
 				// Dropped down among the tick numbers? Keep clear of them too.
-				const tickW = Math.max(0, ...yTicks.filter((t) => t > 0 && t !== yTopTick).map((t) => t.toLocaleString().length * 6.6)) + 8;
+				const tickW = Math.max(0, ...yTicks.filter((t) => t > 0 && t !== yTopTick).map((t) => fmtTick(t).length * 6.6)) + 8;
 				const lx2 = clash && anchor === 'start' ? Math.max(lx, margin.left + tickW) : lx;
 				const pad = 8;
 				const avail = anchor === 'end' ? lx - pad : width - lx - pad;
@@ -858,7 +877,7 @@
 			{@const ex = x(months.length - 1)}
 			<circle class="end-dot" cx={ex} cy={it.ey} r="4" fill={it.s.color} />
 			{#if endMarks.length === 1 && it.s.isAggregate}
-				<text class="end-value" x={ex + 8} y={it.ey - 2}>{Math.round(it.v).toLocaleString()}</text>
+				<text class="end-value" x={ex + 8} y={it.ey - 2}>{fmtEnd(it.v)}</text>
 				<text class="end-sub" x={ex + 8} y={it.ey + 12}>in {lastMonthLabel}</text>
 			{:else}
 				<path class="end-leader" d="M{ex + 5},{it.ey} L{ex + 11},{it.ey} L{ex + 15},{it.ty - 4}" />
@@ -867,14 +886,14 @@
 					onmouseenter={() => (endHoverKey = keyOf(it.s))} onmouseleave={() => (endHoverKey = null)}
 					onfocus={() => (endHoverKey = keyOf(it.s))} onblur={() => (endHoverKey = null)}
 					onclick={() => onSeriesClick?.(keyOf(it.s))}
-					onkeydown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onSeriesClick) { e.preventDefault(); onSeriesClick(keyOf(it.s)); } }}>{#each it.lines as ln, k}<tspan x={ex + 18} dy={k ? 14 : 0}>{ln}{#if k === it.lines.length - 1}{" "}<tspan class="end-num">{Math.round(it.v).toLocaleString()}</tspan>{/if}</tspan>{/each}</text>
+					onkeydown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onSeriesClick) { e.preventDefault(); onSeriesClick(keyOf(it.s)); } }}>{#each it.lines as ln, k}<tspan x={ex + 18} dy={k ? 14 : 0}>{ln}</tspan>{/each}</text>
 			{/if}
 		{/each}
 
 		<!-- y-axis labels, drawn last with a halo so lines never cover them -->
 		{#each yTicks as tick}
 			{#if tick > 0}
-				<text class="y-label" x={margin.left} y={y(tick) - 5}>{tick.toLocaleString()}{tick === yTopTick && unit ? ` ${width >= 560 ? unit : unit.split(' ')[0]}` : ''}</text>
+				<text class="y-label" x={margin.left} y={y(tick) - 5}>{fmtTick(tick)}{tick === yTopTick && unitText(width) ? ` ${unitText(width)}` : ''}</text>
 			{/if}
 		{/each}
 
@@ -919,8 +938,8 @@
                     <span>{groupTotal.toLocaleString()}</span>
                 </div>
             {:else}
-                <div class="tt-value">{(selectedItem.raw ?? selectedItem.values)[hoverIndex].toLocaleString()}<span class="tt-value-unit">checkouts</span></div>
-                {#if smooth && mode === 'line'}<div class="tt-avg">3-month avg. {Math.round(selectedItem.values[hoverIndex]).toLocaleString()}</div>{/if}
+                <div class="tt-value">{percent ? fmtVal((selectedItem.raw ?? selectedItem.values)[hoverIndex]) : (selectedItem.raw ?? selectedItem.values)[hoverIndex].toLocaleString()}<span class="tt-value-unit">{percent ? "of checkouts" : "checkouts"}</span></div>
+                {#if smooth && mode === 'line'}<div class="tt-avg">3-month avg. {fmtVal(selectedItem.values[hoverIndex])}</div>{/if}
             {/if}
 
             {#if selectedItem.otherTitles?.length}

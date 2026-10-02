@@ -10,7 +10,6 @@
 	import { compactNumber } from "$utils/format.js";
 	import { curateGenres, extraGenres, genreLabel } from "$utils/rankGenres.js";
 	import { wikiSummary } from "$utils/wiki.js";
-	import WikiCard from "$components/WikiCard.svelte";
 	import BorrowMenu from "$components/BorrowMenu.svelte";
 
 	// openAuthor(slug) is provided by Index.svelte: jumps to the By-author view.
@@ -25,42 +24,7 @@
 	let shareMsg = $state("");
 	let shareOpen = $state(false);
 	let termsMap = $state({});
-	// Wikipedia preview: which row's card is showing. Desktop previews it on hover
-	// (with a small intent delay); a click or tap PINS it open (so you can use its
-	// links) until you click away.
-	let hoverKey = $state(null);
-	let pinnedKey = $state(null);
-	let hoverTimer;
-	let isTouch = $state(false);
-	function enterName(key) {
-		if (isTouch) return;
-		clearTimeout(hoverTimer);
-		hoverTimer = setTimeout(() => (hoverKey = key), 300);
-	}
-	function leaveName() {
-		if (isTouch) return;
-		clearTimeout(hoverTimer);
-		hoverKey = null;
-	}
-	// Clicking (or tapping) a name pins its card open instead of navigating away —
-	// the card's "See SPL trend" link handles navigation.
-	function activateName(key) {
-		clearTimeout(hoverTimer);
-		hoverKey = null;
-		pinnedKey = pinnedKey === key ? null : key;
-	}
-	// Drop any open card when the filters change the list out from under it.
-	$effect(() => {
-		genre;
-		year;
-		pinnedKey = null;
-		hoverKey = null;
-	});
-
 	onMount(async () => {
-		try {
-			isTouch = window.matchMedia("(hover: none)").matches;
-		} catch {}
 		// Read shareable filters from the URL first.
 		try {
 			const p = new URLSearchParams(window.location.search);
@@ -485,14 +449,9 @@
 									<td class="ta-rank">{i + 1}</td>
 									<td class="ta-name">
 										{#if row[0]}
-											{@const u = lookupUrls(displayName(row[1]))}
-											{@const key = row[0] || row[1]}
-											<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
-												<button class="ta-authorlink" aria-haspopup="dialog" onclick={() => activateName(key)}>{displayName(row[1])}</button>
-												{#if hoverKey === key || pinnedKey === key}
-													<span class="wiki-pop"><WikiCard query={displayName(row[1])} kind="author" links={u} onTrend={() => openAuthor(row[0])} /></span>
-												{/if}
-											</span>
+											<!-- The row already shows the summary, More and Borrow, so the
+											     name just opens the author's trend page. -->
+											<button class="ta-authorlink" title="See this author's checkout trend" onclick={() => openAuthor(row[0])}>{displayName(row[1])}</button>
 											{#if authorKey(row) in summaries}
 												<p class="row-sum">{#if summaries[authorKey(row)]}{blurb(summaries[authorKey(row)])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[authorKey(row)] || lookupUrls(displayName(row[1])).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={displayName(row[1])} compact /></span></p>
 											{/if}
@@ -527,9 +486,6 @@
 		{/if}
 	{/if}
 
-	{#if pinnedKey}
-		<button class="wiki-backdrop" aria-label="Close" onclick={() => (pinnedKey = null)}></button>
-	{/if}
 </div>
 
 <style>

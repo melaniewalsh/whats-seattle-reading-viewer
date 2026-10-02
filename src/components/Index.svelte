@@ -92,13 +92,16 @@
 		try {
 			const url = new URL(window.location);
 			["author", "title", "genre", "year", "kind"].forEach((k) => url.searchParams.delete(k));
+			leaveMethod(url);
 			if (t === "home") url.searchParams.delete("tab");
 			else url.searchParams.set("tab", t === "rankings" ? (rankKind === "authors" ? "top" : "works") : t);
 			window.history.pushState({}, "", url);
 		} catch {}
 		// The Search page has no search box of its own: the header search does it,
 		// so put the cursor there when someone heads to Search.
-		if (t === "search") setTimeout(() => hInputEl?.focus(), 60);
+		// A new page starts at the top, not wherever the last one was scrolled.
+		window.scrollTo({ top: 0 });
+		if (t === "search") focusSearch();
 	}
 
 	// Publications, grouped by year for the Publications view.
@@ -126,6 +129,12 @@
 	// The Data & Methodology section is a collapsed <details>; deep links to its
 	// subheadings (#method-…, from e.g. the works table) open it and scroll to them.
 	let methodOpen = $state(false);
+	// Moving to another page closes the section and drops its #anchor, so a
+	// section left open doesn't pull every later page down to the footer.
+	function leaveMethod(url) {
+		methodOpen = false;
+		if (url && /^#(data-methodology|method-)/.test(url.hash)) url.hash = "";
+	}
 	function scrollToMethod() {
 		const h = (window.location.hash || "").slice(1);
 		if (h === "data-methodology" || h.startsWith("method-")) {
@@ -170,6 +179,11 @@
 	// A shared ?tab= / ?author= makes each view linkable (old tab names still work).
 	onMount(() => {
 		applyUrlState();
+		// A plain ?tab=search link (nothing picked yet) also gets the cursor.
+		try {
+			const sp = new URLSearchParams(window.location.search);
+			if (tab === "search" && !sp.get("author") && !sp.get("title")) focusSearch();
+		} catch {}
 		scrollToMethod();
 		window.addEventListener("hashchange", scrollToMethod);
 		window.addEventListener("popstate", onPopState);
@@ -231,6 +245,8 @@
 	function openAuthor(slug) {
 		try {
 			const url = new URL(window.location);
+			leaveMethod(url);
+			window.scrollTo({ top: 0 });
 			url.searchParams.set("author", slug);
 			["tab", "kind", "genre", "year", "title"].forEach((k) => url.searchParams.delete(k));
 			window.history.pushState({}, "", url);
@@ -247,6 +263,8 @@
 	function openTitle(title, authorSlug = null) {
 		try {
 			const url = new URL(window.location);
+			leaveMethod(url);
+			window.scrollTo({ top: 0 });
 			url.searchParams.set("title", title);
 			["tab", "kind", "genre", "year", "author"].forEach((k) => url.searchParams.delete(k));
 			if (authorSlug) url.searchParams.set("author", authorSlug);
@@ -283,6 +301,18 @@
 	// <input type="search"> fires a `search` event, not `input`, so bind:value
 	// never updated and the dropdown kept showing stale results).
 	let hInputEl;
+	// Heading to Search: put the cursor in the header search box and briefly
+	// ring it, so it's clear that's where to type.
+	let hFlash = $state(false);
+	function focusSearch() {
+		setTimeout(() => {
+			window.scrollTo({ top: 0 });
+			hInputEl?.focus({ preventScroll: true });
+			hFlash = false;
+			setTimeout(() => (hFlash = true), 20);
+			setTimeout(() => (hFlash = false), 1900);
+		}, 60);
+	}
 	function clearHeader() {
 		clearTimeout(hTimer);
 		hq = "";
@@ -321,7 +351,7 @@
 					<span class="mast-title">{copy.title}</span>
 				</button>
 				<!-- Real header search: a live autocomplete over authors AND works. -->
-				<div class="mast-search">
+				<div class="mast-search" class:flash={hFlash}>
 					<svg class="mast-search-ic" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
 						<circle cx="9" cy="9" r="6" /><line x1="13.5" y1="13.5" x2="18" y2="18" />
 					</svg>
@@ -1159,6 +1189,15 @@
 	.mast-search:focus-within {
 		border-color: #3f88cc;
 		background: #fff;
+	}
+	.mast-search.flash { animation: search-ring 1.6s ease-out; }
+	@keyframes search-ring {
+		0% { box-shadow: 0 0 0 0 rgba(63, 136, 204, 0.55); }
+		35% { box-shadow: 0 0 0 7px rgba(63, 136, 204, 0.22); }
+		100% { box-shadow: 0 0 0 10px rgba(63, 136, 204, 0); }
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.mast-search.flash { animation: none; box-shadow: 0 0 0 3px rgba(63, 136, 204, 0.3); }
 	}
 	.mast-search-ic {
 		width: 16px;

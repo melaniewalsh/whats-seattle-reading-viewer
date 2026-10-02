@@ -13,7 +13,6 @@
 	import { titleCase } from "$utils/titleCase.js";
 	import { cleanWorkTitle, searchTitle } from "$utils/cleanTitle.js";
 	import { curateGenres, extraGenres, genreLabel } from "$utils/rankGenres.js";
-	import WikiCard from "$components/WikiCard.svelte";
 	import BorrowMenu from "$components/BorrowMenu.svelte";
 
 	// openAuthor(slug) / openTitle(title, slug) are provided by Index.svelte: jump to the
@@ -32,42 +31,7 @@
 	let shareMsg = $state("");
 	let shareOpen = $state(false);
 	let termsMap = $state({});
-	// Wikipedia preview: which row's card is showing. Desktop previews it on hover
-	// (with a small intent delay); a click or tap PINS it open (so you can use its
-	// links) until you click away.
-	let hoverKey = $state(null);
-	let pinnedKey = $state(null);
-	let hoverTimer;
-	let isTouch = $state(false);
-	function enterName(key) {
-		if (isTouch) return;
-		clearTimeout(hoverTimer);
-		hoverTimer = setTimeout(() => (hoverKey = key), 300);
-	}
-	function leaveName() {
-		if (isTouch) return;
-		clearTimeout(hoverTimer);
-		hoverKey = null;
-	}
-	// Clicking (or tapping) a title pins its card open instead of navigating away —
-	// the card's "See SPL trend" link handles navigation.
-	function activateName(key) {
-		clearTimeout(hoverTimer);
-		hoverKey = null;
-		pinnedKey = pinnedKey === key ? null : key;
-	}
-	// Drop any open card when the filters change the list out from under it.
-	$effect(() => {
-		genre;
-		year;
-		pinnedKey = null;
-		hoverKey = null;
-	});
-
 	onMount(async () => {
-		try {
-			isTouch = window.matchMedia("(hover: none)").matches;
-		} catch {}
 		let yearFromUrl = false;
 		try {
 			const p = new URLSearchParams(window.location.search);
@@ -591,8 +555,6 @@
 				</thead>
 				<tbody>
 					{#each rows as row, i (row[0] + row[2] + i)}
-						{@const u = lookupUrls(`${row[0]} ${displayName(row[1])}`)}
-						{@const key = row[0] + "|" + row[1]}
 						<tr>
 							<td class="ta-rank">{i + 1}</td>
 							<td class="ta-name">
@@ -605,13 +567,10 @@
 										{/if}
 									</button>
 									<span class="tw-text">
-										<span class="name-wrap" role="presentation" onmouseenter={() => enterName(key)} onmouseleave={leaveName}>
-											<button class="tw-title tw-titlelink" aria-haspopup="dialog" onclick={() => activateName(key)}>{titleCase(cleanWorkTitle(row[0]))}</button>
-											{#if hoverKey === key || pinnedKey === key}
-												<span class="wiki-pop"><WikiCard query={row[0]} author={displayName(row[1])} kind="work" links={u} onTrend={() => openTitle(row[0], row[2])} /></span>
-											{/if}
-										</span>
-										<span class="tw-by">by {displayName(row[1])}</span>
+										<!-- The row already shows the summary, More and Borrow, so the
+										     title and author just open their trend pages. -->
+										<button class="tw-title tw-titlelink" title="See this book's checkout trend" onclick={() => openTitle(row[0], row[2])}>{titleCase(cleanWorkTitle(row[0]))}</button>
+										<span class="tw-by">by {#if row[2]}<button class="tw-authorlink" title="See this author's checkout trend" onclick={() => openAuthor(row[2])}>{displayName(row[1])}</button>{:else}{displayName(row[1])}{/if}</span>
 											{#if coverKey(row) in summaries}
 												<p class="row-sum">{#if summaries[coverKey(row)]}{blurb(summaries[coverKey(row)])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[coverKey(row)] || lookupUrls(`${row[0]} ${displayName(row[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={`${row[0]} ${displayName(row[1])}`} compact /></span></p>
 											{/if}
@@ -647,9 +606,6 @@
 		{/if}
 	{/if}
 
-	{#if pinnedKey}
-		<button class="wiki-backdrop" aria-label="Close" onclick={() => (pinnedKey = null)}></button>
-	{/if}
 </div>
 
 <style>
@@ -1281,6 +1237,8 @@
 		text-decoration-thickness: 1.5px;
 		text-underline-offset: 3px;
 	}
+	.tw-authorlink { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
+	.tw-authorlink:hover { text-decoration-color: currentColor; }
 	.tw-titlelink:hover {
 		text-decoration-color: var(--color-fg-light);
 	}

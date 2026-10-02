@@ -14,7 +14,10 @@
 	import ShareIcon from "@lucide/svelte/icons/share-2";
 	import { base } from "$app/paths";
 	import { compactNumber } from "$utils/format.js";
-	import GenreChart from "$components/GenreChart.svelte";
+	import DownloadIcon from "@lucide/svelte/icons/download";
+	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+	import TableIcon from "@lucide/svelte/icons/table";
+	import LineChart from "$components/StackedAreaChart.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
 
@@ -68,6 +71,9 @@
 	let chartWrap = $state(null);    // ref to the chart container, for the PNG export
 	let shareOpen = $state(false);   // whether the share popover is open
 	let shareMsg = $state("");       // transient toast after copy/save
+	let dlOpen = $state(false);      // Download menu (Data / Image)
+	let smoothOn = $state(true);     // 3-month averages, as on the author pages
+	let legendHoverKey = $state(null);
 
 	onMount(async () => {
 		try {
@@ -186,51 +192,77 @@
 	const plotGenres = $derived(
 		isolatedKeys.length ? isolatedKeys.map((k) => k.replace(/^g:/, "")) : [...shown],
 	);
-	// "Focus a genre" search (mirrors the search-tab author/work typeahead):
-	// picking a genre plots + isolates it; "Show all genres" clears the isolation.
+	// Clicking a genre's name plots it alone (like isolating a line).
 	function pickGenre(name) {
 		if (!name) { isolatedKeys = []; return; }
 		if (!shown.has(name)) shown = new Set(shown).add(name);
 		isolatedKeys = [`g:${name}`];
 	}
-	let genreQuery = $state("");
-	// All-time checkouts per genre, for the little count beside each suggestion.
-	function genreCount(name) {
-		const g = genreByName[name];
-		return g ? sum(seriesArr(g)) : 0;
-	}
-	const genreResults = $derived.by(() => {
-		const q = genreQuery.trim().toLowerCase();
-		if (!q) return [];
-		return genreOrder.filter((g) => g.toLowerCase().includes(q)).slice(0, 10);
-	});
-	function chooseGenre(name) {
-		pickGenre(name);
-		genreQuery = "";
-	}
-	// Name them when there are 1–3 ("Romance + Fantasy"); otherwise just "Genres".
-	const genreTitle = $derived(
-		plotGenres.length && plotGenres.length <= 3 ? plotGenres.join(" + ") : "Genres",
-	);
-	// Combined checkouts for those genres over the visible window (only when we name them),
-	// like the "X checkouts" subtitle on the author/title plots.
-	const genreTotal = $derived.by(() => {
-		if (!data || !plotGenres.length || plotGenres.length > 3) return null;
-		let s = 0;
-		for (const name of plotGenres) {
-			const g = genreByName[name];
-			if (g) s += sum(seriesArr(g).slice(lo, hi + 1));
-		}
-		return s;
-	});
 	const yearRange = $derived(
 		viewMonths.length ? `${viewMonths[0].slice(0, 4)}–${viewMonths[viewMonths.length - 1].slice(0, 4)}` : "",
 	);
+	// A genre's share of all book checkouts over the years in view.
+	function windowShare(arr) {
+		let a = 0, t = 0;
+		for (let i = lo; i <= hi; i++) { a += arr[i] || 0; t += data.total[i] || 0; }
+		return t ? (100 * a) / t : 0;
+	}
+	function fmtShare(p) {
+		if (p >= 10) return `${Math.round(p)}%`;
+		if (p >= 0.1) return `${p.toFixed(1)}%`;
+		return p > 0 ? "<0.1%" : "0%";
+	}
+	// Small trend line for the table: the monthly share over the years in view,
+	// as a 3-month average, scaled to its own peak.
+	function sparkPath(arr, w = 84, h = 20) {
+		const seg = share(arr).slice(lo, hi + 1);
+		if (seg.length < 2) return "";
+		const avg = seg.map((_, i) => { let t = 0, n = 0; for (let k = i - 1; k <= i + 1; k++) if (k >= 0 && k < seg.length) { t += seg[k]; n++; } return t / n; });
+		const mx = Math.max(1e-9, ...avg);
+		return avg.map((v, i) => `${i ? "L" : "M"}${(1 + (i * (w - 2)) / (avg.length - 1)).toFixed(1)},${(h - 1 - (v / mx) * (h - 3)).toFixed(1)}`).join("");
+	}
+
+	// What the chart draws: the plotted genres, or only the isolated ones.
+	const chartSeries = $derived(
+		(isolatedKeys.length ? series.filter((s) => isolatedKeys.includes(s.key)) : series).map((s) => ({ ...s, label: s.name })),
+	);
+
+	// Header over the chart, like an author page: one genre gets its name, its
+	// share and its subject headings; several get a short comparison title.
+	const headName = $derived(plotGenres.length === 1 ? plotGenres[0] : null);
+	const headGenre = $derived(headName ? genreByName[headName] || null : null);
+	const headTitle = $derived(
+		headGenre ? headName
+			: plotGenres.length === 0 ? "Pick genres to compare"
+			: plotGenres.length <= 3 ? plotGenres.filter((n) => genreByName[n]).join(" vs. ")
+			: `Comparing ${plotGenres.length} genres`,
+	);
+	// "Romance, Fantasy and Mystery"
+	function listGenres(names) {
+		const n = names.filter((x) => genreByName[x]);
+		return n.length < 3 ? n.join(" and ") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`;
+	}
+	const headTerms = $derived(headGenre ? [...(headGenre.terms || []), ...(headGenre.ficTerms || [])].map(termText).slice(0, 4) : []);
+	// Terms are stored as match rules ("=fiction" means exactly "fiction"); show
+	// just the words.
+	const termText = (t) => String(t || "").replace(/^=/, "");
+	const splSubjectUrl = (t) => `https://seattle.bibliocommons.com/v2/search?query=${encodeURIComponent(t.replace(/[()]/g, ""))}&searchType=subject`;
+
+	// The plotted genres' monthly shares as a spreadsheet.
+	function downloadCSV() {
+		dlOpen = false;
+		const cols = chartSeries;
+		const rows = [["month", ...cols.map((c) => `${c.name} (% of book checkouts)`)]];
+		viewMonths.forEach((m, i) => rows.push([`${m}-01`, ...cols.map((c) => (c.values[i] ?? 0).toFixed(3))]));
+		const cell = (v) => { const t = String(v ?? ""); return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+		const blob = new Blob(["\ufeff" + rows.map((r) => r.map(cell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+		saveBlob(blob, "seattle-reading-genres.csv");
+	}
 
 	// --- Share / download (mirrors the "By author" tab exactly) --------------
 	const plotTitle = $derived(mode === "partition"
 		? "Share of book checkouts · each counted once, in its first genre"
-		: "Raw overlapping share of book checkouts · books are multi-tagged");
+		: "Share of book checkouts · a book can count toward several genres");
 	const legendItems = $derived(series.map((s) => ({ label: s.name, color: s.color, key: s.key })));
 
 	// A shareable link (reopens the genre tab) plus a caption.
@@ -421,124 +453,155 @@
 	{:else}
 		<div class="modebar">
 			<h2 class="genre-title">Seattle's Genre Trends</h2>
-			<p class="mode-note">Checkouts grouped by subject heading at the Seattle Public Library.</p>
+			<p class="mode-note">Each genre's share of book checkouts at the Seattle Public Library, from the subject headings in its catalog.</p>
 		</div>
 
-		<p class="genre-caption">
-			{#if genreTotal != null}
-				<strong>{genreTitle}</strong> · {compactNumber(genreTotal)} checkouts · {yearRange} · raw share of all book checkouts
+		<!-- Header, as on an author page: the genre, its share, its headings -->
+		<div class="g-head">
+			{#if headGenre}
+				<h3 class="g-name">{headTitle}</h3>
+				<p class="g-meta">{fmtShare(windowShare(seriesArr(headGenre)))} of book checkouts, {yearRange} · {compactNumber(sum(seriesArr(headGenre).slice(lo, hi + 1)))} checkouts</p>
+				{#if headTerms.length}
+					<p class="g-terms"><span class="g-lead">Subject headings with</span> {#each headTerms as t, k}{#if k}<span class="g-sep" aria-hidden="true">{" · "}</span>{/if}<a href={splSubjectUrl(t)} target="_blank" rel="noopener noreferrer" title="Find books on “{t}” at the Seattle Public Library">{t}</a>{/each}</p>
+				{/if}
+			{:else if plotGenres.length}
+				<!-- Several genres: a plain line, not a second big title under the page's -->
+				<p class="g-meta g-compare">{plotGenres.length <= 3 ? listGenres(plotGenres) : `${plotGenres.length} genres`}: share of book checkouts, {yearRange}. Click a genre's name to show it alone.</p>
 			{:else}
-				Each genre's raw share of checkouts over time — books are multi-tagged, so genres overlap.
+				<p class="g-meta">Tick genres in the table below to plot them.</p>
 			{/if}
-		</p>
+		</div>
+
+		<div class="plot-toolbar">
+			<div class="tb-left">
+				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
+			</div>
+			<div class="tb-right">
+				<div class="dl-wrap">
+					<button class="tb-btn" onclick={() => (dlOpen = !dlOpen)} aria-haspopup="true" aria-expanded={dlOpen} title="Download the data or the chart">
+						<DownloadIcon size={15} strokeWidth={2} aria-hidden="true" /> Download <ChevronDownIcon size={14} strokeWidth={2} aria-hidden="true" />
+					</button>
+					{#if dlOpen}
+						<button class="share-backdrop" aria-label="Close" onclick={() => (dlOpen = false)}></button>
+						<div class="share-menu" role="menu">
+							<button role="menuitem" class="share-item" onclick={downloadCSV}><span class="share-ic" aria-hidden="true"><TableIcon size={15} strokeWidth={2} /></span> Data (CSV)</button>
+							<button role="menuitem" class="share-item" onclick={() => { dlOpen = false; downloadChart(); }}><span class="share-ic" aria-hidden="true"><ImageIcon size={15} strokeWidth={2} /></span> Image (PNG)</button>
+						</div>
+					{/if}
+				</div>
+				<div class="share-wrap">
+					<button class="tb-btn" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
+						<ShareIcon size={15} strokeWidth={2} aria-hidden="true" /> Share
+					</button>
+					{#if shareOpen}
+						<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
+						<div class="share-menu" role="menu">
+							<button role="menuitem" class="share-item" onclick={copyImage}><span class="share-ic" aria-hidden="true"><ImageIcon size={15} strokeWidth={2} /></span> Copy image</button>
+							<button role="menuitem" class="share-item" onclick={copyShareLink}><span class="share-ic" aria-hidden="true"><LinkIcon size={15} strokeWidth={2} /></span> Copy link</button>
+							<button role="menuitem" class="share-item" onclick={shareImage}><span class="share-ic" aria-hidden="true"><ShareIcon size={15} strokeWidth={2} /></span> Share via…</button>
+						</div>
+					{/if}
+				</div>
+				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
+			</div>
+		</div>
 
 		<div class="chartwrap" bind:this={chartWrap}>
-			<GenreChart months={viewMonths} {series} {isolatedKeys} annotations={EVENT_ANNOTATIONS} />
+			<LineChart months={viewMonths} series={chartSeries} mode="line" percent unit="of book checkouts"
+				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={(k) => toggleIsolate(k)} />
 		</div>
-		<YearBrush months={data.months} values={data.total} bind:lo bind:hi />
 
 		{#if series.length >= 2}
 			<div class="glegend">
 				{#each series as s (s.key)}
 					<button class="gleg-btn" class:on={isIsolated(s.key)} class:dim={isolatedKeys.length && !isIsolated(s.key)}
 							title="Show only this — click again to bring the others back" onclick={() => toggleIsolate(s.key)}
+							onmouseenter={() => (legendHoverKey = s.key)} onmouseleave={() => (legendHoverKey = null)}
 					><span class="gleg-sw" style="background:{s.color}"></span>{s.name}</button>
 				{/each}
 				{#if isolatedKeys.length}<button class="gleg-showall" onclick={() => (isolatedKeys = [])}>Show all</button>{/if}
 			</div>
 		{/if}
 
-		<div class="chart-actions">
-			<button class="chart-action" onclick={downloadChart} title="Download the chart as a PNG image">
-				<span aria-hidden="true">⤓</span> Download image
-			</button>
-			<div class="share-wrap">
-				<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
-					<ShareIcon size={14} strokeWidth={2.2} aria-hidden="true" /> Share
-				</button>
-				{#if shareOpen}
-					<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
-					<div class="share-menu" role="menu">
-						<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true"><ImageIcon size={14} strokeWidth={2.2} /></span> Copy image</button>
-						<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true"><LinkIcon size={14} strokeWidth={2.2} /></span> Copy link</button>
-						<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true"><ShareIcon size={14} strokeWidth={2.2} /></span> Share via…</button>
-					</div>
-				{/if}
-			</div>
-			{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
-		</div>
+		<YearBrush months={data.months} values={data.total} bind:lo bind:hi />
+		<p class="chart-source">Source: Seattle Public Library open data. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap.</p>
 
-		<div class="gtable-head-row">
-			<div class="bulk">
-				<button onclick={showAll}>Show all</button><button onclick={hideAll}>Hide all</button>
+		<!-- Genres table, styled like the author page's Books table -->
+		<section class="books">
+			<div class="bk-head">
+				<h2 class="bk-title">Genres <span class="bk-count">({genreOrder.length})</span></h2>
+				<div class="bk-tools">
+					<input class="bk-filter" type="search" bind:value={genreFilter} placeholder="Filter genres or subjects" aria-label="Filter genres or subject terms" />
+					{#if shown.size || showOther}<button class="bk-btn" onclick={() => { hideAll(); showOther = false; }}>Clear chart</button>{/if}
+				</div>
 			</div>
-		</div>
-		<div class="gt-search">
-			<input type="search" class="gt-search-input" bind:value={genreFilter}
-				placeholder="Search genres or subject terms" aria-label="Search genres" />
-			{#if genreFilter}<button class="gt-search-clear" onclick={() => (genreFilter = "")} aria-label="Clear search" title="Clear">×</button>{/if}
-		</div>
-
-		<div class="gtable">
-			<div class="gt-head" role="row">
-				<span class="gt-cell gt-show">Plot</span>
-				<span class="gt-cell gt-name">Genre</span>
-				<span class="gt-cell gt-share">Share</span>
-			</div>
-			{#each GROUPS as [groupName, names] (groupName)}
-				{@const inGroup = names.filter((n) => genreByName[n] && genreMatches(n)).sort((a, b) => sum(genreByName[b].partition) - sum(genreByName[a].partition))}
-				{#if inGroup.length}
-				{@const isCollapsed = collapsedGroups.has(groupName) && !genreFilter}
-				<button type="button" class="gt-group" class:collapsed={isCollapsed} role="row" aria-expanded={!isCollapsed} onclick={() => toggleGroup(groupName)}>
-					<span class="gt-group-tri" aria-hidden="true">{isCollapsed ? "▸" : "▾"}</span>{groupName}<span class="gt-group-count">{inGroup.length}</span>
-				</button>
-				{#if !isCollapsed}
-				{#each inGroup as name (name)}
-					{@const g = genreByName[name]}
-					<div class="gt-row genre-row" role="row" class:off={!shown.has(name)}>
-						<span class="gt-cell gt-show"><input type="checkbox" checked={shown.has(name)} onchange={() => toggleShown(name)} aria-label={`Plot ${name}`} /></span>
-						<button class="gt-cell gt-name" onclick={() => clickGenre(name)} aria-expanded={expanded.has(name)}>
-							<span class="gt-tri">{expanded.has(name) ? "▾" : "▸"}</span>
-							<span class="gt-sw" style="background:{colorOf(name)}"></span>{name}
-						</button>
-						<span class="gt-cell gt-share">{overall(seriesArr(g)).toFixed(1)}%</span>
-					</div>
-					{#if expanded.has(name)}
-						<div class="gt-detail">
-							{#if showTerms}
-								<div class="gt-terms">Subject terms:{#if g.terms?.length} {#each g.terms as t, i}<code>{t}</code>{i < g.terms.length - 1 ? " " : ""}{/each}{/if}{#if g.ficTerms?.length}<span class="gt-ficlbl">{g.terms?.length ? "· " : ""}only with a <strong>Fiction</strong> tag:</span> {#each g.ficTerms as t, i}<code class="fic">{t}</code>{i < g.ficTerms.length - 1 ? " " : ""}{/each}{/if}</div>
-							{/if}
-							{#if cleanExamples(g.examples).length}
-								<span class="gt-ex-label">Most-checked-out titles</span>
-								<ol class="gt-ex-list">{#each cleanExamples(g.examples) as title}<li>{title}</li>{/each}</ol>
-							{/if}
-						</div>
+			<ul class="bk-list">
+				<li class="bk-row bk-colhead" aria-hidden="true"><span></span><span>Genre</span><span class="bk-sp">{yearRange}</span><span class="bk-num">Share</span></li>
+				{#each GROUPS as [groupName, names] (groupName)}
+					{@const inGroup = names.filter((n) => genreByName[n] && genreMatches(n)).sort((a, b) => windowShare(seriesArr(genreByName[b])) - windowShare(seriesArr(genreByName[a])))}
+					{#if inGroup.length}
+						{@const isCollapsed = collapsedGroups.has(groupName) && !genreFilter}
+						<li class="g-group">
+							<button type="button" aria-expanded={!isCollapsed} onclick={() => toggleGroup(groupName)}>
+								{groupName} <span class="bk-count">{inGroup.length}</span><span class="bk-caret" class:up={!isCollapsed} aria-hidden="true"></span>
+							</button>
+						</li>
+						{#if !isCollapsed}
+							{#each inGroup as name (name)}
+								{@const g = genreByName[name]}
+								{@const on = shown.has(name)}
+								<li class="bk-row" class:plotted={on}>
+									<input type="checkbox" class="bk-check" checked={on} onchange={() => toggleShown(name)} aria-label="Plot {name} on the chart" />
+									<span class="bk-name-cell">
+										{#if on}<span class="bk-swatch" style="background:{colorOf(name)}"></span>{/if}
+										<button type="button" class="bk-name g-pick" title="Show {name} alone on the chart" onclick={() => pickGenre(name)}>{name}</button>
+										<button type="button" class="bk-eds" aria-expanded={expanded.has(name)} onclick={() => toggleExpand(name)}>subjects &amp; titles<span class="bk-caret" class:up={expanded.has(name)} aria-hidden="true"></span></button>
+									</span>
+									<svg class="bk-sp bk-spark" width="84" height="20" viewBox="0 0 84 20" aria-hidden="true"><path d={sparkPath(seriesArr(g))} stroke={on ? colorOf(name) : "#b4b2a9"} /></svg>
+									<span class="bk-num">{fmtShare(windowShare(seriesArr(g)))}</span>
+								</li>
+								{#if expanded.has(name)}
+									<li class="g-detail">
+										{#if g.terms?.length || g.ficTerms?.length}
+											<p class="g-detail-terms"><span class="g-lbl">Subject headings containing</span>
+												{#each (g.terms || []).map(termText) as t, i}{#if i}{" · "}{/if}<a href={splSubjectUrl(t)} target="_blank" rel="noopener noreferrer">{t}</a>{/each}
+												{#if g.ficTerms?.length}<span class="g-fic">{g.terms?.length ? " · " : ""}with a Fiction tag: </span>{#each g.ficTerms.map(termText) as t, i}{#if i}{" · "}{/if}<a href={splSubjectUrl(t)} target="_blank" rel="noopener noreferrer">{t}</a>{/each}{/if}
+											</p>
+										{/if}
+										{#if cleanExamples(g.examples).length}
+											<span class="g-lbl">Most-checked-out titles</span>
+											<ol class="g-ex">{#each cleanExamples(g.examples) as title}<li>{title}</li>{/each}</ol>
+										{/if}
+									</li>
+								{/if}
+							{/each}
+						{/if}
 					{/if}
 				{/each}
-				{/if}
-			{/if}
-			{/each}
-				<div class="gt-row genre-row other-row" class:off={!showOther}>
-					<span class="gt-cell gt-show"><input type="checkbox" checked={showOther} onchange={() => (showOther = !showOther)} aria-label="Plot Other" /></span>
-					<button class="gt-cell gt-name" onclick={() => toggleExpand("__other")} aria-expanded={expanded.has("__other")}>
-						<span class="gt-tri">{expanded.has("__other") ? "▾" : "▸"}</span>
-						<span class="gt-sw" style="background:#b0b0b0"></span>Other / Unclassified
-					</button>
-					<span class="gt-cell gt-share">{overall(data.other).toFixed(1)}%</span>
-				</div>
+				<li class="bk-row g-other" class:plotted={showOther}>
+					<input type="checkbox" class="bk-check" checked={showOther} onchange={() => (showOther = !showOther)} aria-label="Plot Other / Unclassified" />
+					<span class="bk-name-cell">
+						{#if showOther}<span class="bk-swatch" style="background:#b0b0b0"></span>{/if}
+						<span class="bk-name">Other / Unclassified</span>
+						<button type="button" class="bk-eds" aria-expanded={expanded.has("__other")} onclick={() => toggleExpand("__other")}>what's here<span class="bk-caret" class:up={expanded.has("__other")} aria-hidden="true"></span></button>
+					</span>
+					<svg class="bk-sp bk-spark" width="84" height="20" viewBox="0 0 84 20" aria-hidden="true"><path d={sparkPath(data.other.map((v) => Math.max(0, v)))} stroke={showOther ? "#b0b0b0" : "#b4b2a9"} /></svg>
+					<span class="bk-num">{fmtShare(Math.max(0, windowShare(data.other)))}</span>
+				</li>
 				{#if expanded.has("__other")}
-					<div class="gt-detail">
-						<div class="gt-terms">Books matching <em>none</em> of the {genreOrder.length} genres — mostly general, un-genre'd nonfiction.</div>
-						{#if showTerms && data.otherTags?.length}
-							<div class="gt-terms">Top subject tags here: {#each data.otherTags as t, i}<code>{t[0]}</code><span class="gt-pct">{t[1]}%</span>{i < data.otherTags.length - 1 ? " " : ""}{/each}</div>
+					<li class="g-detail">
+						<p class="g-detail-terms">Books matching <em>none</em> of the {genreOrder.length} genres, mostly general nonfiction without a genre heading.</p>
+						{#if data.otherTags?.length}
+							<p class="g-detail-terms"><span class="g-lbl">Top subject headings here</span> {#each data.otherTags as t, i}{#if i}{" · "}{/if}{t[0]} <span class="g-pct">{t[1]}%</span>{/each}</p>
 						{/if}
 						{#if cleanExamples(data.otherExamples).length}
-							<span class="gt-ex-label">Most-checked-out titles</span>
-							<ol class="gt-ex-list">{#each cleanExamples(data.otherExamples) as title}<li>{title}</li>{/each}</ol>
+							<span class="g-lbl">Most-checked-out titles</span>
+							<ol class="g-ex">{#each cleanExamples(data.otherExamples) as title}<li>{title}</li>{/each}</ol>
 						{/if}
-					</div>
+					</li>
 				{/if}
-		</div>
+			</ul>
+		</section>
 
 		<details class="sh-note">
 			<summary>A note on how genres are defined</summary>
@@ -561,108 +624,106 @@
 </div>
 
 <style>
-	.genres { margin-top: var(--space-6); }
-	.genres input[type="checkbox"] {
-		appearance: auto; -webkit-appearance: auto; width: 16px; height: 16px;
-		accent-color: var(--color-fg); background: none; flex: none; cursor: pointer; margin: 0;
-	}
-	.meta { color: var(--color-fg-light); font-family: var(--font-sans); font-size: var(--text-base); margin: 0 0 10px; }
-	.sh-note { font-family: var(--font-sans); font-size: var(--text-sm); margin: 0 0 var(--space-5); }
+	.genres { margin-top: var(--space-6); font-family: var(--font-sans); }
+	.loading, .load-error { font-family: var(--font-sans); color: var(--color-fg-light); }
+
+	/* Section masthead — matches the other tabs (serif title + subtitle + rule). */
+	.modebar { border-bottom: 3px solid var(--color-fg); padding-bottom: var(--space-3); margin: var(--space-6) 0 var(--space-5); }
+	.genre-title { font-family: var(--font-display, var(--font-serif)); font-weight: 700; font-size: clamp(1.7rem, 3.4vw, 2.5rem); color: var(--color-fg); margin: 0; line-height: 1.05; }
+	.mode-note { font-size: var(--text-base); color: var(--color-fg-light); margin: 6px 0 0; line-height: 1.4; }
+
+	/* Header over the chart (same type scale as an author page). */
+	.g-head { margin: 0 0 4px; }
+	.g-name { font-family: var(--font-serif); font-weight: 400; font-size: clamp(1.4rem, 2.6vw, 1.75rem); line-height: 1.15; color: var(--color-fg); margin: 0; }
+	.g-compare { color: var(--color-fg); }
+	.g-meta { font-size: 1.02rem; line-height: 1.4; color: var(--color-fg-light); margin: 6px 0 0; }
+	.g-terms { font-size: var(--text-sm); line-height: 1.6; color: var(--color-fg-light); margin: 2px 0 0; }
+	.g-terms a, .g-detail-terms a { color: var(--color-fg-light); text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
+	.g-terms a:hover, .g-detail-terms a:hover { color: var(--color-fg); text-decoration-color: currentColor; }
+	.g-sep { color: #aaa; }
+	.g-lead { margin-right: 2px; }
+
+	/* Toolbar: 3-month average on the left; Download and Share on the right. */
+	.plot-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin: var(--space-5) 0 var(--space-4); }
+	.tb-left, .tb-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+	.smooth-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-fg-light); cursor: pointer; user-select: none; }
+	.smooth-toggle input { margin: 0; width: 16px; height: 16px; accent-color: var(--color-fg); appearance: auto; -webkit-appearance: auto; }
+	.tb-btn { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; line-height: 1; padding: 7px 11px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white); color: var(--color-fg); cursor: pointer; white-space: nowrap; }
+	.tb-btn:hover { border-color: var(--color-fg-light); }
+	.tb-btn :global(svg) { flex: none; width: 15px; height: 15px; color: var(--color-fg-light); }
+	.tb-btn :global(svg.lucide-chevron-down) { width: 14px; height: 14px; }
+	.dl-wrap, .share-wrap { position: relative; display: inline-flex; }
+	.share-backdrop { position: fixed; inset: 0; z-index: 40; background: none; border: none; cursor: default; }
+	.share-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 41; display: flex; flex-direction: column; min-width: 196px; padding: 4px; background: var(--color-white); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1); }
+	.share-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: none; border-radius: 6px; background: none; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; color: var(--color-fg); cursor: pointer; text-align: left; }
+	.share-item:hover { background: var(--color-gray-100); }
+	.share-ic { display: inline-flex; width: 16px; height: 16px; color: var(--color-fg-light); }
+	.share-ic :global(svg) { display: block; width: 15px; height: 15px; }
+	.share-msg { font-size: var(--text-sm); font-weight: 600; color: #2e7d32; }
+
+	.chartwrap { width: 100%; }
+	.glegend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 0; font-size: var(--text-sm); font-weight: 500; }
+	.gleg-btn { display: inline-flex; align-items: center; gap: 6px; border: none; background: none; padding: 2px 5px; border-radius: 6px; font: inherit; color: var(--color-fg); cursor: pointer; transition: opacity 0.12s, background 0.12s; }
+	.gleg-btn:hover { background: var(--color-gray-100); }
+	.gleg-btn.dim { opacity: 0.38; }
+	.gleg-btn.on { background: var(--color-gray-100); box-shadow: inset 0 0 0 1px var(--color-border); }
+	.gleg-sw { width: 12px; height: 3px; border-radius: 2px; flex: none; }
+	.gleg-showall { border: 1px solid var(--color-border); background: var(--color-white); padding: 3px 10px; border-radius: 8px; font: inherit; color: var(--color-fg); cursor: pointer; }
+	.chart-source { font-size: 12px; color: #8a8a8a; margin: 6px 0 0; }
+
+	/* Genres table — same look as the author page's Books table. */
+	.books { margin: var(--space-6) 0 var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+	.bk-head { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin: 0 0 10px; }
+	.bk-title { font-family: var(--font-sans); font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--color-fg); }
+	.bk-count { font-weight: 400; color: var(--color-fg-light); }
+	.bk-tools { display: flex; gap: 8px; align-items: center; }
+	.bk-filter { width: 200px; padding: 7px 10px; font: inherit; font-size: var(--text-sm); border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white); color: var(--color-fg); }
+	.bk-btn { font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; padding: 7px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white); color: var(--color-fg); cursor: pointer; white-space: nowrap; }
+	.bk-btn:hover { border-color: var(--color-fg-light); }
+	.bk-list { list-style: none; margin: 0; padding: 0; }
+	.bk-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) 84px 64px; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--color-gray-100, #eee); }
+	.bk-colhead { padding: 0 0 6px; border-top: 0; border-bottom: 1px solid var(--color-border); font-size: 12px; color: var(--color-fg-light); }
+	.bk-check { margin: 0; width: 16px; height: 16px; accent-color: var(--color-fg); appearance: auto; -webkit-appearance: auto; cursor: pointer; }
+	.bk-name-cell { min-width: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+	.bk-swatch { display: inline-block; width: 12px; height: 3px; border-radius: 2px; align-self: center; flex: none; }
+	.bk-name { font-family: var(--font-serif); font-size: 1rem; color: var(--color-fg); }
+	.g-pick { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
+	.g-pick:hover, .g-pick:focus-visible { text-decoration-color: currentColor; }
+	.bk-eds { font: inherit; font-size: 12px; color: var(--color-fg-light); background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+	.bk-eds:hover { color: var(--color-fg); text-decoration: underline; text-underline-offset: 3px; }
+	.bk-caret { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid currentColor; margin-left: 4px; }
+	.bk-caret.up { border-top: 0; border-bottom: 5px solid currentColor; }
+	.bk-spark { display: block; }
+	.bk-spark path { fill: none; stroke-width: 1.5; stroke-linejoin: round; }
+	.bk-num { text-align: right; font-size: var(--text-sm); font-variant-numeric: tabular-nums; color: var(--color-fg); white-space: nowrap; }
+	.bk-colhead .bk-num, .bk-colhead .bk-sp { color: var(--color-fg-light); }
+	.g-other .bk-name { font-style: italic; color: var(--color-fg-light); }
+
+	/* Section rows: Fiction / Kids & Young Adult / Nonfiction */
+	.g-group { border-top: 1px solid var(--color-border); }
+	.g-group button { display: flex; align-items: center; gap: 6px; width: 100%; padding: 14px 0 6px; background: none; border: 0; font: inherit; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-fg); text-align: left; cursor: pointer; }
+	.g-group .bk-count { letter-spacing: 0; }
+	.g-group .bk-caret { color: var(--color-fg-light); }
+
+	.g-detail { padding: 2px 0 12px 34px; }
+	.g-detail-terms { font-size: var(--text-sm); line-height: 1.6; color: var(--color-fg-light); margin: 0 0 8px; }
+	.g-lbl { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg-light); margin: 0 0 4px; }
+	.g-fic { color: var(--color-fg-light); }
+	.g-pct { font-size: 0.9em; color: #9a9a9a; }
+	.g-ex { margin: 0; padding-left: 1.4em; columns: 2; column-gap: 28px; }
+	.g-ex li { font-size: var(--text-sm); line-height: 1.5; break-inside: avoid; color: var(--color-fg); }
+
+	.sh-note { font-size: var(--text-sm); margin: 0 0 var(--space-5); }
 	.sh-note summary { cursor: pointer; color: var(--color-fg-light); list-style-position: inside; width: fit-content; }
 	.sh-note summary:hover { color: var(--color-fg); }
 	.sh-note p { font-size: var(--text-sm); line-height: 1.55; color: var(--color-fg-light); margin: 8px 0 0; max-width: 68ch; }
 	.sh-note strong { color: var(--color-fg); }
-	.loading, .load-error { font-family: var(--font-sans); color: var(--color-fg-light); }
 
-	/* Section masthead — matches the Most Borrowed tab (serif title + subtitle + rule). */
-	.modebar { border-bottom: 3px solid var(--color-fg); padding-bottom: var(--space-3); margin: var(--space-6) 0 var(--space-5); }
-	.genre-title { font-family: var(--font-display, var(--font-serif)); font-weight: 700; font-size: clamp(1.7rem, 3.4vw, 2.5rem); color: var(--color-fg); margin: 0; line-height: 1.05; }
-	.mode-note { font-family: var(--font-sans); font-size: var(--text-base); color: var(--color-fg-light); margin: 6px 0 0; line-height: 1.4; }
-	.genre-caption { font-family: var(--font-sans); font-size: var(--text-base); color: var(--color-fg-light); margin: 0 0 8px; line-height: 1.4; }
-	/* "Focus genre" field — mirrors the Most Borrowed tab's filter dropdowns. */
-	.gt-controls { display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap; margin: 0 0 var(--space-4); }
-	.gt-field { display: inline-flex; flex-direction: column; gap: 4px; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg-light); min-width: 260px; }
-	.gt-field.grow { flex: 1; }
-	.gt-search { position: relative; }
-	.gt-search input { width: 100%; box-sizing: border-box; font-family: var(--font-sans); font-size: var(--text-base); font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--color-fg); padding: 9px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white); outline: none; }
-	.gt-search input:focus { border-color: #3f88cc; box-shadow: 0 0 0 3px rgba(63, 136, 204, 0.15); }
-	.gt-results { list-style: none; margin: 6px 0 0; padding: 6px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-white); max-height: 340px; overflow-y: auto; position: absolute; width: 100%; z-index: var(--z-top, 60); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
-	.gt-results button { width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 9px 12px; background: none; border: none; border-radius: var(--radius-sm); font-family: var(--font-sans); font-size: var(--text-base); font-weight: 500; text-transform: none; letter-spacing: 0; text-align: left; cursor: pointer; color: var(--color-fg); }
-	.gt-results button:hover { background: var(--color-gray-100); }
-	.gt-results .count { color: var(--color-fg-light); font-weight: 500; font-variant-numeric: tabular-nums; }
-	.gt-noresults { position: absolute; margin: 6px 0 0; padding: 9px 12px; font-family: var(--font-sans); font-size: var(--text-base); font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--color-fg-light); }
-	.gt-clear { font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; text-transform: none; letter-spacing: 0; color: #3f88cc; background: none; border: none; padding: 9px 0; cursor: pointer; white-space: nowrap; }
-	.gt-clear:hover { text-decoration: underline; }
-	.genre-caption strong { color: var(--color-fg); }
-	.chartwrap { width: 100%; }
-
-	/* Share / download — identical to the "By author" tab. */
-	.chart-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin: 10px 0 4px; }
-	.chart-action { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; line-height: 1; color: var(--color-fg); cursor: pointer; padding: 6px 14px; border: 1.5px solid var(--color-border); border-radius: 999px; background: var(--color-white); transition: background 0.12s, border-color 0.12s; }
-	.chart-action:hover { border-color: var(--color-fg-light); background: #f7f7f7; }
-	.chart-action span { opacity: 0.7; font-size: 0.95em; }
-	.share-msg { font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: #2e7d32; }
-	.share-wrap { position: relative; display: inline-flex; }
-	.share-backdrop { position: fixed; inset: 0; z-index: 40; background: none; border: none; cursor: default; }
-	.share-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 41; display: flex; flex-direction: column; min-width: 168px; padding: 5px; background: var(--color-white); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); }
-	.share-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: none; border-radius: 7px; background: none; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); cursor: pointer; text-align: left; }
-	.share-item:hover { background: #f2f2f2; }
-	.share-ic { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: none; border-radius: 5px; font-size: var(--text-xs); font-weight: 700; color: #fff; font-style: normal; }
-	.share-item.fb .share-ic { background: #1877f2; }
-	.share-item.tw .share-ic { background: #000; }
-	.share-item.bs .share-ic { background: #0a7aff; }
-	.share-item.li .share-ic { background: #0a66c2; }
-	.share-item.img .share-ic { background: #2e7d32; }
-	.share-item.copyimg .share-ic { background: #444; }
-	.share-item.copy .share-ic { background: #666; }
-	.share-sep { height: 1px; margin: 4px 6px; background: var(--color-border); }
-
-	.glegend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin: 12px 0 4px; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; }
-	.gleg-btn { display: inline-flex; align-items: center; gap: 6px; border: none; background: none; padding: 2px 5px; border-radius: 6px; font: inherit; color: var(--color-fg); cursor: pointer; transition: opacity 0.12s, background 0.12s; }
-	.gleg-btn:hover { background: var(--color-gray-100); }
-	.gleg-btn.dim { opacity: 0.38; }
-	.gleg-btn.on { background: var(--color-gray-100); box-shadow: inset 0 0 0 1.5px var(--color-border); }
-	.gleg-sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
-	.gleg-showall { border: 1px solid var(--color-border); background: var(--color-white); padding: 3px 12px; border-radius: 999px; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); cursor: pointer; }
-
-	.gtable-head-row { display: flex; align-items: baseline; justify-content: space-between; margin: var(--space-5) 0 var(--space-1); gap: var(--space-3); }
-	.gtable-title { font-family: var(--font-serif); font-size: var(--text-xl); margin: 0; }
-	.bulk { display: flex; gap: 6px; }
-	.bulk button { font-family: var(--font-sans); font-size: var(--text-xs); border: 1px solid var(--color-border); background: var(--color-white); color: var(--color-fg-light); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
-	.bulk button.on { background: var(--color-fg); border-color: var(--color-fg); color: var(--color-white); }
-	.gtable-hint { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--color-fg-light); margin: 0 0 12px; line-height: 1.45; }
-	.gt-search { position: relative; margin: 0 0 12px; }
-	.gt-search-input { width: 100%; box-sizing: border-box; padding: 9px 34px 9px 14px; font-family: var(--font-sans); font-size: var(--text-base); border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-white); color: var(--color-fg); }
-	.gt-search-input:focus { outline: none; border-color: #3f88cc; box-shadow: 0 0 0 3px rgba(63,136,204,0.15); }
-	.gt-search-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border: none; background: none; font-size: 1.1rem; line-height: 1; color: var(--color-fg-light); cursor: pointer; border-radius: 50%; }
-	.gt-search-clear:hover { background: var(--color-gray-100); color: var(--color-fg); }
-
-	.gtable { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; font-family: var(--font-sans); }
-	.gt-head, .gt-row { display: grid; grid-template-columns: 48px 1fr 72px; align-items: center; gap: 10px; padding: 8px 12px; }
-	.gt-head { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg-light); font-weight: 700; border-bottom: 1px solid var(--color-border); }
-	.gt-group { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 12px; background: var(--color-gray-100, #f2f2f2); border: none; border-top: 1px solid var(--color-border); font-family: var(--font-sans); font-size: var(--text-xs); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-fg); text-align: left; cursor: pointer; }
-	.gt-group:hover { background: var(--color-gray-200, #e8e8e8); }
-	.gt-group:first-of-type { border-top: none; }
-	.gt-group-tri { font-size: 0.6rem; color: var(--color-fg-light); width: 0.7em; }
-	.gt-group-count { margin-left: 4px; font-weight: 700; color: var(--color-fg-light); letter-spacing: 0; }
-	.genre-row { border-top: 1px solid var(--color-gray-100); font-size: var(--text-base); }
-	.genre-row:first-of-type { border-top: none; }
-	.genre-row.off { opacity: 0.55; }
-	.other-row { font-style: italic; color: var(--color-fg-light); }
-	.gt-show { text-align: center; }
-	.gt-name { display: inline-flex; align-items: center; gap: 7px; border: none; background: none; font: inherit; font-weight: 600; color: var(--color-fg); cursor: pointer; text-align: left; padding: 0; }
-	.gt-tri { color: #6a4c93; font-size: var(--text-sm); width: 12px; flex: none; }
-	.gt-sw { width: 11px; height: 11px; border-radius: 3px; flex: none; }
-	.gt-share { text-align: right; font-weight: 600; white-space: nowrap; font-size: var(--text-sm); }
-
-	.gt-detail { padding: 8px 12px 12px 48px; background: #fbfbf9; border-top: 1px solid var(--color-gray-100); }
-	.gt-terms { font-size: var(--text-sm); color: var(--color-fg-light); margin-bottom: 8px; }
-	.gt-terms code { background: var(--color-gray-100); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
-	.gt-terms code.fic { background: #efe9f5; color: #6a4c93; }
-	.gt-ficlbl { margin: 0 3px 0 5px; color: var(--color-fg-light); }
-	.gt-pct { margin: 0 6px 0 3px; font-size: 0.9em; color: var(--color-fg-light); }
-	.gt-ex-label { display: block; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-fg-light); margin-bottom: 6px; }
-	.gt-ex-list { margin: 0; padding-left: 1.4em; columns: 2; column-gap: 28px; }
-	.gt-ex-list li { font-size: var(--text-sm); line-height: 1.5; break-inside: avoid; color: var(--color-fg); }
-
+	@media (max-width: 640px) {
+		.bk-row { grid-template-columns: 22px minmax(0, 1fr) 56px; }
+		.bk-row .bk-sp { display: none; }
+		.bk-filter { width: 150px; }
+		.g-ex { columns: 1; }
+		.g-detail { padding-left: 22px; }
+	}
 </style>
