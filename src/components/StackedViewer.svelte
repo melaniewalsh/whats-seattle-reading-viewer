@@ -2209,10 +2209,8 @@
 	// ebook and audiobook rode on print's swings. One line per format from zero.
 	const chartLineMode = "line";
 
-	// On the Total chart, label the peak month alongside the latest one ("1 in
-	// July" alone hides that the book once drew 59 a month). Skipped when the
-	// peak is one of the last few months or barely above the latest, where the
-	// end label already tells the story.
+	// On the Total chart, label the peak month (the chart has no latest-month
+	// label, which read like the book's size: "1 in July").
 	const peakMarker = $derived.by(() => {
 		if (chartMode !== "line") return null;
 		const agg = viewSeries.find((s) => s.isAggregate);
@@ -2220,8 +2218,7 @@
 		if (!v || v.length < 6) return null;
 		let k = 0;
 		for (let i = 1; i < v.length; i++) if (v[i] > v[k]) k = i;
-		const last = v[v.length - 1] || 0;
-		if (k >= v.length - 3 || v[k] < 1.1 * Math.max(1, last)) return null;
+		if (!(v[k] > 0)) return null;
 		const m = viewMonths[k];
 		return { month: m, kind: "peak", label: `Peak: ${v[k].toLocaleString()} checkouts`, sub: `${MONTH_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}` };
 	});

@@ -43,6 +43,8 @@
 	});
 
 	let featured = $state(null);
+	const MONTHS_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+	const fmtMonthYear = (m) => `${MONTHS_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
 	let featuredLoaded = false;
 	$effect(() => {
 		if (tab === "home" && !featuredLoaded) {
@@ -518,10 +520,9 @@
 						</div>
 					</div>
 					<div class="featured-chart">
-						<!-- Same style as the trend pages. The end label gives the latest month; the
-						     peak gets its own label only when it isn't that month. -->
+						<!-- Same style as the trend pages: the peak month is labelled. -->
 						<LineChart months={featured.months} series={featured.series} mode="line" smooth
-							markers={featured.peak && featured.peak.idx < featured.months.length - 1 ? [{ month: featured.peak.month, label: "Peak", sub: `${featured.peak.value.toLocaleString()} checkouts` }] : []}
+							markers={featured.peak ? [{ month: featured.peak.month, kind: "peak", label: `Peak: ${featured.peak.value.toLocaleString()} checkouts`, sub: fmtMonthYear(featured.peak.month) }] : []}
 							annotations={EVENT_ANNOTATIONS} />
 					</div>
 					<div class="featured-actions">

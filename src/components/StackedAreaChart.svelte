@@ -62,7 +62,8 @@
 	const endLabelW = $derived.by(() => {
 		if (mode !== 'line' || !endLabels || !series.length) return 0;
 		const shown = series.filter((s) => s.values?.length);
-		if (shown.length <= 1 && (shown[0]?.isAggregate || !shown.length)) return 64;
+		// A single total line has no end label (the peak gets one instead).
+		if (shown.length <= 1 && (shown[0]?.isAggregate || !shown.length)) return 0;
 		// Several named lines: labels wrap onto two lines, so the margin only
 		// needs to fit about half the longest name (wider charts get more room).
 		const longest = Math.max(...shown.map((s) => fullName(s.label).length + 1));
@@ -429,8 +430,10 @@
 	const endMarks = $derived.by(() => {
 		if (mode !== 'line' || !endLabels || !lineLayers.length || months.length < 2) return [];
 		const last = months.length - 1;
-		const main = lineLayers.find((s) => s.isAggregate);
-		const shown = main ? [main] : lineLayers;
+		// A total line gets no "latest month" label: it read as the book's size
+		// ("1 in July"). Only named lines (books, formats, genres) are labelled.
+		if (lineLayers.some((s) => s.isAggregate)) return [];
+		const shown = lineLayers;
 		const n = Math.max(10, Math.floor((margin.right - 45) / 6.6));
 		const items = shown.map((s) => ({ s, v: s.values[last] || 0, ey: y(s.values[last] || 0), lines: wrapName(s.label, n) }));
 		items.sort((a, b) => a.ey - b.ey);
