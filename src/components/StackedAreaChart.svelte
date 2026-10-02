@@ -67,7 +67,7 @@
 		// needs to fit about half the longest name (wider charts get more room).
 		const longest = Math.max(...shown.map((s) => fullName(s.label).length + 1));
 		const cap = width < 520 ? 124 : 200;
-		return Math.min(cap, Math.max(84, Math.round(Math.min(longest, longest / 2 + 6) * 6.6 + 34)));
+		return Math.min(cap, Math.max(84, Math.round(Math.min(longest, longest / 2 + 6) * 6.6 + 45)));
 	});
 	const margin = $derived({
 		top: hasMarkers ? (width < 560 ? 66 : 92) : annotations?.length ? 30 : 16,
@@ -431,7 +431,7 @@
 		const last = months.length - 1;
 		const main = lineLayers.find((s) => s.isAggregate);
 		const shown = main ? [main] : lineLayers;
-		const n = Math.max(10, Math.floor((margin.right - 34) / 6.6));
+		const n = Math.max(10, Math.floor((margin.right - 45) / 6.6));
 		const items = shown.map((s) => ({ s, v: s.values[last] || 0, ey: y(s.values[last] || 0), lines: wrapName(s.label, n) }));
 		items.sort((a, b) => a.ey - b.ey);
 		const lh = 14;
@@ -900,16 +900,16 @@
 				<text class="end-value" x={ex + 8} y={it.ey - 2}>{fmtEnd(it.v)}</text>
 				<text class="end-sub" x={ex + 8} y={it.ey + 12}>in {lastMonthLabel}</text>
 			{:else}
-				<!-- The connector and a bar down the label's side wear the line's color,
-				     so each name is tied to its line (the text stays dark to read well). -->
-				<path class="end-leader" class:dim={focusKey && focusKey !== keyOf(it.s)} stroke={it.s.color} d="M{ex + 5},{it.ey} L{ex + 10},{it.ey} L{ex + 14},{Math.min(Math.max(it.ey, it.ty - 9), it.ty + (it.lines.length - 1) * 14 + 2)}" />
-				<line class="end-bar" class:dim={focusKey && focusKey !== keyOf(it.s)} stroke={it.s.color} x1={ex + 14} x2={ex + 14} y1={it.ty - 10} y2={it.ty + (it.lines.length - 1) * 14 + 3} />
+				<!-- A thin connector in the line's color runs to a swatch before the
+				     name, like the legend (the text stays dark to read well). -->
+				<path class="end-leader" class:dim={focusKey && focusKey !== keyOf(it.s)} stroke={it.s.color} d="M{ex + 5},{it.ey} L{ex + 9},{it.ey} L{ex + 15},{it.ty - 4}" />
+				<rect class="end-swatch" class:dim={focusKey && focusKey !== keyOf(it.s)} fill={it.s.color} x={ex + 15} y={it.ty - 9} width="9" height="9" rx="2" />
 				<text class="end-name" class:dim={focusKey && focusKey !== keyOf(it.s)} class:clickable={!!onSeriesClick}
-					x={ex + 18} y={it.ty} role={onSeriesClick ? 'button' : undefined} tabindex={onSeriesClick ? 0 : undefined}
+					x={ex + 29} y={it.ty} role={onSeriesClick ? 'button' : undefined} tabindex={onSeriesClick ? 0 : undefined}
 					onmouseenter={() => (endHoverKey = keyOf(it.s))} onmouseleave={() => (endHoverKey = null)}
 					onfocus={() => (endHoverKey = keyOf(it.s))} onblur={() => (endHoverKey = null)}
 					onclick={() => onSeriesClick?.(keyOf(it.s))}
-					onkeydown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onSeriesClick) { e.preventDefault(); onSeriesClick(keyOf(it.s)); } }}>{#each it.lines as ln, k}<tspan x={ex + 18} dy={k ? 14 : 0}>{ln}</tspan>{/each}</text>
+					onkeydown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onSeriesClick) { e.preventDefault(); onSeriesClick(keyOf(it.s)); } }}>{#each it.lines as ln, k}<tspan x={ex + 29} dy={k ? 14 : 0}>{ln}</tspan>{/each}</text>
 			{/if}
 		{/each}
 
@@ -1078,9 +1078,9 @@
 	.end-dot { stroke: #fff; stroke-width: 2; }
 	.end-value { font-family: var(--font-sans, system-ui, sans-serif); font-size: 12px; font-weight: 600; fill: #1a1a1a; }
 	.end-sub { font-family: var(--font-sans, system-ui, sans-serif); font-size: 11px; fill: #858585; }
-	.end-leader { fill: none; stroke-width: 1.25; transition: opacity 0.12s; }
-	.end-bar { stroke-width: 2.5; stroke-linecap: round; transition: opacity 0.12s; }
-	.end-leader.dim, .end-bar.dim { opacity: 0.2; }
+	.end-leader { fill: none; stroke-width: 1; transition: opacity 0.12s; }
+	.end-swatch { transition: opacity 0.12s; }
+	.end-leader.dim, .end-swatch.dim { opacity: 0.2; }
 	.end-name { font-family: var(--font-sans, system-ui, sans-serif); font-size: 12px; fill: #1a1a1a; transition: opacity 0.12s; }
 	.end-name.clickable { cursor: pointer; }
 	.end-name.clickable:hover { text-decoration: underline; }
