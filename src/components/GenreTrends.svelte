@@ -74,6 +74,7 @@
 	let dlOpen = $state(false);      // Download menu (Data / Image)
 	let smoothOn = $state(true);     // 3-month averages, as on the author pages
 	let legendHoverKey = $state(null);
+	let plotInset = $state(0); // the chart's right margin, to line the footer up with the plot's edge
 
 	onMount(async () => {
 		try {
@@ -479,7 +480,7 @@
 		</div>
 
 		<div class="chartwrap" bind:this={chartWrap}>
-			<LineChart months={viewMonths} series={chartSeries} mode="line" percent unit="of book checkouts"
+			<LineChart bind:plotInset months={viewMonths} series={chartSeries} mode="line" percent unit="of book checkouts"
 				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={(k) => toggleIsolate(k)} />
 		</div>
 
@@ -497,7 +498,7 @@
 
 		<YearBrush months={data.months} values={data.total} bind:lo bind:hi />
 		<!-- Source on the left; Download and Share as small links on the right -->
-		<div class="chart-foot">
+		<div class="chart-foot" style="padding-right: {Math.max(0, plotInset - 2)}px">
 			<p class="chart-source">Source: Seattle Public Library open data. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap.</p>
 			<div class="tb-right foot-actions">
 				<div class="dl-wrap">

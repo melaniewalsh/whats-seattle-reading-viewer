@@ -68,7 +68,8 @@
 	let isolatedKeys = $state([]); // when non-empty, the chart shows ONLY these series (keys 'g<id>' | 's<idx>'); multiple = compare
 	let hiddenKeys = $state([]); // keys the user has clicked to hide/ignore from the stacked "All titles" chart
 	let showAuthorTotal = $state(true); // show the author's aggregate total line in the line view
-	let smoothOn = $state(true); // draw 3-month averages (raw months as faint bars behind the total)
+	let smoothOn = $state(true);
+	let plotInset = $state(0); // the chart's right margin, to line the footer up with the plot's edge // draw 3-month averages (raw months as faint bars behind the total)
 	let dragIdx = $state(null); // title index currently being dragged onto a group pill
 	let dragGroupId = $state(null); // group pill currently being dragged (to merge into another)
 	let dragOverId = $state(null); // group pill currently under the dragged title/pill
@@ -2181,6 +2182,23 @@
 	// stacked area, but only its bottom band (print) could be read accurately:
 	// ebook and audiobook rode on print's swings. One line per format from zero.
 	const chartLineMode = "line";
+
+	// On the Total chart, label the peak month when the line has fallen well
+	// below it (latest under half the peak): "1 in July" alone hides that the
+	// book once drew 59 a month. Skipped when the peak is one of the last few
+	// months, where the end label already tells the story.
+	const peakMarker = $derived.by(() => {
+		if (chartMode !== "line") return null;
+		const agg = viewSeries.find((s) => s.isAggregate);
+		const v = agg?.values;
+		if (!v || v.length < 6) return null;
+		let k = 0;
+		for (let i = 1; i < v.length; i++) if (v[i] > v[k]) k = i;
+		const last = v[v.length - 1] || 0;
+		if (k >= v.length - 3 || v[k] < 2 * Math.max(1, last)) return null;
+		const m = viewMonths[k];
+		return { month: m, kind: "peak", label: `Peak: ${v[k].toLocaleString()} checkouts`, sub: `${MONTH_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}` };
+	});
 </script>
 
 <div class="viewer">
@@ -2356,7 +2374,7 @@
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
+				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={peakMarker ? [...bookMarkers, peakMarker] : bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
 			</div>
 
 			{#if legendItems.length >= 2}
@@ -2395,7 +2413,7 @@
 			{/if}
 
 			<!-- Source on the left; Download and Share as small links on the right -->
-			<div class="chart-foot">
+			<div class="chart-foot" style="padding-right: {Math.max(0, plotInset - 2)}px">
 			<p class="chart-source">Source: Seattle Public Library open data.{#if bookMarkers.length && chartLineMode === "line"}{" "}Book labels mark the month each title was first checked out at SPL.{/if}</p>
 			<div class="chart-actions tb-actions foot-actions">
 				<div class="dl-wrap">

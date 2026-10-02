@@ -25,7 +25,8 @@
 		markers = [],     // [{ month, label, sub }] — labelled moments on the main line
 		endLabels = true, // line mode: label each line at its right end
 		onSeriesClick = null, // click an end label: (key) => … (e.g. isolate that line)
-		percent = false   // values are percentages (the genre shares), not counts
+		percent = false,  // values are percentages (the genre shares), not counts
+		plotInset = $bindable(0) // out: the plot's right margin, so a page can align to its edge
 	} = $props();
 
 	// Numbers on the axis, end labels and tooltip: counts ("1,200") or, with
@@ -74,6 +75,7 @@
 		bottom: monthTickMode ? 42 : 28,
 		left: 2
 	});
+	$effect(() => { plotInset = margin.right; });
 	// Line labels: cut a long work title at its subtitle, then hard-cap it.
 	function shortName(label) {
 		let t = String(label || '');
@@ -805,10 +807,8 @@
 			</g>
 		{/each}
 		<!-- Month ticks: each year's label sits centered under its run of months
-		     (not off the left edge under January), with a hairline span when the
-		     window covers more than one year. -->
+		     (not off the left edge under January). -->
 		{#each yearSpans as ys}
-			{#if ys.multi}<line class="x-yearspan" x1={ys.x0} x2={ys.x1} y1={height - margin.bottom + 25} y2={height - margin.bottom + 25} />{/if}
 			<text class="x-year" x={ys.cx} y={height - margin.bottom + 37} text-anchor="middle">{ys.year}</text>
 		{/each}
 
@@ -883,7 +883,7 @@
 			<g class="marker" pointer-events="none">
 				{#if !mk.hideText}
 					<line class="marker-leader" x1={mk.lx} x2={mk.lx} y1={mk.ty + (mk.sub ? 20 : 6)} y2={mk.ly - 6} />
-					<text class="marker-title" x={mk.end ? mk.lx + 4 : mk.lx - 4} y={mk.ty} text-anchor={mk.end ? 'end' : 'start'}>{mk.label}</text>
+					<text class="marker-title" class:peak={mk.kind === 'peak'} x={mk.end ? mk.lx + 4 : mk.lx - 4} y={mk.ty} text-anchor={mk.end ? 'end' : 'start'}>{mk.label}</text>
 					{#if mk.sub}
 						<text class="marker-sub" x={mk.end ? mk.lx + 4 : mk.lx - 4} y={mk.ty + 14} text-anchor={mk.end ? 'end' : 'start'}>{mk.sub}</text>
 					{/if}
@@ -1051,6 +1051,8 @@
 	/* Book markers */
 	.marker-leader { stroke: #8a8a8a; stroke-width: 0.75; }
 	.marker-dot { fill: #1a1a1a; stroke: #fff; stroke-width: 1.5; }
+	/* A "Peak" label is a number, not a book title: plain sans, not italic serif. */
+	.marker-title.peak { font-family: var(--font-sans, system-ui, sans-serif); font-style: normal; font-weight: 600; font-size: 12.5px; }
 	.marker-title {
 		font-family: var(--font-serif, Georgia, serif);
 		font-style: italic;
@@ -1149,7 +1151,6 @@
 	}
 
 	text.x-year { font-size: 11px; font-weight: 600; fill: #555; }
-	.x-yearspan { stroke: #cfcfcf; stroke-width: 1; }
 	.tick text {
 		font-size: 11px;
 		fill: #666;
