@@ -12,33 +12,38 @@
 	//   months : string[]  full shared month axis, e.g. ["2006-01", ...]
 	//   values : number[]  same length -- the series drawn as context
 	//   lo, hi : bindable month indices of the selected window (inclusive)
-	let { months = [], values = [], lo = $bindable(0), hi = $bindable(0) } = $props();
+	//   start  : first month index the slider covers (skips the empty years
+	//            before a book or author first circulated)
+	let { months = [], values = [], start = 0, lo = $bindable(0), hi = $bindable(0) } = $props();
 
 	const uid = $props.id();
 
 	let width = $state(680); // measured from the container
-	const TRACK_Y = 8; // vertical center of the slider line
-	const R = 6; // radius of the draggable dots
-	const PAD = 10; // horizontal padding so the dots never clip
-	const height = TRACK_Y * 2;
+	const AREA_H = 36; // height of the gray silhouette
+	const PAD = 6; // horizontal padding so the edge handles never clip
+	const height = AREA_H + 18; // silhouette + the year labels under it
 
-	// Set the range from a typed-in year (reverts the field if it's not a year
-	// in this author's data).
-	function setYearInput(e, which) {
-		const y = String(e.target.value).trim();
-		const yi = years.findIndex((yr) => yr.year === y);
-		if (yi < 0) {
-			e.target.value = which === "lo" ? years[loYear]?.year : years[hiYear]?.year;
-			return;
-		}
-		if (which === "lo") lo = years[Math.min(yi, hiYear)].start;
-		else hi = years[Math.max(yi, loYear)].end;
-	}
+	// The whole history as a small gray silhouette (the context you zoom into).
+	const areaPath = $derived.by(() => {
+		const vs = (values || []).slice(start);
+		if (vs.length < 2) return "";
+		const mx = Math.max(1, ...vs);
+		const pts = vs.map((v, k) => `${xOf(start + k).toFixed(1)},${(AREA_H - ((v || 0) / mx) * (AREA_H - 4)).toFixed(1)}`);
+		return `M${xOf(start).toFixed(1)},${AREA_H} L${pts.join(" L")} L${xOf(values.length - 1).toFixed(1)},${AREA_H} Z`;
+	});
+	// A few year labels under the silhouette: every 1, 2 or 5 years, whichever
+	// keeps them ~70px apart, on round years.
+	const yearTicks = $derived.by(() => {
+		if (!years.length) return [];
+		const fit = Math.max(2, Math.floor((width - PAD * 2) / 70));
+		const step = [1, 2, 5, 10].find((s) => years.length / s <= fit) || 10;
+		return years.filter((y) => Number(y.year) % step === 0).map((y) => ({ x: xOf(y.start), label: y.year }));
+	});
 
 	// The months grouped into years: [{ year, start, end }] (month indices).
 	const years = $derived.by(() => {
 		const out = [];
-		for (let i = 0; i < months.length; i++) {
+		for (let i = start; i < months.length; i++) {
 			const yr = months[i].slice(0, 4);
 			if (!out.length || out[out.length - 1].year !== yr) out.push({ year: yr, start: i, end: i });
 			else out[out.length - 1].end = i;
@@ -46,20 +51,20 @@
 		return out;
 	});
 
-	const n = $derived(Math.max(months.length - 1, 1));
-	const xOf = (i) => PAD + (i / n) * (width - PAD * 2);
-	const idxAt = (px) => Math.round(((px - PAD) / (width - PAD * 2)) * n);
+	const n = $derived(Math.max(months.length - 1 - start, 1));
+	const xOf = (i) => PAD + ((i - start) / n) * (width - PAD * 2);
+	const idxAt = (px) => start + Math.round(((px - PAD) / (width - PAD * 2)) * n);
 
 	// The year bucket a month index falls in.
 	function yearIndexOf(idx) {
 		if (!years.length) return 0;
-		const i = Math.max(0, Math.min(idx, months.length - 1));
+		const i = Math.max(start, Math.min(idx, months.length - 1));
 		for (let yi = 0; yi < years.length; yi++) if (i <= years[yi].end) return yi;
 		return years.length - 1;
 	}
 	const loYear = $derived(yearIndexOf(lo));
 	const hiYear = $derived(yearIndexOf(hi));
-	const isFiltered = $derived(months.length > 0 && (lo > 0 || hi < months.length - 1));
+	const isFiltered = $derived(months.length > 0 && (lo > start || hi < months.length - 1));
 
 	// ---- Dragging (handles snap live to whole years) -----------------------
 	let drag = $state(null); // { type: 'lo'|'hi'|'win', grabYear, loYear0, hiYear0 }
@@ -120,180 +125,85 @@
 	}
 
 	function reset() {
-		lo = 0;
+		lo = start;
 		hi = Math.max(months.length - 1, 0);
 	}
 </script>
 
 <div class="brush">
-	<div class="brush-row">
-		<input
-			class="year-input"
-			type="text"
-			inputmode="numeric"
-			aria-label="First year shown"
-			value={years[loYear]?.year ?? ""}
-			onchange={(e) => setYearInput(e, "lo")}
-		/>
-
-		<div class="brush-track" bind:clientWidth={width}>
-			<svg
-				viewBox="0 0 {width} {height}"
-				class:dragging={drag !== null}
-				role="application"
-				aria-label="Filter the chart to a range of years"
-				onpointerdown={onPointerDown}
-				onpointermove={onPointerMove}
-				onpointerup={onPointerUp}
-				onpointercancel={onPointerUp}
-			>
-				<!-- the full track -->
-				<line class="track" x1={PAD} x2={width - PAD} y1={TRACK_Y} y2={TRACK_Y} />
-				<!-- the selected segment, in the site accent -->
-				<line class="track-sel" x1={xOf(lo)} x2={xOf(hi)} y1={TRACK_Y} y2={TRACK_Y} />
-
-				<!-- the two draggable dots (focusable, arrow keys move by a year) -->
-				{#each [["lo", lo, loYear], ["hi", hi, hiYear]] as [which, idx, yi] (which)}
-			<g
-				class="handle"
-				role="slider"
-				tabindex="0"
-				aria-label={which === "lo" ? "First year shown" : "Last year shown"}
-				aria-valuemin={Number(years[0]?.year ?? 0)}
-				aria-valuemax={Number(years[years.length - 1]?.year ?? 0)}
-				aria-valuenow={Number(years[yi]?.year ?? 0)}
-				aria-valuetext={years[yi]?.year}
-				onkeydown={(e) => onHandleKey(e, which)}
-			>
-				<circle class="dot" cx={xOf(idx)} cy={TRACK_Y} r={R} />
-			</g>
-				{/each}
-			</svg>
-		</div>
-
-		<input
-			class="year-input"
-			type="text"
-			inputmode="numeric"
-			aria-label="Last year shown"
-			value={years[hiYear]?.year ?? ""}
-			onchange={(e) => setYearInput(e, "hi")}
-		/>
+	<div class="brush-track" bind:clientWidth={width} title="Drag to choose which years the chart shows">
+		<svg
+			viewBox="0 0 {width} {height}"
+			class:dragging={drag !== null}
+			role="application"
+			aria-label="Choose which years the chart shows"
+			onpointerdown={onPointerDown}
+			onpointermove={onPointerMove}
+			onpointerup={onPointerUp}
+			onpointercancel={onPointerUp}
+		>
+			<path class="hist" d={areaPath} />
+			<line class="base" x1={PAD} x2={width - PAD} y1={AREA_H} y2={AREA_H} />
+			<!-- the selected years: a light window over the silhouette -->
+			<rect class="window" x={xOf(lo)} y="0" width={Math.max(2, xOf(hi) - xOf(lo))} height={AREA_H} />
+			<!-- draggable edge handles (focusable; arrow keys move a year) -->
+			{#each [["lo", lo, loYear], ["hi", hi, hiYear]] as [which, idx, yi] (which)}
+				<g
+					class="handle"
+					role="slider"
+					tabindex="0"
+					aria-label={which === "lo" ? "First year shown" : "Last year shown"}
+					aria-valuemin={Number(years[0]?.year ?? 0)}
+					aria-valuemax={Number(years[years.length - 1]?.year ?? 0)}
+					aria-valuenow={Number(years[yi]?.year ?? 0)}
+					aria-valuetext={years[yi]?.year}
+					onkeydown={(e) => onHandleKey(e, which)}
+				>
+					<rect class="grip-hit" x={xOf(idx) - 9} y="0" width="18" height={AREA_H} />
+					<rect class="grip" x={xOf(idx) - 2.5} y="4" width="5" height={AREA_H - 8} rx="2" />
+				</g>
+			{/each}
+			{#each yearTicks as t}
+				<text class="yr" x={t.x} y={AREA_H + 14} text-anchor={t.x < 20 ? "start" : "middle"}>{t.label}</text>
+			{/each}
+		</svg>
 	</div>
-
-	{#if isFiltered}
-		<div class="brush-foot">
-			<button class="brush-reset" onclick={reset}>All years ×</button>
-		</div>
-	{/if}
+	{#if isFiltered}<button class="brush-reset" onclick={reset}>Show all years</button>{/if}
 </div>
 
 <style>
-	.brush {
-		margin: 8px 0 16px;
-	}
-
-	/* the year inputs flank the slider line, OWID-timeline style */
-	.brush-row {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-	}
-
-	.brush-track {
-		flex: 1 1 auto;
-		min-width: 0;
-	}
-
-	.year-input {
-		flex: none;
-		width: 3.6em;
-		padding: 2px 4px;
-		font-family: var(--font-sans);
-		font-size: 0.75rem;
-		font-weight: 600;
-		text-align: center;
-		color: var(--color-fg-light);
-		background: var(--color-white);
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-	}
-	.year-input:hover {
-		border-color: var(--color-fg-light);
-	}
-	.year-input:focus {
-		outline: none;
-		border-color: var(--color-fg);
-	}
-
-	.brush-foot {
-		display: flex;
-		justify-content: flex-end;
-		margin-top: 4px;
-	}
-
+	.brush { margin: 18px 0 0; font-family: var(--font-sans); }
 	.brush-reset {
+		display: block;
+		margin: 4px 0 0 auto;
 		background: none;
-		border: none;
+		border: 0;
 		padding: 0;
-		font-family: var(--font-sans);
-		font-size: 0.78rem;
+		font: inherit;
+		font-size: 12px;
 		color: var(--color-fg-light);
 		text-decoration: underline;
+		text-underline-offset: 3px;
 		cursor: pointer;
 	}
-
-	.brush-reset:hover {
-		color: var(--color-fg);
-	}
-
+	.brush-reset:hover { color: var(--color-fg); }
+	.brush-track { min-width: 0; }
 	svg {
 		display: block;
 		width: 100%;
 		height: auto;
 		overflow: visible;
-		touch-action: none; /* so dragging the dots works on phones */
+		touch-action: none; /* so dragging works on phones */
 		cursor: pointer;
 	}
-
-	svg.dragging {
-		cursor: grabbing;
-	}
-
-	/* the full track: a thin gray line */
-	.track {
-		stroke: var(--color-gray-300);
-		stroke-width: 2;
-		stroke-linecap: round;
-	}
-
-	/* the selected span: a slightly stronger muted line */
-	.track-sel {
-		stroke: var(--color-fg-light);
-		stroke-width: 2;
-		stroke-linecap: round;
-	}
-
-	.handle {
-		cursor: grab;
-		outline: none;
-	}
-
-	/* a solid dot you slide along the line */
-	.dot {
-		fill: var(--color-fg-light);
-		stroke: var(--color-white);
-		stroke-width: 2;
-		transition: r 0.1s ease;
-	}
-
-	.handle:hover .dot,
-	.handle:focus-visible .dot {
-		r: 7.5;
-	}
-
-	.handle:focus-visible .dot {
-		stroke: var(--chip-color, #6a4c93);
-		stroke-width: 3;
-	}
+	svg.dragging { cursor: grabbing; }
+	.hist { fill: #d6d4cc; }
+	.base { stroke: #9a9a9a; stroke-width: 1; }
+	.window { fill: rgba(63, 136, 204, 0.12); stroke: #3f88cc; stroke-width: 1; }
+	.handle { cursor: ew-resize; outline: none; }
+	.grip-hit { fill: transparent; }
+	.grip { fill: #3f88cc; transition: fill 0.1s; }
+	.handle:hover .grip { fill: #26597f; }
+	.handle:focus-visible .grip { fill: #26597f; stroke: #fff; stroke-width: 1.5; }
+	.yr { font-size: 11px; fill: #8a8a8a; }
 </style>

@@ -5,6 +5,11 @@
 	import ImageIcon from "@lucide/svelte/icons/image";
 	import LinkIcon from "@lucide/svelte/icons/link";
 	import ShareIcon from "@lucide/svelte/icons/share-2";
+	import DownloadIcon from "@lucide/svelte/icons/download";
+	import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
+	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+	import TableIcon from "@lucide/svelte/icons/table";
+	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
 	import { base } from "$app/paths";
 	import workOverrides from "$data/work-overrides.json";
 	import { displayName } from "$utils/displayName.js";
@@ -17,6 +22,7 @@
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
 	import WikiCard from "$components/WikiCard.svelte";
+	import { wikiSummary, wikiWork } from "$utils/wiki.js";
 	import BorrowMenu from "$components/BorrowMenu.svelte";
 	import Switch from "$components/ui/Switch.svelte";
 	import { getMonths, searchAuthors, searchTitles, searchAll, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks } from "$components/db.js";
@@ -62,6 +68,7 @@
 	let isolatedKeys = $state([]); // when non-empty, the chart shows ONLY these series (keys 'g<id>' | 's<idx>'); multiple = compare
 	let hiddenKeys = $state([]); // keys the user has clicked to hide/ignore from the stacked "All titles" chart
 	let showAuthorTotal = $state(true); // show the author's aggregate total line in the line view
+	let smoothOn = $state(true); // draw 3-month averages (raw months as faint bars behind the total)
 	let dragIdx = $state(null); // title index currently being dragged onto a group pill
 	let dragGroupId = $state(null); // group pill currently being dragged (to merge into another)
 	let dragOverId = $state(null); // group pill currently under the dragged title/pill
@@ -85,7 +92,10 @@
 	let currentSlug = $state(null); // slug of the selected author (for shareable URLs)
 	let isOverview = $state(false); // true when showing the library-wide "all checkouts" landing view (no per-title data)
 	let mobileTableOpen = $state(false); // on narrow screens the title table opens as a drawer
-	let tableCollapsed = $state(true); // the works table starts collapsed; opened via its header or "Make a custom work"
+	let tableCollapsed = $state(false); // the books table is open by default; its header still collapses it
+	let editMode = $state(false); // "Edit groupings": reveals drag handles, exclude, save/reset/custom work
+	let booksShowAll = $state(false); // view mode lists the top BOOKS_PREVIEW books until "Show all"
+	const BOOKS_PREVIEW = 8;
 	let autoHidAuthorTotal = $state(false); // whether we've auto-hidden the author-total line for this author yet
 	let shareMsg = $state(""); // transient toast after copying a share link
 	let shareOpen = $state(false); // whether the share-platform popover is open
@@ -217,7 +227,7 @@
 		autoHidAuthorTotal = false; autoGroupNote = ""; workAssign = {};
 		expandedWorks = []; workOrder = "checkouts"; titleSort = "work";
 		yearLo = 0; yearHi = Math.max(months.length - 1, 0);
-		mobileTableOpen = false; tableCollapsed = true; query = ""; results = [];
+		mobileTableOpen = false; tableCollapsed = false; editMode = false; booksShowAll = false; query = ""; results = [];
 		wikiHover = false;
 		try {
 			const url = new URL(window.location.href);
@@ -354,6 +364,14 @@
 			wantAuthor = sp.get("author");
 		} catch {}
 		try {
+			// A link that names the author (a book name in the Books table, a
+			// ranking) goes straight to that author's own titles: the search index
+			// below only holds books with 500+ checkouts, so smaller ones would
+			// never be found there.
+			if (want && wantAuthor) {
+				await selectTitle({ slug: wantAuthor, title: want, author: "" }, { scroll: true });
+				if (searchedWork) return;
+			}
 			const q = want || "The Fire Next Time";
 			const hits = await searchTitles(q, 50);
 			// searchTitles is a substring match over a popularity-sorted index, so
@@ -771,6 +789,24 @@
 	// Make a new group. If titles are currently single-selected, seed the group
 	// with them (so "select a few, then hit New group" bundles them in one go)
 	// and clear the single selection.
+	// "New book" in the books table: an empty book you fill with "Move to…".
+	// It's a work key in workAssign (like any other book), not a chart group.
+	let customBooks = $state([]); // [{ key, name }]
+	let customBookCounter = 0;
+	function newBook() {
+		const key = `custom-${++customBookCounter}`;
+		customBooks = [{ key, name: "New book" }, ...customBooks];
+		editMode = true;
+	}
+	function renameBook(key, name) {
+		customBooks = customBooks.map((b) => (b.key === key ? { ...b, name: name.trim() || "New book" } : b));
+	}
+	function dropEmptyBook(key) {
+		customBooks = customBooks.filter((b) => b.key !== key);
+	}
+	const isCustomBook = (key) => customBooks.some((b) => b.key === key);
+	const emptyCustomBooks = $derived(customBooks.filter((b) => !workGroups.has(b.key)));
+
 	function addGroup() {
 		const g = {id: ++groupIdCounter, name: "", idxs: [...singleIdxs]};
 		singleIdxs = [];
@@ -1112,6 +1148,7 @@
 	function clearGroupings() {
 		if (currentSlug) { try { localStorage.removeItem(worksLSKey(currentSlug)); } catch {} }
 		workAssign = {};
+		customBooks = [];
 		groups = [];
 		singleIdxs = [];
 		activeGroupId = null;
@@ -1169,6 +1206,10 @@
 		for (const g of groups) {
 			const w = m.get(`g${g.id}`);
 			if (w) w.name = groupLabel(g);
+		}
+		for (const b of customBooks) {
+			const w = m.get(b.key);
+			if (w) w.name = b.name;
 		}
 		return m;
 	});
@@ -1452,7 +1493,49 @@
 		});
 		return blocks;
 	});
-	const visibleWorkBlocks = $derived(workBlocks.slice(0, WORK_BLOCK_CAP));
+	// "Move to…" targets in edit mode: every book (by its table key), plus any
+	// new, still-empty book made with "New book".
+	const moveTargets = $derived.by(() => {
+		// "(N editions)" helps tell apart near-duplicate books, e.g. the big
+		// "Nicholas Nickleby" cluster vs a stray one-edition "Life and Adventures of…".
+		const eds = (n) => `${n} edition${n === 1 ? "" : "s"}`;
+		const out = workBlocks.map((w) => ({ key: w.key, name: `${w.name} (${eds(w.editions.length)})` }));
+		for (const b of emptyCustomBooks) out.unshift({ key: b.key, name: `${b.name} (new, empty)` });
+		return out;
+	});
+	// Move one edition into another book. If that book is plotted, the edition
+	// joins its line too.
+	function moveEdition(idx, key) {
+		if (!key) return;
+		const target = workBlocks.find((w) => w.key === key);
+		const g = target ? groups.find((gr) => gr.idxs.length && target.editions.some((e) => gr.idxs.includes(e.idx))) : null;
+		addEditionToWork(idx, key);
+		if (g && !g.idxs.includes(idx)) g.idxs = [...g.idxs, idx];
+		if (!expandedWorks.includes(key)) expandedWorks = [...expandedWorks, key];
+	}
+	const booksYears = $derived.by(() => {
+		if (!months.length || !current) return "";
+		const lo = isYearFiltered ? yearLo : Math.max(0, current.series.findIndex((v) => v > 0));
+		const hi = isYearFiltered ? yearHi : months.length - 1;
+		const a1 = months[lo]?.slice(0, 4), b1 = months[hi]?.slice(0, 4);
+		return a1 === b1 ? a1 : `${a1}\u2013${b1}`;
+	});
+
+	// View mode shows the top few books; editing, filtering or "Show all" lists them all.
+	const booksCapped = $derived(!editMode && !titleFilter.trim() && !booksShowAll);
+	const visibleWorkBlocks = $derived(workBlocks.slice(0, booksCapped ? BOOKS_PREVIEW : WORK_BLOCK_CAP));
+	// Tiny trend line for a book's row: its checkouts over the visible window.
+	function sparkPath(idxs, w = 78, h = 18) {
+		if (!current || !idxs?.length) return "";
+		const s = sumSeries(idxs);
+		const lo = isYearFiltered ? yearLo : Math.max(0, current.series.findIndex((v) => v > 0));
+		const hi = isYearFiltered ? yearHi : s.length - 1;
+		const seg = s.slice(lo, hi + 1);
+		if (seg.length < 2) return "";
+		const avg = seg.map((_, i) => { let t = 0, n = 0; for (let k = i - 1; k <= i + 1; k++) if (k >= 0 && k < seg.length) { t += seg[k]; n++; } return t / n; });
+		const mx = Math.max(1, ...avg);
+		return avg.map((v, i) => `${i ? "L" : "M"}${(1 + (i * (w - 2)) / (avg.length - 1)).toFixed(1)},${(h - 1 - (v / mx) * (h - 3)).toFixed(1)}`).join("");
+	}
 	const hiddenWorkCount = $derived(Math.max(0, workBlocks.length - visibleWorkBlocks.length));
 
 	let expandedWorks = $state([]); // work keys currently expanded in the table
@@ -1493,7 +1576,7 @@
 		// "Total" (line mode) is the author's overall trend, so a lingering
 		// isolated-title caption doesn't belong — only caption the stacked view.
 		if (chartMode === "line") return "";
-		if (isolatedKeys.length === 1) return keyLabel(isolatedKeys[0]);
+		if (isolatedKeys.length === 1 && isOverview) return keyLabel(isolatedKeys[0]);
 		return "";
 	});
 
@@ -1611,6 +1694,25 @@
 	}
 	const top5Terms = (map) => [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map((e) => e[0]);
 
+	// Subject headings for the page header, tidied for reading. SPL's data strips
+	// LC punctuation ("Dublin Ireland Fiction", "Man woman relationships Fiction"),
+	// mixes in format words ("Large type books", "Novels") and near-duplicates
+	// ("Horror" / "Horror fiction"). Clean that up and keep the top five.
+	const SUBJ_DROP = /^(fiction|nonfiction|non-fiction|literature|novels?|large type books|large print books|audiobooks?|downloadable audio books|electronic books|juvenile fiction|juvenile literature|general|adult|stories)$/i;
+	const PLACES = new Set(["Ireland", "England", "Scotland", "Wales", "France", "Italy", "Spain", "Germany", "Japan", "China", "India", "Mexico", "Canada", "Australia", "Russia", "Nigeria", "Israel", "Egypt", "Greece", "Korea", "Washington", "Calif", "California", "Texas", "Florida", "Alaska", "Oregon", "Mass", "Massachusetts", "Ill", "Illinois", "N.Y", "N Y", "Ohio", "Mich", "Minn", "Ga", "La", "Va", "Pa"]);
+	function cleanSubject(raw) {
+		let t = String(raw || "").replace(/\s+/g, " ").trim();
+		if (!t || SUBJ_DROP.test(t)) return null;
+		// "X Fiction" (capital F, LC form subdivision) -> "X"; keep genre phrases
+		// like "Psychological fiction" or "Science fiction".
+		t = t.replace(/ Fiction$/, "");
+		t = t.replace(/^Man woman\b/, "Man-woman").replace(/^Parent child\b/, "Parent-child");
+		const words = t.split(" ");
+		if (words.length >= 2 && PLACES.has(words[words.length - 1])) t = `${words.slice(0, -1).join(" ")} (${words[words.length - 1]})`;
+		if (!t || SUBJ_DROP.test(t)) return null;
+		return t.charAt(0).toUpperCase() + t.slice(1);
+	}
+
 	// Split display text into segments, marking the run(s) that match the current
 	// table filter, so only the matched word is highlighted (not the whole row).
 	function markMatch(text) {
@@ -1629,23 +1731,68 @@
 		return parts;
 	}
 
-	const subjectTerms = $derived.by(() => {
+	// Up to three short, cleaned, de-duplicated subjects for the header line.
+	const subjectLine = $derived.by(() => {
 		if (!current || isOverview) return [];
+		const m = new Map();
 		if (searchMode === "title") {
 			const gs = groups.filter((g) => g.idxs.length);
-			let idxs = null;
-			if (gs.length === 1 && !singleIdxs.length) idxs = gs[0].idxs;
-			else if (!gs.length && singleIdxs.length === 1) idxs = singleIdxs;
+			const idxs = gs.length === 1 && !singleIdxs.length ? gs[0].idxs : !gs.length && singleIdxs.length === 1 ? singleIdxs : null;
 			if (!idxs) return [];
-			const m = new Map();
 			for (const i of idxs) poolSubjects(m, current.titles[i]?.subjects);
-			return top5Terms(m);
+		} else {
+			poolSubjects(m, current.subjects);
 		}
-		// author mode: already pooled across everything in the build
-		const m = new Map();
-		poolSubjects(m, current.subjects);
-		return top5Terms(m);
+		const out = [];
+		const seen = new Set();
+		for (const [raw] of [...m.entries()].sort((a, b) => b[1] - a[1])) {
+			const c = cleanSubject(raw);
+			// Long compound LC headings ("Odysseus King of Ithaca Mythological
+			// character Poetry") read as noise in a header; keep short ones.
+			if (!c || c.length > 28) continue;
+			const key = c.toLowerCase().replace(/ fiction$/, "");
+			if (seen.has(key)) continue;
+			seen.add(key);
+			out.push(c);
+			if (out.length >= 3) break;
+		}
+		return out;
 	});
+	// SPL catalog subject search for a header subject.
+	const splSubjectUrl = (t) => `https://seattle.bibliocommons.com/v2/search?query=${encodeURIComponent(t.replace(/[()]/g, ""))}&searchType=subject`;
+
+	// Wikipedia's one-line description under the heading: "Irish author (born
+	// 1991)" for an author, "2018 novel by Sally Rooney" for a book. Only shown
+	// when it plausibly describes a writer or a book (a same-named place or
+	// musician is skipped).
+	const DESC_OK = /(author|writer|novelist|poet|journalist|illustrator|cartoonist|historian|playwright|screenwriter|essayist|biographer|memoirist|scholar|critic|editor|professor|philosopher|scientist|activist|politician|comedian|chef|economist|psychologist|novel|book|memoir|collection|series|poem|play|essay|story|graphic)/i;
+	const DESC_PERSON = /(author|writer|novelist|poet|journalist|illustrator|cartoonist|historian|playwright|screenwriter|essayist|biographer|memoirist|scholar|critic|editor|professor|philosopher|scientist|activist|politician|comedian|chef|economist|psychologist|actor|actress|musician|singer|artist|lawyer|physician|theologian|priest|monk|teacher|educator|entrepreneur|television|personality|founder|leader|general|president|emperor|king|queen|saint|(born|died|\d{4}[–-]\d{4}))/i;
+	let headDesc = $state("");
+	let headPhoto = $state(null); // the author's Wikipedia portrait, beside the name
+	$effect(() => {
+		const isTitle = searchMode === "title";
+		const nm = current && !isOverview ? (isTitle ? headingText : displayName(current.name)) : "";
+		const au = current ? displayName(current.name) : "";
+		headDesc = "";
+		headPhoto = null;
+		if (!nm) return;
+		let alive = true;
+		(isTitle ? wikiWork(nm, au) : wikiSummary(nm))
+			.then((s) => {
+				if (!alive) return;
+				const d = (s?.description || "").trim();
+				// On an author page, skip a description of a book: an author without
+				// their own article redirects to their novel ("2026 debut novel by …").
+				const ok = d && DESC_OK.test(d) && (isTitle || (DESC_PERSON.test(d) && !/\bby\b/i.test(d)));
+				headDesc = ok ? d.charAt(0).toUpperCase() + d.slice(1) : "";
+				// Same check for the photo, so a novel's cover (or a namesake) never
+				// stands in for the author.
+				if (!isTitle && ok) headPhoto = s?.thumbnail || null;
+			})
+			.catch(() => {});
+		return () => { alive = false; };
+	});
+
 
 	// StackedViewer.svelte
 	const chartSeries = $derived.by(() => {
@@ -1731,7 +1878,7 @@
 		singleIdxs.forEach((idx, i) => {
 			parts.push({
 				key: `s${idx}`,
-				label: current.titles[idx].title,
+				label: `${cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title} (${formatLabel(current.titles[idx].format)})`,
 				color: singleColor(i),
 				values: current.titles[idx].series,
 				isSingle: true
@@ -1878,7 +2025,22 @@
 			const showBase = lineBaseIsWork || authorTotalShown;
 			return [showBase ? base : null, ...singles].filter(Boolean);
 		}
-		// area mode
+		// "By book" (the non-overview 'area' state): one line per plotted work,
+		// plus any individually plotted editions — compared from a common zero
+		// baseline instead of stacked, so each book's own trend reads directly.
+		if (!isOverview) {
+			const parts = [];
+			groups.forEach((g, gi) => {
+				if (g.idxs.length) parts.push({ key: `g${g.id}`, legendKey: `g${g.id}`, label: groupLabel(g), color: groupColor(gi), values: sumSeries(g.idxs), groupIndex: gi, isGroup: true });
+			});
+			soloSingleIdxs.forEach((idx, i) => {
+				parts.push({ key: `s${idx}`, legendKey: `s${idx}`, label: `${cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title} (${formatLabel(current.titles[idx].format)})`, color: singleColor(i), values: current.titles[idx].series, isSingle: true });
+			});
+			let shown = isolatedKeys.length ? parts.filter((p) => isolatedKeys.includes(p.key)) : parts;
+			shown = shown.filter((p) => !hiddenKeys.includes(p.key));
+			return shown.length ? shown : [authorLine].filter(Boolean);
+		}
+		// area mode (overview "By format")
 		const only = isolatedIdxSet();
 		const hidden = hiddenIdxSet();
 		let areaAll = only ? chartSeries.filter((s) => only.has(s.titleIdx)) : chartSeries;
@@ -1915,7 +2077,7 @@
 		// Based on chartSeries (not displaySeries) so the entry stays put — and
 		// clickable to un-hide — even after "Other" is hidden. key "other" makes it
 		// a toggle like the rest.
-		if (out.length && chartSeries.some((s) => !s.isSelected)) {
+		if (isOverview && out.length && chartSeries.some((s) => !s.isSelected)) {
 			out.push({ label: "Other", color: "oklch(92.2% 0 0)", key: "other" });
 		}
 		return out;
@@ -1931,56 +2093,62 @@
 			? displaySeries.map((s) => ({ ...s, values: s.values.slice(yearLo, yearHi + 1) }))
 			: displaySeries
 	);
+
+	// The year slider's context, over every month: the author's whole record on
+	// an author page (not just the lines currently shown, so isolating one book
+	// doesn't shrink it), or the plotted book on a book page. It starts at the
+	// January the first checkout happened (no empty 2006-on stretch for a 2021
+	// book), and is hidden when there are under two years to zoom.
+	const brushValues = $derived.by(() => {
+		if (searchMode !== "title" && current?.series) return current.series;
+		const out = new Array(months.length).fill(0);
+		for (const s of displaySeries) s.values.forEach((v, i) => { out[i] += v || 0; });
+		return out;
+	});
+	const brushStart = $derived(Math.min(firstActiveMonth(brushValues), yearLo));
+
+	// Book markers on an author's "Total" chart: the month each of their top
+	// three books was FIRST CHECKED OUT at SPL (not its publication or arrival
+	// date — the data can't tell us those). Skipped for books already circulating
+	// when the data begins, and for the author's very first book, whose marker
+	// would just sit at the left edge.
+	const MONTH_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+	const bookMarkers = $derived.by(() => {
+		if (!current || isOverview || searchMode === "title" || chartMode !== "line" || !months.length) return [];
+		const firstActive = current.series.findIndex((v) => v > 0);
+		return [...workGroups.values()]
+			.sort((a, b) => b.total - a.total)
+			.slice(0, 3)
+			// Only label books big enough to matter on the chart (>= 10% of the
+			// author's checkouts), not a small anthology that happens to be new.
+			.filter((w) => w.total >= current.total * 0.1)
+			.map((w) => ({ w, f: sumSeries(w.idxs).findIndex((v) => v > 0) }))
+			// Skip the first three years of data: older books' catalog records
+			// trickle in then, so a "first checkout" there isn't a real debut.
+			.filter((o) => o.f >= 36 && o.f > firstActive + 6)
+			.map((o) => {
+				const m = months[o.f];
+				return { month: m, label: o.w.name, sub: `first checked out ${MONTH_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}` };
+			});
+	});
+
+	const chartLineMode = $derived(isOverview && chartMode === "area" ? "area" : "line");
 </script>
 
 <div class="viewer">
 	{#snippet authorPicker()}
-		<div class="search-row">
-			<label class="ta-field grow">
-				<span>Search</span>
-				<div class="search">
-					<input
-							id="author-search"
-							type="search"
-							placeholder="Search authors or books"
-							aria-label="Search authors or books"
-							bind:value={query}
-							autocomplete="off"
-							onsearch={(e) => (query = e.currentTarget.value)}
-					/>
-			{#if results.length}
-				<ul class="results">
-					{#each results as a}
-						<li>
-							{#if a.kind === "work"}
-								<button onclick={() => pickResult(a)}>
-									<span class="res-line"><span class="res-title">{titleCase(a.title)}</span><span class="res-kind kind-book">Book</span></span>
-									<span class="count res-author">{displayName(a.author)}</span>
-								</button>
-							{:else}
-								<button onclick={() => pickResult(a)}>
-									<span class="res-line"><span>{displayName(a.name)}</span><span class="res-kind kind-author">Author</span></span>
-									<span class="count">{a.total.toLocaleString()}</span>
-								</button>
-							{/if}
-						</li>
-					{/each}
-				</ul>
-				{:else if query.trim().length >= 2}
-					<p class="no-results">Nothing found for “{query.trim()}”.</p>
-				{/if}
-				</div>
-			</label>
-		</div>
-
+		<!-- No search box here: the header search (on every page) does it. Just
+		     a quiet line of starting points. -->
 		<!-- quick-pick: a varied mix (recent, classic, romance, nonfiction), tucked in a dropdown -->
 		{#if searchMode === "title"}
 			{@const picks = mixTitles.length ? mixTitles : topTitles}
 			{#if picks.length}
-				<div class="suggest-row">
-					<button class="suggest-btn" onclick={() => (suggestOpen = !suggestOpen)} aria-expanded={suggestOpen}>Suggestions <span class="suggest-caret" class:open={suggestOpen} aria-hidden="true">▾</span></button>
-					<button class="suggest-btn surprise-btn" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
-				</div>
+				<p class="suggest-row">
+					<span class="suggest-lead">Not sure where to start?</span>
+					<button class="suggest-btn" onclick={() => (suggestOpen = !suggestOpen)} aria-expanded={suggestOpen}><span class="sb-txt">Suggestions</span> <span class="suggest-caret" class:open={suggestOpen} aria-hidden="true">▾</span></button>
+					<span class="suggest-sep" aria-hidden="true">·</span>
+					<button class="suggest-btn surprise-btn" onclick={surpriseMe}>Surprise me</button>
+				</p>
 				{#if suggestOpen}
 					<div class="top-authors suggest-pills">
 						{#each picks as t}
@@ -1992,10 +2160,12 @@
 		{:else}
 			{@const picks = mixAuthors.length ? mixAuthors : topAuthors}
 			{#if picks.length}
-				<div class="suggest-row">
-					<button class="suggest-btn" onclick={() => (suggestOpen = !suggestOpen)} aria-expanded={suggestOpen}>Suggestions <span class="suggest-caret" class:open={suggestOpen} aria-hidden="true">▾</span></button>
-					<button class="suggest-btn surprise-btn" onclick={surpriseMe}><span aria-hidden="true">🎲</span> Surprise me</button>
-				</div>
+				<p class="suggest-row">
+					<span class="suggest-lead">Not sure where to start?</span>
+					<button class="suggest-btn" onclick={() => (suggestOpen = !suggestOpen)} aria-expanded={suggestOpen}><span class="sb-txt">Suggestions</span> <span class="suggest-caret" class:open={suggestOpen} aria-hidden="true">▾</span></button>
+					<span class="suggest-sep" aria-hidden="true">·</span>
+					<button class="suggest-btn surprise-btn" onclick={surpriseMe}>Surprise me</button>
+				</p>
 				{#if suggestOpen}
 					<div class="top-authors suggest-pills">
 						{#each picks as a}
@@ -2008,7 +2178,7 @@
 	{/snippet}
 
 	{#if landing === "search"}
-		{@render authorPicker()}
+		<div class="picker-block">{@render authorPicker()}</div>
 	{/if}
 
 	{#if loadError}
@@ -2023,10 +2193,14 @@
 	{#if current}
 		<div class="author">
 			<div class="split" class:collapsed={tableCollapsed}>
-			<div class="split-main" class:has-work-cover={searchMode === "title" && workCover} bind:this={titleEl}>
+			<div class="split-main" class:has-work-cover={searchMode === "title" ? !!workCover : !!headPhoto} bind:this={titleEl}>
 			{#if searchMode === "title" && workCover}
 				<img class="work-cover" src={workCover} alt="" loading="lazy" onerror={() => (workCover = null)} />
+			{:else if searchMode !== "title" && headPhoto}
+				<img class="work-cover author-photo" src={headPhoto} alt="" loading="lazy" onerror={() => (headPhoto = null)} />
 			{/if}
+			<div class="hd-top">
+			<div class="hd-main">
 			{#if headingText}
 				{#if isOverview}
 					<h2>{headingText}</h2>
@@ -2040,6 +2214,7 @@
 										kind={searchMode === "title" ? "work" : "author"}
 										author={searchMode === "title" ? displayName(current.name) : ""}
 										links={lookupLinks || {}}
+										quiet
 								/>
 							</span>
 						{/if}
@@ -2049,47 +2224,42 @@
 					{/if}
 				{/if}
 			{/if}
+			{#if headDesc}<p class="hd-desc">{headDesc}</p>{/if}
 			<div class="hdr-line">
 				<span class="meta">
 					{#if isOverview}
 						{compactNumber(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 					{:else if searchMode === "title"}
-						by <button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} checkouts all-time{/if}
+						by <button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} checkouts all-time{/if}{#if genreRanks.length}{" · "}<button type="button" class="author-link" onclick={() => openGenre(genreRanks[0].genre)} title="See the most-borrowed {genreRanks[0].genre} books">#{genreRanks[0].rank} in {genreRanks[0].genre}</button>{/if}
 					{:else}
-						{compactNumber(current.total)} checkouts all-time · {workGroups.size.toLocaleString()} works
+						{compactNumber(current.total)} checkouts all-time · {workGroups.size.toLocaleString()} {workGroups.size === 1 ? "work" : "works"}
 					{/if}
 				</span>
 			</div>
+			{#if subjectLine.length}
+				<p class="hd-subjects">{#each subjectLine as term, k}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/each}</p>
+			{/if}
+			</div>
 			{#if lookupLinks}
 			<div class="hdr-actions">
-					<BorrowMenu q={searchMode === "title" ? `${headingText} ${displayName(current.name)}` : headingText} />
+					<BorrowMenu variant="outline" q={searchMode === "title" ? `${headingText} ${displayName(current.name)}` : headingText} />
 					<span class="lookup-wrap">
-						<button class="hdr-chip" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere">Learn <span class="hdr-caret" aria-hidden="true">▾</span></button>
+						<button class="tb-btn" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere"><ExternalLinkIcon size={15} strokeWidth={2} aria-hidden="true" /> Learn more <ChevronDownIcon size={14} strokeWidth={2} aria-hidden="true" /></button>
 						{#if lookupOpen}
 							<button class="share-backdrop" aria-label="Close" onclick={() => (lookupOpen = false)}></button>
 							<div class="lookup-menu" role="menu">
-								<a role="menuitem" href={lookupLinks.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Wikipedia <span aria-hidden="true">↗</span></a>
-								<a role="menuitem" href={lookupLinks.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Goodreads <span aria-hidden="true">↗</span></a>
-								<a role="menuitem" href={lookupLinks.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>LibraryThing <span aria-hidden="true">↗</span></a>
+								<a role="menuitem" href={lookupLinks.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Wikipedia <ArrowUpRightIcon size={14} strokeWidth={2} aria-hidden="true" /></a>
+								<a role="menuitem" href={lookupLinks.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Goodreads <ArrowUpRightIcon size={14} strokeWidth={2} aria-hidden="true" /></a>
+								<a role="menuitem" href={lookupLinks.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>LibraryThing <ArrowUpRightIcon size={14} strokeWidth={2} aria-hidden="true" /></a>
 							</div>
 						{/if}
 					</span>
 			</div>
 			{/if}
-			{#if (searchMode === "title" && genreRanks.length) || subjectTerms.length}
-				<div class="genre-ranks">
-					{#if searchMode === "title"}
-						{#each genreRanks.slice(0, 4) as gr}
-							<button type="button" class="genre-rank" onclick={() => openGenre(gr.genre)} title="See the most-borrowed {gr.genre} books"><strong>#{gr.rank}</strong> in {gr.genre}</button>
-						{/each}
-					{/if}
-					{#each subjectTerms.slice(0, 3) as term}
-						<span class="subj-pill">{term}</span>
-					{/each}
-				</div>
-			{/if}
+			</div>
 
 						<div class="plot-toolbar">
+					<div class="tb-left">
 					<div class="mode-toggle" role="group" aria-label="Chart type">
 				<button
 						type="button"
@@ -2105,7 +2275,6 @@
 							isolatedKeys = [];
 						}}
 				>
-					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M2 20 L2 14 L8 8 L13 12 L22 3 L22 20 Z" fill="currentColor" opacity="0.85"/></svg>
 					Total
 				</button>
 				<button
@@ -2127,17 +2296,56 @@
 							chartMode = "area";
 						}}
 				>
-					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M2 19 L8 11 L13 15 L22 5 L22 20 L2 20 Z" fill="currentColor" opacity="0.85"/></svg>
-					{isOverview ? "By format" : "All titles"}
+					{isOverview ? "By format" : "By book"}
 				</button>
 			</div>
+			{#if chartLineMode === "line"}
+				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
+			{/if}
+					</div>
+					<div class="tb-right">
+			<div class="chart-actions tb-actions">
+				<div class="dl-wrap">
+					<button class="tb-btn" onclick={() => (downloadOpen = !downloadOpen)} title="Download the data or the chart image" aria-haspopup="true" aria-expanded={downloadOpen}>
+						<DownloadIcon size={15} strokeWidth={2} aria-hidden="true" /> Download <ChevronDownIcon size={14} strokeWidth={2} aria-hidden="true" />
+					</button>
+					{#if downloadOpen}
+						<button class="share-backdrop" aria-label="Close download menu" onclick={() => (downloadOpen = false)}></button>
+						<div class="share-menu dl-menu" role="menu">
+							{#if !isOverview}
+								<button role="menuitem" class="share-item" onclick={() => { downloadData(); downloadOpen = false; }}>
+									<span class="share-ic dl-ic" aria-hidden="true"><TableIcon size={15} strokeWidth={2} /></span> Data <span class="dl-fmt">CSV</span>
+								</button>
+							{/if}
+							<button role="menuitem" class="share-item" onclick={() => { downloadChart(); downloadOpen = false; }}>
+								<span class="share-ic dl-ic" aria-hidden="true"><ImageIcon size={15} strokeWidth={2} /></span> Image <span class="dl-fmt">PNG</span>
+							</button>
+						</div>
+					{/if}
+				</div>
+				<div class="share-wrap">
+					<button class="tb-btn" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
+						<ShareIcon size={15} strokeWidth={2} aria-hidden="true" /> Share
+					</button>
+					{#if shareOpen}
+						<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
+						<div class="share-menu" role="menu">
+							<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true"><ImageIcon size={15} strokeWidth={2} /></span> Copy image</button>
+							<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true"><LinkIcon size={15} strokeWidth={2} /></span> Copy link</button>
+							<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true"><ShareIcon size={15} strokeWidth={2} /></span> Share via…</button>
+						</div>
+					{/if}
+				</div>
+				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
+			</div>
 
+					</div>
 					</div>
 					<div class="chart-wrap" bind:this={chartWrap}>
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
+				<LineChart months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" && !isOverview ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
 			</div>
 
 			{#if legendItems.length >= 2}
@@ -2171,53 +2379,16 @@
 				</div>
 			{/if}
 
-			{#if months.length > 1}
-				<YearBrush {months} values={current.series} bind:lo={yearLo} bind:hi={yearHi} />
+			{#if months.length - brushStart >= 24}
+				<YearBrush {months} values={brushValues} start={brushStart} bind:lo={yearLo} bind:hi={yearHi} />
 			{/if}
 
-			<div class="chart-actions">
-				<div class="dl-wrap">
-					<button class="chart-action" onclick={() => (downloadOpen = !downloadOpen)} title="Download the data or the chart image" aria-haspopup="true" aria-expanded={downloadOpen}>
-						<span aria-hidden="true">⤓</span> Download <span class="dl-caret" aria-hidden="true">▾</span>
-					</button>
-					{#if downloadOpen}
-						<button class="share-backdrop" aria-label="Close download menu" onclick={() => (downloadOpen = false)}></button>
-						<div class="share-menu dl-menu" role="menu">
-							{#if !isOverview}
-								<button role="menuitem" class="share-item" onclick={() => { downloadData(); downloadOpen = false; }}>
-									<span class="share-ic dl-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 10h18M9 5v14"/></svg></span> Data <span class="dl-fmt">CSV</span>
-								</button>
-							{/if}
-							<button role="menuitem" class="share-item" onclick={() => { downloadChart(); downloadOpen = false; }}>
-								<span class="share-ic dl-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.5"/><circle cx="8.5" cy="10" r="1.4"/><path d="M21 16l-5-4-8 7"/></svg></span> Image <span class="dl-fmt">PNG</span>
-							</button>
-						</div>
-					{/if}
-				</div>
-				<div class="share-wrap">
-					<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
-						<ShareIcon size={14} strokeWidth={2.2} aria-hidden="true" /> Share
-					</button>
-					{#if shareOpen}
-						<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
-						<div class="share-menu" role="menu">
-							<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true"><ImageIcon size={14} strokeWidth={2.2} /></span> Copy image</button>
-							<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true"><LinkIcon size={14} strokeWidth={2.2} /></span> Copy link</button>
-							<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true"><ShareIcon size={14} strokeWidth={2.2} /></span> Share via…</button>
-						</div>
-					{/if}
-				</div>
-				{#if !isOverview}
-				<button class="chart-action edit-titles-btn" onclick={() => (mobileTableOpen = true)}>
-					<span aria-hidden="true">✎</span> Add/edit titles
-				</button>
-				{/if}
-				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
-			</div>
+			<p class="chart-source">Source: Seattle Public Library open data.{#if bookMarkers.length && chartLineMode === "line"}{" "}Book labels mark the month each title was first checked out at SPL.{/if}</p>
 
 
 
-			{#if !isOverview}
+			<!-- Only while building a "New book": name it and tick editions into it. -->
+			{#if !isOverview && activeGroup}
 			<div class="groups-panel">
 				<div class="groups-header">
 					<span class="groups-label">On the chart</span>
@@ -2331,246 +2502,107 @@
 			</div><!-- /.split-main -->
 
 			{#if !isOverview}
-			<div class="split-side" class:open={mobileTableOpen} class:collapsed={tableCollapsed} bind:this={sideEl}>
-				<div class="side-mobile-head">
-					<span>Add/edit works</span>
-					<button class="side-close" onclick={() => (mobileTableOpen = false)}>Done</button>
+			<!-- Books: every work by this author. Reading mode lets you plot books
+			     and look inside them; "Edit groupings" adds the tools for fixing
+			     how editions are grouped into books. -->
+			<section class="books" bind:this={sideEl} aria-label="Books">
+				<div class="bk-head">
+					<h3 class="bk-title">Books <span class="bk-count">({workGroups.size.toLocaleString()})</span></h3>
+					<div class="bk-tools">
+						<input class="bk-filter" type="search" placeholder="Filter books" bind:value={titleFilter} autocomplete="off" aria-label="Filter books" />
+						<button type="button" class="bk-btn" class:on={editMode} aria-pressed={editMode} onclick={() => (editMode = !editMode)}>{editMode ? "Done editing" : "Edit groupings"}</button>
+					</div>
 				</div>
-				<button class="side-desktop-head" onclick={() => (tableCollapsed = !tableCollapsed)} aria-expanded={!tableCollapsed}>
-					<span class="sdh-label">Add / Edit All Works By This Author{#if workGroups.size} <span class="sdh-count">({workGroups.size.toLocaleString()})</span>{/if}</span>
-					<span class="side-chevron" class:open={!tableCollapsed} aria-hidden="true">▾</span>
-				</button>
-				<div class="titles-header side-filter">
-					<input
-							class="title-filter"
-							type="search"
-							placeholder="Filter titles…"
-							bind:value={titleFilter}
-							onfocus={() => (tableCollapsed = false)}
-							autocomplete="off"
-					/>
-				</div>
-				<div class="titles">
-				<div class="works-min-note">Drag and drop titles into the correct Work, exclude ones that don't belong, or make your own.<details class="works-more"><summary>How does this work?</summary><span class="works-more-body">Every title associated with this author is listed here. We automatically cluster related titles into “Works”—attempting to gather ebooks, audiobooks, and print editions into one category. There may be incorrect or missing titles, especially with series. <a class="works-why" href="#method-clustering">Why is clustering works so hard?</a></span></details></div>
-				{#if titleSort === "work"}
-					<div class="works-actions">
-						<button type="button" class="wa-btn" onclick={saveGroupings} title="Remember this author's grouping in your browser, so your fixes are here next time">💾 Save my groupings</button>
-						<button type="button" class="wa-btn wa-reset" onclick={clearGroupings} title="Discard custom grouping and go back to automatic clustering">↺ Reset to automatic</button>
-						<button type="button" class="wa-btn" onclick={addGroup} title="Start a new, empty work you can drag titles into">＋ Make a custom work</button>
-						{#if curator}<button type="button" class="wa-btn wa-export" onclick={exportGroupings} title="Copy this author's groupings to paste into work_overrides.json">⬇ Export groupings</button>{/if}
-						{#if savedFlash}<span class="wa-saved" role="status">✓ custom grouping saved</span>{/if}
-						{#if exportNote}<span class="wa-saved" role="status">{exportNote}</span>{/if}
+				{#if editMode}
+					<div class="bk-editbar">
+						<p class="bk-editnote">Move editions between books, or split out ones that don't belong. <a class="works-why" href="#method-clustering">Why is this hard?</a></p>
+						<div class="bk-editactions">
+							<button type="button" class="bk-btn" onclick={newBook}>New book</button>
+							<button type="button" class="bk-btn" onclick={clearGroupings}>Reset to automatic</button>
+							<button type="button" class="bk-btn bk-primary" onclick={saveGroupings}>Save my groupings</button>
+							{#if curator}<button type="button" class="bk-btn" onclick={exportGroupings}>Export groupings</button>{/if}
+							{#if savedFlash}<span class="bk-saved" role="status">Saved in this browser</span>{/if}
+							{#if exportNote}<span class="bk-saved" role="status">{exportNote}</span>{/if}
+						</div>
 					</div>
 				{/if}
-				<div class="title-table" role="table" aria-label="Titles, grouped by work" style="--work-w:{workColW}px; --edition-w:{editionColW}px">
-					<div class="tt-head" role="row">
-						<span class="tt-cell tt-plot" role="columnheader" class:editing={activeGroup} title={activeGroup ? `Tick to add editions to “${groupLabel(activeGroup)}”` : "Tick to plot a title on the chart"}></span>
-						<span
-								class="tt-cell tt-work"
-								role="columnheader"
-								aria-sort={titleSort === "work" && workOrder === "name" ? "ascending" : "none"}
-						>
-							<button
-									class="col-sort"
-									class:active={titleSort === "work" && workOrder === "name"}
-									title="Group by work, ordered A–Z"
-									onclick={() => { titleSort = "work"; workOrder = "name"; }}
-							>Work{#if titleSort === "work" && workOrder === "name"}&nbsp;↓{/if}</button>
-							<span class="col-resize" title="Drag to resize" onpointerdown={(e) => startColResize(e, "work")}></span>
-						</span>
-						<span class="tt-cell tt-edition" role="columnheader" aria-label="Edition">
-							<span class="col-resize" title="Drag to widen and see full titles" onpointerdown={(e) => startColResize(e, "edition")}></span>
-						</span>
-						<span
-								class="tt-cell tt-format"
-								role="columnheader"
-								aria-sort={titleSort === "work" && workOrder === "format" ? "ascending" : "none"}
-						>
-							<button
-									class="col-sort"
-									class:active={titleSort === "work" && workOrder === "format"}
-									title="Group by work, ordered by format (print → ebook → audio)"
-									onclick={() => { titleSort = "work"; workOrder = "format"; }}
-							>Format{#if titleSort === "work" && workOrder === "format"}&nbsp;↓{/if}</button>
-						</span>
-						<span
-								class="tt-cell tt-count"
-								role="columnheader"
-								aria-sort={titleSort === "work" && workOrder === "checkouts" ? "descending" : "none"}
-						>
-							<button
-									class="col-sort"
-									class:active={titleSort === "work" && workOrder === "checkouts"}
-									title="Group by work, ordered by total checkouts"
-									onclick={() => { titleSort = "work"; workOrder = "checkouts"; }}
-							>{#if titleSort === "work" && workOrder === "checkouts"}↓&nbsp;{/if}Checkouts</button>
-						</span>
-					</div>
-					{#snippet editionRow(t, showWork, indent)}
-						{@const owner = groupForTitle(t.idx)}
-						{@const ownerIdx = owner ? groups.indexOf(owner) : -1}
-						{@const single = isSingleSelected(t.idx)}
-						{@const singleIdx = single ? singleIdxs.indexOf(t.idx) : -1}
-						{@const ownerColor = owner
-								? groupColor(ownerIdx)
-								: single
-										? singleColor(soloSingleIdxs.indexOf(t.idx))
-										: ""}
-						{@const isCurrentOwner = activeGroupId ? owner?.id === activeGroupId : single}
-						<li
-								class="title-row"
-								role="row"
-								class:dragging={dragIdx === t.idx}
-								draggable={groups.length > 0 || titleSort === "work"}
-								ondragstart={(e) => { dragIdx = t.idx; try { e.dataTransfer.setData("text/plain", String(t.idx)); e.dataTransfer.effectAllowed = "move"; } catch {} }}
-								ondragend={() => { dragIdx = null; dragOverId = null; }}
-						>
-							<label
-									class="tt-row"
-									role="presentation"
-									class:selected={owner !== null || single}
-									class:filter-match={t.match}
-									style={ownerColor ? `--chip-color:${ownerColor}` : ""}
-							>
-								<span class="tt-cell tt-plot" role="cell">
-									<input
-											type="checkbox"
-											aria-label="Plot “{t.title}” on the chart"
-											checked={isCurrentOwner}
-											onchange={() => keepTableStill(() => toggleTitle(t.idx))}
-									/>
+				<div class="bk-row bk-colhead" aria-hidden="true">
+					<span></span><span>Book</span><span class="bk-fmt">Formats</span><span class="bk-sp">{booksYears}</span><span class="bk-num">Checkouts</span>
+				</div>
+				<ul class="bk-list">
+					{#if editMode}
+						{#each emptyCustomBooks as b (b.key)}
+							<li class="bk-row bk-book bk-new">
+								<span></span>
+								<span class="bk-name-cell">
+									<input class="bk-rename" value={b.name} aria-label="Name this book" onchange={(e) => renameBook(b.key, e.currentTarget.value)} onfocus={(e) => e.currentTarget.select()} />
+									<span class="bk-new-note">0 editions · use “Move to…” on any edition to add it here</span>
 								</span>
-								{#if indent}
-									<!-- Edition under an expanded work: the exclude button and the
-									     edition title share one cell that spans the (otherwise empty)
-									     Work column, pulling the title far to the left. -->
-									<span
-											class="tt-cell tt-edition span-work"
-											role="cell"
-											onmousemove={(e) => (hoverTip = { text: titleCase(t.title), x: e.clientX, y: e.clientY })}
-											onmouseleave={() => (hoverTip = null)}
-									>
-										<button
-												class="exclude-btn"
-												title="Pull this edition out of the work — make it its own work"
-												onclick={() => excludeEdition(t.idx)}
-										>exclude</button>
-										{#if (owner || single) && !isCurrentOwner}
-											<span class="other-group-dot"
-												  title="In “{owner ? groupLabel(owner) : titleCase(t.title)}”"></span>
-										{/if}
-										<span class="t-name">{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}</span>
-									</span>
+								<span class="bk-fmt"></span>
+								<span class="bk-sp"></span>
+								<span class="bk-num"><button type="button" class="bk-x" title="Remove this empty book" aria-label="Remove this empty book" onclick={() => dropEmptyBook(b.key)}>×</button></span>
+							</li>
+						{/each}
+					{/if}
+					{#each visibleWorkBlocks as w (w.key)}
+						{@const wColor = workPlotColor(w)}
+						{@const open = isExpanded(w.key) || (titleFilter.trim() && w.matchCount > 0)}
+						{@const fmts = ["ebook", "audiobook", "print", "largeprint"].filter((f) => w.editions.some((e) => e.format === f))}
+						{#if !w.filteredOut}
+						<li class="bk-row bk-book" class:plotted={!!wColor}>
+							<input type="checkbox" class="bk-check" checked={isWorkPlotted(w.key)}
+								indeterminate={!isWorkPlotted(w.key) && w.editions.some((e) => groupForTitle(e.idx) || isSingleSelected(e.idx))}
+								onchange={() => keepTableStill(() => toggleWork(w.key))}
+								aria-label="Plot {w.name} on the chart" />
+							<span class="bk-name-cell">
+								{#if wColor}<span class="bk-swatch" style="background:{wColor}"></span>{/if}
+								{#if editMode && isCustomBook(w.key)}
+									<input class="bk-rename" value={w.name} aria-label="Name this book" onchange={(e) => renameBook(w.key, e.currentTarget.value)} />
+								{:else if editMode || !currentSlug}
+									<span class="bk-name">{#each markMatch(w.name) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}</span>
 								{:else}
-									<span class="tt-cell tt-work" role="cell" title={showWork ? t.workName : ""}>
-										{#if showWork}
-											<span class="tt-work-name">{t.workName}</span>
-										{/if}
-									</span>
-									<span
-											class="tt-cell tt-edition"
-											role="cell"
-											onmousemove={(e) => (hoverTip = { text: titleCase(t.title), x: e.clientX, y: e.clientY })}
-											onmouseleave={() => (hoverTip = null)}
-									>
-										{#if (owner || single) && !isCurrentOwner}
-											<span class="other-group-dot"
-												  title="In “{owner ? groupLabel(owner) : titleCase(t.title)}”"></span>
-										{/if}
-										<span class="t-name">{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}</span>
-									</span>
+									<!-- The name opens the book's own page; the checkbox plots it here. -->
+									{@const top = w.editions.reduce((a, b) => (b.total > a.total ? b : a))}
+									<button type="button" class="bk-name bk-open" title="Open the page for {w.name}" onclick={() => openTitle(isCustomBook(w.key) ? current.titles[top.idx].title : w.name, currentSlug)}>{#each markMatch(w.name) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{"\u00A0"}<span class="bk-open-arrow" aria-hidden="true">→</span></button>
 								{/if}
-								<span class="tt-cell tt-format" role="cell">
-									<span class="badge badge-{t.format}">{formatLabel(t.format)}</span>
-								</span>
-								<span class="tt-cell tt-count" role="cell">{compactNumber(t.total)}</span>
-							</label>
+								<button type="button" class="bk-eds" aria-expanded={!!open} onclick={() => toggleExpand(w.key)}>{w.editions.length} edition{w.editions.length === 1 ? "" : "s"}<span class="bk-caret" class:up={open} aria-hidden="true"></span></button>
+							</span>
+							<span class="bk-fmt">{fmts.map((f, k) => { const l = formatLabel(f); return k ? l : l.charAt(0).toUpperCase() + l.slice(1); }).join(" · ")}</span>
+							<svg class="bk-sp bk-spark" width="84" height="20" viewBox="0 0 84 20" aria-hidden="true"><path d={sparkPath(w.editions.map((e) => e.idx), 84, 20)} stroke={wColor || "#b4b2a9"} /></svg>
+							<span class="bk-num">{compactNumber(w.total)}</span>
 						</li>
-					{/snippet}
-
-					<ul class="title-list" role="rowgroup">
-						{#if titleSort === "work"}
-							{#each visibleWorkBlocks as w (w.key)}
-								{@const multi = w.editions.length > 1}
-								{@const fmts = [...new Set(w.editions.map((e) => e.format))]}
-								{@const wColor = workPlotColor(w)}
-								<li
-										class="work-header"
-										role="row"
-										class:cluster={multi}
-										class:expanded={workOpen(w)}
-										class:plotted={!!wColor}
-										class:work-drop={dragOverWorkKey === w.key}
-										class:filtered-hidden={w.filteredOut && !dragActive}
-										class:hl={hlWorkKey === w.key}
-										style={wColor ? `--chip-color:${wColor}` : ""}
-										draggable="true"
-										onmouseenter={() => (hlWorkKey = w.key)}
-										onmouseleave={() => (hlWorkKey === w.key && (hlWorkKey = null))}
-										ondragstart={(e) => { dragWorkKey = w.key; try { e.dataTransfer.setData("text/plain", w.key); e.dataTransfer.effectAllowed = "move"; } catch {} }}
-										ondragend={() => { dragWorkKey = null; dragOverWorkKey = null; }}
-										ondragover={(e) => { if ((dragWorkKey && dragWorkKey !== w.key) || dragIdx !== null) { e.preventDefault(); dragOverWorkKey = w.key; } }}
-										ondragleave={() => (dragOverWorkKey === w.key && (dragOverWorkKey = null))}
-										ondrop={(e) => { e.preventDefault(); if (dragWorkKey && dragWorkKey !== w.key) mergeWorks(dragWorkKey, w.key); else if (dragIdx !== null) addEditionToWork(dragIdx, w.key); dragWorkKey = null; dragOverWorkKey = null; dragIdx = null; }}
-								>
-									<span class="tt-cell tt-plot" role="cell">
-										<input
-												type="checkbox"
-												class="plot-check"
-												aria-label={multi ? `Plot the work “${w.name}” (${w.editions.length} editions) on the chart` : `Plot “${w.name}” on the chart`}
-												title={multi ? `Plot “${w.name}” — all ${w.editions.length} editions as one line` : `Plot “${w.name}”`}
-												checked={isWorkPlotted(w.key)}
-												indeterminate={!isWorkPlotted(w.key) && w.editions.some((e) => groupForTitle(e.idx) || isSingleSelected(e.idx))}
-												onchange={() => keepTableStill(() => toggleWork(w.key))}
-										/>
-									</span>
-									<span class="tt-cell tt-work" role="cell" title={w.name}>
-										<button
-												class="disclosure"
-												aria-expanded={workOpen(w)}
-												aria-label="{workOpen(w) ? 'Collapse' : 'Expand'} {w.name}"
-												onclick={() => toggleExpand(w.key)}
-										>{workOpen(w) ? "▾" : "▸"}</button>
-										<span class="tt-work-name">{w.name}</span>
-									</span>
-									<button class="tt-cell tt-edition ed-summary" onclick={() => toggleExpand(w.key)}>
-											{#if multi}
-												<span class="cluster-badge" class:has-match={w.matchCount > 0}>{w.editions.length} editions</span>{#if w.matchCount > 0}<span class="match-note"> · {w.matchCount} match{w.matchCount === 1 ? "" : "es"}</span>{/if}
-											{:else}
-												<span class="ed-single">1 edition</span>
-											{/if}
-										</button>
-									<span class="tt-cell tt-format" role="cell">
-										{#each fmts as f}<span class="badge badge-{f}">{formatLabel(f)}</span>{/each}
-									</span>
-									<span class="tt-cell tt-count" role="cell">{compactNumber(w.total)}</span>
+						{#if open}
+							{#each w.editions.slice().sort((a, b) => b.total - a.total) as t (t.idx)}
+								<li class="bk-row bk-ed" class:editing={editMode} class:hit={t.match}>
+									<input type="checkbox" class="bk-check"
+										checked={activeGroupId ? groupForTitle(t.idx)?.id === activeGroupId : isSingleSelected(t.idx)}
+										onchange={() => keepTableStill(() => toggleTitle(t.idx))}
+										aria-label="Plot this edition on its own: {t.title}" />
+									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}</span>
+									{#if editMode}
+										<span class="bk-ed-tools">
+											<select class="bk-move" aria-label="Move this edition to another book" onchange={(e) => { moveEdition(t.idx, e.currentTarget.value); e.currentTarget.value = ""; }}>
+												<option value="">Move to…</option>
+												{#each moveTargets as mt (mt.key)}{#if mt.key !== w.key}<option value={mt.key}>{mt.name}</option>{/if}{/each}
+											</select>
+											<button type="button" class="bk-x" title="Split this edition out into its own book" aria-label="Split out this edition" onclick={() => excludeEdition(t.idx)}>×</button>
+										</span>
+									{/if}
+									<span class="bk-num">{t.total.toLocaleString()}</span>
 								</li>
-								{#if workOpen(w)}
-									{#each (filtering ? w.editions.filter((e) => e.match) : w.editions) as t (t.idx)}
-										{@render editionRow(t, false, true)}
-									{/each}
-								{/if}
-							{/each}
-						{:else}
-							{#each visibleTitles as t (t.idx)}
-								{@render editionRow(t, t.firstOfWork, false)}
 							{/each}
 						{/if}
-					</ul>
-				</div>
-				{#if titleSort === "work" && hiddenWorkCount > 0}
-					<p class="titles-more">
-						Showing the top {visibleWorkBlocks.length} works. {hiddenWorkCount.toLocaleString()} more —
-						type in the filter above to find a specific one.
-					</p>
-				{:else if titleSort !== "work" && hiddenTitleCount > 0}
-					<p class="titles-more">
-						Showing the top {visibleTitles.length} titles. {hiddenTitleCount.toLocaleString()} more —
-						type in the filter above to find a specific one.
-					</p>
+						{/if}
+					{/each}
+				</ul>
+				{#if booksCapped && workBlocks.length > BOOKS_PREVIEW}
+					<button type="button" class="books-more" onclick={() => (booksShowAll = true)}>Show all {workBlocks.length.toLocaleString()} books</button>
+				{:else if booksShowAll && !editMode && !titleFilter.trim() && workBlocks.length > BOOKS_PREVIEW}
+					<button type="button" class="books-more" onclick={() => (booksShowAll = false)}>Show fewer</button>
+				{:else if hiddenWorkCount > 0}
+					<p class="titles-more">Showing the top {visibleWorkBlocks.length.toLocaleString()} books. Type in the filter to find others.</p>
 				{/if}
-			</div>
-			</div><!-- /.split-side -->
+			</section>
 			{/if}
 			</div><!-- /.split -->
 		</div>
@@ -2790,10 +2822,51 @@
 		border-radius: 3px;
 		box-shadow: 0 1px 5px rgba(0, 0, 0, 0.22);
 	}
-	.split-main.has-work-cover .hd-name,
-	.split-main.has-work-cover .hdr-line {
+	/* Author portrait: same slot as a book cover, cropped to the face. */
+	.work-cover.author-photo {
+		height: 58px;
+		max-height: none;
+		object-fit: cover;
+		object-position: 50% 20%;
+		border-radius: 4px;
+	}
+	.split-main.has-work-cover .hd-main {
 		padding-left: 60px;
 	}
+	/* Header: name, description, subjects and counts on the left; Borrow and
+	   Learn on the right of the name row (they wrap under it on phones). */
+	.hd-top {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: var(--space-3) var(--space-5);
+		flex-wrap: wrap;
+	}
+	.hd-main { min-width: 0; flex: 1 1 360px; }
+	.hd-top .hdr-actions { margin: 6px 0 0; flex: 0 1 auto; max-width: 100%; }
+	.split-main.has-work-cover .hd-top .hdr-actions { margin-top: 6px; }
+	.hd-desc {
+		font-family: var(--font-sans);
+		font-size: 1.02rem;
+		line-height: 1.4;
+		color: var(--color-fg);
+		margin: 4px 0 0;
+	}
+	.hd-subjects {
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		line-height: 1.6;
+		color: var(--color-fg-light);
+		margin: 2px 0 0;
+	}
+	.hd-subjects a {
+		color: var(--color-fg-light);
+		text-decoration: underline;
+		text-decoration-color: var(--color-border);
+		text-underline-offset: 3px;
+	}
+	.hd-subjects a:hover { color: var(--color-fg); text-decoration-color: currentColor; }
+	.hd-sep { color: #aaa; }
 	/* "#N in Genre" ranking badges under the work title. */
 	.genre-ranks {
 		display: flex;
@@ -3165,11 +3238,9 @@
 	}
 	.sdh-label {
 		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: 700;
-		color: var(--color-fg-light);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
+		font-size: 1.05rem;
+		font-weight: 600;
+		color: var(--color-fg);
 	}
 	.sdh-count {
 		margin-left: 5px;
@@ -3191,14 +3262,15 @@
 		transform: rotate(180deg);
 	}
 
-	/* On desktop the works panel is one gray card (matching the "On the chart"
-	   panel); the header is a toggle inside it. */
+	/* On desktop the books table is its own section under the chart: a heading
+	   rule, no card. The heading still collapses it. */
 	@media (min-width: 861px) {
 		.split-side {
-			background: var(--color-gray-100);
-			border: 1px solid var(--color-border);
-			border-radius: var(--radius-md);
-			padding: 4px 16px 16px;
+			background: none;
+			border: 0;
+			border-top: 1px solid var(--color-border);
+			border-radius: 0;
+			padding: 6px 0 0;
 		}
 		.side-desktop-head {
 			display: flex;
@@ -3234,6 +3306,7 @@
 			position: static;
 			margin: 0 0 8px;
 		}
+		.split-main.has-work-cover .hd-main,
 		.split-main.has-work-cover .hd-name,
 		.split-main.has-work-cover .hdr-line {
 			padding-left: 0;
@@ -3373,7 +3446,7 @@
 		flex-wrap: wrap;
 		align-items: baseline;
 		gap: 3px 8px;
-		margin: 3px 0 8px;
+		margin: 4px 0 0;
 		font-family: var(--font-sans);
 		color: var(--color-fg-light);
 	}
@@ -4178,6 +4251,40 @@
 		border-color: #6a4c93;
 		color: var(--color-white);
 	}
+	/* starting points as one quiet line of text links */
+	p.suggest-row { margin: 4px 0 6px; gap: 6px; font-size: var(--text-sm); color: var(--color-fg-light); }
+	.suggest-lead { margin-right: 2px; }
+	.suggest-sep { color: #aaa; }
+	p.suggest-row .suggest-btn,
+	p.suggest-row .surprise-btn {
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		background: none;
+		font-size: var(--text-sm);
+		font-weight: 500;
+		color: var(--color-fg);
+		text-decoration: underline;
+		text-decoration-color: var(--color-border);
+		text-underline-offset: 3px;
+	}
+	p.suggest-row .suggest-btn:hover,
+	p.suggest-row .surprise-btn:hover { background: none; color: var(--color-fg); text-decoration-color: currentColor; }
+	/* Closes the page masthead: the intro + starting points, then the rule. */
+	.picker-block {
+		border-bottom: 3px solid var(--color-fg);
+		padding-bottom: 12px;
+		margin-bottom: 16px;
+	}
+	.picker-block p.suggest-row { margin: 8px 0 0; }
+	/* Underline the word only, not the caret beside it. */
+	p.suggest-row .suggest-btn:not(.surprise-btn) { text-decoration: none; }
+	.sb-txt {
+		text-decoration: underline;
+		text-decoration-color: var(--color-border);
+		text-underline-offset: 3px;
+	}
+	.suggest-btn:hover .sb-txt { text-decoration-color: currentColor; }
 	.suggest-caret {
 		font-size: var(--text-xs);
 		transition: transform 0.15s ease;
@@ -4235,6 +4342,7 @@
 	/* Row above the plot: Line/Area toggle on the left, "Show top works" on the
 	   right so it's prominent instead of buried in the panel below. */
 	.plot-toolbar {
+		margin-top: var(--space-5) !important;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -4244,6 +4352,97 @@
 	}
 	.plot-toolbar .mode-toggle {
 		margin: 0;
+	}
+	/* The chart's view toggle: two ordinary buttons side by side (no shared
+	   pill outline); the selected one is filled. */
+	.plot-toolbar .mode-toggle {
+		border: 0;
+		border-radius: 0;
+		overflow: visible;
+		gap: 6px;
+	}
+	.plot-toolbar .mode-toggle button {
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		padding: 7px 13px;
+		font-weight: 500;
+		color: var(--color-fg);
+	}
+	.plot-toolbar .mode-toggle button + button { border-left: 1px solid var(--color-border); }
+	.plot-toolbar .mode-toggle button:hover:not(.active) { border-color: var(--color-fg-light); }
+	.plot-toolbar .mode-toggle button.active {
+		background: var(--color-fg);
+		border-color: var(--color-fg);
+		color: var(--color-white);
+	}
+	.tb-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+	.tb-right { display: flex; align-items: center; }
+	.chart-actions.tb-actions { margin: 0; }
+	.chart-actions.tb-actions > .dl-wrap,
+	.chart-actions.tb-actions > .share-wrap { flex: none; min-width: auto; }
+	/* One quiet button style for the page: Learn more, Download, Share (Borrow
+	   at SPL matches it from BorrowMenu's outline variant). */
+	.tb-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		font-weight: 500;
+		line-height: 1;
+		padding: 7px 11px;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-white);
+		color: var(--color-fg);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.tb-btn:hover { border-color: var(--color-fg-light); }
+	/* Menus in the same quiet style as the buttons */
+	.share-menu, .lookup-menu {
+		min-width: 196px;
+		padding: 4px;
+		border-radius: 8px;
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+	}
+	.share-menu .share-item, .lookup-menu a {
+		gap: 10px;
+		padding: 8px 10px;
+		border-radius: 6px;
+		font-size: var(--text-sm);
+		font-weight: 500;
+		color: var(--color-fg);
+	}
+	.share-menu .share-item:hover, .lookup-menu a:hover { background: var(--color-gray-100); }
+	.share-menu .share-ic {
+		width: 16px;
+		height: 16px;
+		border-radius: 0;
+		background: none !important;
+		color: var(--color-fg-light);
+	}
+	.share-menu .share-ic :global(svg) { display: block; width: 15px; height: 15px; }
+	.share-menu .dl-fmt { font-size: 11px; font-weight: 500; letter-spacing: 0.03em; opacity: 1; }
+	.lookup-menu a :global(svg) { width: 14px; height: 14px; color: var(--color-fg-light); flex: none; }
+	.tb-btn :global(svg) { flex: none; width: 15px; height: 15px; color: var(--color-fg-light); }
+	.tb-btn :global(svg.lucide-chevron-down) { width: 14px; height: 14px; }
+	.smooth-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		color: var(--color-fg-light);
+		cursor: pointer;
+		user-select: none;
+	}
+	.smooth-toggle input { margin: 0; accent-color: var(--color-fg); }
+	.chart-source {
+		font-family: var(--font-sans);
+		font-size: 12px;
+		color: #8a8a8a;
+		margin: 6px 0 0;
 	}
 	.top-works-btn {
 		font-family: var(--font-sans);
@@ -4361,6 +4560,170 @@
 		margin-bottom: 8px;
 	}
 
+	/* ---- Books table (under the chart) -------------------------------- */
+	.books {
+		margin: var(--space-6) 0 var(--space-4);
+		padding-top: var(--space-4);
+		border-top: 1px solid var(--color-border);
+		font-family: var(--font-sans);
+	}
+	.bk-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 10px 16px;
+		flex-wrap: wrap;
+		margin: 0 0 10px;
+	}
+	.bk-title { font-family: var(--font-sans); font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--color-fg); }
+	.bk-count { font-weight: 400; color: var(--color-fg-light); }
+	.bk-tools { display: flex; gap: 8px; align-items: center; }
+	.bk-filter {
+		width: 180px;
+		padding: 7px 10px;
+		font: inherit;
+		font-size: var(--text-sm);
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-white);
+	}
+	.bk-btn {
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		font-weight: 500;
+		padding: 7px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-white);
+		color: var(--color-fg);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.bk-btn:hover { border-color: var(--color-fg-light); }
+	.bk-btn.on, .bk-btn.bk-primary { background: var(--color-fg); border-color: var(--color-fg); color: var(--color-white); }
+	.bk-editbar {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 10px;
+		flex-wrap: wrap;
+		background: var(--color-gray-100);
+		border-radius: 8px;
+		padding: 10px 12px;
+		margin: 0 0 10px;
+	}
+	.bk-editnote { margin: 0; font-size: var(--text-sm); color: var(--color-fg-light); }
+	.bk-editactions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+	.bk-saved { font-size: var(--text-sm); color: #1f7a4d; }
+	.bk-list { list-style: none; margin: 0; padding: 0; }
+	.bk-row {
+		display: grid;
+		grid-template-columns: 22px minmax(0, 1fr) 150px 84px 76px;
+		gap: 12px;
+		align-items: center;
+		padding: 9px 0;
+		border-top: 1px solid var(--color-gray-100, #eee);
+	}
+	.bk-colhead {
+		padding: 0 0 6px;
+		border-top: 0;
+		border-bottom: 1px solid var(--color-border);
+		font-size: 12px;
+		color: var(--color-fg-light);
+	}
+	.bk-check { margin: 0; accent-color: var(--color-fg); }
+	.bk-name-cell { min-width: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+	.bk-swatch { display: inline-block; width: 12px; height: 3px; border-radius: 2px; align-self: center; flex: none; }
+	.bk-name { font-family: var(--font-serif); font-size: 1rem; color: var(--color-fg); }
+	/* Book names link to the book's page: always underlined (like the header's
+	   subject links) with an arrow glued to the last word, so they read as links
+	   at rest, not only on hover. The checkbox is what plots a book here. */
+	.bk-open {
+		background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+		text-align: left; line-height: inherit;
+		text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px;
+	}
+	.bk-open:hover, .bk-open:focus-visible { text-decoration-color: currentColor; }
+	.bk-open-arrow { font-family: var(--font-sans); font-size: 0.85em; color: var(--color-fg-light); }
+	.bk-open:hover .bk-open-arrow, .bk-open:focus-visible .bk-open-arrow { color: var(--color-fg); }
+	.bk-eds {
+		font: inherit;
+		font-size: 12px;
+		color: var(--color-fg-light);
+		background: none;
+		border: 0;
+		padding: 0;
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+	}
+	.bk-eds:hover { color: var(--color-fg); text-decoration: underline; text-underline-offset: 3px; }
+	.bk-caret { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid currentColor; }
+	.bk-caret.up { border-top: 0; border-bottom: 5px solid currentColor; }
+	.bk-fmt { font-size: 12px; color: var(--color-fg-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.bk-spark { display: block; }
+	.bk-spark path { fill: none; stroke-width: 1.5; stroke-linejoin: round; }
+	.bk-num { text-align: right; font-size: var(--text-sm); font-variant-numeric: tabular-nums; color: var(--color-fg); white-space: nowrap; }
+	.bk-colhead .bk-num, .bk-colhead .bk-sp { color: var(--color-fg-light); }
+	/* editions under an open book */
+	.bk-ed { grid-template-columns: 22px minmax(0, 1fr) 76px; padding: 5px 0 5px 22px; border-top: 0; font-size: var(--text-sm); color: var(--color-fg-light); }
+	.bk-ed.editing { grid-template-columns: 22px minmax(0, 1fr) auto 76px; }
+	.bk-ed .bk-num { color: var(--color-fg-light); }
+	.bk-ed-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.bk-rename { font-family: var(--font-serif); font-size: 1rem; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-white); color: var(--color-fg); min-width: 0; width: 16em; max-width: 100%; }
+	.bk-new { background: #fbfaf6; }
+	.bk-new-note { font-size: 12px; color: var(--color-fg-light); }
+	.bk-ed-swatch { display: inline-block; vertical-align: middle; margin-right: 8px; }
+	.bk-ed-fmt { display: inline-block; min-width: 4.2em; margin-right: 8px; color: var(--color-fg); }
+	.bk-ed-tools { display: flex; gap: 6px; align-items: center; }
+	.bk-move { font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-white); color: var(--color-fg); -webkit-appearance: menulist; appearance: auto; max-width: 190px; }
+	.bk-x { font: inherit; font-size: 15px; line-height: 1; padding: 3px 8px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-white); color: var(--color-fg-light); cursor: pointer; }
+	.bk-x:hover { color: var(--color-fg); border-color: var(--color-fg-light); }
+	@media (max-width: 640px) {
+		.bk-row { grid-template-columns: 22px minmax(0, 1fr) 60px; }
+		.bk-row .bk-fmt, .bk-row .bk-sp { display: none; }
+		.bk-ed.editing { grid-template-columns: 22px minmax(0, 1fr) 60px; }
+		.bk-ed.editing .bk-ed-tools { grid-column: 2 / -1; grid-row: 2; }
+		.bk-filter { width: 140px; }
+	}
+
+	/* Edit groupings: a plain button beside the filter; filled while editing. */
+	.edit-toggle {
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		font-weight: 500;
+		padding: 8px 13px;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-white);
+		color: var(--color-fg);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.edit-toggle:hover { border-color: var(--color-fg-light); }
+	.edit-toggle.on { background: var(--color-fg); border-color: var(--color-fg); color: var(--color-white); }
+	.books-more {
+		display: block;
+		margin: 10px 0 0;
+		padding: 0;
+		border: 0;
+		background: none;
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		color: var(--color-fg-light);
+		text-decoration: underline;
+		text-underline-offset: 3px;
+		cursor: pointer;
+	}
+	.books-more:hover { color: var(--color-fg); }
+	/* per-book trend line, inside the checkouts cell */
+	.work-header .tt-count { display: inline-flex; align-items: center; justify-content: flex-end; gap: 10px; white-space: nowrap; }
+	.work-header .tt-count .row-spark { flex: none; display: block; width: 78px; height: 18px; max-width: none; }
+	/* view mode: the table is part of the page, not its own scroll box */
+	.split-side .title-table.flow { max-height: none; overflow: visible; border: 0; border-top: 1px solid var(--color-border); border-radius: 0; }
+	.row-spark path { fill: none; stroke-width: 1.5; stroke-linejoin: round; }
+	@media (max-width: 860px) { .row-spark { display: none; } }
 	.title-filter {
 		flex: 1;
 		min-width: 180px;
@@ -4426,7 +4789,7 @@
 		/* Work is capped at a fixed max (not an fr) so it never balloons on wide
 		   screens and shove the edition titles far to the right; Edition takes all
 		   the slack, keeping edition titles anchored just left of center. */
-		grid-template-columns: 26px minmax(110px, 300px) minmax(0, 1fr) auto minmax(92px, auto);
+		grid-template-columns: 26px minmax(110px, 300px) minmax(0, 1fr) auto 140px;
 		gap: 9px;
 		padding: 7px 9px;
 		font-size: var(--text-sm);
@@ -4507,13 +4870,10 @@
 
 	/* a real work cluster (2+ editions) -- highlight it with an accent bar + tint
 	   so it stands apart from single-edition rows */
-	.work-header.cluster {
-		background: #f7f3fb;
-		box-shadow: inset 3px 0 0 0 #6a4c93;
-		border-top-color: #e6dcf1;
-	}
+	/* Multi-edition works look like every other book row; the "N editions"
+	   pill already says they're clusters. */
 	.work-header.cluster:hover {
-		background: #f1eaf8;
+		background: var(--color-gray-100);
 	}
 
 	.work-header[draggable="true"] {
@@ -4594,11 +4954,23 @@
 	}
 	/* format column can show several badges for a multi-format work -- stacked
 	   vertically so the column stays narrow */
+	/* formats read as one quiet line of small gray words, not colored pills */
+	.work-header .tt-format .badge {
+		background: none;
+		border: 0;
+		padding: 0;
+		color: var(--color-fg-light);
+		font-weight: 500;
+		text-transform: lowercase;
+		letter-spacing: 0;
+	}
 	.work-header .tt-format {
 		display: flex;
-		flex-direction: column;
-		gap: 3px;
-		align-items: flex-end;
+		flex-direction: row;
+		flex-wrap: nowrap;
+		gap: 6px;
+		align-items: center;
+		justify-content: flex-end;
 	}
 	/* An expanded work's editions: the title cell spans the Work + Edition columns
 	   (exclude button first, then the title) so the title sits far left instead of
@@ -5011,21 +5383,6 @@
 
 		.author h2 {
 			font-size: 1.6rem;
-		}
-		/* Reserve the top-right corner (first line only) so a long title doesn't run
-		   under the floating "Add/edit titles" button. The .h2-hoverable heading is
-		   used only in the by-author / by-title views, i.e. exactly when that button
-		   exists — the overview heading is a plain <h2> and keeps the full width.
-		   The wrap is inline-block for the desktop hover-card anchor; on mobile the
-		   card is a fixed bottom sheet, so block is fine and lets the float work. */
-		.h2-wrap {
-			display: block;
-		}
-		.author .h2-hoverable::before {
-			content: "";
-			float: right;
-			width: 140px;
-			height: 34px;
 		}
 
 		.groups-panel {

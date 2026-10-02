@@ -6,7 +6,10 @@
 	// author: the work's author, used to disambiguate the Wikidata match.
 	// links:  { wikipedia } search URL (fallback when there's no article match).
 	// onTrend: called when the "See SPL trend" button is clicked.
-	let { query, kind = "author", author = "", links = {}, onTrend } = $props();
+	// quiet:  for the trend-page heading, where Borrow / Learn more buttons sit
+	//         alongside: no catalog link, no repeat of the header's photo or
+	//         cover, and Wikipedia shown as a small source credit.
+	let { query, kind = "author", author = "", links = {}, onTrend, quiet = false } = $props();
 
 	let status = $state({ loading: true, data: null });
 
@@ -42,7 +45,7 @@
 			<div class="wiki-skel-lines"><span></span><span></span><span></span></div>
 		</div>
 	{:else if status.data}
-		{#if status.data.thumbnail}
+		{#if status.data.thumbnail && !quiet}
 			<img class="wiki-thumb" src={status.data.thumbnail} alt="" />
 		{/if}
 		<p class="wiki-extract">{trim(status.data.extract)}</p>
@@ -50,6 +53,13 @@
 		<p class="wiki-none">No Wikipedia summary found for this {kind}.</p>
 	{/if}
 
+	{#if quiet}
+		{#if !status.loading}
+			<a class="wiki-credit" href={wikiHref} target="_blank" rel="noopener noreferrer"
+				>{status.data ? "From Wikipedia" : "Search Wikipedia"} <span aria-hidden="true">↗</span></a
+			>
+		{/if}
+	{:else}
 	<div class="wiki-act">
 		{#if onTrend}
 			<button class="wiki-trend" onclick={onTrend}>
@@ -67,6 +77,7 @@
 			>
 		{/if}
 	</div>
+	{/if}
 </div>
 
 <style>
@@ -133,6 +144,16 @@
 	.wiki-trend:hover {
 		text-decoration: underline;
 	}
+	.wiki-credit {
+		display: inline-block;
+		font-family: var(--font-sans);
+		font-size: 0.78rem;
+		color: var(--color-fg-light);
+		text-decoration: underline;
+		text-decoration-color: var(--color-border);
+		text-underline-offset: 3px;
+	}
+	.wiki-credit:hover { color: var(--color-fg); text-decoration-color: currentColor; }
 	.wiki-wiki {
 		display: inline-block;
 		font-family: var(--font-sans);

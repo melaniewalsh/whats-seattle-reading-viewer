@@ -1,12 +1,18 @@
 <script>
 	import { base } from "$app/paths";
 	import { lookupUrls } from "$utils/lookup.js";
+	import BookOpen from "@lucide/svelte/icons/book-open";
+	import ChevronDown from "@lucide/svelte/icons/chevron-down";
+	import Globe from "@lucide/svelte/icons/globe";
+	import ShoppingBag from "@lucide/svelte/icons/shopping-bag";
 
 	// A small blue "Borrow" button that opens a dropdown of places to get the book:
 	// the Seattle Public Library catalog, WorldCat (find it at your OWN local library),
 	// and Bookshop.org (buy, supporting local bookstores). `q` is the search string
 	// (e.g. "The Odyssey Homer"); `compact` shrinks it for dense table rows.
-	let { q = "", compact = false } = $props();
+	// variant "outline": the quieter header button ("Borrow at SPL", book icon)
+	// used on the author / book pages; the default blue pill stays elsewhere.
+	let { q = "", compact = false, variant = "pill" } = $props();
 	let open = $state(false);
 	let btnEl;
 	// The menu is position:fixed and placed under the button. On its own that
@@ -40,12 +46,17 @@
 			bind:this={btnEl}
 			class="borrow-btn"
 			class:compact
+			class:outline={variant === "outline"}
 			onclick={toggle}
 			aria-haspopup="true"
 			aria-expanded={open}
 			title="Where to borrow or buy this book"
 	>
-		Borrow <span class="borrow-caret" aria-hidden="true">▾</span>
+		{#if variant === "outline"}
+			<BookOpen size={15} strokeWidth={2} aria-hidden="true" /> Borrow at SPL <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
+		{:else}
+			Borrow <span class="borrow-caret" aria-hidden="true">▾</span>
+		{/if}
 	</button>
 	{#if open}
 		<div class="borrow-portal" use:portal>
@@ -56,11 +67,11 @@
 					<span class="bm-text"><span class="bm-name">Seattle Public Library</span><span class="bm-sub">Borrow · the SPL catalog</span></span>
 				</a>
 				<a role="menuitem" href={links.worldcat} target="_blank" rel="noopener noreferrer" onclick={close}>
-					<span class="bm-ic bm-emoji" aria-hidden="true">🌍</span>
+					<span class="bm-ic bm-lucide" aria-hidden="true"><Globe size={17} strokeWidth={1.8} /></span>
 					<span class="bm-text"><span class="bm-name">Your local library</span><span class="bm-sub">Borrow · find it on WorldCat</span></span>
 				</a>
 				<a role="menuitem" href={links.bookshop} target="_blank" rel="noopener noreferrer" onclick={close}>
-					<span class="bm-ic bm-emoji" aria-hidden="true">🛍️</span>
+					<span class="bm-ic bm-lucide" aria-hidden="true"><ShoppingBag size={17} strokeWidth={1.8} /></span>
 					<span class="bm-text"><span class="bm-name">Bookshop.org</span><span class="bm-sub">Buy · supports local bookstores</span></span>
 				</a>
 			</div>
@@ -96,6 +107,19 @@
 	.borrow-btn:hover {
 		background: #2f6ea8;
 	}
+	.borrow-btn.outline {
+		gap: 6px;
+		font-weight: 500;
+		padding: 7px 11px;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-white);
+		color: var(--color-fg);
+	}
+	.borrow-btn.outline:hover {
+		background: var(--color-white);
+		border-color: var(--color-fg-light);
+	}
 	.borrow-btn.compact {
 		font-size: var(--text-sm);
 		padding: 3px 9px;
@@ -128,18 +152,18 @@
 		/* Never wider than the viewport (with a small gutter) so it can't run off
 		   the edge on a phone. */
 		max-width: calc(100vw - 24px);
-		padding: 5px;
+		padding: 4px;
 		background: var(--color-white);
 		border: 1px solid var(--color-border);
-		border-radius: 10px;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+		border-radius: 8px;
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 	}
 	.borrow-menu a {
 		display: flex;
 		align-items: center;
 		gap: 10px;
 		padding: 8px 10px;
-		border-radius: 7px;
+		border-radius: 6px;
 		text-decoration: none;
 		color: var(--color-fg);
 	}
@@ -167,8 +191,10 @@
 	.bm-name {
 		font-family: var(--font-sans);
 		font-size: var(--text-sm);
-		font-weight: 600;
+		font-weight: 500;
 	}
+	.bm-lucide { color: var(--color-fg-light); }
+	.bm-lucide :global(svg) { display: block; width: 17px; height: 17px; }
 	.bm-sub {
 		font-size: var(--text-xs);
 		color: var(--color-fg-light);

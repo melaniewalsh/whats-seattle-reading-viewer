@@ -96,6 +96,9 @@
 			else url.searchParams.set("tab", t === "rankings" ? (rankKind === "authors" ? "top" : "works") : t);
 			window.history.pushState({}, "", url);
 		} catch {}
+		// The Search page has no search box of its own: the header search does it,
+		// so put the cursor there when someone heads to Search.
+		if (t === "search") setTimeout(() => hInputEl?.focus(), 60);
 	}
 
 	// Publications, grouped by year for the Publications view.
@@ -157,15 +160,22 @@
 		} catch {}
 	}
 
+	// Back/Forward between two trend pages (a book, then its author) stays on the
+	// search tab, so remount the viewer to load whatever the URL now names.
+	function onPopState() {
+		applyUrlState();
+		if (tab === "search") searchNonce++;
+	}
+
 	// A shared ?tab= / ?author= makes each view linkable (old tab names still work).
 	onMount(() => {
 		applyUrlState();
 		scrollToMethod();
 		window.addEventListener("hashchange", scrollToMethod);
-		window.addEventListener("popstate", applyUrlState);
+		window.addEventListener("popstate", onPopState);
 		return () => {
 			window.removeEventListener("hashchange", scrollToMethod);
-			window.removeEventListener("popstate", applyUrlState);
+			window.removeEventListener("popstate", onPopState);
 		};
 	});
 
@@ -210,39 +220,6 @@
 		rankKind = kind;
 	}
 
-	// When you open a trend from the Rankings tab, remember where you were so a
-	// "Back to rankings" link can restore that exact list (kind + genre + year).
-	let rankReturn = $state(null);
-	function rememberRankings() {
-		if (tab !== "rankings") return;
-		try {
-			const url = new URL(window.location);
-			rankReturn = { rankKind, genre: url.searchParams.get("genre"), year: url.searchParams.get("year") };
-		} catch {
-			rankReturn = { rankKind, genre: null, year: null };
-		}
-	}
-	function backToRankings() {
-		const r = rankReturn;
-		rankReturn = null;
-		try {
-			const url = new URL(window.location);
-			["author", "title", "kind"].forEach((k) => url.searchParams.delete(k));
-			if (r?.genre) url.searchParams.set("genre", r.genre);
-			else url.searchParams.delete("genre");
-			if (r?.year) url.searchParams.set("year", r.year);
-			else url.searchParams.delete("year");
-			url.searchParams.set("tab", r?.rankKind === "authors" ? "top" : "works");
-			window.history.replaceState({}, "", url);
-		} catch {}
-		rankKind = r?.rankKind || "works";
-		tab = "rankings";
-	}
-	// Drop the return link once you navigate away from the trend view.
-	$effect(() => {
-		if (tab !== "search") rankReturn = null;
-	});
-
 	// Bumped on every openAuthor/openTitle so the search Viewer (keyed on it) remounts
 	// and re-reads the URL — needed when you're ALREADY on the search view and pick a
 	// new author/work (e.g. from the header search), since the Viewer only reads
@@ -252,7 +229,6 @@
 	// Clicking an author (from Rankings, or a card's "See checkout trend") opens the
 	// Search view with that author loaded (Viewer reads ?author on mount).
 	function openAuthor(slug) {
-		rememberRankings();
 		try {
 			const url = new URL(window.location);
 			url.searchParams.set("author", slug);
@@ -269,7 +245,6 @@
 	// shared with (or contained in) a more-borrowed book — Patchett's "Whistler"
 	// vs Grisham's "The Whistler" — opens the right one.
 	function openTitle(title, authorSlug = null) {
-		rememberRankings();
 		try {
 			const url = new URL(window.location);
 			url.searchParams.set("title", title);
@@ -422,17 +397,14 @@
 		</nav>
 
 		{#if tab === "search"}
-			<header class="section-masthead">
-				<h2 class="sec-title">{searchKind === "title" ? "Seattle's Work Trends" : "Seattle's Author Trends"}</h2>
+			<!-- The rule under this masthead is drawn by the viewer, below its
+			     "Not sure where to start?" line, which belongs with the intro. -->
+			<header class="section-masthead no-rule">
+				<h2 class="sec-title">Seattle's Checkout Trends</h2>
 				<p class="sec-sub">Look up any author or title's borrowing trend at the Seattle Public Library.</p>
 			</header>
 		{/if}
 
-		{#if rankReturn && tab === "search"}
-			<div class="back-bar">
-				<button class="back-rankings" onclick={backToRankings}>← Back to rankings</button>
-			</div>
-		{/if}
 
 		{#if tab === "genres"}
 			<GenreTrends />
@@ -1443,25 +1415,6 @@
 		}
 	}
 
-	/* "Back to rankings" shown after you open a trend from the Rankings tab. */
-	.back-bar {
-		max-width: 720px;
-		margin: 0 auto 10px;
-	}
-	.back-rankings {
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: 600;
-		color: var(--color-fg);
-		background: none;
-		border: none;
-		padding: 4px 0;
-		cursor: pointer;
-	}
-	.back-rankings:hover {
-		text-decoration: underline;
-		text-underline-offset: 2px;
-	}
 	/* segmented sub-toggle (Author/Title, Authors/Works) beneath the main tabs */
 	/* Section masthead — identical to the Most Borrowed / Genres tabs. */
 	.section-masthead {
@@ -1477,6 +1430,7 @@
 		color: var(--color-fg);
 		margin: 0;
 	}
+	.section-masthead.no-rule { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
 	.sec-sub {
 		font-family: var(--font-sans);
 		font-size: var(--text-base);
