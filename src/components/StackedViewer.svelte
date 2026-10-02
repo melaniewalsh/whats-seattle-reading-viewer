@@ -2398,6 +2398,10 @@
 			{#if chartLineMode === "line"}
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 			{/if}
+			{#if chartMode === "area" && (isolatedKeys.length || hiddenKeys.length)}
+				<!-- The way back after clicking a line's name to show it alone -->
+				<span class="iso-note">Showing {viewSeries.length} of {legendItems.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={() => { clearIsolate(); clearHidden(); }}>Show all</button></span>
+			{/if}
 					</div>
 					</div>
 					<div class="chart-wrap" bind:this={chartWrap}>
@@ -2407,7 +2411,10 @@
 				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={peakMarker ? [...bookMarkers, peakMarker] : bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
 			</div>
 
-			{#if legendItems.length >= 2}
+			<!-- "By book" / "By format" lines are named at their right ends, so no
+			     legend; Total keeps one for any editions overlaid on it (those lines
+			     have no end labels). Exported images still draw the legend. -->
+			{#if legendItems.length >= 2 && chartMode !== "area"}
 				<div class="format-legend">
 					{#each legendItems as it}
 						{#if it.key === "other"}
@@ -4528,6 +4535,8 @@
 	.lookup-menu a :global(svg) { width: 14px; height: 14px; color: var(--color-fg-light); flex: none; }
 	.tb-btn :global(svg) { flex: none; width: 15px; height: 15px; color: var(--color-fg-light); }
 	.tb-btn :global(svg.lucide-chevron-down) { width: 14px; height: 14px; }
+	.iso-note { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--color-fg-light); }
+	.iso-showall { background: none; border: 0; padding: 0; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 	.smooth-toggle {
 		display: inline-flex;
 		align-items: center;

@@ -493,6 +493,9 @@
 		<div class="plot-toolbar">
 			<div class="tb-left">
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
+				{#if isolatedKeys.length && series.length >= 2}
+					<span class="iso-note">Showing {chartSeries.length} of {series.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={() => (isolatedKeys = [])}>Show all</button></span>
+				{/if}
 			</div>
 		</div>
 
@@ -501,17 +504,8 @@
 				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={(k) => toggleIsolate(k)} />
 		</div>
 
-		{#if series.length >= 2}
-			<div class="glegend">
-				{#each series as s (s.key)}
-					<button class="gleg-btn" class:on={isIsolated(s.key)} class:dim={isolatedKeys.length && !isIsolated(s.key)}
-							title="Show only this — click again to bring the others back" onclick={() => toggleIsolate(s.key)}
-							onmouseenter={() => (legendHoverKey = s.key)} onmouseleave={() => (legendHoverKey = null)}
-					><span class="gleg-sw" style="background:{s.color}"></span>{s.name}</button>
-				{/each}
-				{#if isolatedKeys.length}<button class="gleg-showall" onclick={() => (isolatedKeys = [])}>Show all</button>{/if}
-			</div>
-		{/if}
+		<!-- No legend on the page: the lines are named at their right ends (the
+		     exported image still draws one). -->
 
 		<YearBrush months={data.months} values={data.total} bind:lo bind:hi />
 		<!-- Source on the left; Download and Share as small links on the right -->
@@ -667,6 +661,8 @@
 	/* Toolbar: 3-month average on the left; Download and Share on the right. */
 	.plot-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin: var(--space-5) 0 var(--space-4); }
 	.tb-left, .tb-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+	.iso-note { font-size: var(--text-sm); color: var(--color-fg-light); }
+	.iso-showall { background: none; border: 0; padding: 0; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 	.smooth-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-fg-light); cursor: pointer; user-select: none; }
 	.smooth-toggle input { margin: 0; width: 16px; height: 16px; accent-color: var(--color-fg); appearance: auto; -webkit-appearance: auto; }
 	.tb-btn { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; line-height: 1; padding: 7px 11px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white); color: var(--color-fg); cursor: pointer; white-space: nowrap; }
@@ -683,13 +679,6 @@
 	.share-msg { font-size: var(--text-sm); font-weight: 600; color: #2e7d32; }
 
 	.chartwrap { width: 100%; }
-	.glegend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 0; font-size: var(--text-sm); font-weight: 500; }
-	.gleg-btn { display: inline-flex; align-items: center; gap: 6px; border: none; background: none; padding: 2px 5px; border-radius: 6px; font: inherit; color: var(--color-fg); cursor: pointer; transition: opacity 0.12s, background 0.12s; }
-	.gleg-btn:hover { background: var(--color-gray-100); }
-	.gleg-btn.dim { opacity: 0.38; }
-	.gleg-btn.on { background: var(--color-gray-100); box-shadow: inset 0 0 0 1px var(--color-border); }
-	.gleg-sw { width: 12px; height: 3px; border-radius: 2px; flex: none; }
-	.gleg-showall { border: 1px solid var(--color-border); background: var(--color-white); padding: 3px 10px; border-radius: 8px; font: inherit; color: var(--color-fg); cursor: pointer; }
 	.chart-source { font-size: 12px; color: #8a8a8a; margin: 0; flex: 1 1 260px; }
 	.chart-source a { color: inherit; text-decoration: underline; text-decoration-color: #c9c9c9; text-underline-offset: 2px; }
 	.chart-source a:hover { color: var(--color-fg); text-decoration-color: currentColor; }
