@@ -58,6 +58,7 @@
 	// Margins. The y-axis labels sit INSIDE the plot (on their gridlines), so the
 	// left margin is ~0. The top grows to fit book markers or event labels; the
 	// right grows to fit end-of-line labels.
+	const markerCount = $derived((markers || []).filter((mk) => months.includes(mk.month)).length);
 	const hasMarkers = $derived(mode === 'line' && (markers || []).some((mk) => months.includes(mk.month)));
 	const endLabelW = $derived.by(() => {
 		if (mode !== 'line' || !endLabels || !series.length) return 0;
@@ -71,7 +72,9 @@
 		return Math.min(cap, Math.max(84, Math.round(Math.min(longest, longest / 2 + 6) * 6.6 + 45)));
 	});
 	const margin = $derived({
-		top: hasMarkers ? (width < 560 ? 66 : 92) : annotations?.length ? 30 : 16,
+		// Room for label rows above the plot: one row for a single label (e.g.
+		// just the peak), two when several might need to stagger.
+		top: hasMarkers ? (markerCount > 1 ? (width < 560 ? 66 : 92) : (width < 560 ? 50 : 56)) : annotations?.length ? 30 : 16,
 		right: Math.max(16, endLabelW),
 		bottom: monthTickMode ? 42 : 28,
 		left: 2

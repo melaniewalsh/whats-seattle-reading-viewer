@@ -54,9 +54,7 @@
 	function onBackdrop(e) { if (e.target === dialog) close(); }
 </script>
 
-<button type="button" class="di-link" onclick={open}>Learn more about this data</button>
-
-<dialog class="di" bind:this={dialog} onclick={onBackdrop} aria-labelledby="di-title">
+<button type="button" class="di-link" onclick={open}>Learn more about this data</button><dialog class="di" bind:this={dialog} onclick={onBackdrop} aria-labelledby="di-title">
 	<div class="di-body">
 		<button type="button" class="di-close" onclick={close} aria-label="Close"><XIcon size={18} strokeWidth={2} /></button>
 

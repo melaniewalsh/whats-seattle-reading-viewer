@@ -21,6 +21,7 @@
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
+	import ChartLogo from "$components/ChartLogo.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
 	import WikiCard from "$components/WikiCard.svelte";
@@ -1856,7 +1857,11 @@
 				// On an author page, skip a description of a book: an author without
 				// their own article redirects to their novel ("2026 debut novel by …").
 				const ok = d && DESC_OK.test(d) && (isTitle || (DESC_PERSON.test(d) && !/\bby\b/i.test(d)));
-				headDesc = ok ? d.charAt(0).toUpperCase() + d.slice(1) : "";
+				let t = ok ? d.charAt(0).toUpperCase() + d.slice(1) : "";
+				// "2025 novel by Virginia Evans": the byline right below already names
+				// the author, so keep just "2025 novel".
+				if (isTitle) t = t.replace(/\s+by\s+[^,;()]+$/i, "");
+				headDesc = t;
 				// Same check for the photo, so a novel's cover (or a namesake) never
 				// stands in for the author.
 				if (!isTitle && ok) headPhoto = s?.thumbnail || null;
@@ -2395,6 +2400,7 @@
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 			{/if}
 					</div>
+					<ChartLogo inset={plotInset} />
 					</div>
 					<div class="chart-wrap" bind:this={chartWrap}>
 				{#if plotTitle && searchMode !== "title"}
