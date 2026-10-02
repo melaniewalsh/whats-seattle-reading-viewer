@@ -301,6 +301,7 @@
 	// <input type="search"> fires a `search` event, not `input`, so bind:value
 	// never updated and the dropdown kept showing stale results).
 	let hInputEl;
+	let trendLoaded = $state(false); // the Search page has an author or book on screen
 	// Heading to Search: put the cursor in the header search box and briefly
 	// ring it, so it's clear that's where to type.
 	let hFlash = $state(false);
@@ -429,7 +430,9 @@
 		{#if tab === "search"}
 			<!-- The rule under this masthead is drawn by the viewer, below its
 			     "Not sure where to start?" line, which belongs with the intro. -->
-			<header class="section-masthead no-rule">
+			<!-- Once an author or book is loaded it's the page's subject, so this
+			     shrinks to a small label above it rather than a second big title. -->
+			<header class="section-masthead no-rule" class:compact={trendLoaded}>
 				<h2 class="sec-title">Seattle's Checkout Trends</h2>
 				<p class="sec-sub">Look up any author or title's borrowing trend at the Seattle Public Library.</p>
 			</header>
@@ -613,7 +616,7 @@
 			</article>
 		{:else}
 			{#key `${searchKind}-${searchNonce}`}
-				<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} {openTitle} />
+				<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} {openTitle} bind:loaded={trendLoaded} />
 			{/key}
 		{/if}
 
@@ -660,6 +663,8 @@
 			</div>
 		</details>
 
+			<!-- Pages with a chart already credit (and link) the data under it. -->
+			{#if !["search", "overview", "genres"].includes(tab)}
 			<p class="cf-source">
 				Data source:
 				<a
@@ -669,6 +674,7 @@
 				>Seattle Public Library — Checkouts by Title</a>
 				(2006–2026)
 			</p>
+			{/if}
 			<p class="cf-attr">
 				What Is Seattle Reading?
 				<span class="cf-sep">·</span>
@@ -1474,6 +1480,9 @@
 		margin: 0;
 	}
 	.section-masthead.no-rule { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
+	.section-masthead.compact { margin-top: 22px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border); margin-bottom: 0; }
+	.section-masthead.compact .sec-title { font-family: var(--font-sans); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-fg-light); }
+	.section-masthead.compact .sec-sub { display: none; }
 	.sec-sub {
 		font-family: var(--font-sans);
 		font-size: var(--text-base);

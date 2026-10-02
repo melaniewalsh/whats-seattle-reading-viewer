@@ -19,7 +19,7 @@
 	const uid = $props.id();
 
 	let width = $state(680); // measured from the container
-	const AREA_H = 36; // height of the gray silhouette
+	const AREA_H = 28; // height of the gray silhouette
 	const PAD = 6; // horizontal padding so the edge handles never clip
 	const height = AREA_H + 18; // silhouette + the year labels under it
 
@@ -130,7 +130,7 @@
 	}
 </script>
 
-<div class="brush">
+<div class="brush" class:zoomed={isFiltered} class:active={drag !== null}>
 	<div class="brush-track" bind:clientWidth={width} title="Drag to choose which years the chart shows">
 		<svg
 			viewBox="0 0 {width} {height}"
@@ -197,12 +197,16 @@
 		cursor: pointer;
 	}
 	svg.dragging { cursor: grabbing; }
-	.hist { fill: #d6d4cc; }
-	.base { stroke: #9a9a9a; stroke-width: 1; }
-	.window { fill: rgba(63, 136, 204, 0.12); stroke: #3f88cc; stroke-width: 1; }
+	/* Quiet at rest (gray, no outline) while it shows every year; blue once
+	   you hover, focus or drag it, and whenever it's zoomed in. */
+	.hist { fill: #dddbd4; }
+	.base { stroke: #b5b5b5; stroke-width: 1; }
+	.window { fill: transparent; stroke: transparent; stroke-width: 1; transition: fill 0.15s, stroke 0.15s; }
 	.handle { cursor: ew-resize; outline: none; }
 	.grip-hit { fill: transparent; }
-	.grip { fill: #3f88cc; transition: fill 0.1s; }
+	.grip { fill: #b9b9b9; transition: fill 0.15s; }
+	.brush:hover .window, .brush:focus-within .window, .brush.zoomed .window, .brush.active .window { fill: rgba(63, 136, 204, 0.12); stroke: #3f88cc; }
+	.brush:hover .grip, .brush:focus-within .grip, .brush.zoomed .grip, .brush.active .grip { fill: #3f88cc; }
 	.handle:hover .grip { fill: #26597f; }
 	.handle:focus-visible .grip { fill: #26597f; stroke: #fff; stroke-width: 1.5; }
 	.yr { font-size: 11px; fill: #8a8a8a; }

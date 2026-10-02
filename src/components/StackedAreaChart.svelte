@@ -900,7 +900,10 @@
 				<text class="end-value" x={ex + 8} y={it.ey - 2}>{fmtEnd(it.v)}</text>
 				<text class="end-sub" x={ex + 8} y={it.ey + 12}>in {lastMonthLabel}</text>
 			{:else}
-				<path class="end-leader" d="M{ex + 5},{it.ey} L{ex + 11},{it.ey} L{ex + 15},{it.ty - 4}" />
+				<!-- The connector and a bar down the label's side wear the line's color,
+				     so each name is tied to its line (the text stays dark to read well). -->
+				<path class="end-leader" class:dim={focusKey && focusKey !== keyOf(it.s)} stroke={it.s.color} d="M{ex + 5},{it.ey} L{ex + 10},{it.ey} L{ex + 14},{Math.min(Math.max(it.ey, it.ty - 9), it.ty + (it.lines.length - 1) * 14 + 2)}" />
+				<line class="end-bar" class:dim={focusKey && focusKey !== keyOf(it.s)} stroke={it.s.color} x1={ex + 14} x2={ex + 14} y1={it.ty - 10} y2={it.ty + (it.lines.length - 1) * 14 + 3} />
 				<text class="end-name" class:dim={focusKey && focusKey !== keyOf(it.s)} class:clickable={!!onSeriesClick}
 					x={ex + 18} y={it.ty} role={onSeriesClick ? 'button' : undefined} tabindex={onSeriesClick ? 0 : undefined}
 					onmouseenter={() => (endHoverKey = keyOf(it.s))} onmouseleave={() => (endHoverKey = null)}
@@ -1075,7 +1078,9 @@
 	.end-dot { stroke: #fff; stroke-width: 2; }
 	.end-value { font-family: var(--font-sans, system-ui, sans-serif); font-size: 12px; font-weight: 600; fill: #1a1a1a; }
 	.end-sub { font-family: var(--font-sans, system-ui, sans-serif); font-size: 11px; fill: #858585; }
-	.end-leader { fill: none; stroke: #9a9a9a; stroke-width: 0.75; }
+	.end-leader { fill: none; stroke-width: 1.25; transition: opacity 0.12s; }
+	.end-bar { stroke-width: 2.5; stroke-linecap: round; transition: opacity 0.12s; }
+	.end-leader.dim, .end-bar.dim { opacity: 0.2; }
 	.end-name { font-family: var(--font-sans, system-ui, sans-serif); font-size: 12px; fill: #1a1a1a; transition: opacity 0.12s; }
 	.end-name.clickable { cursor: pointer; }
 	.end-name.clickable:hover { text-decoration: underline; }

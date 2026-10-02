@@ -31,7 +31,8 @@
 	// resolve to its author, open the author's drilldown with that work highlighted.
 	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
 	// (the "By author" tab -> open straight to the search box).
-	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {} } = $props();
+	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {}, loaded = $bindable(false) } = $props();
+	$effect(() => { loaded = !!current && !isOverview; });
 
 	// Colors for title lines.
 	// Palette for the stacked "All titles" bands. Leads with the site blue so the
@@ -1556,6 +1557,13 @@
 		moveNote = null;
 		movedIdx = null;
 	}
+	// Table totals at one precision: "14.0k" beside "13.1k", not "14k".
+	function tableNumber(n) {
+		if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+		if (n >= 1e5) return `${Math.round(n / 1e3)}k`;
+		if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k`;
+		return n.toLocaleString();
+	}
 	const booksYears = $derived.by(() => {
 		if (!months.length || !current) return "";
 		const lo = isYearFiltered ? yearLo : Math.max(0, current.series.findIndex((v) => v > 0));
@@ -1576,9 +1584,27 @@
 		const seg = s.slice(lo, hi + 1);
 		if (seg.length < 2) return "";
 		const avg = seg.map((_, i) => { let t = 0, n = 0; for (let k = i - 1; k <= i + 1; k++) if (k >= 0 && k < seg.length) { t += seg[k]; n++; } return t / n; });
-		const mx = Math.max(1, ...avg);
+		// One scale for every row, so a 30-checkout book draws a flat line next
+		// to a 22k one instead of spikes just as tall.
+		const mx = Math.max(1, sparkMax);
 		return avg.map((v, i) => `${i ? "L" : "M"}${(1 + (i * (w - 2)) / (avg.length - 1)).toFixed(1)},${(h - 1 - (v / mx) * (h - 3)).toFixed(1)}`).join("");
 	}
+	// The tallest 3-month average among the books, over the years in view.
+	const sparkMax = $derived.by(() => {
+		if (!current) return 1;
+		const lo = isYearFiltered ? yearLo : Math.max(0, current.series.findIndex((v) => v > 0));
+		const hi = isYearFiltered ? yearHi : months.length - 1;
+		let mx = 1;
+		for (const w of workBlocks) {
+			const s = sumSeries(w.editions.map((e) => e.idx));
+			for (let i = lo; i <= hi; i++) {
+				let t = 0, n = 0;
+				for (let k = i - 1; k <= i + 1; k++) if (k >= lo && k <= hi) { t += s[k] || 0; n++; }
+				if (n && t / n > mx) mx = t / n;
+			}
+		}
+		return mx;
+	});
 	const hiddenWorkCount = $derived(Math.max(0, workBlocks.length - visibleWorkBlocks.length));
 
 	let expandedWorks = $state([]); // work keys currently expanded in the table
@@ -2243,7 +2269,7 @@
 		{/if}
 	{/snippet}
 
-	{#if landing === "search"}
+	{#if landing === "search" && !(current && !isOverview)}
 		<div class="picker-block">{@render authorPicker()}</div>
 	{/if}
 
@@ -2414,7 +2440,7 @@
 
 			<!-- Source on the left; Download and Share as small links on the right -->
 			<div class="chart-foot" style="padding-right: {Math.max(0, plotInset - 2)}px">
-			<p class="chart-source">Source: Seattle Public Library open data.{#if bookMarkers.length && chartLineMode === "line"}{" "}Book labels mark the month each title was first checked out at SPL.{/if}</p>
+			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>.{#if bookMarkers.length && chartLineMode === "line"}{" "}Book labels mark the month each title was first checked out at SPL.{/if}</p>
 			<div class="chart-actions tb-actions foot-actions">
 				<div class="dl-wrap">
 					<button class="tb-btn" onclick={() => (downloadOpen = !downloadOpen)} title="Download the data or the chart image" aria-haspopup="true" aria-expanded={downloadOpen}>
@@ -2635,7 +2661,7 @@
 							</span>
 							<span class="bk-fmt">{fmts.map((f, k) => { const l = formatLabel(f); return k ? l : l.charAt(0).toUpperCase() + l.slice(1); }).join(" · ")}</span>
 							<svg class="bk-sp bk-spark" width="84" height="20" viewBox="0 0 84 20" aria-hidden="true"><path d={sparkPath(w.editions.map((e) => e.idx), 84, 20)} stroke={wColor || "#b4b2a9"} /></svg>
-							<span class="bk-num">{compactNumber(w.total)}</span>
+							<span class="bk-num">{tableNumber(w.total)}</span>
 						</li>
 						{#if open}
 							{#each w.editions.slice().sort((a, b) => b.total - a.total) as t (t.idx)}
@@ -4419,7 +4445,7 @@
 		justify-content: space-between;
 		gap: var(--space-3);
 		flex-wrap: wrap;
-		margin: 0 0 var(--space-4);
+		margin: 0 0 var(--space-5);
 	}
 	.plot-toolbar .mode-toggle {
 		margin: 0;
@@ -4519,6 +4545,8 @@
 	.chart-foot .share-menu { left: auto; right: 0; }
 	/* On a phone the links wrap under the source, at the left: open menus rightward. */
 	@media (max-width: 640px) { .chart-foot .share-menu { left: 0; right: auto; } }
+	.chart-source a { color: inherit; text-decoration: underline; text-decoration-color: #c9c9c9; text-underline-offset: 2px; }
+	.chart-source a:hover { color: var(--color-fg); text-decoration-color: currentColor; }
 	.chart-source {
 		font-family: var(--font-sans);
 		font-size: 12px;
@@ -4820,18 +4848,18 @@
 	.edit-toggle.on { background: var(--color-fg); border-color: var(--color-fg); color: var(--color-white); }
 	.books-more {
 		display: block;
-		margin: 10px 0 0;
-		padding: 0;
-		border: 0;
-		background: none;
+		margin: 12px 0 0;
+		padding: 7px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		background: var(--color-white);
 		font-family: var(--font-sans);
 		font-size: var(--text-sm);
-		color: var(--color-fg-light);
-		text-decoration: underline;
-		text-underline-offset: 3px;
+		font-weight: 500;
+		color: var(--color-fg);
 		cursor: pointer;
 	}
-	.books-more:hover { color: var(--color-fg); }
+	.books-more:hover { border-color: var(--color-fg-light); }
 	/* per-book trend line, inside the checkouts cell */
 	.work-header .tt-count { display: inline-flex; align-items: center; justify-content: flex-end; gap: 10px; white-space: nowrap; }
 	.work-header .tt-count .row-spark { flex: none; display: block; width: 78px; height: 18px; max-width: none; }

@@ -213,13 +213,27 @@
 		if (p >= 0.1) return `${p.toFixed(1)}%`;
 		return p > 0 ? "<0.1%" : "0%";
 	}
+	const sparkMax = $derived.by(() => {
+		if (!data) return 1;
+		let mx = 1e-9;
+		for (const name of genreOrder) {
+			const seg = share(seriesArr(genreByName[name])).slice(lo, hi + 1);
+			for (let i = 0; i < seg.length; i++) {
+				let t = 0, n = 0;
+				for (let k = i - 1; k <= i + 1; k++) if (k >= 0 && k < seg.length) { t += seg[k]; n++; }
+				if (t / n > mx) mx = t / n;
+			}
+		}
+		return mx;
+	});
 	// Small trend line for the table: the monthly share over the years in view,
 	// as a 3-month average, scaled to its own peak.
 	function sparkPath(arr, w = 84, h = 20) {
 		const seg = share(arr).slice(lo, hi + 1);
 		if (seg.length < 2) return "";
 		const avg = seg.map((_, i) => { let t = 0, n = 0; for (let k = i - 1; k <= i + 1; k++) if (k >= 0 && k < seg.length) { t += seg[k]; n++; } return t / n; });
-		const mx = Math.max(1e-9, ...avg);
+		// One scale for every genre row (small genres draw flatter lines).
+		const mx = Math.max(1e-9, sparkMax);
 		return avg.map((v, i) => `${i ? "L" : "M"}${(1 + (i * (w - 2)) / (avg.length - 1)).toFixed(1)},${(h - 1 - (v / mx) * (h - 3)).toFixed(1)}`).join("");
 	}
 
@@ -499,7 +513,7 @@
 		<YearBrush months={data.months} values={data.total} bind:lo bind:hi />
 		<!-- Source on the left; Download and Share as small links on the right -->
 		<div class="chart-foot" style="padding-right: {Math.max(0, plotInset - 2)}px">
-			<p class="chart-source">Source: Seattle Public Library open data. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap.</p>
+			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap.</p>
 			<div class="tb-right foot-actions">
 				<div class="dl-wrap">
 					<button class="tb-btn" onclick={() => (dlOpen = !dlOpen)} aria-haspopup="true" aria-expanded={dlOpen} title="Download the data or the chart">
@@ -674,6 +688,8 @@
 	.gleg-sw { width: 12px; height: 3px; border-radius: 2px; flex: none; }
 	.gleg-showall { border: 1px solid var(--color-border); background: var(--color-white); padding: 3px 10px; border-radius: 8px; font: inherit; color: var(--color-fg); cursor: pointer; }
 	.chart-source { font-size: 12px; color: #8a8a8a; margin: 0; flex: 1 1 260px; }
+	.chart-source a { color: inherit; text-decoration: underline; text-decoration-color: #c9c9c9; text-underline-offset: 2px; }
+	.chart-source a:hover { color: var(--color-fg); text-decoration-color: currentColor; }
 	.chart-foot { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px 16px; flex-wrap: wrap; margin: 6px 0 0; }
 	.chart-foot .foot-actions { gap: 14px; flex: none; }
 	.chart-foot .tb-btn { padding: 0; border: 0; background: none; font-size: 12px; color: #6f6f6f; gap: 4px; }
