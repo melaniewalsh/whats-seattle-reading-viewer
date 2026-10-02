@@ -520,7 +520,7 @@
 			{/if}
 			<p class="ta-caption">
 				Most-borrowed <strong>{genre === "All genres" ? "works" : `${genreLabel(genre)} works`}</strong>
-				at the Seattle Public Library, {yearLabel(year)}. <span class="ta-hint">Hover or tap a title for more.</span>
+				at the Seattle Public Library, {yearLabel(year)}. <span class="ta-hint">Click a title to see its checkout trend.</span>
 			</p>
 		{/if}
 

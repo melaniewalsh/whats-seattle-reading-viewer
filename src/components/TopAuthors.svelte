@@ -430,7 +430,7 @@
 			</div>
 			<p class="ta-caption">
 				Most-borrowed authors of <strong>{genre === "All genres" ? "all books" : `${genreLabel(genre)} books`}</strong>
-				at the Seattle Public Library, {yearLabel(year)}. <span class="ta-hint">Hover or tap a name for more.</span>
+				at the Seattle Public Library, {yearLabel(year)}. <span class="ta-hint">Click a name to see their checkout trend.</span>
 			</p>
 			<div class="list-layout">
 				<div class="list-main">
