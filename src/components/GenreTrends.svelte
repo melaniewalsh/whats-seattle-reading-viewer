@@ -20,7 +20,6 @@
 	import TableIcon from "@lucide/svelte/icons/table";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
-	import ChartLogo from "$components/ChartLogo.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
 
@@ -495,7 +494,6 @@
 			<div class="tb-left">
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 			</div>
-			<ChartLogo inset={plotInset} />
 		</div>
 
 		<div class="chartwrap" bind:this={chartWrap}>

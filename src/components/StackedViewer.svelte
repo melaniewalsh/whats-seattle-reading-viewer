@@ -21,7 +21,6 @@
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
-	import ChartLogo from "$components/ChartLogo.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
 	import WikiCard from "$components/WikiCard.svelte";
@@ -2400,7 +2399,6 @@
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 			{/if}
 					</div>
-					<ChartLogo inset={plotInset} />
 					</div>
 					<div class="chart-wrap" bind:this={chartWrap}>
 				{#if plotTitle && searchMode !== "title"}
