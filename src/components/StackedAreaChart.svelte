@@ -16,9 +16,14 @@
 		mode = 'area',
 		grandTotal = 0,   // the author's (or overview's) all-time total, for the share line
 		shareOf = '',     // phrase after "% of ", e.g. "J. K. Rowling's checkouts"
-		annotations = [],  // [{ month, label, blurb, url }] — a "?" marker above each dip
+		annotations = [],  // [{ month, end, label, short, blurb, url }] — shaded event bands
 		peak = null,      // { idx, value, month } — a static callout pointing at the peak
-		legendHoverKey = null  // key of the legend entry being hovered -> light up its band(s)
+		legendHoverKey = null,  // key of the legend entry being hovered -> light up its band(s)
+		unit = 'checkouts a month', // appended to the top y-axis label only (NYT style)
+		smooth = false,   // line mode: draw 3-month averages, with the raw monthly
+		                  // values of the main series as faint bars behind
+		markers = [],     // [{ month, label, sub }] — labelled moments on the main line
+		endLabels = true  // line mode: label each line at its right end
 	} = $props();
 
 	// Measured from the container (bind:clientWidth) so the chart fits any
@@ -29,7 +34,37 @@
 	// Month-tick mode (narrow year window) draws a second axis row for the
 	// year, so it needs a little more room at the bottom.
 	const monthTickMode = $derived(months.length > 0 && months.length <= 48);
-	const margin = $derived({ top: 16, right: 16, bottom: monthTickMode ? 42 : 28, left: 44 });
+	// Margins. The y-axis labels sit INSIDE the plot (on their gridlines), so the
+	// left margin is ~0. The top grows to fit book markers or event labels; the
+	// right grows to fit end-of-line labels.
+	const hasMarkers = $derived(mode === 'line' && (markers || []).some((mk) => months.includes(mk.month)));
+	const endLabelW = $derived.by(() => {
+		if (mode !== 'line' || !endLabels || !series.length) return 0;
+		const shown = series.filter((s) => s.values?.length);
+		if (shown.length <= 1) return 64;
+		const longest = Math.max(...shown.map((s) => shortName(s.label).length + 6));
+		return Math.min(176, Math.max(84, Math.round(longest * 6.6 + 30)));
+	});
+	const margin = $derived({
+		top: hasMarkers ? 66 : annotations?.length ? 30 : 16,
+		right: Math.max(16, endLabelW),
+		bottom: monthTickMode ? 42 : 28,
+		left: 2
+	});
+	// Line labels: cut a long work title at its subtitle, then hard-cap it.
+	function shortName(label) {
+		let t = String(label || '');
+		if (t.length > 18) t = t.split(/[:,(]/)[0].trim();
+		return t.length > 20 ? t.slice(0, 19).trimEnd() + '…' : t;
+	}
+	// Centered 3-month moving average (2 points at the ends).
+	function avg3(a) {
+		return a.map((_, i) => {
+			let sum = 0, n = 0;
+			for (let k = i - 1; k <= i + 1; k++) if (k >= 0 && k < a.length) { sum += a[k] || 0; n++; }
+			return n ? sum / n : 0;
+		});
+	}
 
 	const PALETTE = [
 		'#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
@@ -141,26 +176,27 @@
 			.range([margin.left, width - margin.right])
 	);
 
-	// "?" markers for the event dips (COVID, ransomware): resolve each to an x
-	// position; a horizontal anchor keeps near-edge popovers from overflowing.
+	// Event bands (COVID, ransomware): shade the affected months and put a short
+	// two-line label at the top of the band. Both events are DIPS, so the top of
+	// the band is always clear of the line. The label sits outside the band on
+	// whichever side has room; hovering/focusing it shows the full note.
+	const halfStep = $derived(months.length > 1 ? (x(1) - x(0)) / 2 : 0);
 	const annotationMarks = $derived.by(() => {
 		if (!annotations?.length || months.length < 2) return [];
 		return annotations
 			.map((a) => {
-				const i = months.findIndex((m) => m === a.month || m.startsWith(a.month));
-				if (i < 0) return null;
-				const px = x(i);
-				const align = px > width * 0.62 ? 'end' : px < width * 0.38 ? 'start' : 'center';
-				// Cap the popover width to the space actually available on that side
-				// so it never runs off the edge on a narrow (mobile) chart. The wrap
-				// sits at px (±10px for the button); leave an 8px gutter.
+				const end = a.end || a.month;
+				const i0 = months.findIndex((m) => m >= a.month);
+				let i1 = -1;
+				for (let k = months.length - 1; k >= 0; k--) if (months[k] <= end) { i1 = k; break; }
+				if (i0 < 0 || i1 < i0) return null;
+				const x0 = x(i0) - halfStep, x1 = x(i1) + halfStep;
+				const anchor = x0 > (width - margin.right) * 0.6 ? 'end' : 'start';
+				const lx = anchor === 'end' ? x0 - 5 : x1 + 5;
 				const pad = 8;
-				const avail =
-					align === 'end' ? px + 10 - pad
-					: align === 'start' ? width - (px - 10) - pad
-					: 2 * Math.min(px, width - px) - 2 * pad;
-				const maxw = Math.max(180, Math.min(320, Math.round(avail)));
-				return { ...a, x: px, align, maxw };
+				const avail = anchor === 'end' ? lx - pad : width - lx - pad;
+				const maxw = Math.max(200, Math.min(320, Math.round(avail)));
+				return { ...a, x0, x1, lx, anchor, maxw, lines: a.short || [a.label] };
 			})
 			.filter(Boolean);
 	});
@@ -182,7 +218,23 @@
 		});
 	});
 
-	const lineLayers = $derived(series.map((s) => ({ ...s, bottom: null, top: s.values })));
+	// Line mode: with `smooth`, every line shows its 3-month average; the raw
+	// monthly values stay on each layer as `raw` for the tooltip (and the bars).
+	const lineLayers = $derived(
+		series.map((s) => {
+			const v = smooth ? avg3(s.values) : s.values;
+			return { ...s, raw: s.values, values: v, bottom: null, top: v };
+		})
+	);
+	// The series whose raw months are drawn as faint bars: the aggregate line
+	// (author / work total), or the only line.
+	const barLayer = $derived(
+		smooth && mode === 'line'
+			? lineLayers.find((s) => s.isAggregate) || (lineLayers.length === 1 ? lineLayers[0] : null)
+			: null
+	);
+	// Multi-line comparison ("By book"): several lines and no total line.
+	const multiLine = $derived(mode === 'line' && lineLayers.length >= 2 && !lineLayers.some((s) => s.isAggregate));
 
 	const layers = $derived(mode === 'line' ? lineLayers : stackedSeries);
 
@@ -191,6 +243,7 @@
 		if (mode === 'line') {
 			let m = 0;
 			for (const s of layers) for (const v of s.values) if (v > m) m = v;
+			if (barLayer) for (const v of barLayer.raw) if (v > m) m = v;
 			return m || 1;
 		}
 		return d3max(layers[layers.length - 1].top) || 1;
@@ -250,22 +303,74 @@
 		};
 	});
 
-	// In line ("Total") mode, fill the area under the aggregate/total line so the
-	// default view reads as a filled area chart (comparison lines still overlay).
-	const aggregateArea = $derived.by(() => {
-		if (mode !== 'line') return null;
-		const agg = lineLayers.find((s) => s.isAggregate);
-		if (!agg) return null;
-		return {
-			color: agg.color,
-			d: d3area()
-				.x((_, i) => x(i))
-				.y0(() => y(0))
-				.y1((_, i) => y(agg.values[i]))(agg.values)
-		};
+	const yTicks = $derived(y.ticks(5));
+	// The topmost labelled gridline carries the unit ("1,200 checkouts a month").
+	const yTopTick = $derived(yTicks.length ? yTicks[yTicks.length - 1] : null);
+
+	// Monthly bars behind the average line (only with `smooth`).
+	const barW = $derived(Math.max(0.6, Math.min(24, (months.length > 1 ? x(1) - x(0) : 8) - (months.length > 60 ? 1 : 2))));
+
+	// Book markers: a dot on the main line at the given month, a thin leader up
+	// to an italic title, staggered across two rows so neighbours don't collide.
+	const markerMarks = $derived.by(() => {
+		if (mode !== 'line' || !markers?.length) return [];
+		const main = lineLayers.find((s) => s.isAggregate) || lineLayers[0];
+		if (!main) return [];
+		// Place each label in one of two rows, on whichever side of its dot fits
+		// without colliding with labels already placed; on a narrow chart drop the
+		// sub-line and shorten long titles. A label that fits nowhere keeps only
+		// its dot.
+		const narrow = width < 560;
+		const rows = [26, 46];
+		const placed = [[], []];
+		const fits = (r, a, b) => a >= 0 && b <= width && placed[r].every(([p, q]) => b + 8 <= p || a >= q + 8);
+		return markers
+			.map((mk) => ({ ...mk, i: months.indexOf(mk.month) }))
+			.filter((mk) => mk.i >= 0)
+			.sort((a, b) => a.i - b.i)
+			.map((mk) => {
+				const lx = x(mk.i);
+				const label = narrow ? shortName(mk.label) : mk.label;
+				const sub = narrow ? '' : mk.sub || '';
+				const w = Math.max(label.length * 7.2, sub.length * 6);
+				const sides = lx + w > width - 4 ? ['end', 'start'] : ['start', 'end'];
+				let spot = null;
+				for (const r of [0, 1]) {
+					for (const side of sides) {
+						const a = side === 'start' ? lx - 4 : lx + 4 - w;
+						if (fits(r, a, a + w)) { spot = { r, side, a }; break; }
+					}
+					if (spot) break;
+				}
+				if (spot) placed[spot.r].push([spot.a, spot.a + w]);
+				return {
+					...mk, label, sub, lx, ly: y(main.values[mk.i] || 0),
+					ty: spot ? rows[spot.r] : null, end: spot?.side === 'end', hideText: !spot
+				};
+			});
 	});
 
-	const yTicks = $derived(y.ticks(5));
+	// End-of-line labels. One line: its last value and month. Several lines: the
+	// name and value of each, nudged apart vertically with a small leader line.
+	const endMarks = $derived.by(() => {
+		if (mode !== 'line' || !endLabels || !lineLayers.length || months.length < 2) return [];
+		const last = months.length - 1;
+		const main = lineLayers.find((s) => s.isAggregate);
+		const shown = main ? [main] : lineLayers;
+		const items = shown.map((s) => ({ s, v: s.values[last] || 0, ey: y(s.values[last] || 0) }));
+		items.sort((a, b) => a.ey - b.ey);
+		const gap = 15;
+		items.forEach((it, k) => { it.ty = k ? Math.max(it.ey, items[k - 1].ty + gap) : it.ey; });
+		const floor = height - margin.bottom - 2;
+		for (let k = items.length - 1; k >= 0; k--) {
+			const cap = k === items.length - 1 ? floor : items[k + 1].ty - gap;
+			if (items[k].ty > cap) items[k].ty = cap;
+		}
+		return items;
+	});
+	// AP-style month for the end label: "in July." / "in Aug." / "in Sept."
+	const AP_MONTHS = ['Jan.', 'Feb.', 'March', 'April', 'May', 'June', 'July', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.'];
+	const lastMonthLabel = $derived(months.length ? AP_MONTHS[Number(months[months.length - 1].slice(5, 7)) - 1] : '');
 
 	// Abbreviate axis numbers: 700000 -> "700k", 1200000 -> "1.2M", 1500 -> "1.5k".
 	function abbrevNum(n) {
@@ -298,9 +403,12 @@
 		const all = months
 			.map((m, i) => ({ i, year: m.slice(0, 4), isJan: m.endsWith('-01') }))
 			.filter((d) => d.isJan);
-		const maxLabels = Math.max(2, Math.floor(innerW / 44));
+		const maxLabels = Math.max(2, Math.floor(innerW / 40));
 		const step = Math.ceil(all.length / maxLabels);
-		return all.filter((_, i) => i % step === 0).map((d) => ({ i: d.i, label: d.year, yearLabel: null }));
+		// The first year in full, then abbreviated: 2017, '18, '19 ...
+		return all
+			.filter((_, i) => i % step === 0)
+			.map((d, k) => ({ i: d.i, label: k === 0 ? d.year : `’${d.year.slice(2)}`, yearLabel: null }));
 	});
 
 	let hoverIndex = $state(null);
@@ -581,38 +689,44 @@
 		onpointermove={onMove}
 		onpointerleave={onLeave}
 	>
-		<!-- Y Axis Ticks & Gridlines -->
-		{#each yTicks as tick}
-			<g class="tick y-tick" transform="translate(0, {y(tick)})">
-				<line x1={margin.left} x2={width - margin.right} stroke="#eee" />
-				<text x={margin.left - 8} dx="-4" dy="4" text-anchor="end">{abbrevNum(tick)}</text>
-			</g>
+		<!-- Event bands (COVID, ransomware): shaded months behind everything -->
+		{#each annotationMarks as a}
+			<rect class="ev-band" x={a.x0} width={Math.max(2, a.x1 - a.x0)} y={margin.top - 12} height={height - margin.bottom - margin.top + 12} />
 		{/each}
 
-		<!-- X Axis Ticks -->
+		<!-- Horizontal gridlines only; the labels sit inside the plot on their line -->
+		{#each yTicks as tick}
+			<line class="gridline" class:zero={tick === 0} x1={margin.left} x2={width - margin.right + 4} y1={y(tick)} y2={y(tick)} />
+		{/each}
+
+		<!-- X axis: small ticks under the baseline, no vertical gridlines -->
 		{#each xTicks as tick}
 			<g class="tick x-tick" transform="translate({x(tick.i)}, 0)">
-				<line y1={margin.top} y2={height - margin.bottom} stroke="#eee" stroke-dasharray="2 2" />
-				<text y={height - margin.bottom + 16} text-anchor="middle">{tick.label}</text>
+				<line class="x-tickmark" y1={height - margin.bottom} y2={height - margin.bottom + 5} />
+				<text y={height - margin.bottom + 18} text-anchor="middle">{tick.label}</text>
 				{#if tick.yearLabel}
-					<text class="x-year" y={height - margin.bottom + 30} text-anchor="middle">{tick.yearLabel}</text>
+					<text class="x-year" y={height - margin.bottom + 33} text-anchor="middle">{tick.yearLabel}</text>
 				{/if}
 			</g>
 		{/each}
 
-		<line x1={margin.left} x2={width - margin.right} y1={height - margin.bottom} y2={height - margin.bottom} stroke="#ccc" />
-
 		<!-- Layers: overlaid lines (line mode) or stacked areas (area mode) -->
 		{#if mode === 'line'}
-			{#if aggregateArea}
-				<path d={aggregateArea.d} fill={aggregateArea.color} opacity="0.13" class="agg-area" />
+			{#if barLayer}
+				<g class="month-bars" fill={barLayer.color}>
+					{#each barLayer.raw as v, i}
+						{#if v > 0}<rect x={x(i) - barW / 2} width={barW} y={y(v)} height={Math.max(0, y(0) - y(v))} />{/if}
+					{/each}
+				</g>
 			{/if}
 			{#each linePaths as p}
 				<path
 					d={p.d}
 					fill="none"
 					stroke={p.color}
-					stroke-width={p.isAggregate ? 2.5 : 1.75}
+					stroke-width={p.isAggregate ? 2.25 : 2}
+					stroke-linejoin="round"
+					stroke-linecap="round"
 					opacity={pathOpacity(p)}
 					class="line-path"
 				/>
@@ -662,41 +776,74 @@
 			</g>
 		{/if}
 
-		<!-- Hover marker: a faint vertical guide plus a dot on the hovered line -->
+		<!-- Book markers: dot on the main line, leader up to an italic title -->
+		{#each markerMarks as mk}
+			<g class="marker" pointer-events="none">
+				{#if !mk.hideText}
+					<line class="marker-leader" x1={mk.lx} x2={mk.lx} y1={mk.ty + (mk.sub ? 20 : 6)} y2={mk.ly - 6} />
+					<text class="marker-title" x={mk.end ? mk.lx + 4 : mk.lx - 4} y={mk.ty} text-anchor={mk.end ? 'end' : 'start'}>{mk.label}</text>
+					{#if mk.sub}
+						<text class="marker-sub" x={mk.end ? mk.lx + 4 : mk.lx - 4} y={mk.ty + 14} text-anchor={mk.end ? 'end' : 'start'}>{mk.sub}</text>
+					{/if}
+				{/if}
+				<circle class="marker-dot" cx={mk.lx} cy={mk.ly} r="3" />
+			</g>
+		{/each}
+
+		<!-- End-of-line labels -->
+		{#each endMarks as it}
+			{@const ex = x(months.length - 1)}
+			<circle class="end-dot" cx={ex} cy={it.ey} r="4" fill={it.s.color} />
+			{#if endMarks.length === 1}
+				<text class="end-value" x={ex + 8} y={it.ey - 2}>{Math.round(it.v).toLocaleString()}</text>
+				<text class="end-sub" x={ex + 8} y={it.ey + 12}>in {lastMonthLabel}</text>
+			{:else}
+				<path class="end-leader" d="M{ex + 5},{it.ey} L{ex + 11},{it.ey} L{ex + 15},{it.ty - 4}" />
+				<text class="end-name" x={ex + 18} y={it.ty}>{shortName(it.s.label)} <tspan class="end-num">{Math.round(it.v).toLocaleString()}</tspan></text>
+			{/if}
+		{/each}
+
+		<!-- y-axis labels, drawn last with a halo so lines never cover them -->
+		{#each yTicks as tick}
+			{#if tick > 0}
+				<text class="y-label" x={margin.left} y={y(tick) - 5}>{tick.toLocaleString()}{tick === yTopTick && unit && width >= 560 ? ` ${unit}` : ''}</text>
+			{/if}
+		{/each}
+
+		<!-- Hover marker: a thin vertical rule plus a dot on the hovered line(s) -->
 		{#if hoverIndex !== null}
-			{#if selectedItem && selectedItem.values[hoverIndex] > 0}
-				<line
-					class="hover-guide"
-					x1={x(hoverIndex)}
-					x2={x(hoverIndex)}
-					y1={y(selectedItem.top[hoverIndex])}
-					y2={height - margin.bottom}
-					stroke="#c9c9c9"
-					stroke-width="1"
-					stroke-dasharray="3 3"
-				/>
-				<circle
-					class="hover-dot"
-					cx={x(hoverIndex)}
-					cy={y(selectedItem.top[hoverIndex])}
-					r="5"
-					fill={selectedItem.color}
-					stroke="white"
-					stroke-width="2"
-				/>
+			<line class="hover-guide" x1={x(hoverIndex)} x2={x(hoverIndex)} y1={margin.top - 12} y2={height - margin.bottom} />
+			{#if multiLine}
+				{#each lineLayers as s}
+					<circle class="hover-dot" cx={x(hoverIndex)} cy={y(s.values[hoverIndex] || 0)} r="4" fill={s.color} />
+				{/each}
+			{:else if selectedItem && selectedItem.values[hoverIndex] > 0}
+				<circle class="hover-dot" cx={x(hoverIndex)} cy={y(selectedItem.top[hoverIndex])} r="5" fill={selectedItem.color} />
 			{/if}
 		{/if}
 	</svg>
-	<!-- "?" markers above the event dips; hover/focus for the explanation -->
+	<!-- Event labels: short text at the top of each band; hover/focus for the note -->
 	{#each annotationMarks as a}
-		<div class="qmark-wrap align-{a.align}" style="left: {a.x}px;">
-			<button class="qmark" aria-label="Why the drop here?">?</button>
+		<div class="ev-wrap align-{a.anchor}" style="left: {a.lx}px; top: {margin.top - 10}px;">
+			<span class="ev-label" tabindex="0" role="button" aria-label="{a.label}: about this dip">{#each a.lines as ln}<span class="ev-line">{ln}</span>{/each}</span>
 			<div class="qmark-pop" role="tooltip" style="max-width: {a.maxw}px;">
 				<p class="qmark-body"><strong>{a.label}.</strong> {a.blurb} <a href={a.url} target="_blank" rel="noopener noreferrer">Read more</a></p>
 			</div>
 		</div>
 	{/each}
-	{#if hoverIndex !== null && selectedItem}
+	{#if hoverIndex !== null && multiLine}
+        <div class="tooltip" class:below={tooltipBelow} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
+            <div class="tt-date tt-date-top">{formatMonth(months[hoverIndex])}</div>
+            {#each [...lineLayers].sort((a, b) => (b.values[hoverIndex] || 0) - (a.values[hoverIndex] || 0)) as s}
+                <div class="tt-row">
+                    <span class="tt-dot" style="background-color: {s.color}"></span>
+                    <span class="tt-row-name">{shortName(s.label)}</span>
+                    <span class="tt-row-val">{Math.round(s.values[hoverIndex] || 0).toLocaleString()}</span>
+                </div>
+            {/each}
+            {#if smooth}<div class="tt-note">3-month averages</div>{/if}
+        </div>
+	{:else if hoverIndex !== null && selectedItem}
         <div class="tooltip" class:below={tooltipBelow} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
             <div class="tt-title">
                 <span class="tt-dot" style="background-color: {selectedItem.color}"></span>
@@ -720,7 +867,8 @@
                     <span>{groupTotal.toLocaleString()}</span>
                 </div>
             {:else}
-                <div class="tt-value">{selectedItem.values[hoverIndex].toLocaleString()}<span class="tt-value-unit">checkouts</span></div>
+                <div class="tt-value">{(selectedItem.raw ?? selectedItem.values)[hoverIndex].toLocaleString()}<span class="tt-value-unit">checkouts</span></div>
+                {#if smooth && mode === 'line'}<div class="tt-avg">3-month avg. {Math.round(selectedItem.values[hoverIndex]).toLocaleString()}</div>{/if}
             {/if}
 
             {#if selectedItem.otherTitles?.length}
@@ -751,38 +899,29 @@
 </div>
 
 <style>
-	/* "?" markers for event dips (COVID, ransomware) — hover reveals the note. */
-	.qmark-wrap {
+	/* Event bands + labels (COVID, ransomware). The label sits beside the band
+	   at its top; hovering or focusing it reveals the note. */
+	.ev-band { fill: rgba(0, 0, 0, 0.045); }
+	.ev-wrap {
 		position: absolute;
-		top: 4px;
 		z-index: 7;
 	}
-	.qmark-wrap.align-center { transform: translateX(-50%); }
-	.qmark-wrap.align-end { transform: translateX(-50%); }
-	.qmark-wrap.align-start { transform: translateX(-50%); }
-	.qmark {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 20px;
-		height: 20px;
+	.ev-wrap.align-end { transform: translateX(-100%); text-align: right; }
+	.ev-label {
+		display: inline-flex;
+		flex-direction: column;
 		font-family: var(--font-sans, system-ui, sans-serif);
-		font-size: 0.78rem;
-		font-weight: 700;
-		color: var(--color-fg-light, #667);
-		background: rgba(255, 255, 255, 0.95);
-		border: 1.5px solid var(--color-border, #d5d9e0);
-		border-radius: 50%;
+		font-size: 11px;
+		line-height: 1.25;
+		color: #858585;
 		cursor: help;
-		padding: 0;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+		text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff;
 	}
-	.qmark-wrap:hover .qmark,
-	.qmark-wrap:focus-within .qmark {
-		color: #fff;
-		background: #3f88cc;
-		border-color: #3f88cc;
-	}
+	.ev-line { border-bottom: 1px dotted transparent; }
+	.ev-label:hover .ev-line,
+	.ev-label:focus .ev-line { color: var(--color-fg, #1a1a1a); }
+	.ev-label:focus { outline: none; }
+	.ev-label:focus-visible { outline: 2px solid #3f88cc; outline-offset: 2px; border-radius: 2px; }
 	.qmark-pop {
 		display: none;
 		position: absolute;
@@ -798,10 +937,64 @@
 		box-shadow: 0 8px 26px rgba(0, 0, 0, 0.16);
 	}
 	/* keep the near-edge popovers from overflowing the chart */
-	.qmark-wrap.align-end .qmark-pop { left: auto; right: 0; transform: none; }
-	.qmark-wrap.align-start .qmark-pop { left: 0; transform: none; }
-	.qmark-wrap:hover .qmark-pop,
-	.qmark-wrap:focus-within .qmark-pop { display: block; }
+	.ev-wrap.align-end .qmark-pop { left: auto; right: 0; transform: none; text-align: left; }
+	.ev-wrap.align-start .qmark-pop { left: 0; transform: none; }
+	.ev-wrap:hover .qmark-pop,
+	.ev-wrap:focus-within .qmark-pop { display: block; }
+
+	/* Axes: horizontal hairlines, a darker zero baseline, labels inside the plot */
+	.gridline { stroke: #e8e7e2; stroke-width: 1; }
+	.gridline.zero { stroke: #555; }
+	.x-tickmark { stroke: #555; stroke-width: 1; }
+	.y-label {
+		font-family: var(--font-sans, system-ui, sans-serif);
+		font-size: 12px;
+		fill: #7a7a7a;
+		paint-order: stroke;
+		stroke: #fff;
+		stroke-width: 3px;
+		stroke-linejoin: round;
+	}
+	.month-bars { opacity: 0.28; }
+
+	/* Book markers */
+	.marker-leader { stroke: #8a8a8a; stroke-width: 0.75; }
+	.marker-dot { fill: #1a1a1a; stroke: #fff; stroke-width: 1.5; }
+	.marker-title {
+		font-family: var(--font-serif, Georgia, serif);
+		font-style: italic;
+		font-size: 13.5px;
+		fill: #1a1a1a;
+		paint-order: stroke;
+		stroke: #fff;
+		stroke-width: 3px;
+	}
+	.marker-sub {
+		font-family: var(--font-sans, system-ui, sans-serif);
+		font-size: 11px;
+		fill: #858585;
+		paint-order: stroke;
+		stroke: #fff;
+		stroke-width: 3px;
+	}
+
+	/* End-of-line labels */
+	.end-dot { stroke: #fff; stroke-width: 2; }
+	.end-value { font-family: var(--font-sans, system-ui, sans-serif); font-size: 12px; font-weight: 600; fill: #1a1a1a; }
+	.end-sub { font-family: var(--font-sans, system-ui, sans-serif); font-size: 11px; fill: #858585; }
+	.end-leader { fill: none; stroke: #9a9a9a; stroke-width: 0.75; }
+	.end-name { font-family: var(--font-sans, system-ui, sans-serif); font-size: 12px; fill: #1a1a1a; }
+	.end-num { fill: #858585; }
+
+	/* Hover */
+	.hover-guide { stroke: #9a9a9a; stroke-width: 0.75; }
+	.hover-dot { stroke: #fff; stroke-width: 2; }
+	.tt-date-top { margin-top: 0 !important; margin-bottom: 6px !important; }
+	.tt-row { display: flex; align-items: center; gap: 7px; font-size: 13px; line-height: 1.5; }
+	.tt-row-name { flex: 1; color: #444; }
+	.tt-row-val { font-variant-numeric: tabular-nums; color: #1a1a1a; font-weight: 600; margin-left: 12px; }
+	.tt-avg { font-size: 12px; color: #858585; margin-top: 2px; }
+	.tt-note { font-size: 11px; color: #9a9a9a; margin-top: 6px; }
 	.qmark-body {
 		margin: 0;
 		font-family: var(--font-sans, system-ui, sans-serif);
