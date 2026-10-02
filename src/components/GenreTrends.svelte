@@ -13,11 +13,13 @@
 	import LinkIcon from "@lucide/svelte/icons/link";
 	import ShareIcon from "@lucide/svelte/icons/share-2";
 	import { base } from "$app/paths";
+	import { drawChartLogo } from "$utils/chartLogo.js";
 	import { compactNumber } from "$utils/format.js";
 	import DownloadIcon from "@lucide/svelte/icons/download";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import TableIcon from "@lucide/svelte/icons/table";
 	import LineChart from "$components/StackedAreaChart.svelte";
+	import DataInfo from "$components/DataInfo.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
 
@@ -402,6 +404,7 @@
 		ctx.fillStyle = "#666666";
 		ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 		ctx.fillText(plotTitle, padX, 54);
+		await drawChartLogo(ctx, padX + w, 26);
 		ctx.drawImage(img, padX, titleH, w, h);
 		if (showLegend) {
 			ctx.font = LEG_FONT;
@@ -513,7 +516,7 @@
 		<YearBrush months={data.months} values={data.total} bind:lo bind:hi />
 		<!-- Source on the left; Download and Share as small links on the right -->
 		<div class="chart-foot" style="padding-right: {Math.max(0, plotInset - 2)}px">
-			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap.</p>
+			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap. <DataInfo first={data.months[0]} last={data.months[data.months.length - 1]} genres />.</p>
 			<div class="tb-right foot-actions">
 				<div class="dl-wrap">
 					<button class="tb-btn" onclick={() => (dlOpen = !dlOpen)} aria-haspopup="true" aria-expanded={dlOpen} title="Download the data or the chart">

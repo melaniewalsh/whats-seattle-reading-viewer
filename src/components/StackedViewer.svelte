@@ -11,6 +11,7 @@
 	import TableIcon from "@lucide/svelte/icons/table";
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
 	import { base } from "$app/paths";
+	import { drawChartLogo } from "$utils/chartLogo.js";
 	import workOverrides from "$data/work-overrides.json";
 	import { displayName } from "$utils/displayName.js";
 	import { titleCase } from "$utils/titleCase.js";
@@ -19,6 +20,7 @@
 	import { compactNumber } from "$utils/format.js";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
+	import DataInfo from "$components/DataInfo.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
 	import WikiCard from "$components/WikiCard.svelte";
@@ -676,6 +678,7 @@
 		ctx.fillStyle = "#666666";
 		ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 		ctx.fillText(plotTitle || (current ? `${abbrevCount(current.total)} checkouts` : ""), padX, 54);
+		await drawChartLogo(ctx, padX + w, 26);
 		ctx.drawImage(img, padX, titleH, w, h);
 		if (showLegend) {
 			ctx.font = LEG_FONT;
@@ -2437,7 +2440,7 @@
 
 			<!-- Source on the left; Download and Share as small links on the right -->
 			<div class="chart-foot" style="padding-right: {Math.max(0, plotInset - 2)}px">
-			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>.{#if bookMarkers.length && chartLineMode === "line"}{" "}Book labels mark the month each title was first checked out at SPL.{/if}</p>
+			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>.{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.{#if bookMarkers.length && chartLineMode === "line"}{" "}Book labels mark the month each title was first checked out at SPL.{/if}</p>
 			<div class="chart-actions tb-actions foot-actions">
 				<div class="dl-wrap">
 					<button class="tb-btn" onclick={() => (downloadOpen = !downloadOpen)} title="Download the data or the chart image" aria-haspopup="true" aria-expanded={downloadOpen}>
