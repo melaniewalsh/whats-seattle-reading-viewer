@@ -69,7 +69,7 @@
 			for (let i = 1; i < monthCount; i++) if (sum[i] > sum[peakIdx]) peakIdx = i;
 			featured = {
 				months,
-				series: [{ label: "The Odyssey", color: "#3f88cc", values: sum }],
+				series: [{ key: "featured", label: "The Odyssey", color: "#3f88cc", values: sum, isAggregate: true }],
 				title: hit.title,
 				authorSlug: hit.slug,
 				checkouts: sum.reduce((s, v) => s + v, 0),
@@ -515,7 +515,11 @@
 						</div>
 					</div>
 					<div class="featured-chart">
-						<LineChart months={featured.months} series={featured.series} mode="area" peak={featured.peak} annotations={EVENT_ANNOTATIONS} />
+						<!-- Same style as the trend pages. The end label gives the latest month; the
+						     peak gets its own label only when it isn't that month. -->
+						<LineChart months={featured.months} series={featured.series} mode="line" smooth
+							markers={featured.peak && featured.peak.idx < featured.months.length - 1 ? [{ month: featured.peak.month, label: "Peak", sub: `${featured.peak.value.toLocaleString()} checkouts` }] : []}
+							annotations={EVENT_ANNOTATIONS} />
 					</div>
 					<div class="featured-actions">
 						<button class="featured-cta" onclick={() => openTitle(featured.title, featured.authorSlug)}>Explore the full trend →</button>

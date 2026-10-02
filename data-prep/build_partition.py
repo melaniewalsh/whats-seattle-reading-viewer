@@ -122,7 +122,10 @@ TAXONOMY = [
     # "domestic fiction" and "psychological fiction" were dropped too (2026-09):
     # both are broad form tags that pull in plenty of commercial fiction
     # (thrillers, book-club and family sagas), not specifically literary work.
-    ("Literary & Classic Fiction", ["literary fiction", "short stories", "classic literature"], []),
+    # "short stories" was dropped too (2026-10): it's a form heading that also
+    # lands on genre books (a print edition of the hockey romance Heated Rivalry
+    # carries it), and one matching edition pulls in a whole work.
+    ("Literary & Classic Fiction", ["literary fiction", "classic literature"], []),
     # The broad BISAC "Literature" tag = contemporary general / book-club fiction
     # (Demon Copperhead, Lessons in Chemistry) — NOT the same as literary fiction,
     # so it gets its own bucket, just after the specific one claims the classics.
