@@ -461,6 +461,22 @@
 		if (a >= 1e3) { const v = n / 1e3; return (Number.isInteger(v) ? v : v.toFixed(1)) + "k"; }
 		return String(n);
 	}
+	// In month-tick mode, one label per year centered under that year's months;
+	// a year with too little room (a sliver at the window's edge) is skipped.
+	const yearSpans = $derived.by(() => {
+		if (!monthTickMode || !months.length) return [];
+		const spans = [];
+		months.forEach((m, i) => {
+			const yr = m.slice(0, 4);
+			const last = spans[spans.length - 1];
+			if (last && last.year === yr) last.i1 = i;
+			else spans.push({ year: yr, i0: i, i1: i });
+		});
+		const multi = spans.length > 1;
+		return spans
+			.map((sp) => ({ year: sp.year, x0: x(sp.i0), x1: x(sp.i1), cx: (x(sp.i0) + x(sp.i1)) / 2, multi }))
+			.filter((sp) => !multi || sp.x1 - sp.x0 >= 34);
+	});
 	// X-axis ticks. Over a long window: one tick per January, thinned so year
 	// labels never collide on a narrow screen (~44px per label). Once the year
 	// brush narrows the window to a few years, years alone are too coarse (a
@@ -786,10 +802,14 @@
 			<g class="tick x-tick" transform="translate({x(tick.i)}, 0)">
 				<line class="x-tickmark" y1={height - margin.bottom} y2={height - margin.bottom + 5} />
 				<text y={height - margin.bottom + 18} text-anchor="middle">{tick.label}</text>
-				{#if tick.yearLabel}
-					<text class="x-year" y={height - margin.bottom + 33} text-anchor="middle">{tick.yearLabel}</text>
-				{/if}
 			</g>
+		{/each}
+		<!-- Month ticks: each year's label sits centered under its run of months
+		     (not off the left edge under January), with a hairline span when the
+		     window covers more than one year. -->
+		{#each yearSpans as ys}
+			{#if ys.multi}<line class="x-yearspan" x1={ys.x0} x2={ys.x1} y1={height - margin.bottom + 25} y2={height - margin.bottom + 25} />{/if}
+			<text class="x-year" x={ys.cx} y={height - margin.bottom + 37} text-anchor="middle">{ys.year}</text>
 		{/each}
 
 		<!-- Layers: overlaid lines (line mode) or stacked areas (area mode) -->
@@ -1128,7 +1148,8 @@
 			y1 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 	}
 
-	.tick text.x-year { font-weight: 600; fill: #555; }
+	text.x-year { font-size: 11px; font-weight: 600; fill: #555; }
+	.x-yearspan { stroke: #cfcfcf; stroke-width: 1; }
 	.tick text {
 		font-size: 11px;
 		fill: #666;
