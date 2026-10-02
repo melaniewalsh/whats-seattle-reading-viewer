@@ -1047,8 +1047,11 @@
 	// Pull one edition out of its work cluster into its own singleton work. Also
 	// take it out of any group first, so the exclusion actually sticks.
 	function excludeEdition(idx) {
+		const undo = groupingSnapshot();
 		releaseTitle(idx);
 		workAssign = { ...workAssign, [idx]: `excl-${idx}` };
+		if (!expandedWorks.includes(`excl-${idx}`)) expandedWorks = [...expandedWorks, `excl-${idx}`];
+		showMoved(idx, `Split the ${formatLabel(current.titles[idx].format)} edition out into its own book`, undo);
 	}
 
 	// Merge one work into another: reassign every edition currently in srcKey to
@@ -1186,15 +1189,25 @@
 		current.titles.forEach((t, idx) => {
 			const key = workIdentityKey(idx, t.title);
 			if (!key) return;
-			if (!m.has(key)) m.set(key, { idxs: [], name: cleanTitleForDisplay(t.title) || t.title, topTotal: -1, total: 0 });
+			if (!m.has(key)) m.set(key, { idxs: [], name: cleanTitleForDisplay(t.title) || t.title, topTotal: -1, total: 0, nativeTop: -1, nativeName: null });
 			const w = m.get(key);
 			w.idxs.push(idx);
 			w.total += t.total;
+			const label = cleanTitleForDisplay(t.title) || t.title;
 			if (t.total > w.topTotal) {
 				w.topTotal = t.total;
-				w.name = cleanTitleForDisplay(t.title) || t.title;
+				w.name = label;
+			}
+			// An edition the user MOVED in doesn't rename the book it joined (moving
+			// the Normal People ebook into Intermezzo mustn't relabel Intermezzo).
+			const natural = overrideKeyByTitle?.get(t.title) ?? normalizeWorkKey(t.title);
+			const movedIn = workAssign[idx] != null && workAssign[idx] !== natural;
+			if (!movedIn && t.total > w.nativeTop) {
+				w.nativeTop = t.total;
+				w.nativeName = label;
 			}
 		});
+		for (const w of m.values()) if (w.nativeName) w.name = w.nativeName;
 		// A group-defined work takes its name from the group label (which the user
 		// may have renamed), so the table row matches the pill.
 		for (const g of groups) {
@@ -1503,9 +1516,44 @@
 		if (!key) return;
 		const target = workBlocks.find((w) => w.key === key);
 		const g = target ? groups.find((gr) => gr.idxs.length && target.editions.some((e) => gr.idxs.includes(e.idx))) : null;
+		const undo = groupingSnapshot();
 		addEditionToWork(idx, key);
 		if (g && !g.idxs.includes(idx)) g.idxs = [...g.idxs, idx];
 		if (!expandedWorks.includes(key)) expandedWorks = [...expandedWorks, key];
+		const name = moveTargets.find((m) => m.key === key)?.name?.replace(/\s*\((?:\d+ editions?|new, empty)\)$/, "") || target?.name || "another book";
+		showMoved(idx, `Moved the ${formatLabel(current.titles[idx].format)} edition to ${name}`, undo);
+	}
+
+	// Feedback for a move or split: the edition flashes in its new place (scrolled
+	// into view), and a short note at the bottom says what happened, with Undo.
+	let movedIdx = $state(null);
+	let moveNote = $state(null); // { text, undo }
+	let moveTimers = [];
+	function groupingSnapshot() {
+		return {
+			workAssign: { ...workAssign },
+			groups: groups.map((g) => ({ ...g, idxs: [...g.idxs] })),
+			singleIdxs: [...singleIdxs],
+			expandedWorks: [...expandedWorks],
+		};
+	}
+	function showMoved(idx, text, snap) {
+		moveTimers.forEach(clearTimeout);
+		movedIdx = idx;
+		moveNote = { text, undo: snap };
+		tick().then(() => document.querySelector(`[data-ed="${idx}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+		moveTimers = [setTimeout(() => (movedIdx = null), 1800), setTimeout(() => (moveNote = null), 8000)];
+	}
+	function undoMove() {
+		const snap = moveNote?.undo;
+		if (!snap) return;
+		workAssign = snap.workAssign;
+		groups = snap.groups;
+		singleIdxs = snap.singleIdxs;
+		expandedWorks = snap.expandedWorks;
+		moveTimers.forEach(clearTimeout);
+		moveNote = null;
+		movedIdx = null;
 	}
 	const booksYears = $derived.by(() => {
 		if (!months.length || !current) return "";
@@ -2573,7 +2621,7 @@
 						</li>
 						{#if open}
 							{#each w.editions.slice().sort((a, b) => b.total - a.total) as t (t.idx)}
-								<li class="bk-row bk-ed" class:editing={editMode} class:hit={t.match}>
+								<li class="bk-row bk-ed" class:editing={editMode} class:hit={t.match} class:just-moved={movedIdx === t.idx} data-ed={t.idx}>
 									<input type="checkbox" class="bk-check"
 										checked={activeGroupId ? groupForTitle(t.idx)?.id === activeGroupId : isSingleSelected(t.idx)}
 										onchange={() => keepTableStill(() => toggleTitle(t.idx))}
@@ -2605,6 +2653,13 @@
 			</section>
 			{/if}
 			</div><!-- /.split -->
+		</div>
+	{/if}
+
+	{#if moveNote}
+		<div class="move-note" role="status">
+			<span>{moveNote.text}</span>
+			<button type="button" class="move-undo" onclick={undoMove}>Undo</button>
 		</div>
 	{/if}
 
@@ -4671,6 +4726,35 @@
 	   belonging to that book. */
 	.bk-ed { grid-template-columns: 22px minmax(0, 1fr) 76px; padding: 5px 8px 5px 30px; border-top: 0; font-size: var(--text-sm); color: var(--color-fg-light); background: #f8f7f3; }
 	.bk-ed:hover { background: #f0efea; }
+	/* A just-moved edition flashes in its new place, then settles. */
+	.bk-ed.just-moved { animation: moved-flash 1.8s ease-out; }
+	@keyframes moved-flash {
+		0%, 25% { background: #fde8a6; box-shadow: inset 3px 0 0 #e0a100; }
+		100% { background: #f8f7f3; box-shadow: inset 3px 0 0 transparent; }
+	}
+	.move-note {
+		position: fixed;
+		left: 50%;
+		bottom: 22px;
+		transform: translateX(-50%);
+		z-index: 70;
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		max-width: calc(100vw - 32px);
+		padding: 10px 14px 10px 16px;
+		background: #1f1f1f;
+		color: #fff;
+		border-radius: 8px;
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		animation: note-in 0.18s ease-out;
+	}
+	@keyframes note-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+	.move-undo { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: #9cc8f0; cursor: pointer; white-space: nowrap; }
+	.move-undo:hover { text-decoration: underline; text-underline-offset: 3px; }
+	@media (prefers-reduced-motion: reduce) { .bk-ed.just-moved, .move-note { animation: none; } .bk-ed.just-moved { background: #fde8a6; } }
 	.bk-ed.editing { grid-template-columns: 22px minmax(0, 1fr) auto 76px; }
 	.bk-ed .bk-num { color: var(--color-fg-light); }
 	.bk-ed-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
