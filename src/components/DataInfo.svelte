@@ -11,6 +11,7 @@
 	import CopyIcon from "@lucide/svelte/icons/copy";
 	import CheckIcon from "@lucide/svelte/icons/check";
 	import XIcon from "@lucide/svelte/icons/x";
+	import { publications } from "$data/publications.js";
 
 	let { first = "", last = "", genres = false } = $props();
 
@@ -28,10 +29,19 @@
 	});
 
 	const inline = $derived(`Seattle Public Library, Checkouts by Title (${y0}–${y1}) – processed by What Is Seattle Reading?`);
-	const full = $derived(
-		`Seattle Public Library. “Checkouts by Title” [dataset], ${y0}–${y1}. City of Seattle Open Data Portal, ${DATASET}. ` +
-		`Processed by Melanie Walsh and Neel Gupta, What Is Seattle Reading? University of Washington, ${y1}. ${siteUrl}`,
+	// The project (this site) and the library's dataset are cited separately.
+	const project = $derived(`Melanie Walsh and Neel Gupta. What Is Seattle Reading? University of Washington, ${y1}. ${siteUrl}`);
+	const projectBib = $derived(
+		`@misc{walshWhatSeattleReading${y1},\n  author = {Walsh, Melanie and Gupta, Neel},\n  title = {What Is Seattle Reading?},\n  year = {${y1}},\n  publisher = {University of Washington},\n  url = {${siteUrl}}\n}`,
 	);
+	// The data paper (Journal of Open Humanities Data), from the Publications list.
+	const paper = publications.find((p) => /johd/i.test(p.doi || ""));
+	// Its citation is "Authors. Journal 11, no. 1 (2025)." -> split, so the title
+	// can go in its usual place: Authors. "Title." Journal ... DOI
+	const [paperAuthors, paperVenue] = paper ? [paper.citation.split(/\.\s+/)[0], paper.citation.split(/\.\s+/).slice(1).join(". ").replace(/\.\s*$/, "")] : ["", ""];
+	const paperTitle = paper ? paper.title.replace(/[.?]?$/, (m) => m || "") : "";
+	const paperCite = paper ? `${paperAuthors}. “${paperTitle.replace(/\.$/, "")}${/[?!]$/.test(paperTitle) ? "" : "."}” ${paperVenue}. ${paper.doi}` : "";
+	const full = $derived(`Seattle Public Library. “Checkouts by Title” [dataset], ${y0}–${y1}. City of Seattle Open Data Portal. ${DATASET}`);
 
 	function open() { dialog?.showModal(); }
 	function close() { dialog?.close(); }
@@ -73,6 +83,11 @@
 			in each month, for physical items and for digital ebooks and audiobooks, on the City of Seattle's
 			open data portal. Each record names the title, its creator, its format and its catalog subject
 			headings.
+			{#if paper}
+				For a full description of the dataset and what it can tell us about readers, see
+				{paperAuthors}, <a href={paper.doi} target="_blank" rel="noopener noreferrer">“{paperTitle.replace(/\.$/, "")}”</a>,
+				<em>{paperVenue}</em>.
+			{/if}
 		</p>
 
 		<div class="di-notes">
@@ -88,6 +103,17 @@
 			</ul>
 		</div>
 
+		<h3 class="di-h">How to cite this project</h3>
+		<div class="di-cite">
+			<code>{project}</code>
+			<button type="button" class="di-copy" onclick={() => copy("project", project)} aria-label="Copy the project citation">{#if copied === "project"}<CheckIcon size={16} strokeWidth={2} />{:else}<CopyIcon size={16} strokeWidth={2} />{/if}</button>
+		</div>
+		<p class="di-sub">BibTeX:</p>
+		<div class="di-cite">
+			<code>{projectBib}</code>
+			<button type="button" class="di-copy" onclick={() => copy("bib", projectBib)} aria-label="Copy the BibTeX">{#if copied === "bib"}<CheckIcon size={16} strokeWidth={2} />{:else}<CopyIcon size={16} strokeWidth={2} />{/if}</button>
+		</div>
+
 		<h3 class="di-h">How to cite this data</h3>
 		<p class="di-sub">In-line citation, for charts and other tight spaces:</p>
 		<div class="di-cite">
@@ -99,6 +125,13 @@
 			<code>{full}</code>
 			<button type="button" class="di-copy" onclick={() => copy("full", full)} aria-label="Copy the full citation">{#if copied === "full"}<CheckIcon size={16} strokeWidth={2} />{:else}<CopyIcon size={16} strokeWidth={2} />{/if}</button>
 		</div>
+		{#if paper}
+			<p class="di-sub">And the paper describing the dataset:</p>
+			<div class="di-cite">
+				<code>{paperCite}</code>
+				<button type="button" class="di-copy" onclick={() => copy("paper", paperCite)} aria-label="Copy the data paper citation">{#if copied === "paper"}<CheckIcon size={16} strokeWidth={2} />{:else}<CopyIcon size={16} strokeWidth={2} />{/if}</button>
+			</div>
+		{/if}
 		<p class="di-more">Our research with this data is listed under <a href="{base}/?tab=publications">Publications</a>.</p>
 	</div>
 </dialog>
@@ -120,7 +153,7 @@
 	.di-facts .di-wide { grid-column: 1 / -1; }
 	.di-facts dt { font-size: 13px; color: var(--color-fg-light); }
 	.di-facts dd { margin: 2px 0 0; }
-	.di-facts a, .di-more a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+	.di-facts a, .di-more a, .di p a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 	.di-h { font-family: var(--font-serif); font-weight: 400; font-size: 1.35rem; margin: 26px 0 8px; }
 	.di p { margin: 0 0 10px; }
 	.di-notes { background: var(--color-gray-100, #f2f2f2); border-radius: 6px; padding: 16px 20px 6px; margin: 20px 0 6px; }
