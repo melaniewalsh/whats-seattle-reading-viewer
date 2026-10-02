@@ -77,9 +77,6 @@ async function summaryByTitle(title) {
 		if (!d || d.type === "disambiguation" || !d.extract) return null;
 		return {
 			title: d.title || t,
-			// Wikipedia's one-line short description, e.g. "Irish author (born 1991)"
-			// or "2018 novel by Sally Rooney" — shown under the page heading.
-			description: d.description || null,
 			extract: d.extract,
 			thumbnail: d.thumbnail?.source || null,
 			url:
@@ -145,7 +142,7 @@ function nameVariants(name) {
 // writer/illustrator — so "Peter Brown" resolves to the children's illustrator,
 // and "Lincoln C. Peirce" to the "Lincoln Peirce" cartoonist page.
 export function wikiSummary(name) {
-	return cached(`wiki6:${(name || "").trim().toLowerCase()}`, async () => {
+	return cached(`wiki5:${(name || "").trim().toLowerCase()}`, async () => {
 		const variants = nameVariants(name);
 		let firstDirect = null;
 		for (const v of variants) {
@@ -300,7 +297,7 @@ export function wikiWork(title, author) {
 	return wikiWorkResolved(title, author);
 }
 function wikiWorkResolved(title, author) {
-	const key = `wikiwork5:${(title || "").trim().toLowerCase()}|${(author || "").trim().toLowerCase()}`;
+	const key = `wikiwork4:${(title || "").trim().toLowerCase()}|${(author || "").trim().toLowerCase()}`;
 	return cached(key, async () => {
 		const en = await enwikiTitleForWork(title, author);
 		if (en) {

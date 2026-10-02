@@ -17,7 +17,6 @@
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
 	import WikiCard from "$components/WikiCard.svelte";
-	import { wikiSummary, wikiWork } from "$utils/wiki.js";
 	import BorrowMenu from "$components/BorrowMenu.svelte";
 	import Switch from "$components/ui/Switch.svelte";
 	import { getMonths, searchAuthors, searchTitles, searchAll, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks } from "$components/db.js";
@@ -63,7 +62,6 @@
 	let isolatedKeys = $state([]); // when non-empty, the chart shows ONLY these series (keys 'g<id>' | 's<idx>'); multiple = compare
 	let hiddenKeys = $state([]); // keys the user has clicked to hide/ignore from the stacked "All titles" chart
 	let showAuthorTotal = $state(true); // show the author's aggregate total line in the line view
-	let smoothOn = $state(true); // draw 3-month averages (raw months as faint bars behind the total)
 	let dragIdx = $state(null); // title index currently being dragged onto a group pill
 	let dragGroupId = $state(null); // group pill currently being dragged (to merge into another)
 	let dragOverId = $state(null); // group pill currently under the dragged title/pill
@@ -87,10 +85,7 @@
 	let currentSlug = $state(null); // slug of the selected author (for shareable URLs)
 	let isOverview = $state(false); // true when showing the library-wide "all checkouts" landing view (no per-title data)
 	let mobileTableOpen = $state(false); // on narrow screens the title table opens as a drawer
-	let tableCollapsed = $state(false); // the books table is open by default; its header still collapses it
-	let editMode = $state(false); // "Edit groupings": reveals drag handles, exclude, save/reset/custom work
-	let booksShowAll = $state(false); // view mode lists the top BOOKS_PREVIEW books until "Show all"
-	const BOOKS_PREVIEW = 8;
+	let tableCollapsed = $state(true); // the works table starts collapsed; opened via its header or "Make a custom work"
 	let autoHidAuthorTotal = $state(false); // whether we've auto-hidden the author-total line for this author yet
 	let shareMsg = $state(""); // transient toast after copying a share link
 	let shareOpen = $state(false); // whether the share-platform popover is open
@@ -222,7 +217,7 @@
 		autoHidAuthorTotal = false; autoGroupNote = ""; workAssign = {};
 		expandedWorks = []; workOrder = "checkouts"; titleSort = "work";
 		yearLo = 0; yearHi = Math.max(months.length - 1, 0);
-		mobileTableOpen = false; tableCollapsed = false; editMode = false; booksShowAll = false; query = ""; results = [];
+		mobileTableOpen = false; tableCollapsed = true; query = ""; results = [];
 		wikiHover = false;
 		try {
 			const url = new URL(window.location.href);
@@ -1457,21 +1452,7 @@
 		});
 		return blocks;
 	});
-	// View mode shows the top few books; editing, filtering or "Show all" lists them all.
-	const booksCapped = $derived(!editMode && !titleFilter.trim() && !booksShowAll);
-	const visibleWorkBlocks = $derived(workBlocks.slice(0, booksCapped ? BOOKS_PREVIEW : WORK_BLOCK_CAP));
-	// Tiny trend line for a book's row: its checkouts over the visible window.
-	function sparkPath(idxs, w = 78, h = 18) {
-		if (!current || !idxs?.length) return "";
-		const s = sumSeries(idxs);
-		const lo = isYearFiltered ? yearLo : Math.max(0, current.series.findIndex((v) => v > 0));
-		const hi = isYearFiltered ? yearHi : s.length - 1;
-		const seg = s.slice(lo, hi + 1);
-		if (seg.length < 2) return "";
-		const avg = seg.map((_, i) => { let t = 0, n = 0; for (let k = i - 1; k <= i + 1; k++) if (k >= 0 && k < seg.length) { t += seg[k]; n++; } return t / n; });
-		const mx = Math.max(1, ...avg);
-		return avg.map((v, i) => `${i ? "L" : "M"}${(1 + (i * (w - 2)) / (avg.length - 1)).toFixed(1)},${(h - 1 - (v / mx) * (h - 3)).toFixed(1)}`).join("");
-	}
+	const visibleWorkBlocks = $derived(workBlocks.slice(0, WORK_BLOCK_CAP));
 	const hiddenWorkCount = $derived(Math.max(0, workBlocks.length - visibleWorkBlocks.length));
 
 	let expandedWorks = $state([]); // work keys currently expanded in the table
@@ -1630,25 +1611,6 @@
 	}
 	const top5Terms = (map) => [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map((e) => e[0]);
 
-	// Subject headings for the page header, tidied for reading. SPL's data strips
-	// LC punctuation ("Dublin Ireland Fiction", "Man woman relationships Fiction"),
-	// mixes in format words ("Large type books", "Novels") and near-duplicates
-	// ("Horror" / "Horror fiction"). Clean that up and keep the top five.
-	const SUBJ_DROP = /^(fiction|nonfiction|non-fiction|literature|novels?|large type books|large print books|audiobooks?|downloadable audio books|electronic books|juvenile fiction|juvenile literature|general|adult|stories)$/i;
-	const PLACES = new Set(["Ireland", "England", "Scotland", "Wales", "France", "Italy", "Spain", "Germany", "Japan", "China", "India", "Mexico", "Canada", "Australia", "Russia", "Nigeria", "Israel", "Egypt", "Greece", "Korea", "Washington", "Calif", "California", "Texas", "Florida", "Alaska", "Oregon", "Mass", "Massachusetts", "Ill", "Illinois", "N.Y", "N Y", "Ohio", "Mich", "Minn", "Ga", "La", "Va", "Pa"]);
-	function cleanSubject(raw) {
-		let t = String(raw || "").replace(/\s+/g, " ").trim();
-		if (!t || SUBJ_DROP.test(t)) return null;
-		// "X Fiction" (capital F, LC form subdivision) -> "X"; keep genre phrases
-		// like "Psychological fiction" or "Science fiction".
-		t = t.replace(/ Fiction$/, "");
-		t = t.replace(/^Man woman\b/, "Man-woman").replace(/^Parent child\b/, "Parent-child");
-		const words = t.split(" ");
-		if (words.length >= 2 && PLACES.has(words[words.length - 1])) t = `${words.slice(0, -1).join(" ")} (${words[words.length - 1]})`;
-		if (!t || SUBJ_DROP.test(t)) return null;
-		return t.charAt(0).toUpperCase() + t.slice(1);
-	}
-
 	// Split display text into segments, marking the run(s) that match the current
 	// table filter, so only the matched word is highlighted (not the whole row).
 	function markMatch(text) {
@@ -1667,57 +1629,23 @@
 		return parts;
 	}
 
-	// Up to five cleaned, de-duplicated subjects for the header line.
-	const subjectLine = $derived.by(() => {
+	const subjectTerms = $derived.by(() => {
 		if (!current || isOverview) return [];
-		const m = new Map();
 		if (searchMode === "title") {
 			const gs = groups.filter((g) => g.idxs.length);
-			const idxs = gs.length === 1 && !singleIdxs.length ? gs[0].idxs : !gs.length && singleIdxs.length === 1 ? singleIdxs : null;
+			let idxs = null;
+			if (gs.length === 1 && !singleIdxs.length) idxs = gs[0].idxs;
+			else if (!gs.length && singleIdxs.length === 1) idxs = singleIdxs;
 			if (!idxs) return [];
+			const m = new Map();
 			for (const i of idxs) poolSubjects(m, current.titles[i]?.subjects);
-		} else {
-			poolSubjects(m, current.subjects);
+			return top5Terms(m);
 		}
-		const out = [];
-		const seen = new Set();
-		for (const [raw] of [...m.entries()].sort((a, b) => b[1] - a[1])) {
-			const c = cleanSubject(raw);
-			if (!c) continue;
-			const key = c.toLowerCase().replace(/ fiction$/, "");
-			if (seen.has(key)) continue;
-			seen.add(key);
-			out.push(c);
-			if (out.length >= 5) break;
-		}
-		return out;
+		// author mode: already pooled across everything in the build
+		const m = new Map();
+		poolSubjects(m, current.subjects);
+		return top5Terms(m);
 	});
-	// SPL catalog subject search for a header subject.
-	const splSubjectUrl = (t) => `https://seattle.bibliocommons.com/v2/search?query=${encodeURIComponent(t.replace(/[()]/g, ""))}&searchType=subject`;
-
-	// Wikipedia's one-line description under the heading: "Irish author (born
-	// 1991)" for an author, "2018 novel by Sally Rooney" for a book. Only shown
-	// when it plausibly describes a writer or a book (a same-named place or
-	// musician is skipped).
-	const DESC_OK = /(author|writer|novelist|poet|journalist|illustrator|cartoonist|historian|playwright|screenwriter|essayist|biographer|memoirist|scholar|critic|editor|professor|philosopher|scientist|activist|politician|comedian|chef|economist|psychologist|novel|book|memoir|collection|series|poem|play|essay|story|graphic)/i;
-	let headDesc = $state("");
-	$effect(() => {
-		const isTitle = searchMode === "title";
-		const nm = current && !isOverview ? (isTitle ? headingText : displayName(current.name)) : "";
-		const au = current ? displayName(current.name) : "";
-		headDesc = "";
-		if (!nm) return;
-		let alive = true;
-		(isTitle ? wikiWork(nm, au) : wikiSummary(nm))
-			.then((s) => {
-				if (!alive) return;
-				const d = (s?.description || "").trim();
-				headDesc = d && DESC_OK.test(d) ? d.charAt(0).toUpperCase() + d.slice(1) : "";
-			})
-			.catch(() => {});
-		return () => { alive = false; };
-	});
-
 
 	// StackedViewer.svelte
 	const chartSeries = $derived.by(() => {
@@ -1950,22 +1878,7 @@
 			const showBase = lineBaseIsWork || authorTotalShown;
 			return [showBase ? base : null, ...singles].filter(Boolean);
 		}
-		// "By book" (the non-overview 'area' state): one line per plotted work,
-		// plus any individually plotted editions — compared from a common zero
-		// baseline instead of stacked, so each book's own trend reads directly.
-		if (!isOverview) {
-			const parts = [];
-			groups.forEach((g, gi) => {
-				if (g.idxs.length) parts.push({ key: `g${g.id}`, legendKey: `g${g.id}`, label: groupLabel(g), color: groupColor(gi), values: sumSeries(g.idxs), groupIndex: gi, isGroup: true });
-			});
-			soloSingleIdxs.forEach((idx, i) => {
-				parts.push({ key: `s${idx}`, legendKey: `s${idx}`, label: cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title, color: singleColor(i), values: current.titles[idx].series, isSingle: true });
-			});
-			let shown = isolatedKeys.length ? parts.filter((p) => isolatedKeys.includes(p.key)) : parts;
-			shown = shown.filter((p) => !hiddenKeys.includes(p.key));
-			return shown.length ? shown : [authorLine].filter(Boolean);
-		}
-		// area mode (overview "By format")
+		// area mode
 		const only = isolatedIdxSet();
 		const hidden = hiddenIdxSet();
 		let areaAll = only ? chartSeries.filter((s) => only.has(s.titleIdx)) : chartSeries;
@@ -2002,7 +1915,7 @@
 		// Based on chartSeries (not displaySeries) so the entry stays put — and
 		// clickable to un-hide — even after "Other" is hidden. key "other" makes it
 		// a toggle like the rest.
-		if (isOverview && out.length && chartSeries.some((s) => !s.isSelected)) {
+		if (out.length && chartSeries.some((s) => !s.isSelected)) {
 			out.push({ label: "Other", color: "oklch(92.2% 0 0)", key: "other" });
 		}
 		return out;
@@ -2018,38 +1931,6 @@
 			? displaySeries.map((s) => ({ ...s, values: s.values.slice(yearLo, yearHi + 1) }))
 			: displaySeries
 	);
-
-	// Book markers on an author's "Total" chart: the month each of their top
-	// three books was FIRST CHECKED OUT at SPL (not its publication or arrival
-	// date — the data can't tell us those). Skipped for books already circulating
-	// when the data begins, and for the author's very first book, whose marker
-	// would just sit at the left edge.
-	const MONTH_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-	const bookMarkers = $derived.by(() => {
-		if (!current || isOverview || searchMode === "title" || chartMode !== "line" || !months.length) return [];
-		const firstActive = current.series.findIndex((v) => v > 0);
-		return [...workGroups.values()]
-			.sort((a, b) => b.total - a.total)
-			.slice(0, 3)
-			.map((w) => ({ w, f: sumSeries(w.idxs).findIndex((v) => v > 0) }))
-			.filter((o) => o.f >= 12 && o.f > firstActive + 6)
-			.map((o) => {
-				const m = months[o.f];
-				return { month: m, label: o.w.name, sub: `first checked out ${MONTH_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}` };
-			});
-	});
-
-	// One plain sentence above the chart saying exactly what's plotted. Uses the
-	// author's NAME, never a pronoun (we don't know anyone's pronouns).
-	const chartSubtitle = $derived.by(() => {
-		if (!current) return "";
-		const all = "all editions, including e-books and audiobooks";
-		if (isOverview) return chartMode === "area" ? "Monthly checkouts of books, e-books and audiobooks at the Seattle Public Library, by format" : "Monthly checkouts of books, e-books and audiobooks at the Seattle Public Library";
-		if (chartMode !== "line") return `Monthly checkouts of each book at the Seattle Public Library, ${all}`;
-		if (searchMode === "title" && headingText) return `Monthly checkouts of ${headingText} at the Seattle Public Library, ${all}`;
-		return `Monthly checkouts of ${displayName(current.name)}’s books at the Seattle Public Library, ${all}`;
-	});
-	const chartLineMode = $derived(isOverview && chartMode === "area" ? "area" : "line");
 </script>
 
 <div class="viewer">
@@ -2146,8 +2027,6 @@
 			{#if searchMode === "title" && workCover}
 				<img class="work-cover" src={workCover} alt="" loading="lazy" onerror={() => (workCover = null)} />
 			{/if}
-			<div class="hd-top">
-			<div class="hd-main">
 			{#if headingText}
 				{#if isOverview}
 					<h2>{headingText}</h2>
@@ -2170,10 +2049,6 @@
 					{/if}
 				{/if}
 			{/if}
-			{#if headDesc}<p class="hd-desc">{headDesc}</p>{/if}
-			{#if subjectLine.length}
-				<p class="hd-subjects">{#each subjectLine as term, k}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/each}</p>
-			{/if}
 			<div class="hdr-line">
 				<span class="meta">
 					{#if isOverview}
@@ -2184,7 +2059,6 @@
 						{compactNumber(current.total)} checkouts all-time · {workGroups.size.toLocaleString()} works
 					{/if}
 				</span>
-			</div>
 			</div>
 			{#if lookupLinks}
 			<div class="hdr-actions">
@@ -2202,18 +2076,20 @@
 					</span>
 			</div>
 			{/if}
-			</div>
-			{#if searchMode === "title" && genreRanks.length}
+			{#if (searchMode === "title" && genreRanks.length) || subjectTerms.length}
 				<div class="genre-ranks">
-					{#each genreRanks.slice(0, 4) as gr}
-						<button type="button" class="genre-rank" onclick={() => openGenre(gr.genre)} title="See the most-borrowed {gr.genre} books"><strong>#{gr.rank}</strong> in {gr.genre}</button>
+					{#if searchMode === "title"}
+						{#each genreRanks.slice(0, 4) as gr}
+							<button type="button" class="genre-rank" onclick={() => openGenre(gr.genre)} title="See the most-borrowed {gr.genre} books"><strong>#{gr.rank}</strong> in {gr.genre}</button>
+						{/each}
+					{/if}
+					{#each subjectTerms.slice(0, 3) as term}
+						<span class="subj-pill">{term}</span>
 					{/each}
 				</div>
 			{/if}
 
-			{#if chartSubtitle}<p class="chart-sub">{chartSubtitle}</p>{/if}
 						<div class="plot-toolbar">
-					<div class="tb-left">
 					<div class="mode-toggle" role="group" aria-label="Chart type">
 				<button
 						type="button"
@@ -2229,6 +2105,7 @@
 							isolatedKeys = [];
 						}}
 				>
+					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M2 20 L2 14 L8 8 L13 12 L22 3 L22 20 Z" fill="currentColor" opacity="0.85"/></svg>
 					Total
 				</button>
 				<button
@@ -2250,15 +2127,55 @@
 							chartMode = "area";
 						}}
 				>
-					{isOverview ? "By format" : "By book"}
+					<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M2 19 L8 11 L13 15 L22 5 L22 20 L2 20 Z" fill="currentColor" opacity="0.85"/></svg>
+					{isOverview ? "By format" : "All titles"}
 				</button>
 			</div>
-			{#if chartLineMode === "line"}
-				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
-			{/if}
+
 					</div>
-					<div class="tb-right">
-			<div class="chart-actions tb-actions">
+					<div class="chart-wrap" bind:this={chartWrap}>
+				{#if plotTitle && searchMode !== "title"}
+					<p class="plot-title">{plotTitle}</p>
+				{/if}
+				<LineChart months={viewMonths} series={viewSeries} mode={chartMode} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
+			</div>
+
+			{#if legendItems.length >= 2}
+				<div class="format-legend">
+					{#each legendItems as it}
+						{#if it.key === "other"}
+							<span class="fmt-leg other-leg" class:hidden-leg={isHidden("other")} class:dim={isolatedKeys.length}
+									onmouseenter={() => (legendHoverKey = "other")} onmouseleave={() => (legendHoverKey = null)}>
+								<span class="fmt-sw" style="background:{it.color}"></span>{it.label}
+								<button class="leg-x" title={isHidden("other") ? "Show “Other” again" : "Hide “Other”"} onclick={() => toggleHidden("other")}>×</button>
+							</span>
+						{:else if it.key}
+							<button
+									class="fmt-leg leg-btn"
+									class:on={isIsolated(it.key)}
+									class:dim={isolatedKeys.length && !isIsolated(it.key)}
+									title="Show only this — click again to bring the others back"
+									onclick={() => toggleIsolate(it.key)}
+									onmouseenter={() => (legendHoverKey = it.key)}
+									onmouseleave={() => (legendHoverKey = null)}
+									onfocus={() => (legendHoverKey = it.key)}
+									onblur={() => (legendHoverKey = null)}
+							><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</button>
+						{:else}
+							<span class="fmt-leg"><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</span>
+						{/if}
+					{/each}
+					{#if isolatedKeys.length || hiddenKeys.length}
+						<button class="leg-showall" onclick={() => { clearIsolate(); clearHidden(); }}>Show all</button>
+					{/if}
+				</div>
+			{/if}
+
+			{#if months.length > 1}
+				<YearBrush {months} values={current.series} bind:lo={yearLo} bind:hi={yearHi} />
+			{/if}
+
+			<div class="chart-actions">
 				<div class="dl-wrap">
 					<button class="chart-action" onclick={() => (downloadOpen = !downloadOpen)} title="Download the data or the chart image" aria-haspopup="true" aria-expanded={downloadOpen}>
 						<span aria-hidden="true">⤓</span> Download <span class="dl-caret" aria-hidden="true">▾</span>
@@ -2298,55 +2215,9 @@
 				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 			</div>
 
-					</div>
-					</div>
-					<div class="chart-wrap" bind:this={chartWrap}>
-				{#if plotTitle && searchMode !== "title"}
-					<p class="plot-title">{plotTitle}</p>
-				{/if}
-				<LineChart months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
-			</div>
-
-			{#if legendItems.length >= 2}
-				<div class="format-legend">
-					{#each legendItems as it}
-						{#if it.key === "other"}
-							<span class="fmt-leg other-leg" class:hidden-leg={isHidden("other")} class:dim={isolatedKeys.length}
-									onmouseenter={() => (legendHoverKey = "other")} onmouseleave={() => (legendHoverKey = null)}>
-								<span class="fmt-sw" style="background:{it.color}"></span>{it.label}
-								<button class="leg-x" title={isHidden("other") ? "Show “Other” again" : "Hide “Other”"} onclick={() => toggleHidden("other")}>×</button>
-							</span>
-						{:else if it.key}
-							<button
-									class="fmt-leg leg-btn"
-									class:on={isIsolated(it.key)}
-									class:dim={isolatedKeys.length && !isIsolated(it.key)}
-									title="Show only this — click again to bring the others back"
-									onclick={() => toggleIsolate(it.key)}
-									onmouseenter={() => (legendHoverKey = it.key)}
-									onmouseleave={() => (legendHoverKey = null)}
-									onfocus={() => (legendHoverKey = it.key)}
-									onblur={() => (legendHoverKey = null)}
-							><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</button>
-						{:else}
-							<span class="fmt-leg"><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</span>
-						{/if}
-					{/each}
-					{#if isolatedKeys.length || hiddenKeys.length}
-						<button class="leg-showall" onclick={() => { clearIsolate(); clearHidden(); }}>Show all</button>
-					{/if}
-				</div>
-			{/if}
-
-			{#if months.length > 1}
-				<YearBrush {months} values={current.series} bind:lo={yearLo} bind:hi={yearHi} />
-			{/if}
-
-			<p class="chart-source">Source: Seattle Public Library open data.{#if bookMarkers.length && chartLineMode === "line"}{" "}Book labels mark the month each title was first checked out at SPL.{/if}</p>
 
 
-
-			{#if !isOverview && (editMode || activeGroup || soloSingleIdxs.length)}
+			{#if !isOverview}
 			<div class="groups-panel">
 				<div class="groups-header">
 					<span class="groups-label">On the chart</span>
@@ -2466,22 +2337,20 @@
 					<button class="side-close" onclick={() => (mobileTableOpen = false)}>Done</button>
 				</div>
 				<button class="side-desktop-head" onclick={() => (tableCollapsed = !tableCollapsed)} aria-expanded={!tableCollapsed}>
-					<span class="sdh-label">Books{#if workGroups.size} <span class="sdh-count">({workGroups.size.toLocaleString()})</span>{/if}</span>
+					<span class="sdh-label">Add / Edit All Works By This Author{#if workGroups.size} <span class="sdh-count">({workGroups.size.toLocaleString()})</span>{/if}</span>
 					<span class="side-chevron" class:open={!tableCollapsed} aria-hidden="true">▾</span>
 				</button>
 				<div class="titles-header side-filter">
 					<input
 							class="title-filter"
 							type="search"
-							placeholder="Filter books…"
+							placeholder="Filter titles…"
 							bind:value={titleFilter}
 							onfocus={() => (tableCollapsed = false)}
 							autocomplete="off"
 					/>
-					<button type="button" class="edit-toggle" class:on={editMode} aria-pressed={editMode} onclick={() => { editMode = !editMode; tableCollapsed = false; }}>{editMode ? "Done editing" : "Edit groupings"}</button>
 				</div>
 				<div class="titles">
-				{#if editMode}
 				<div class="works-min-note">Drag and drop titles into the correct Work, exclude ones that don't belong, or make your own.<details class="works-more"><summary>How does this work?</summary><span class="works-more-body">Every title associated with this author is listed here. We automatically cluster related titles into “Works”—attempting to gather ebooks, audiobooks, and print editions into one category. There may be incorrect or missing titles, especially with series. <a class="works-why" href="#method-clustering">Why is clustering works so hard?</a></span></details></div>
 				{#if titleSort === "work"}
 					<div class="works-actions">
@@ -2493,8 +2362,7 @@
 						{#if exportNote}<span class="wa-saved" role="status">{exportNote}</span>{/if}
 					</div>
 				{/if}
-				{/if}
-				<div class="title-table" class:flow={!editMode} role="table" aria-label="Books, with their editions" style="--work-w:{workColW}px; --edition-w:{editionColW}px">
+				<div class="title-table" role="table" aria-label="Titles, grouped by work" style="--work-w:{workColW}px; --edition-w:{editionColW}px">
 					<div class="tt-head" role="row">
 						<span class="tt-cell tt-plot" role="columnheader" class:editing={activeGroup} title={activeGroup ? `Tick to add editions to “${groupLabel(activeGroup)}”` : "Tick to plot a title on the chart"}></span>
 						<span
@@ -2507,7 +2375,7 @@
 									class:active={titleSort === "work" && workOrder === "name"}
 									title="Group by work, ordered A–Z"
 									onclick={() => { titleSort = "work"; workOrder = "name"; }}
-							>Book{#if titleSort === "work" && workOrder === "name"}&nbsp;↓{/if}</button>
+							>Work{#if titleSort === "work" && workOrder === "name"}&nbsp;↓{/if}</button>
 							<span class="col-resize" title="Drag to resize" onpointerdown={(e) => startColResize(e, "work")}></span>
 						</span>
 						<span class="tt-cell tt-edition" role="columnheader" aria-label="Edition">
@@ -2553,7 +2421,7 @@
 								class="title-row"
 								role="row"
 								class:dragging={dragIdx === t.idx}
-								draggable={editMode && (groups.length > 0 || titleSort === "work")}
+								draggable={groups.length > 0 || titleSort === "work"}
 								ondragstart={(e) => { dragIdx = t.idx; try { e.dataTransfer.setData("text/plain", String(t.idx)); e.dataTransfer.effectAllowed = "move"; } catch {} }}
 								ondragend={() => { dragIdx = null; dragOverId = null; }}
 						>
@@ -2582,11 +2450,11 @@
 											onmousemove={(e) => (hoverTip = { text: titleCase(t.title), x: e.clientX, y: e.clientY })}
 											onmouseleave={() => (hoverTip = null)}
 									>
-										{#if editMode}<button
+										<button
 												class="exclude-btn"
 												title="Pull this edition out of the work — make it its own work"
 												onclick={() => excludeEdition(t.idx)}
-										>exclude</button>{/if}
+										>exclude</button>
 										{#if (owner || single) && !isCurrentOwner}
 											<span class="other-group-dot"
 												  title="In “{owner ? groupLabel(owner) : titleCase(t.title)}”"></span>
@@ -2636,7 +2504,7 @@
 										class:filtered-hidden={w.filteredOut && !dragActive}
 										class:hl={hlWorkKey === w.key}
 										style={wColor ? `--chip-color:${wColor}` : ""}
-										draggable={editMode}
+										draggable="true"
 										onmouseenter={() => (hlWorkKey = w.key)}
 										onmouseleave={() => (hlWorkKey === w.key && (hlWorkKey = null))}
 										ondragstart={(e) => { dragWorkKey = w.key; try { e.dataTransfer.setData("text/plain", w.key); e.dataTransfer.effectAllowed = "move"; } catch {} }}
@@ -2675,7 +2543,7 @@
 									<span class="tt-cell tt-format" role="cell">
 										{#each fmts as f}<span class="badge badge-{f}">{formatLabel(f)}</span>{/each}
 									</span>
-									<span class="tt-cell tt-count" role="cell"><svg class="row-spark" width="78" height="18" viewBox="0 0 78 18" aria-hidden="true"><path d={sparkPath(w.editions.map((e) => e.idx))} stroke={wColor || "#b4b2a9"} /></svg>{compactNumber(w.total)}</span>
+									<span class="tt-cell tt-count" role="cell">{compactNumber(w.total)}</span>
 								</li>
 								{#if workOpen(w)}
 									{#each (filtering ? w.editions.filter((e) => e.match) : w.editions) as t (t.idx)}
@@ -2690,11 +2558,7 @@
 						{/if}
 					</ul>
 				</div>
-				{#if titleSort === "work" && booksCapped && workBlocks.length > BOOKS_PREVIEW}
-					<button type="button" class="books-more" onclick={() => (booksShowAll = true)}>Show all {workBlocks.length.toLocaleString()} books</button>
-				{:else if titleSort === "work" && booksShowAll && !editMode && !titleFilter.trim() && workBlocks.length > BOOKS_PREVIEW}
-					<button type="button" class="books-more" onclick={() => (booksShowAll = false)}>Show fewer</button>
-				{:else if titleSort === "work" && hiddenWorkCount > 0}
+				{#if titleSort === "work" && hiddenWorkCount > 0}
 					<p class="titles-more">
 						Showing the top {visibleWorkBlocks.length} works. {hiddenWorkCount.toLocaleString()} more —
 						type in the filter above to find a specific one.
@@ -2926,43 +2790,10 @@
 		border-radius: 3px;
 		box-shadow: 0 1px 5px rgba(0, 0, 0, 0.22);
 	}
-	.split-main.has-work-cover .hd-main {
+	.split-main.has-work-cover .hd-name,
+	.split-main.has-work-cover .hdr-line {
 		padding-left: 60px;
 	}
-	/* Header: name, description, subjects and counts on the left; Borrow and
-	   Learn on the right of the name row (they wrap under it on phones). */
-	.hd-top {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		gap: var(--space-3) var(--space-5);
-		flex-wrap: wrap;
-	}
-	.hd-main { min-width: 0; flex: 1 1 360px; }
-	.hd-top .hdr-actions { margin: 6px 0 0; flex: none; }
-	.split-main.has-work-cover .hd-top .hdr-actions { margin-top: 6px; }
-	.hd-desc {
-		font-family: var(--font-sans);
-		font-size: 1.02rem;
-		line-height: 1.4;
-		color: var(--color-fg);
-		margin: 4px 0 0;
-	}
-	.hd-subjects {
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		line-height: 1.6;
-		color: var(--color-fg-light);
-		margin: 4px 0 0;
-	}
-	.hd-subjects a {
-		color: var(--color-fg-light);
-		text-decoration: underline;
-		text-decoration-color: var(--color-border);
-		text-underline-offset: 3px;
-	}
-	.hd-subjects a:hover { color: var(--color-fg); text-decoration-color: currentColor; }
-	.hd-sep { color: #aaa; }
 	/* "#N in Genre" ranking badges under the work title. */
 	.genre-ranks {
 		display: flex;
@@ -3334,9 +3165,11 @@
 	}
 	.sdh-label {
 		font-family: var(--font-sans);
-		font-size: 1.05rem;
-		font-weight: 600;
-		color: var(--color-fg);
+		font-size: var(--text-sm);
+		font-weight: 700;
+		color: var(--color-fg-light);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
 	}
 	.sdh-count {
 		margin-left: 5px;
@@ -3358,15 +3191,14 @@
 		transform: rotate(180deg);
 	}
 
-	/* On desktop the books table is its own section under the chart: a heading
-	   rule, no card. The heading still collapses it. */
+	/* On desktop the works panel is one gray card (matching the "On the chart"
+	   panel); the header is a toggle inside it. */
 	@media (min-width: 861px) {
 		.split-side {
-			background: none;
-			border: 0;
-			border-top: 1px solid var(--color-border);
-			border-radius: 0;
-			padding: 6px 0 0;
+			background: var(--color-gray-100);
+			border: 1px solid var(--color-border);
+			border-radius: var(--radius-md);
+			padding: 4px 16px 16px;
 		}
 		.side-desktop-head {
 			display: flex;
@@ -4413,58 +4245,6 @@
 	.plot-toolbar .mode-toggle {
 		margin: 0;
 	}
-	/* The chart's view toggle: two ordinary buttons side by side (no shared
-	   pill outline); the selected one is filled. */
-	.plot-toolbar .mode-toggle {
-		border: 0;
-		border-radius: 0;
-		overflow: visible;
-		gap: 6px;
-	}
-	.plot-toolbar .mode-toggle button {
-		border: 1px solid var(--color-border);
-		border-radius: 8px;
-		padding: 7px 13px;
-		font-weight: 500;
-		color: var(--color-fg);
-	}
-	.plot-toolbar .mode-toggle button + button { border-left: 1px solid var(--color-border); }
-	.plot-toolbar .mode-toggle button:hover:not(.active) { border-color: var(--color-fg-light); }
-	.plot-toolbar .mode-toggle button.active {
-		background: var(--color-fg);
-		border-color: var(--color-fg);
-		color: var(--color-white);
-	}
-	.tb-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-	.tb-right { display: flex; align-items: center; }
-	.chart-actions.tb-actions { margin: 0; }
-	.tb-actions .chart-action :global(svg) { width: 14px; height: 14px; flex: none; }
-	.smooth-toggle {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		color: var(--color-fg-light);
-		cursor: pointer;
-		user-select: none;
-	}
-	.smooth-toggle input { margin: 0; accent-color: var(--color-fg); }
-	/* What the chart shows, in one plain sentence above it */
-	.chart-sub {
-		font-family: var(--font-sans);
-		font-size: var(--text-base);
-		line-height: 1.45;
-		color: var(--color-fg-light);
-		margin: var(--space-4) 0 var(--space-3);
-		max-width: 62ch;
-	}
-	.chart-source {
-		font-family: var(--font-sans);
-		font-size: 12px;
-		color: #8a8a8a;
-		margin: 8px 0 0;
-	}
 	.top-works-btn {
 		font-family: var(--font-sans);
 		font-size: var(--text-sm);
@@ -4581,42 +4361,6 @@
 		margin-bottom: 8px;
 	}
 
-	/* Edit groupings: a plain button beside the filter; filled while editing. */
-	.edit-toggle {
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: 500;
-		padding: 8px 13px;
-		border: 1px solid var(--color-border);
-		border-radius: 8px;
-		background: var(--color-white);
-		color: var(--color-fg);
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	.edit-toggle:hover { border-color: var(--color-fg-light); }
-	.edit-toggle.on { background: var(--color-fg); border-color: var(--color-fg); color: var(--color-white); }
-	.books-more {
-		display: block;
-		margin: 10px 0 0;
-		padding: 0;
-		border: 0;
-		background: none;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		color: var(--color-fg-light);
-		text-decoration: underline;
-		text-underline-offset: 3px;
-		cursor: pointer;
-	}
-	.books-more:hover { color: var(--color-fg); }
-	/* per-book trend line, inside the checkouts cell */
-	.work-header .tt-count { display: inline-flex; align-items: center; justify-content: flex-end; gap: 10px; white-space: nowrap; }
-	.work-header .tt-count .row-spark { flex: none; display: block; width: 78px; height: 18px; max-width: none; }
-	/* view mode: the table is part of the page, not its own scroll box */
-	.split-side .title-table.flow { max-height: none; overflow: visible; border: 0; border-top: 1px solid var(--color-border); border-radius: 0; }
-	.row-spark path { fill: none; stroke-width: 1.5; stroke-linejoin: round; }
-	@media (max-width: 860px) { .row-spark { display: none; } }
 	.title-filter {
 		flex: 1;
 		min-width: 180px;
@@ -4682,7 +4426,7 @@
 		/* Work is capped at a fixed max (not an fr) so it never balloons on wide
 		   screens and shove the edition titles far to the right; Edition takes all
 		   the slack, keeping edition titles anchored just left of center. */
-		grid-template-columns: 26px minmax(110px, 300px) minmax(0, 1fr) auto 140px;
+		grid-template-columns: 26px minmax(110px, 300px) minmax(0, 1fr) auto minmax(92px, auto);
 		gap: 9px;
 		padding: 7px 9px;
 		font-size: var(--text-sm);
@@ -4763,10 +4507,13 @@
 
 	/* a real work cluster (2+ editions) -- highlight it with an accent bar + tint
 	   so it stands apart from single-edition rows */
-	/* Multi-edition works look like every other book row; the "N editions"
-	   pill already says they're clusters. */
+	.work-header.cluster {
+		background: #f7f3fb;
+		box-shadow: inset 3px 0 0 0 #6a4c93;
+		border-top-color: #e6dcf1;
+	}
 	.work-header.cluster:hover {
-		background: var(--color-gray-100);
+		background: #f1eaf8;
 	}
 
 	.work-header[draggable="true"] {
@@ -4847,23 +4594,11 @@
 	}
 	/* format column can show several badges for a multi-format work -- stacked
 	   vertically so the column stays narrow */
-	/* formats read as one quiet line of small gray words, not colored pills */
-	.work-header .tt-format .badge {
-		background: none;
-		border: 0;
-		padding: 0;
-		color: var(--color-fg-light);
-		font-weight: 500;
-		text-transform: lowercase;
-		letter-spacing: 0;
-	}
 	.work-header .tt-format {
 		display: flex;
-		flex-direction: row;
-		flex-wrap: nowrap;
-		gap: 6px;
-		align-items: center;
-		justify-content: flex-end;
+		flex-direction: column;
+		gap: 3px;
+		align-items: flex-end;
 	}
 	/* An expanded work's editions: the title cell spans the Work + Edition columns
 	   (exclude button first, then the title) so the title sits far left instead of
