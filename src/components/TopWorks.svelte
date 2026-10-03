@@ -5,6 +5,7 @@
 	import ShareIcon from "@lucide/svelte/icons/share-2";
 	import { base } from "$app/paths";
 	import { getTopWorks, getGenreTerms } from "$components/db.js";
+	import homeTop from "$data/home-top.json";
 	import { displayName } from "$utils/displayName.js";
 	import { coverUrl, coverOverride } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
@@ -23,15 +24,22 @@
 	// Most Borrowed view.
 	let { openAuthor, openTitle, rankKind = "works", setRankKind = () => {}, embedded = false, onSeeAll = () => {} } = $props();
 
-	let data = $state(null);
+	// The home strip uses the five books baked in at build time
+	// (data-prep/build_home_top.py), set up front so they're in the pre-built
+	// HTML: no 2.6 MB rankings download, no wait.
+	const baked = embedded && homeTop?.rows?.length
+		? { period: homeTop.latestMonth ? "month" : "all", rows: homeTop.rows, latestMonth: homeTop.latestMonth }
+		: null;
+	let data = $state(baked ? { latestMonth: baked.latestMonth, years: [], genres: ["All genres"], data: { "All genres": { [baked.period]: baked.rows } } } : null);
 	let genre = $state("All genres");
-	let year = $state("all");
-	let loading = $state(true);
+	let year = $state(baked ? baked.period : "all");
+	let loading = $state(!baked);
 	let loadError = $state("");
 	let shareMsg = $state("");
 	let shareOpen = $state(false);
 	let termsMap = $state({});
 	onMount(async () => {
+		if (baked) return; // the home strip already has its books
 		let yearFromUrl = false;
 		try {
 			const p = new URLSearchParams(window.location.search);
@@ -76,10 +84,11 @@
 	// Book-cover thumbnails. Open Library first; when it has nothing, fall back to
 	// the Wikipedia/Wikidata article thumbnail (usually the book's cover). covers[key]
 	// = url | null (no cover) | undefined (not fetched yet). Cached once per work.
-	let covers = $state({});
+	const coverKey = (r) => `${r[0]}|${r[1]}`;
+	// The baked home rows carry their cover URLs, so those are in the HTML too.
+	let covers = $state(baked ? Object.fromEntries(baked.rows.filter((r) => r[4]).map((r) => [coverKey(r), r[4]])) : {});
 	const coverInflight = new Set();
 	const wikiTried = new Set();
-	const coverKey = (r) => `${r[0]}|${r[1]}`;
 	// Backup cover: the Wikipedia/Wikidata article thumbnail (usually the book's
 	// cover). Tried once per work when Open Library has nothing or its image fails
 	// to load; on a second failure we settle for the placeholder.
@@ -422,7 +431,7 @@
 					<span class="gal-rank">{i + 1}</span>
 					<button class="gal-cover" class:has-img={!!covers[k]} onclick={() => openTitle(r[0], r[2])} title="See borrowing trend">
 						{#if covers[k]}
-							<img src={covers[k]} alt="" loading="lazy" onerror={() => fillFromWiki(r)} />
+							<img src={covers[k]} alt="" loading={embedded ? "eager" : "lazy"} onerror={() => fillFromWiki(r)} />
 						{:else}
 							<span class="gal-cover-ph" aria-hidden="true">📖</span>
 						{/if}

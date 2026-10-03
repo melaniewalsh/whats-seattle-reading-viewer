@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: write # push the regenerated author_map.json back to the repo
+  actions: write # start a Pages deploy at the end (see the last step)
 
 env:
   # The PUBLIC R2 bucket the finished DB is uploaded to (see README for the
@@ -134,16 +135,20 @@ jobs:
           python3 data-prep/build_backlist.py
           # Copy its cover thumbnails to R2 (see data-prep/host_covers.py).
           python3 data-prep/host_covers.py
+          # The home page's "Most borrowed last month" strip, baked into the
+          # site (src/data/home-top.json) so it shows without downloading the
+          # whole rankings file. Its covers go to R2 with the others.
+          python3 data-prep/build_home_top.py
 
       # Keep the bundled fallback copy of the overview current in the repo so
       # the next Pages deploy ships it too.
-      - name: Commit refreshed overview.json and backlist.json
+      - name: Commit refreshed overview.json, backlist.json and home-top.json
         run: |
-          git add static/overview.json static/backlist.json
+          git add static/overview.json static/backlist.json src/data/home-top.json
           if git diff --cached --quiet; then
-            echo "overview.json / backlist.json unchanged -- nothing to commit"
+            echo "overview.json / backlist.json / home-top.json unchanged -- nothing to commit"
           else
-            git commit -m "CI: refresh overview.json and backlist.json"
+            git commit -m "CI: refresh overview.json, backlist.json and home-top.json"
             for i in 1 2 3; do
               if git pull --rebase -X theirs origin ${{ github.ref_name }} \
                  && git push origin HEAD:${{ github.ref_name }}; then
@@ -231,3 +236,12 @@ jobs:
             --title "Data snapshot ${MONTH}" \
             --notes "Clustered Seattle Public Library checkout data through ${MONTH}: per-author JSON time series, the author and title search indexes, and the shared month axis. These are the same files served live from the R2 bucket, bundled for bulk download. See the repository README for the file layout and a fetch example."
           gh release upload "$TAG" "$TARBALL" --clobber
+
+      # Pushes made with the workflow's own token don't start other workflows,
+      # so the bundled files committed above (home-top.json, overview.json,
+      # backlist.json) would wait for the next human push to go live. Deploy
+      # now -- last, so the cover thumbnails are already on R2.
+      - name: Redeploy the site with the refreshed bundled files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref ${{ github.ref_name }}
