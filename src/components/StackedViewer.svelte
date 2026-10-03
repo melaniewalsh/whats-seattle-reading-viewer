@@ -2688,12 +2688,8 @@
 								{#if wColor}<span class="bk-swatch" style="background:{wColor}"></span>{/if}
 								{#if editMode && isCustomBook(w.key)}
 									<input class="bk-rename" value={w.name} aria-label="Name this book" onchange={(e) => renameBook(w.key, e.currentTarget.value)} />
-								{:else if editMode || !currentSlug}
-									<span class="bk-name">{#each markMatch(w.name) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}</span>
 								{:else}
-									<!-- The name opens the book's own page; the checkbox plots it here. -->
-									{@const top = w.editions.reduce((a, b) => (b.total > a.total ? b : a))}
-									<button type="button" class="bk-name bk-open" title="Open the page for {w.name}" onclick={() => openTitle(isCustomBook(w.key) ? current.titles[top.idx].title : w.name, currentSlug)}>{#each markMatch(w.name) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{"\u00A0"}<span class="bk-open-arrow" aria-hidden="true">→</span></button>
+									<span class="bk-name">{#each markMatch(w.name) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}</span>
 								{/if}
 								<button type="button" class="bk-eds" aria-expanded={!!open} onclick={() => toggleExpand(w.key)}>{w.editions.length} edition{w.editions.length === 1 ? "" : "s"} · details<span class="bk-caret" class:up={open} aria-hidden="true"></span></button>
 							</span>
@@ -4817,17 +4813,6 @@
 	.bk-name-cell { min-width: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 	.bk-swatch { display: inline-block; width: 12px; height: 3px; border-radius: 2px; align-self: center; flex: none; }
 	.bk-name { font-family: var(--font-serif); font-size: 1rem; color: var(--color-fg); }
-	/* Book names link to the book's page: always underlined (like the header's
-	   subject links) with an arrow glued to the last word, so they read as links
-	   at rest, not only on hover. The checkbox is what plots a book here. */
-	.bk-open {
-		background: none; border: none; padding: 0; margin: 0; cursor: pointer;
-		text-align: left; line-height: inherit;
-		text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px;
-	}
-	.bk-open:hover, .bk-open:focus-visible { text-decoration-color: currentColor; }
-	.bk-open-arrow { font-family: var(--font-sans); font-size: 0.85em; color: var(--color-fg-light); }
-	.bk-open:hover .bk-open-arrow, .bk-open:focus-visible .bk-open-arrow { color: var(--color-fg); }
 	.bk-eds {
 		font: inherit;
 		font-size: 12px;

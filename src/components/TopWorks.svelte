@@ -1171,10 +1171,15 @@
 		vertical-align: baseline;
 	}
 	.ta-rank {
-		width: 2.5rem;
+		width: 3rem;
 		color: var(--color-fg-light);
 		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
 	}
+	/* Rank sits at the top of its row, like the count; the panel's own edge
+	   closes the list, so the last row needs no divider. */
+	td.ta-rank { vertical-align: top; padding-top: 13px; }
+	.ta-table tbody tr:last-child td { border-bottom: 0; }
 	td.ta-count {
 		width: 4.5rem;
 		vertical-align: top;
