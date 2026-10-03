@@ -506,8 +506,15 @@
 				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={(k) => toggleIsolate(k)} />
 		</div>
 
-		<!-- No legend on the page: the lines are named at their right ends (the
-		     exported image still draws one). -->
+		<!-- Lines are named at their right ends on wide screens; phones (no room
+		     for those names) get this swatch legend instead. Tap one to show it alone. -->
+		{#if series.length >= 2}
+			<div class="phone-legend">
+				{#each series as s (s.key)}
+					<button type="button" class="pl-item" class:dim={isolatedKeys.length && !isIsolated(s.key)} onclick={() => toggleIsolate(s.key)}><span class="pl-sw" style="background:{s.color}"></span>{s.name}</button>
+				{/each}
+			</div>
+		{/if}
 
 		<YearBrush months={data.months} values={data.total} inset={plotInset} bind:lo bind:hi />
 		<!-- Source on the left; Download and Share as small links on the right -->
@@ -696,6 +703,15 @@
 	/* White panels on the warm-gray page: the chart, and the Genres table. */
 	.chart-panel, .books { background: #fff; border: 1px solid var(--color-border); border-radius: 6px; }
 	.chart-panel { padding: 14px 16px 12px 12px; }
+	/* Phones: every pixel to the plot. */
+	@media (max-width: 600px) { .chart-panel { padding: 10px 8px 10px 6px; } }
+	.phone-legend { display: none; }
+	@media (max-width: 600px) {
+		.phone-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0 2px; font-size: 13px; }
+		.pl-item { display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; font: inherit; color: var(--color-fg); cursor: pointer; }
+		.pl-item.dim { opacity: .4; }
+		.pl-sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+	}
 	.books { margin: var(--space-5) 0 var(--space-4); padding: 16px 18px 12px; }
 	.bk-head { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin: 0 0 10px; }
 	.bk-title { font-family: var(--font-sans); font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--color-fg); }

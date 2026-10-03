@@ -2313,12 +2313,8 @@
 	{#if current}
 		<div class="author">
 			<div class="split" class:collapsed={tableCollapsed}>
-			<div class="split-main" class:has-work-cover={searchMode === "title" ? !!workCover : !!headPhoto} bind:this={titleEl}>
-			{#if searchMode === "title" && workCover}
-				<img class="work-cover" src={workCover} alt="" loading="lazy" onerror={() => (workCover = null)} />
-			{:else if searchMode !== "title" && headPhoto}
-				<img class="work-cover author-photo" src={headPhoto} alt="" loading="lazy" onerror={() => (headPhoto = null)} />
-			{/if}
+			<!-- No cover or photo in the header: the name's hover card shows it. -->
+			<div class="split-main" bind:this={titleEl}>
 			<div class="hd-top">
 			<div class="hd-main">
 			{#if headingText}
@@ -2440,14 +2436,14 @@
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={peakMarker ? [...bookMarkers, peakMarker] : bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
+				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
 			</div>
 
 			<!-- "By book" / "By format" lines are named at their right ends, so no
 			     legend; Total keeps one for any editions overlaid on it (those lines
 			     have no end labels). Exported images still draw the legend. -->
-			{#if legendItems.length >= 2 && chartMode !== "area"}
-				<div class="format-legend">
+			{#if legendItems.length >= 2}
+				<div class="format-legend" class:phone-only={chartMode === "area"}>
 					{#each legendItems as it}
 						{#if it.key === "other"}
 							<span class="fmt-leg other-leg" class:hidden-leg={isHidden("other")} class:dim={isolatedKeys.length}
@@ -3109,6 +3105,10 @@
 		background: none;
 	}
 	/* format legend for the overview "by format" area chart */
+	/* "By book" / "By format" lines are named at their ends on wide screens; on
+	   phones (no room for those names) this legend takes over. */
+	.format-legend.phone-only { display: none !important; }
+	@media (max-width: 600px) { .format-legend.phone-only { display: flex !important; } }
 	.format-legend {
 		display: flex;
 		justify-content: center;
@@ -4736,6 +4736,8 @@
 		border-radius: 6px;
 	}
 	.chart-panel { padding: 14px 16px 12px 12px; }
+	/* Phones: every pixel to the plot. */
+	@media (max-width: 600px) { .chart-panel { padding: 10px 8px 10px 6px; } }
 	.books {
 		margin: var(--space-5) 0 var(--space-4);
 		padding: 16px 18px 12px;

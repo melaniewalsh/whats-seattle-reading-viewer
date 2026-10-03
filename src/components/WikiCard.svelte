@@ -7,8 +7,8 @@
 	// links:  { wikipedia } search URL (fallback when there's no article match).
 	// onTrend: called when the "See SPL trend" button is clicked.
 	// quiet:  for the trend-page heading, where Borrow / Learn more buttons sit
-	//         alongside: no catalog link, no repeat of the header's photo or
-	//         cover, and Wikipedia shown as a small source credit.
+	//         alongside: no catalog link, and Wikipedia shown as a small source
+	//         credit. Its photo or cover is the only one on the page.
 	let { query, kind = "author", author = "", links = {}, onTrend, quiet = false } = $props();
 
 	let status = $state({ loading: true, data: null });
@@ -45,7 +45,7 @@
 			<div class="wiki-skel-lines"><span></span><span></span><span></span></div>
 		</div>
 	{:else if status.data}
-		{#if status.data.thumbnail && !quiet}
+		{#if status.data.thumbnail}
 			<img class="wiki-thumb" src={status.data.thumbnail} alt="" />
 		{/if}
 		<p class="wiki-extract">{trim(status.data.extract)}</p>

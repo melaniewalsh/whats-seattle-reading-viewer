@@ -62,7 +62,7 @@
 	const markerCount = $derived((markers || []).filter((mk) => months.includes(mk.month)).length);
 	const hasMarkers = $derived(mode === 'line' && (markers || []).some((mk) => months.includes(mk.month)));
 	const endLabelW = $derived.by(() => {
-		if (mode !== 'line' || !endLabels || !series.length) return 0;
+		if (mode !== 'line' || !endLabels || !series.length || width < 560) return 0;
 		const shown = series.filter((s) => s.values?.length);
 		// A single total line has no end label (the peak gets one instead).
 		if (shown.length <= 1 && (shown[0]?.isAggregate || !shown.length)) return 0;
@@ -432,7 +432,8 @@
 	// End-of-line labels. One line: its last value and month. Several lines: the
 	// name and value of each, nudged apart vertically with a small leader line.
 	const endMarks = $derived.by(() => {
-		if (mode !== 'line' || !endLabels || !lineLayers.length || months.length < 2) return [];
+		// Phones: no end labels; the page shows a swatch legend under the chart.
+		if (mode !== 'line' || !endLabels || !lineLayers.length || months.length < 2 || width < 560) return [];
 		const last = months.length - 1;
 		// A total line gets no "latest month" label: it read as the book's size
 		// ("1 in July"). Only named lines (books, formats, genres) are labelled.
@@ -549,9 +550,12 @@
 			// pick the line whose value at this month sits closest to the cursor
 			let best = null, bestDist = Infinity;
 			for (const s of layers) {
-				const d = Math.abs(y(s.values[hoverIndex]) - py);
+				// near the drawn (average) line, or the raw month's bar top
+				const d = Math.min(Math.abs(y(s.values[hoverIndex]) - py), Math.abs(y((s.raw ?? s.values)[hoverIndex]) - py));
 				if (d < bestDist) { bestDist = d; best = s; }
 			}
+			// A mouse far from every line shows nothing; a tap is deliberate.
+			if (!pinned && event.pointerType !== 'touch' && bestDist > 32) { hoverIndex = null; hoveredSeriesKey = null; return; }
 			hoveredSeriesKey = best ? best.label : null;
 		} else {
 			// specific stacked layer whose band contains this Y data value
@@ -950,7 +954,6 @@
 	{/each}
 	{#if hoverIndex !== null && selectedItem}
         <div class="tooltip {pinned ? '' : 'side-' + tooltipSide}" class:below={pinned && tooltipBelow} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
-            <div class="tt-due" aria-hidden="true">DATE DUE</div>
             <div class="tt-title">
                 <span class="tt-dot" style="background-color: {selectedItem.color}"></span>
                 <span class="tt-title-text">{tooltipTitle}</span>
@@ -1181,14 +1184,10 @@
 		/* glide horizontally between month positions; vertical tracks the cursor
 		   directly (no transition) so it never lags or bounces */
 		transition: left 0.12s cubic-bezier(0.22, 1, 0.36, 1);
-		/* A library date-due slip: ruled card, violet top edge, month stamped. */
-		background-color: #fff;
-		background-image: repeating-linear-gradient(to bottom, transparent 0 23px, rgba(70, 125, 185, 0.16) 23px 24px);
-		background-position: 0 30px;
+		background: #fff;
 		border: 1px solid #e3e4e0;
-		border-top: 4px solid #6a46a0;
-		border-radius: 3px;
-		padding: 7px 14px 10px;
+		border-radius: 8px;
+		padding: 10px 14px 11px;
 		font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
 		font-size: 13px;
 		color: #333;
@@ -1231,19 +1230,13 @@
 	.tt-title-text {
 		word-break: break-word;
 	}
-	.tt-due { font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-align: center; color: #8a8f99; border-bottom: 1px solid #b9bcc3; margin: 0 0 8px; padding-bottom: 2px; }
 	.tt-date {
-		display: inline-block;
-		margin: 6px 0 8px 19px;
-		padding: 0 6px;
+		margin: 3px 0 8px 19px;
 		font-size: 11px;
 		font-weight: 700;
-		letter-spacing: 0.05em;
+		letter-spacing: 0.04em;
 		text-transform: uppercase;
-		color: #6a46a0;
-		border: 1.5px solid currentColor;
-		border-radius: 3px;
-		transform: rotate(-3deg);
+		color: var(--color-fg-light);
 	}
 	.tt-value {
 		display: flex;

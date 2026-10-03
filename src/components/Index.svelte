@@ -517,9 +517,8 @@
 						</div>
 					</div>
 					<div class="featured-chart">
-						<!-- Same style as the trend pages: the peak month is labelled. -->
+						<!-- Same style as the trend pages. -->
 						<LineChart months={featured.months} series={featured.series} mode="line" smooth
-							markers={featured.peak ? [{ month: featured.peak.month, kind: "peak", label: `Peak: ${featured.peak.value.toLocaleString()} checkouts`, sub: fmtMonthYear(featured.peak.month) }] : []}
 							annotations={EVENT_ANNOTATIONS} />
 					</div>
 					<div class="featured-actions">
