@@ -1139,7 +1139,11 @@
 		z-index: 50;
 		width: 100vw;
 		margin-left: calc(50% - 50vw);
-		background: #fff;
+		/* Same warm gray as the page (a slightly translucent copy, so content
+		   scrolling under the sticky bar is softened); white is kept for panels. */
+		background: rgba(250, 250, 248, 0.94);
+		-webkit-backdrop-filter: saturate(1.4) blur(8px);
+		backdrop-filter: saturate(1.4) blur(8px);
 		border-bottom: 1px solid var(--color-border);
 	}
 	.masthead-top {

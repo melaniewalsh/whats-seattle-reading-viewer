@@ -42,7 +42,8 @@
 		const k = v / 1000;
 		return `${k >= 100 ? Math.round(k) : parseFloat(k.toFixed(1))}k`;
 	}
-	const fmtTick = (t) => (percent ? fmtVal(t) : t.toLocaleString());
+	// Axis numbers abbreviated: 500, 1k, 1.5k, 2M.
+	const fmtTick = (t) => (percent ? fmtVal(t) : abbrevNum(t));
 	// The unit after the top y label; a phone gets only its first word ("1,200
 	// checkouts"), or none for a percentage ("12%").
 	const unitText = (w) => (!unit ? '' : w >= 560 ? unit : percent ? '' : unit.split(' ')[0]);
@@ -804,8 +805,7 @@
 		{#each yTicks as tick}
 			<line class="gridline" class:zero={tick === 0} x1={margin.left} x2={width - margin.right + 4} y1={y(tick)} y2={y(tick)} />
 		{/each}
-		<!-- The red margin line of an index card, standing in for the y axis -->
-		<line class="marginline" x1={margin.left} x2={margin.left} y1={margin.top - 8} y2={height - margin.bottom} />
+
 
 		<!-- X axis: small ticks under the baseline, no vertical gridlines -->
 		{#each xTicks as tick}
@@ -1046,9 +1046,8 @@
 	.ev-wrap:focus-within .qmark-pop { display: block; }
 
 	/* Axes: horizontal hairlines, a darker zero baseline, labels inside the plot */
-	/* Index-card rules: faint blue lines, with a red margin line for the axis. */
+	/* Index-card rules: faint blue gridlines. */
 	.gridline { stroke: rgba(70, 125, 185, 0.2); stroke-width: 1; }
-	.marginline { stroke: rgba(204, 70, 62, 0.75); stroke-width: 1.25; }
 	.gridline.zero { stroke: #555; }
 	.x-tickmark { stroke: #555; stroke-width: 1; }
 	.y-label {

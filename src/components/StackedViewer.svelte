@@ -1767,6 +1767,19 @@
 			if (term) map.set(term, (map.get(term) || 0) + w);
 		}
 	}
+	// A book's own subject headings (from its editions), for its details row.
+	function bookSubjects(w) {
+		const m = new Map();
+		for (const e of w.editions) poolSubjects(m, current.titles[e.idx]?.subjects);
+		const out = [], seen = new Set();
+		for (const [raw] of [...m.entries()].sort((a, b) => b[1] - a[1])) {
+			const c = cleanSubject(raw);
+			if (!c || c.length > 28 || seen.has(c.toLowerCase())) continue;
+			seen.add(c.toLowerCase()); out.push(c);
+			if (out.length >= 3) break;
+		}
+		return out;
+	}
 	const top5Terms = (map) => [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map((e) => e[0]);
 
 	// Subject headings for the page header, tidied for reading. SPL's data strips
@@ -2334,9 +2347,9 @@
 					{#if isOverview}
 						{compactNumber(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 					{:else if searchMode === "title"}
-						by <button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} checkouts all-time{/if}{#if genreRanks.length}{" · "}<button type="button" class="author-link" onclick={() => openGenre(genreRanks[0].genre)} title="See the most-borrowed {genreRanks[0].genre} books">#{genreRanks[0].rank} in {genreRanks[0].genre}</button>{/if}
+						by <button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} total checkouts{/if}{#if genreRanks.length}{" · "}<button type="button" class="author-link" onclick={() => openGenre(genreRanks[0].genre)} title="See the most-borrowed {genreRanks[0].genre} books">#{genreRanks[0].rank} in {genreRanks[0].genre}</button>{/if}
 					{:else}
-						{compactNumber(current.total)} checkouts all-time · {workGroups.size.toLocaleString()} {workGroups.size === 1 ? "work" : "works"}
+						{compactNumber(current.total)} total checkouts · {workGroups.size.toLocaleString()} {workGroups.size === 1 ? "work" : "works"}
 					{/if}
 				</span>
 			</div>
@@ -2647,7 +2660,7 @@
 					</div>
 				{/if}
 				<div class="bk-row bk-colhead" aria-hidden="true">
-					<span></span><span>Book</span><span class="bk-fmt">Formats</span><span class="bk-sp">{booksYears}</span><span class="bk-num">Checkouts</span>
+					<span></span><span>Book</span><span class="bk-sp">{booksYears}</span><span class="bk-num">Checkouts</span>
 				</div>
 				<ul class="bk-list">
 					{#if editMode}
@@ -2658,7 +2671,6 @@
 									<input class="bk-rename" value={b.name} aria-label="Name this book" onchange={(e) => renameBook(b.key, e.currentTarget.value)} onfocus={(e) => e.currentTarget.select()} />
 									<span class="bk-new-note">0 editions · use “Move to…” on any edition to add it here</span>
 								</span>
-								<span class="bk-fmt"></span>
 								<span class="bk-sp"></span>
 								<span class="bk-num"><button type="button" class="bk-x" title="Remove this empty book" aria-label="Remove this empty book" onclick={() => dropEmptyBook(b.key)}>×</button></span>
 							</li>
@@ -2667,7 +2679,6 @@
 					{#each visibleWorkBlocks as w (w.key)}
 						{@const wColor = workPlotColor(w)}
 						{@const open = isExpanded(w.key) || (titleFilter.trim() && w.matchCount > 0)}
-						{@const fmts = ["ebook", "audiobook", "print", "largeprint"].filter((f) => w.editions.some((e) => e.format === f))}
 						{#if !w.filteredOut}
 						<li class="bk-row bk-book" class:plotted={!!wColor}>
 							<input type="checkbox" class="bk-check" checked={isWorkPlotted(w.key)}
@@ -2685,13 +2696,16 @@
 									{@const top = w.editions.reduce((a, b) => (b.total > a.total ? b : a))}
 									<button type="button" class="bk-name bk-open" title="Open the page for {w.name}" onclick={() => openTitle(isCustomBook(w.key) ? current.titles[top.idx].title : w.name, currentSlug)}>{#each markMatch(w.name) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{"\u00A0"}<span class="bk-open-arrow" aria-hidden="true">→</span></button>
 								{/if}
-								<button type="button" class="bk-eds" aria-expanded={!!open} onclick={() => toggleExpand(w.key)}>{w.editions.length} edition{w.editions.length === 1 ? "" : "s"}<span class="bk-caret" class:up={open} aria-hidden="true"></span></button>
+								<button type="button" class="bk-eds" aria-expanded={!!open} onclick={() => toggleExpand(w.key)}>{w.editions.length} edition{w.editions.length === 1 ? "" : "s"} · details<span class="bk-caret" class:up={open} aria-hidden="true"></span></button>
 							</span>
-							<span class="bk-fmt">{fmts.map((f, k) => { const l = formatLabel(f); return k ? l : l.charAt(0).toUpperCase() + l.slice(1); }).join(" · ")}</span>
 							<svg class="bk-sp bk-spark" width="84" height="20" viewBox="0 0 84 20" aria-hidden="true"><path d={sparkPath(w.editions.map((e) => e.idx), 84, 20)} stroke={wColor || "#b4b2a9"} /></svg>
 							<span class="bk-num">{tableNumber(w.total)}</span>
 						</li>
 						{#if open}
+							{@const subj = bookSubjects(w)}
+							{#if subj.length}
+								<li class="bk-row bk-ed bk-subj"><span></span><span class="bk-subj-list">{#each subj as term, k}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/each}</span></li>
+							{/if}
 							{#each w.editions.slice().sort((a, b) => b.total - a.total) as t (t.idx)}
 								<li class="bk-row bk-ed" class:editing={editMode} class:hit={t.match} class:just-moved={movedIdx === t.idx} data-ed={t.idx}>
 									<input type="checkbox" class="bk-check"
@@ -4775,12 +4789,16 @@
 	.bk-list { list-style: none; margin: 0; padding: 0; }
 	.bk-row {
 		display: grid;
-		grid-template-columns: 22px minmax(0, 1fr) 150px 84px 76px;
+		grid-template-columns: 22px minmax(0, 1fr) 96px 76px;
 		gap: 12px;
 		align-items: center;
 		padding: 9px 8px;
 		border-top: 1px solid var(--color-gray-100, #eee);
 	}
+	.bk-subj { grid-template-columns: 22px minmax(0, 1fr); padding-block: 8px 2px; }
+	.bk-subj-list { font-size: var(--text-sm); color: var(--color-fg-light); }
+	.bk-subj-list a { color: inherit; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
+	.bk-subj-list a:hover { color: var(--color-fg); text-decoration-color: currentColor; }
 	/* Hover lights the row, to help trace a title across to its numbers. */
 	.bk-book:hover { background: #f6f6f4; }
 	.bk-colhead {
