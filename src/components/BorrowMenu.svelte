@@ -11,7 +11,6 @@
 	// and Bookshop.org (buy, supporting local bookstores). `q` is the search string
 	// (e.g. "The Odyssey Homer"); `compact` shrinks it for dense table rows.
 	// variant "outline": the quieter header button ("Borrow at SPL", book icon)
-	// variant "link": a plain text link with the SPL logo, for page headers
 	// used on the author / book pages; the default blue pill stays elsewhere.
 	let { q = "", compact = false, variant = "pill" } = $props();
 	let open = $state(false);
@@ -48,15 +47,12 @@
 			class="borrow-btn"
 			class:compact
 			class:outline={variant === "outline"}
-			class:link={variant === "link"}
 			onclick={toggle}
 			aria-haspopup="true"
 			aria-expanded={open}
 			title="Where to borrow or buy this book"
 	>
-		{#if variant === "link"}
-			<img class="bl-logo" src="{base}/spl-logo.png" alt="" width="18" height="18" /> <span class="bl-text">Borrow at SPL</span> <ChevronDown size={13} strokeWidth={2} aria-hidden="true" />
-		{:else if variant === "outline"}
+		{#if variant === "outline"}
 			<BookOpen size={15} strokeWidth={2} aria-hidden="true" /> Borrow at SPL <ChevronDown size={14} strokeWidth={2} aria-hidden="true" />
 		{:else}
 			Borrow <span class="borrow-caret" aria-hidden="true">▾</span>
@@ -124,13 +120,6 @@
 		background: var(--color-white);
 		border-color: var(--color-fg-light);
 	}
-	/* A plain link: logo + words, a light underline that darkens on hover. */
-	.borrow-btn.link { gap: 6px; padding: 2px 0; border: 0; border-radius: 0; background: none; font-weight: 500; color: var(--color-fg); }
-	.borrow-btn.link .bl-text { text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
-	.borrow-btn.link:hover { background: none; }
-	.borrow-btn.link:hover .bl-text { text-decoration-color: currentColor; }
-	.borrow-btn.link .bl-logo { width: 18px; height: 18px; border-radius: 2px; flex: none; }
-	.borrow-btn.link :global(svg) { width: 13px; height: 13px; color: var(--color-fg-light); }
 	.borrow-btn.compact {
 		font-size: var(--text-sm);
 		padding: 3px 9px;

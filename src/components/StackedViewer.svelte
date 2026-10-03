@@ -10,6 +10,8 @@
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import TableIcon from "@lucide/svelte/icons/table";
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
+	import GlobeIcon from "@lucide/svelte/icons/globe";
+	import ShoppingBagIcon from "@lucide/svelte/icons/shopping-bag";
 	import { base } from "$app/paths";
 	import { drawChartLogo } from "$utils/chartLogo.js";
 	import workOverrides from "$data/work-overrides.json";
@@ -25,7 +27,6 @@
 	import YearBrush from "$components/YearBrush.svelte";
 	import WikiCard from "$components/WikiCard.svelte";
 	import { wikiSummary, wikiWork } from "$utils/wiki.js";
-	import BorrowMenu from "$components/BorrowMenu.svelte";
 	import Switch from "$components/ui/Switch.svelte";
 	import { getMonths, searchAuthors, searchTitles, searchAll, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks } from "$components/db.js";
 
@@ -1678,6 +1679,9 @@
 		return displayName(current.name);
 	});
 
+	// Catalog / WorldCat / Bookshop searches: the book with its author on a book
+	// page, the author's name on an author page.
+	const borrowLinks = $derived(lookupUrls(searchMode === "title" && current ? `${headingText} ${displayName(current.name)}` : headingText || ""));
 	const lookupLinks = $derived.by(() => {
 		if (!current || isOverview) return null;
 		const q = headingText;
@@ -2342,12 +2346,18 @@
 			</div>
 			{#if lookupLinks}
 			<div class="hdr-actions">
-					<BorrowMenu variant="link" q={searchMode === "title" ? `${headingText} ${displayName(current.name)}` : headingText} />
+					<!-- Borrow at SPL goes straight to the catalog; everything else
+					     (other places to borrow or buy, and reading about it) is under More. -->
+					<a class="hd-link" href={borrowLinks.spl} target="_blank" rel="noopener noreferrer" title="Search the Seattle Public Library catalog"><img class="hl-logo" src="{base}/spl-logo.png" alt="" width="18" height="18" /> <span class="hl-text">Borrow at SPL</span> <ArrowUpRightIcon size={13} strokeWidth={2} aria-hidden="true" /></a>
 					<span class="lookup-wrap">
-						<button class="hd-link" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere"><ExternalLinkIcon size={15} strokeWidth={2} aria-hidden="true" /> <span class="hl-text">Learn more</span> <ChevronDownIcon size={13} strokeWidth={2} aria-hidden="true" /></button>
+						<button class="hd-link" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Other places to borrow, buy or read about it"><span class="hl-text">More</span> <ChevronDownIcon size={13} strokeWidth={2} aria-hidden="true" /></button>
 						{#if lookupOpen}
 							<button class="share-backdrop" aria-label="Close" onclick={() => (lookupOpen = false)}></button>
 							<div class="lookup-menu" role="menu">
+								<div class="lm-group">Borrow or buy elsewhere</div>
+								<a role="menuitem" href={borrowLinks.worldcat} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}><GlobeIcon size={15} strokeWidth={1.8} aria-hidden="true" /> Your local library <span class="lm-sub">WorldCat</span></a>
+								<a role="menuitem" href={borrowLinks.bookshop} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}><ShoppingBagIcon size={15} strokeWidth={1.8} aria-hidden="true" /> Bookshop.org <span class="lm-sub">buy</span></a>
+								<div class="lm-group">Read about it</div>
 								<a role="menuitem" href={lookupLinks.wikipedia} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Wikipedia <ArrowUpRightIcon size={14} strokeWidth={2} aria-hidden="true" /></a>
 								<a role="menuitem" href={lookupLinks.goodreads} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>Goodreads <ArrowUpRightIcon size={14} strokeWidth={2} aria-hidden="true" /></a>
 								<a role="menuitem" href={lookupLinks.librarything} target="_blank" rel="noopener noreferrer" onclick={() => (lookupOpen = false)}>LibraryThing <ArrowUpRightIcon size={14} strokeWidth={2} aria-hidden="true" /></a>
@@ -3659,11 +3669,12 @@
 	.lookup-menu {
 		position: absolute;
 		top: calc(100% + 6px);
-		left: 0;
+		/* "More" sits at the page's right edge: open the menu leftward. */
+		right: 0;
 		z-index: 41;
 		display: flex;
 		flex-direction: column;
-		min-width: 162px;
+		min-width: 230px;
 		padding: 5px;
 		background: var(--color-white);
 		border: 1px solid var(--color-border);
@@ -4511,12 +4522,16 @@
 		white-space: nowrap;
 	}
 	.tb-btn:hover { border-color: var(--color-fg-light); }
-	/* Header links (Learn more), matching BorrowMenu's "link" variant. */
+	/* Header links: "Borrow at SPL" (straight to the catalog) and "More". */
 	.hd-link { display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; color: var(--color-fg); cursor: pointer; white-space: nowrap; }
 	.hd-link .hl-text { text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
 	.hd-link:hover .hl-text { text-decoration-color: currentColor; }
 	.hd-link :global(svg) { width: 15px; height: 15px; color: var(--color-fg-light); flex: none; }
-	.hd-link :global(svg.lucide-chevron-down) { width: 13px; height: 13px; }
+	.hd-link :global(svg.lucide-chevron-down), .hd-link :global(svg.lucide-arrow-up-right) { width: 13px; height: 13px; }
+	a.hd-link { text-decoration: none; }
+	.hd-link .hl-logo { width: 18px; height: 18px; border-radius: 2px; flex: none; }
+	.lookup-menu .lm-group { padding: 8px 10px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-fg-light); }
+	.lookup-menu .lm-sub { margin-left: auto; font-size: 12px; color: var(--color-fg-light); }
 	/* Menus in the same quiet style as the buttons */
 	.share-menu, .lookup-menu {
 		min-width: 196px;
