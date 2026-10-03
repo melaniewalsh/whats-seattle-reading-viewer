@@ -220,8 +220,12 @@
 		return s.slice(0, max).replace(/\s+\S*$/, "") + "…";
 	}
 
+	// Keep the Most Borrowed page's filters in the URL. Not for the home strip:
+	// it isn't that page, and (with its books baked in) it would rewrite the
+	// URL on load before the site reads it, sending /?author=… links to the
+	// rankings.
 	$effect(() => {
-		if (!data) return;
+		if (!data || embedded) return;
 		try {
 			const url = new URL(window.location);
 			url.searchParams.set("tab", "works");
