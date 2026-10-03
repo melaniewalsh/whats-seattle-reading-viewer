@@ -33,8 +33,7 @@
 	// resolve to its author, open the author's drilldown with that work highlighted.
 	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
 	// (the "By author" tab -> open straight to the search box).
-	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {}, loaded = $bindable(false) } = $props();
-	$effect(() => { loaded = !!current && !isOverview; });
+	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {} } = $props();
 
 	// Colors for title lines.
 	// Palette for the stacked "All titles" bands. Leads with the site blue so the
@@ -2273,7 +2272,7 @@
 		{/if}
 	{/snippet}
 
-	{#if landing === "search" && !(current && !isOverview)}
+	{#if landing === "search"}
 		<div class="picker-block">{@render authorPicker()}</div>
 	{/if}
 
