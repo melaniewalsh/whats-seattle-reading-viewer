@@ -612,8 +612,11 @@
 
 	const FMT_LABEL = { ebook: 'ebook', audiobook: 'audio', print: 'print', largeprint: 'large print', other: 'other' };
 
+	// Mouse: the card sits BESIDE the hovered point (right of it, or left in the
+	// chart's right half), never on top of the point or the cursor.
+	const tooltipSide = $derived(hoverIndex !== null && x(hoverIndex) > width * 0.55 ? 'left' : 'right');
 	const tooltipLeft = $derived(
-		hoverIndex === null ? 0 : Math.min(Math.max(x(hoverIndex), 100), width - 100)
+		hoverIndex === null ? 0 : pinned ? Math.min(Math.max(x(hoverIndex), 100), width - 100) : x(hoverIndex)
 	);
 
 	// Float the tooltip at the cursor's height (not the data point's) so it tracks
@@ -625,7 +628,7 @@
 	const tooltipTop = $derived(
 		hoverIndex === null ? margin.top
 			: pinned ? (pointerY < height / 2 ? height - margin.bottom : margin.top)
-			: Math.min(Math.max(pointerY, margin.top), height - margin.bottom)
+			: Math.min(Math.max(pointerY, margin.top + 50), height - margin.bottom - 50)
 	);
 	const tooltipBelow = $derived(
 		hoverIndex !== null && (pinned ? pointerY >= height / 2 : tooltipTop < 90)
@@ -946,7 +949,7 @@
 		</div>
 	{/each}
 	{#if hoverIndex !== null && selectedItem}
-        <div class="tooltip" class:below={tooltipBelow} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
+        <div class="tooltip {pinned ? '' : 'side-' + tooltipSide}" class:below={pinned && tooltipBelow} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
             <div class="tt-due" aria-hidden="true">DATE DUE</div>
             <div class="tt-title">
                 <span class="tt-dot" style="background-color: {selectedItem.color}"></span>
@@ -1052,8 +1055,8 @@
 	.x-tickmark { stroke: #555; stroke-width: 1; }
 	.y-label {
 		font-family: var(--font-sans, system-ui, sans-serif);
-		font-size: 12px;
-		fill: #7a7a7a;
+		font-size: 11.5px;
+		fill: #858a94;
 		paint-order: stroke;
 		stroke: #fff;
 		stroke-width: 3px;
@@ -1068,7 +1071,7 @@
 	.marker-title {
 		font-family: var(--font-serif, Georgia, serif);
 		font-weight: 600;
-		font-size: 13.5px;
+		font-size: 13px;
 		fill: #1a1a1a;
 		paint-order: stroke;
 		stroke: #fff;
@@ -1167,7 +1170,7 @@
 	text.x-year { font-size: 11px; font-weight: 600; fill: #555; }
 	.tick text {
 		font-size: 11px;
-		fill: #666;
+		fill: #858a94;
 	}
 
 	.tooltip {
@@ -1185,14 +1188,14 @@
 		border: 1px solid #e3e4e0;
 		border-top: 4px solid #6a46a0;
 		border-radius: 3px;
-		padding: 8px 16px 12px;
+		padding: 7px 14px 10px;
 		font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
 		font-size: 13px;
 		color: #333;
 		pointer-events: none;
 		box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.3);
-		min-width: 210px;
-		max-width: 330px;
+		min-width: 180px;
+		max-width: 280px;
 		z-index: 10;
 		animation: tt-fade 0.14s ease-out;
 	}
@@ -1204,6 +1207,9 @@
 	.tooltip.below {
 		transform: translate(-50%, 18px);
 	}
+	/* Mouse: beside the point, vertically centered on the pointer */
+	.tooltip.side-right { transform: translate(18px, -50%); }
+	.tooltip.side-left { transform: translate(calc(-100% - 18px), -50%); }
 
 	.tt-title {
 		display: flex;

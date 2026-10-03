@@ -948,7 +948,10 @@
 	// A readable name for a work, taken from its best-known edition's title.
 	function cleanTitleForDisplay(title) {
 		let t = (title || "").split(" / ")[0];
-		t = t.replace(/\s*:\s*.*$/, ""); // drop subtitle after the first colon
+		// Drop a subtitle after the first colon -- but not from a title that is
+		// itself numbers around a colon, like Ben Lerner's "10:04".
+		const clock = t.trim().match(/^\d+:\d+/);
+		t = clock ? clock[0] + t.trim().slice(clock[0].length).replace(/\s*:\s*.*$/, "") : t.replace(/\s*:\s*.*$/, "");
 		t = t.replace(/[,\s]+part\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3})\b.*$/i, ""); // drop "…, Part 1" audiobook split
 		t = t.replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
 		return titleCase(t);
@@ -1948,7 +1951,7 @@
 	// catalog form like "emily st john mandel, 1979".
 	const authorLine = $derived(
 			current
-					? {key: "author", label: isOverview ? current.name : displayName(current.name), color: "#3f88cc", values: current.series, groupIndex: -2, isAggregate: true}
+					? {key: "author", label: isOverview ? current.name : displayName(current.name), color: "#2d5ca6", values: current.series, groupIndex: -2, isAggregate: true}
 					: null
 	);
 
@@ -2118,7 +2121,7 @@
 				// clicked out to overlay — so "Total" always shows the whole work, with
 				// the clicked edition drawn on top for comparison.
 				const workIdxs = [...gs[0].idxs, ...singleIdxs.filter((i) => searchedWork?.idxs.includes(i))];
-				base = { key: "worktotal", label: groupLabel(gs[0]), color: "#3f88cc", values: sumSeries(workIdxs), isAggregate: true };
+				base = { key: "worktotal", label: groupLabel(gs[0]), color: "#2d5ca6", values: sumSeries(workIdxs), isAggregate: true };
 			}
 			// The work total is always shown (it's the point of a title search); only the
 			// author aggregate can be hidden once an edition line is overlaid.
