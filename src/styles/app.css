@@ -4,11 +4,10 @@
 @import "reset.css";
 @import "ui.css"; /* optional for bits UI components */
 
-/* Force a pure #ffffff page background. The theme's --color-white is
-   oklch(100% 0 0), which some browsers render a touch off-white. */
+/* A light warm-gray page, so white panels (the chart, the tables) stand off it. */
 html,
 body {
-	background-color: #ffffff;
+	background-color: #fafaf8;
 }
 
 /* Two fonts, loaded from Google Fonts via a <link> in Meta.svelte: Zilla Slab

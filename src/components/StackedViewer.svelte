@@ -2418,6 +2418,8 @@
 			{/if}
 					</div>
 					</div>
+					<!-- The chart, its slider and source line share one white panel -->
+					<div class="chart-panel">
 					<div class="chart-wrap" bind:this={chartWrap}>
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
@@ -2501,6 +2503,7 @@
 				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 			</div>
 			</div>
+			</div><!-- /.chart-panel -->
 
 
 
@@ -4708,10 +4711,17 @@
 	}
 
 	/* ---- Books table (under the chart) -------------------------------- */
+	/* White panels on the page's warm-gray background: one for the chart (with
+	   its slider and source line), one for the Books table. */
+	.chart-panel, .books {
+		background: #fff;
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
+	}
+	.chart-panel { padding: 14px 16px 12px 12px; }
 	.books {
-		margin: var(--space-6) 0 var(--space-4);
-		padding-top: var(--space-4);
-		border-top: 1px solid var(--color-border);
+		margin: var(--space-5) 0 var(--space-4);
+		padding: 16px 18px 12px;
 		font-family: var(--font-sans);
 	}
 	.bk-head {

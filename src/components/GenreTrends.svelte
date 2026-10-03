@@ -499,6 +499,8 @@
 			</div>
 		</div>
 
+		<!-- The chart, its slider and source line share one white panel -->
+		<div class="chart-panel">
 		<div class="chartwrap" bind:this={chartWrap}>
 			<LineChart bind:plotInset months={viewMonths} series={chartSeries} mode="line" percent unit="of book checkouts"
 				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={(k) => toggleIsolate(k)} />
@@ -540,6 +542,7 @@
 				{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 			</div>
 		</div>
+		</div><!-- /.chart-panel -->
 
 		<!-- Genres table, styled like the author page's Books table -->
 		<section class="books">
@@ -690,7 +693,10 @@
 	@media (max-width: 640px) { .chart-foot .share-menu { left: 0; right: auto; } }
 
 	/* Genres table — same look as the author page's Books table. */
-	.books { margin: var(--space-6) 0 var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+	/* White panels on the warm-gray page: the chart, and the Genres table. */
+	.chart-panel, .books { background: #fff; border: 1px solid var(--color-border); border-radius: 6px; }
+	.chart-panel { padding: 14px 16px 12px 12px; }
+	.books { margin: var(--space-5) 0 var(--space-4); padding: 16px 18px 12px; }
 	.bk-head { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin: 0 0 10px; }
 	.bk-title { font-family: var(--font-sans); font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--color-fg); }
 	.bk-count { font-weight: 400; color: var(--color-fg-light); }

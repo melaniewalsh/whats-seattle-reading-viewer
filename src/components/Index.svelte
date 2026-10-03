@@ -1186,17 +1186,18 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-		height: 34px;
-		padding: 0 14px;
-		background: var(--color-gray-100);
-		border: 1px solid var(--color-border);
-		border-radius: 999px;
-		transition: border-color 0.12s, background 0.12s;
+		height: 38px;
+		padding: 0 12px;
+		background: #fff;
+		border: 1.5px solid var(--color-border);
+		border-radius: 8px;
+		transition: border-color 0.12s, box-shadow 0.12s;
 	}
-	.mast-search:hover,
+	/* A plain white field with a crisp edge; blue ring while typing. */
+	.mast-search:hover { border-color: var(--color-fg-light); }
 	.mast-search:focus-within {
 		border-color: #3f88cc;
-		background: #fff;
+		box-shadow: 0 0 0 3px rgba(63, 136, 204, 0.18);
 	}
 	.mast-search.flash { animation: search-ring 1.6s ease-out; }
 	@keyframes search-ring {
@@ -1211,7 +1212,7 @@
 		width: 16px;
 		height: 16px;
 		flex: none;
-		color: #3f88cc;
+		color: var(--color-fg-light);
 	}
 	.mast-search-input {
 		flex: 1 1 auto;
@@ -1220,7 +1221,8 @@
 		background: none;
 		outline: none;
 		font-family: var(--font-sans);
-		font-size: var(--text-sm);
+		font-size: 15px;
+		font-weight: 500;
 		color: var(--color-fg);
 	}
 	.mast-search-input::placeholder {
