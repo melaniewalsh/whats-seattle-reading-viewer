@@ -267,12 +267,16 @@
 	.ta-hint { color: var(--color-fg-light); }
 	.bb-loading { font-family: var(--font-sans); color: var(--color-fg-light); margin: var(--space-4) 0; }
 
+	/* The list sits on a white panel, like the site's other tables. */
 	.bb-list {
 		list-style: none;
 		margin: 0;
-		padding: 0;
-		border-top: 1px solid var(--color-border);
+		padding: 2px 16px;
+		background: #fff;
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
 	}
+	.bb-list > li:first-child { border-top: 0; }
 	.bb-row {
 		display: grid;
 		grid-template-columns: 2rem 54px 1fr 180px;

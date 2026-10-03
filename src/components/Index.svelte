@@ -738,8 +738,8 @@
 		margin: 40px auto 10px;
 		padding: 22px 24px 24px;
 		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md, 12px);
-		background: var(--color-white);
+		border-radius: 6px;
+		background: #fff;
 	}
 	.featured-eyebrow {
 		font-family: var(--font-sans);
@@ -855,8 +855,8 @@
 		margin: 40px auto 10px;
 		padding: 22px 24px 24px;
 		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md, 12px);
-		background: var(--color-white);
+		border-radius: 6px;
+		background: #fff;
 	}
 	.hub {
 		max-width: 880px;
@@ -878,16 +878,15 @@
 		text-align: left;
 		padding: 22px;
 		border: 1px solid var(--color-border);
-		border-radius: 14px;
-		background: var(--color-white);
+		border-radius: 6px;
+		background: #fff;
 		cursor: pointer;
 		font-family: var(--font-sans);
 		transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
 	}
+	/* Same quiet hover as the site's other panels: just a darker edge. */
 	.hub-card:hover {
 		border-color: var(--color-fg-light);
-		box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
-		transform: translateY(-2px);
 	}
 	.hub-emoji { font-size: 1.7rem; line-height: 1; }
 	.hub-lucide { display: inline-flex; color: #e3120b; }
