@@ -1771,15 +1771,20 @@
 	// ("Horror" / "Horror fiction"). Clean that up and keep the top five.
 	const SUBJ_DROP = /^(fiction|nonfiction|non-fiction|literature|novels?|large type books|large print books|audiobooks?|downloadable audio books|electronic books|juvenile fiction|juvenile literature|general|adult|stories)$/i;
 	const PLACES = new Set(["Ireland", "England", "Scotland", "Wales", "France", "Italy", "Spain", "Germany", "Japan", "China", "India", "Mexico", "Canada", "Australia", "Russia", "Nigeria", "Israel", "Egypt", "Greece", "Korea", "Washington", "Calif", "California", "Texas", "Florida", "Alaska", "Oregon", "Mass", "Massachusetts", "Ill", "Illinois", "N.Y", "N Y", "Ohio", "Mich", "Minn", "Ga", "La", "Va", "Pa"]);
+	// US state abbreviations as LC writes them ("Jackson Miss" -> "Jackson (Miss.)").
+	const STATE_ABBR = new Set(["Ala", "Ariz", "Ark", "Calif", "Colo", "Conn", "Del", "Fla", "Ga", "Ill", "Ind", "Kan", "Ky", "La", "Md", "Mass", "Mich", "Minn", "Miss", "Mo", "Mont", "Neb", "Nev", "Okla", "Or", "Ore", "Pa", "Tenn", "Tex", "Va", "Vt", "Wash", "Wis", "Wyo"]);
 	function cleanSubject(raw) {
 		let t = String(raw || "").replace(/\s+/g, " ").trim();
 		if (!t || SUBJ_DROP.test(t)) return null;
 		// "X Fiction" (capital F, LC form subdivision) -> "X"; keep genre phrases
 		// like "Psychological fiction" or "Science fiction".
-		t = t.replace(/ Fiction$/, "");
+		// A one-word genre adjective keeps its noun: "Historical Fiction" ->
+		// "Historical fiction", not "Historical".
+		t = /^\S+ Fiction$/.test(t) ? t.replace(/ Fiction$/, " fiction") : t.replace(/ Fiction$/, "");
 		t = t.replace(/^Man woman\b/, "Man-woman").replace(/^Parent child\b/, "Parent-child");
 		const words = t.split(" ");
-		if (words.length >= 2 && PLACES.has(words[words.length - 1])) t = `${words.slice(0, -1).join(" ")} (${words[words.length - 1]})`;
+		const lastW = words[words.length - 1];
+		if (words.length >= 2 && (PLACES.has(lastW) || STATE_ABBR.has(lastW))) t = `${words.slice(0, -1).join(" ")} (${lastW}${STATE_ABBR.has(lastW) && !lastW.endsWith(".") ? "." : ""})`;
 		if (!t || SUBJ_DROP.test(t)) return null;
 		return t.charAt(0).toUpperCase() + t.slice(1);
 	}
@@ -2337,9 +2342,9 @@
 			</div>
 			{#if lookupLinks}
 			<div class="hdr-actions">
-					<BorrowMenu variant="outline" q={searchMode === "title" ? `${headingText} ${displayName(current.name)}` : headingText} />
+					<BorrowMenu variant="link" q={searchMode === "title" ? `${headingText} ${displayName(current.name)}` : headingText} />
 					<span class="lookup-wrap">
-						<button class="tb-btn" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere"><ExternalLinkIcon size={15} strokeWidth={2} aria-hidden="true" /> Learn more <ChevronDownIcon size={14} strokeWidth={2} aria-hidden="true" /></button>
+						<button class="hd-link" onclick={() => (lookupOpen = !lookupOpen)} aria-haspopup="true" aria-expanded={lookupOpen} title="Learn more elsewhere"><ExternalLinkIcon size={15} strokeWidth={2} aria-hidden="true" /> <span class="hl-text">Learn more</span> <ChevronDownIcon size={13} strokeWidth={2} aria-hidden="true" /></button>
 						{#if lookupOpen}
 							<button class="share-backdrop" aria-label="Close" onclick={() => (lookupOpen = false)}></button>
 							<div class="lookup-menu" role="menu">
@@ -2950,7 +2955,7 @@
 		flex-wrap: wrap;
 	}
 	.hd-main { min-width: 0; flex: 1 1 360px; }
-	.hd-top .hdr-actions { margin: 6px 0 0; flex: 0 1 auto; max-width: 100%; }
+	.hd-top .hdr-actions { margin: 10px 0 0; flex: 0 1 auto; max-width: 100%; gap: 6px 20px; }
 	.split-main.has-work-cover .hd-top .hdr-actions { margin-top: 6px; }
 	.hd-desc {
 		font-family: var(--font-sans);
@@ -4506,6 +4511,12 @@
 		white-space: nowrap;
 	}
 	.tb-btn:hover { border-color: var(--color-fg-light); }
+	/* Header links (Learn more), matching BorrowMenu's "link" variant. */
+	.hd-link { display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; color: var(--color-fg); cursor: pointer; white-space: nowrap; }
+	.hd-link .hl-text { text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
+	.hd-link:hover .hl-text { text-decoration-color: currentColor; }
+	.hd-link :global(svg) { width: 15px; height: 15px; color: var(--color-fg-light); flex: none; }
+	.hd-link :global(svg.lucide-chevron-down) { width: 13px; height: 13px; }
 	/* Menus in the same quiet style as the buttons */
 	.share-menu, .lookup-menu {
 		min-width: 196px;

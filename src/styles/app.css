@@ -11,18 +11,18 @@ body {
 	background-color: #ffffff;
 }
 
-/* Two fonts, loaded from Google Fonts via a <link> in Meta.svelte: Fraunces for
-   all serif (display headlines + small serif accents, via its optical-size axis)
-   and Inter for the UI sans. These replace the old Pudding-hosted Recoleta /
-   Tiempos / Atlas Grotesk, which are licensed and not for reuse. */
+/* Two fonts, loaded from Google Fonts via a <link> in Meta.svelte: Zilla Slab
+   for headlines, names and book titles, and Public Sans for everything else.
+   These replace the old Pudding-hosted Recoleta / Tiempos / Atlas Grotesk,
+   which are licensed and not for reuse. */
 
 /* colors defined in variables.css */
 :root {
 	/* font */
-	--font-sans: "Inter", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
-	/* One serif for everything — Fraunces has an optical-size axis, so it reads well
-	   both as a big display headline and as small serif accents. */
-	--font-serif: "Fraunces", Iowan Old Style, "Times New Roman", Times, serif;
+	--font-sans: "Public Sans", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+	/* Two typefaces site-wide: a slab serif (Zilla Slab) for headlines, names and
+	   book titles, and a sans (Public Sans) for everything else. */
+	--font-serif: "Zilla Slab", "Roboto Slab", Georgia, serif;
 	--font-display: var(--font-serif);
 	--font-mono: Menlo, Consolas, Monaco, monospace;
 

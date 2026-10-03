@@ -804,6 +804,8 @@
 		{#each yTicks as tick}
 			<line class="gridline" class:zero={tick === 0} x1={margin.left} x2={width - margin.right + 4} y1={y(tick)} y2={y(tick)} />
 		{/each}
+		<!-- The red margin line of an index card, standing in for the y axis -->
+		<line class="marginline" x1={margin.left} x2={margin.left} y1={margin.top - 8} y2={height - margin.bottom} />
 
 		<!-- X axis: small ticks under the baseline, no vertical gridlines -->
 		{#each xTicks as tick}
@@ -922,7 +924,7 @@
 		<!-- y-axis labels, drawn last with a halo so lines never cover them -->
 		{#each yTicks as tick}
 			{#if tick > 0}
-				<text class="y-label" x={margin.left} y={y(tick) - 5}>{fmtTick(tick)}{tick === yTopTick && unitText(width) ? ` ${unitText(width)}` : ''}</text>
+				<text class="y-label" x={margin.left + 6} y={y(tick) - 5}>{fmtTick(tick)}{tick === yTopTick && unitText(width) ? ` ${unitText(width)}` : ''}</text>
 			{/if}
 		{/each}
 
@@ -945,6 +947,7 @@
 	{/each}
 	{#if hoverIndex !== null && selectedItem}
         <div class="tooltip" class:below={tooltipBelow} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
+            <div class="tt-due" aria-hidden="true">DATE DUE</div>
             <div class="tt-title">
                 <span class="tt-dot" style="background-color: {selectedItem.color}"></span>
                 <span class="tt-title-text">{tooltipTitle}</span>
@@ -1043,7 +1046,9 @@
 	.ev-wrap:focus-within .qmark-pop { display: block; }
 
 	/* Axes: horizontal hairlines, a darker zero baseline, labels inside the plot */
-	.gridline { stroke: #e8e7e2; stroke-width: 1; }
+	/* Index-card rules: faint blue lines, with a red margin line for the axis. */
+	.gridline { stroke: rgba(70, 125, 185, 0.2); stroke-width: 1; }
+	.marginline { stroke: rgba(204, 70, 62, 0.75); stroke-width: 1.25; }
 	.gridline.zero { stroke: #555; }
 	.x-tickmark { stroke: #555; stroke-width: 1; }
 	.y-label {
@@ -1060,11 +1065,10 @@
 	/* Book markers */
 	.marker-leader { stroke: #8a8a8a; stroke-width: 0.75; }
 	.marker-dot { fill: #1a1a1a; stroke: #fff; stroke-width: 1.5; }
-	/* A "Peak" label is a number, not a book title: plain sans, not italic serif. */
-	.marker-title.peak { font-family: var(--font-sans, system-ui, sans-serif); font-style: normal; font-weight: 600; font-size: 12.5px; }
+	/* Notes over the chart: the title in the slab, a gray line under it. */
 	.marker-title {
 		font-family: var(--font-serif, Georgia, serif);
-		font-style: italic;
+		font-weight: 600;
 		font-size: 13.5px;
 		fill: #1a1a1a;
 		paint-order: stroke;
@@ -1175,19 +1179,19 @@
 		/* glide horizontally between month positions; vertical tracks the cursor
 		   directly (no transition) so it never lags or bounces */
 		transition: left 0.12s cubic-bezier(0.22, 1, 0.36, 1);
-		background: rgba(255, 255, 255, 0.98);
-		-webkit-backdrop-filter: saturate(1.8) blur(6px);
-		backdrop-filter: saturate(1.8) blur(6px);
-		border: 1px solid rgba(0, 0, 0, 0.06);
-		border-radius: 12px;
-		padding: 14px 18px 15px;
+		/* A library date-due slip: ruled card, violet top edge, month stamped. */
+		background-color: #fff;
+		background-image: repeating-linear-gradient(to bottom, transparent 0 23px, rgba(70, 125, 185, 0.16) 23px 24px);
+		background-position: 0 30px;
+		border: 1px solid #e3e4e0;
+		border-top: 4px solid #6a46a0;
+		border-radius: 3px;
+		padding: 8px 16px 12px;
 		font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
 		font-size: 13px;
 		color: #333;
 		pointer-events: none;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04),
-			0 6px 16px rgba(0, 0, 0, 0.08),
-			0 18px 40px rgba(0, 0, 0, 0.10);
+		box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.3);
 		min-width: 210px;
 		max-width: 330px;
 		z-index: 10;
@@ -1222,13 +1226,19 @@
 	.tt-title-text {
 		word-break: break-word;
 	}
+	.tt-due { font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-align: center; color: #8a8f99; border-bottom: 1px solid #b9bcc3; margin: 0 0 8px; padding-bottom: 2px; }
 	.tt-date {
-		margin: 3px 0 10px 19px;
+		display: inline-block;
+		margin: 6px 0 8px 19px;
+		padding: 0 6px;
 		font-size: 11px;
 		font-weight: 700;
-		letter-spacing: 0.04em;
+		letter-spacing: 0.05em;
 		text-transform: uppercase;
-		color: var(--color-fg);
+		color: #6a46a0;
+		border: 1.5px solid currentColor;
+		border-radius: 3px;
+		transform: rotate(-3deg);
 	}
 	.tt-value {
 		display: flex;
