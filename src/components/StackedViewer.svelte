@@ -128,6 +128,7 @@
 	let chartWrap = $state(null); // ref to the chart container, for the PNG export
 	let titleEl = $state(null); // ref to the plot heading, so a search scrolls to the title
 	let workCover = $state(null); // book-cover thumbnail for the heading in work-search mode
+	let showCover = $derived(!isOverview && searchMode === "title" && !!workCover);
 	let topWorksData = $state(null); // genre-ranked top works (for the "#N in Genre" badges)
 	let sideEl = $state(null); // ref to the titles panel, for keeping it still when ticking
 
@@ -1951,7 +1952,7 @@
 	// catalog form like "emily st john mandel, 1979".
 	const authorLine = $derived(
 			current
-					? {key: "author", label: isOverview ? current.name : displayName(current.name), color: "#2d5ca6", values: current.series, groupIndex: -2, isAggregate: true}
+					? {key: "author", label: isOverview ? current.name : displayName(current.name), color: "#3f88cc", values: current.series, groupIndex: -2, isAggregate: true}
 					: null
 	);
 
@@ -2121,7 +2122,7 @@
 				// clicked out to overlay — so "Total" always shows the whole work, with
 				// the clicked edition drawn on top for comparison.
 				const workIdxs = [...gs[0].idxs, ...singleIdxs.filter((i) => searchedWork?.idxs.includes(i))];
-				base = { key: "worktotal", label: groupLabel(gs[0]), color: "#2d5ca6", values: sumSeries(workIdxs), isAggregate: true };
+				base = { key: "worktotal", label: groupLabel(gs[0]), color: "#3f88cc", values: sumSeries(workIdxs), isAggregate: true };
 			}
 			// The work total is always shown (it's the point of a title search); only the
 			// author aggregate can be hidden once an edition line is overlaid.
@@ -2313,10 +2314,15 @@
 	{#if current}
 		<div class="author">
 			<div class="split" class:collapsed={tableCollapsed}>
-			<!-- No cover or photo in the header: the name's hover card shows it. -->
 			<div class="split-main" bind:this={titleEl}>
 			<div class="hd-top">
-			<div class="hd-main">
+			<!-- A book's cover sits beside its title and byline; subjects run full
+			     width underneath. Authors get no photo here (the hover card has it). -->
+			<div class="hd-main" class:has-cover={showCover}>
+			{#if showCover}
+				<img class="hd-cover" src={workCover} alt="" loading="lazy" onerror={() => (workCover = null)} />
+			{/if}
+			<div class="hd-text">
 			{#if headingText}
 				{#if isOverview}
 					<h2>{headingText}</h2>
@@ -2352,6 +2358,7 @@
 					{/if}
 				</span>
 			</div>
+			</div><!-- /.hd-text -->
 			{#if subjectLine.length}
 				<p class="hd-subjects">{#each subjectLine as term, k}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/each}</p>
 			{/if}
@@ -2944,28 +2951,21 @@
 		scroll-margin-top: 72px;
 		position: relative;
 	}
-	/* Book cover beside the work title (work-search mode). */
-	.work-cover {
-		position: absolute;
-		top: 3px;
-		left: 0;
-		width: 46px;
+	/* Book cover beside the title and byline (work pages). */
+	.hd-main.has-cover {
+		display: grid;
+		grid-template-columns: 54px minmax(0, 1fr);
+		column-gap: 16px;
+		align-items: start;
+	}
+	.hd-main.has-cover > .hd-subjects { grid-column: 1 / -1; }
+	.hd-text { min-width: 0; }
+	.hd-cover {
+		width: 54px;
 		height: auto;
-		max-height: 68px;
-		object-fit: contain;
-		border-radius: 3px;
-		box-shadow: 0 1px 5px rgba(0, 0, 0, 0.22);
-	}
-	/* Author portrait: same slot as a book cover, cropped to the face. */
-	.work-cover.author-photo {
-		height: 58px;
-		max-height: none;
-		object-fit: cover;
-		object-position: 50% 20%;
-		border-radius: 4px;
-	}
-	.split-main.has-work-cover .hd-main {
-		padding-left: 60px;
+		margin-top: 5px;
+		border-radius: 2px;
+		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.16);
 	}
 	/* Header: name, description, subjects and counts on the left; Borrow and
 	   Learn on the right of the name row (they wrap under it on phones). */
@@ -2978,7 +2978,6 @@
 	}
 	.hd-main { min-width: 0; flex: 1 1 360px; }
 	.hd-top .hdr-actions { margin: 10px 0 0; flex: 0 1 auto; max-width: 100%; gap: 6px 20px; }
-	.split-main.has-work-cover .hd-top .hdr-actions { margin-top: 6px; }
 	.hd-desc {
 		font-family: var(--font-sans);
 		font-size: 1.02rem;
@@ -3437,18 +3436,9 @@
 			width: 100%;
 			justify-content: center;
 		}
-		/* On phones the work cover stacks above the heading so the title, byline
-		   (author · checkouts) and everything below all left-align to the page edge
-		   instead of being indented beside the cover. */
-		.split-main.has-work-cover .work-cover {
-			position: static;
-			margin: 0 0 8px;
-		}
-		.split-main.has-work-cover .hd-main,
-		.split-main.has-work-cover .hd-name,
-		.split-main.has-work-cover .hdr-line {
-			padding-left: 0;
-		}
+		/* Phones: a smaller cover, still beside the title (never stacked on top). */
+		.hd-main.has-cover { grid-template-columns: 40px minmax(0, 1fr); column-gap: 12px; }
+		.hd-cover { width: 40px; margin-top: 4px; }
 		.split {
 			display: block;
 		}
@@ -3600,11 +3590,6 @@
 		flex-wrap: wrap;
 		gap: 8px;
 		margin: 0 0 14px;
-	}
-	/* With a book cover beside the heading, give the Borrow row room so it clears
-	   the cover instead of crowding right up against it. */
-	.split-main.has-work-cover .hdr-actions {
-		margin-top: var(--space-4);
 	}
 	/* Author name in the work heading — click to switch to that author's search. */
 	.author-link {
@@ -4724,19 +4709,10 @@
 	}
 
 	/* ---- Books table (under the chart) -------------------------------- */
-	/* White panels on the page's warm-gray background: one for the chart (with
-	   its slider and source line), one for the Books table. */
-	.chart-panel, .books {
-		background: #fff;
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-	}
-	.chart-panel { padding: 14px 16px 12px 12px; }
-	/* Phones: every pixel to the plot. */
-	@media (max-width: 600px) { .chart-panel { padding: 10px 8px 10px 6px; } }
 	.books {
-		margin: var(--space-5) 0 var(--space-4);
-		padding: 16px 18px 12px;
+		margin: var(--space-6) 0 var(--space-4);
+		padding-top: var(--space-4);
+		border-top: 1px solid var(--color-border);
 		font-family: var(--font-sans);
 	}
 	.bk-head {

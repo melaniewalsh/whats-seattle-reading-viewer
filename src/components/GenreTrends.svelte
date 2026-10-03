@@ -700,11 +700,6 @@
 	@media (max-width: 640px) { .chart-foot .share-menu { left: 0; right: auto; } }
 
 	/* Genres table — same look as the author page's Books table. */
-	/* White panels on the warm-gray page: the chart, and the Genres table. */
-	.chart-panel, .books { background: #fff; border: 1px solid var(--color-border); border-radius: 6px; }
-	.chart-panel { padding: 14px 16px 12px 12px; }
-	/* Phones: every pixel to the plot. */
-	@media (max-width: 600px) { .chart-panel { padding: 10px 8px 10px 6px; } }
 	.phone-legend { display: none; }
 	@media (max-width: 600px) {
 		.phone-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0 2px; font-size: 13px; }
@@ -712,7 +707,7 @@
 		.pl-item.dim { opacity: .4; }
 		.pl-sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
 	}
-	.books { margin: var(--space-5) 0 var(--space-4); padding: 16px 18px 12px; }
+	.books { margin: var(--space-6) 0 var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
 	.bk-head { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin: 0 0 10px; }
 	.bk-title { font-family: var(--font-sans); font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--color-fg); }
 	.bk-count { font-weight: 400; color: var(--color-fg-light); }

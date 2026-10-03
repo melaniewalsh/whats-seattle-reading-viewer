@@ -1052,14 +1052,13 @@
 	.ev-wrap:focus-within .qmark-pop { display: block; }
 
 	/* Axes: horizontal hairlines, a darker zero baseline, labels inside the plot */
-	/* Index-card rules: faint blue gridlines. */
-	.gridline { stroke: rgba(70, 125, 185, 0.2); stroke-width: 1; }
+	.gridline { stroke: #e8e7e2; stroke-width: 1; }
 	.gridline.zero { stroke: #555; }
 	.x-tickmark { stroke: #555; stroke-width: 1; }
 	.y-label {
 		font-family: var(--font-sans, system-ui, sans-serif);
-		font-size: 11.5px;
-		fill: #858a94;
+		font-size: 12px;
+		fill: #7a7a7a;
 		paint-order: stroke;
 		stroke: #fff;
 		stroke-width: 3px;
@@ -1070,11 +1069,10 @@
 	/* Book markers */
 	.marker-leader { stroke: #8a8a8a; stroke-width: 0.75; }
 	.marker-dot { fill: #1a1a1a; stroke: #fff; stroke-width: 1.5; }
-	/* Notes over the chart: the title in the slab, a gray line under it. */
 	.marker-title {
 		font-family: var(--font-serif, Georgia, serif);
-		font-weight: 600;
-		font-size: 13px;
+		font-style: italic;
+		font-size: 13.5px;
 		fill: #1a1a1a;
 		paint-order: stroke;
 		stroke: #fff;
@@ -1173,7 +1171,7 @@
 	text.x-year { font-size: 11px; font-weight: 600; fill: #555; }
 	.tick text {
 		font-size: 11px;
-		fill: #858a94;
+		fill: #666;
 	}
 
 	.tooltip {
@@ -1184,17 +1182,21 @@
 		/* glide horizontally between month positions; vertical tracks the cursor
 		   directly (no transition) so it never lags or bounces */
 		transition: left 0.12s cubic-bezier(0.22, 1, 0.36, 1);
-		background: #fff;
-		border: 1px solid #e3e4e0;
-		border-radius: 8px;
-		padding: 10px 14px 11px;
+		background: rgba(255, 255, 255, 0.98);
+		-webkit-backdrop-filter: saturate(1.8) blur(6px);
+		backdrop-filter: saturate(1.8) blur(6px);
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		border-radius: 12px;
+		padding: 14px 18px 15px;
 		font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
 		font-size: 13px;
 		color: #333;
 		pointer-events: none;
-		box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.3);
-		min-width: 180px;
-		max-width: 280px;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04),
+			0 6px 16px rgba(0, 0, 0, 0.08),
+			0 18px 40px rgba(0, 0, 0, 0.10);
+		min-width: 210px;
+		max-width: 330px;
 		z-index: 10;
 		animation: tt-fade 0.14s ease-out;
 	}
@@ -1231,12 +1233,12 @@
 		word-break: break-word;
 	}
 	.tt-date {
-		margin: 3px 0 8px 19px;
+		margin: 3px 0 10px 19px;
 		font-size: 11px;
 		font-weight: 700;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
-		color: var(--color-fg-light);
+		color: var(--color-fg);
 	}
 	.tt-value {
 		display: flex;

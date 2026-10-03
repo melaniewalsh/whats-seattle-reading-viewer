@@ -93,20 +93,19 @@
 		gap: 5px;
 		font-family: var(--font-sans);
 		font-size: var(--text-sm);
-		font-weight: 500;
+		font-weight: 600;
 		line-height: 1;
-		padding: 5px 11px;
-		/* Quiet outlined button, like the site's others (no solid blue pill). */
-		border: 1px solid var(--color-border);
-		border-radius: 8px;
-		background: #fff;
-		color: var(--color-fg);
+		padding: 6px 14px;
+		border: 1.5px solid transparent;
+		border-radius: 999px;
+		background: #3f88cc;
+		color: #fff;
 		cursor: pointer;
 		white-space: nowrap;
-		transition: border-color 0.12s;
+		transition: background 0.12s;
 	}
 	.borrow-btn:hover {
-		border-color: var(--color-fg-light);
+		background: #2f6ea8;
 	}
 	.borrow-btn.outline {
 		gap: 6px;

@@ -636,13 +636,8 @@
 		gap: 44px;
 		align-items: start;
 	}
-	/* The ranked list sits on a white panel, like the trend pages' tables. */
 	.list-main {
 		min-width: 0;
-		background: #fff;
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		padding: 6px 16px 4px;
 	}
 	.list-aside {
 		display: flex;
@@ -723,14 +718,9 @@
 	.gallery {
 		margin: 6px 0 4px;
 	}
-	/* Each gallery strip is its own white panel on the warm-gray page. */
 	.gal-sec {
-		margin: 0 0 20px;
+		margin: 0 0 32px;
 		position: relative;
-		background: #fff;
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		padding: 16px 20px 6px;
 	}
 	/* Swipe affordance (mobile): a translucent right-chevron floating over the
 	   strip's right edge, centered on the covers, that fades once you reach the end. */
@@ -772,12 +762,8 @@
 	}
 	/* Embedded (home-page) strip: heading + "See all" link over the overall row.
 	   Lives inside a bordered card, so no outer section margin and a lighter rule. */
-	/* The home page puts this strip in its own card already. */
 	.gal-sec.home-tw {
 		margin: 0;
-		background: none;
-		border: 0;
-		padding: 0;
 	}
 	.home-tw-head {
 		display: flex;
@@ -946,8 +932,8 @@
 	}
 	.gal-count {
 		font-size: 0.72rem;
-		font-weight: 600;
-		color: var(--color-fg-light);
+		font-weight: 700;
+		color: #3f88cc;
 		margin-top: 4px;
 		font-variant-numeric: tabular-nums;
 	}
@@ -1162,9 +1148,8 @@
 		letter-spacing: 0.05em;
 		color: var(--color-fg-light);
 		padding: 6px 10px;
-		border-bottom: 1px solid var(--color-border);
+		border-bottom: 2px solid var(--color-border);
 	}
-	.ta-table tbody tr:hover { background: #f6f6f4; }
 	.ta-table td {
 		padding: 9px 10px;
 		border-bottom: 1px solid var(--color-border);
@@ -1176,10 +1161,8 @@
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
-	/* Rank sits at the top of its row, like the count; the panel's own edge
-	   closes the list, so the last row needs no divider. */
+	/* Rank sits at the top of its row, like the count ("10" no longer wraps). */
 	td.ta-rank { vertical-align: top; padding-top: 13px; }
-	.ta-table tbody tr:last-child td { border-bottom: 0; }
 	td.ta-count {
 		width: 4.5rem;
 		vertical-align: top;

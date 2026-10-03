@@ -1,5 +1,5 @@
 /* Fonts are loaded from Google Fonts via a <link> in src/components/Meta.svelte:
-   Public Sans (UI sans) and Zilla Slab (headlines, names and titles).
+   Inter (UI sans), Source Serif 4 (serif), and Fraunces (display headline).
    These replace the Pudding-hosted Atlas Grotesk / Tiempos / Recoleta, which are
    licensed typefaces not available for reuse (see the svelte-starter README:
    "Do not use or reproduce The Pudding logos or fonts without written

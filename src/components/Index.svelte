@@ -737,8 +737,8 @@
 		margin: 40px auto 10px;
 		padding: 22px 24px 24px;
 		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		background: #fff;
+		border-radius: var(--radius-md, 12px);
+		background: var(--color-white);
 	}
 	.featured-eyebrow {
 		font-family: var(--font-sans);
@@ -854,8 +854,8 @@
 		margin: 40px auto 10px;
 		padding: 22px 24px 24px;
 		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		background: #fff;
+		border-radius: var(--radius-md, 12px);
+		background: var(--color-white);
 	}
 	.hub {
 		max-width: 880px;
@@ -877,15 +877,16 @@
 		text-align: left;
 		padding: 22px;
 		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		background: #fff;
+		border-radius: 14px;
+		background: var(--color-white);
 		cursor: pointer;
 		font-family: var(--font-sans);
 		transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
 	}
-	/* Same quiet hover as the site's other panels: just a darker edge. */
 	.hub-card:hover {
 		border-color: var(--color-fg-light);
+		box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+		transform: translateY(-2px);
 	}
 	.hub-emoji { font-size: 1.7rem; line-height: 1; }
 	.hub-lucide { display: inline-flex; color: #e3120b; }
@@ -1137,11 +1138,7 @@
 		z-index: 50;
 		width: 100vw;
 		margin-left: calc(50% - 50vw);
-		/* Same warm gray as the page (a slightly translucent copy, so content
-		   scrolling under the sticky bar is softened); white is kept for panels. */
-		background: rgba(250, 250, 248, 0.94);
-		-webkit-backdrop-filter: saturate(1.4) blur(8px);
-		backdrop-filter: saturate(1.4) blur(8px);
+		background: #fff;
 		border-bottom: 1px solid var(--color-border);
 	}
 	.masthead-top {
