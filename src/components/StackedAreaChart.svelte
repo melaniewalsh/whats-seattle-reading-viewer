@@ -59,6 +59,11 @@
 	// Margins. The y-axis labels sit INSIDE the plot (on their gridlines), so the
 	// left margin is ~0. The top grows to fit book markers or event labels; the
 	// right grows to fit end-of-line labels.
+	// Event labels ("Covid closures") get their own row ABOVE the plot, so no
+	// line can run into them. Too narrow a chart (phones, beside the line
+	// names) keeps the shaded bands but drops the labels.
+	const EVENT_ROW = 34;
+	const showEventLabels = $derived(!!annotations?.length && width >= 480);
 	const markerCount = $derived((markers || []).filter((mk) => months.includes(mk.month)).length);
 	const hasMarkers = $derived(mode === 'line' && (markers || []).some((mk) => months.includes(mk.month)));
 	const endLabelW = $derived.by(() => {
@@ -75,7 +80,7 @@
 	const margin = $derived({
 		// Room for label rows above the plot: one row for a single label (e.g.
 		// just the peak), two when several might need to stagger.
-		top: hasMarkers ? (markerCount > 1 ? (width < 560 ? 66 : 92) : (width < 560 ? 50 : 56)) : annotations?.length ? 30 : 16,
+		top: (hasMarkers ? (markerCount > 1 ? (width < 560 ? 66 : 92) : (width < 560 ? 50 : 56)) : 16) + (showEventLabels ? EVENT_ROW : 0),
 		right: Math.max(16, endLabelW),
 		bottom: monthTickMode ? 42 : 28,
 		left: 2
@@ -262,8 +267,9 @@
 				const topTxt = yTopTick != null ? `${fmtTick(yTopTick)}${unitText(width) ? ' ' + unitText(width) : ''}` : '';
 				const unitR = margin.left + topTxt.length * 6.6 + 8;
 				const ty = yTopTick != null ? y(yTopTick) : margin.top;
-				const clash = la < unitR && lb > margin.left && ty - 18 < margin.top + 22;
-				const top = clash ? ty + 4 : margin.top - 10;
+				// In the row above the plot, just over the top of the shaded band.
+				const clash = false;
+				const top = margin.top - 12 - (a.short || [a.label]).length * 14 - 4;
 				// Dropped down among the tick numbers? Keep clear of them too.
 				const tickW = Math.max(0, ...yTicks.filter((t) => t > 0 && t !== yTopTick).map((t) => fmtTick(t).length * 6.6)) + 8;
 				const lx2 = clash && anchor === 'start' ? Math.max(lx, margin.left + tickW) : lx;
@@ -962,7 +968,7 @@
 	<!-- Event labels: short text at the top of each band; hover/focus for the note -->
 	<!-- A narrow plot (phones, beside the line names) keeps the shaded bands but
 	     drops their text labels, which would pile up over the lines. -->
-	{#each width - margin.left - margin.right < 300 ? [] : annotationMarks as a}
+	{#each showEventLabels ? annotationMarks : [] as a}
 		<div class="ev-wrap align-{a.anchor}" style="left: {a.lx}px; top: {a.top}px;">
 			<span class="ev-label" tabindex="0" role="button" aria-label="{a.label}: about this dip">{#each a.lines as ln}<span class="ev-line">{ln}</span>{/each}</span>
 			<div class="qmark-pop" role="tooltip" style="max-width: {a.maxw}px;">

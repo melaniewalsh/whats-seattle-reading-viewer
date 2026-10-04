@@ -15,6 +15,7 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import ChartAreaIcon from "@lucide/svelte/icons/chart-area";
 	import ChartLineIcon from "@lucide/svelte/icons/chart-line";
+	import BookCopyIcon from "@lucide/svelte/icons/book-copy";
 	import SlidersIcon from "@lucide/svelte/icons/sliders-horizontal";
 	import ShoppingBagIcon from "@lucide/svelte/icons/shopping-bag";
 	import { base } from "$app/paths";
@@ -2410,7 +2411,7 @@
 						}}
 						title={isOverview ? "By format" : "By book"} aria-label={isOverview ? "By format" : "By book"}
 				>
-					<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">{isOverview ? "By format" : "By book"}</span>
+					{#if isOverview}<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" />{:else}<BookCopyIcon size={17} strokeWidth={2} aria-hidden="true" />{/if}<span class="mt-txt">{isOverview ? "By format" : "By book"}</span>
 				</button>
 			</div>
 			{#if chartLineMode === "line"}

@@ -11,7 +11,7 @@
 	import TrendingUp from "@lucide/svelte/icons/trending-up";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import SiteSearch from "$components/SiteSearch.svelte";
-	import { getMonths, getAuthor, searchTitles, densify } from "$components/db.js";
+	import { getMonths, getAuthor, searchTitles, densify, randomAuthor } from "$components/db.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { compactNumber } from "$utils/format.js";
@@ -283,6 +283,18 @@
 
 	// --- Search (the field on the Checkout Trends page) ------------------------
 	let pageSearch = $state(null);
+	let homeSearch = $state(null);
+	// Starting points under the home page's search field.
+	const HOME_TRY = [
+		{ label: "Sally Rooney", slug: "sally-rooney" },
+		{ label: "Wuthering Heights", slug: "emily-bronte-1818", title: "Wuthering Heights" },
+		{ label: "Colleen Hoover", slug: "colleen-hoover" },
+		{ label: "Becoming", slug: "michelle-obama-1964", title: "Becoming" },
+	];
+	async function homeSurprise() {
+		const a = await randomAuthor();
+		if (a) openAuthor(a.slug);
+	}
 	let cmp = $state(null); // the compare view, when it's showing
 	let compareMode = $state(false);
 	function pickSearch(res) {
@@ -330,6 +342,10 @@
 	// jump to its field.
 	function navSearch() {
 		menuOpen = false;
+		if (tab === "home" && homeSearch) {
+			window.scrollTo({ top: 0 });
+			return homeSearch.focus(true);
+		}
 		if (tab === "search") focusSearch();
 		else go("search");
 	}
@@ -440,6 +456,17 @@
 			</header>
 			<!-- The most eye-catching thing up top: what Seattle borrowed most last
 			     month, with a link into the full Most Borrowed view. -->
+			<!-- Looking something up is what most people come to do, so the search
+			     field leads the home page (the Explore cards follow). -->
+			<div class="home-search">
+				<SiteSearch bind:this={homeSearch} onPick={pickSearch} placeholder="Search any author or book" />
+				<p class="home-try">
+					<span class="ht-lead">Try</span>
+					{#each HOME_TRY as t, k}{#if k}<span class="ht-sep" aria-hidden="true">·</span>{/if}<button class="ht-link" class:is-title={!!t.title} onclick={() => (t.title ? openTitle(t.title, t.slug) : openAuthor(t.slug))}>{t.label}</button>{/each}
+					<span class="ht-sep" aria-hidden="true">·</span>
+					<button class="ht-link ht-surprise" onclick={homeSurprise}>Surprise me</button>
+				</p>
+			</div>
 			<section class="home-topworks" aria-label="Most borrowed last month">
 				<TopWorks {openAuthor} {openTitle} embedded onSeeAll={() => go("rankings")} />
 			</section>
@@ -470,12 +497,6 @@
 					</span>
 					<span class="hub-h">Genres</span>
 					<span class="hub-d">How Seattle's taste in romance, mystery, fantasy and more has shifted over the years.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
-				<button class="hub-card" onclick={() => go("search")}>
-					<img class="hub-emoji hub-img" src="{base}/hub-search.png" alt="" width="34" height="34" />
-					<span class="hub-h">Search</span>
-					<span class="hub-d">Look up any author or title and see its checkout trend at the Seattle Public Library.</span>
 					<span class="hub-go">Explore →</span>
 				</button>
 			</nav>
@@ -678,6 +699,16 @@
 		margin: 0 auto;
 		padding: 0 24px 80px;
 	}
+	/* Home search: centered under the title, the page's first thing to do. */
+	.home-search { max-width: 600px; margin: 22px auto 34px; }
+	.home-search :global(.ss) { max-width: none; height: 52px; }
+	.home-try { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 7px; margin: 12px 0 0; font-family: var(--font-sans); font-size: 14.5px; color: var(--color-fg-light); }
+	.ht-lead::after { content: ":"; }
+	.ht-sep { color: var(--color-gray-300, #c8c8c8); }
+	.ht-link { padding: 0; border: 0; background: none; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
+	.ht-link:hover { text-decoration-color: currentColor; }
+	.ht-link.is-title { font-style: italic; }
+	.ht-link.ht-surprise { color: var(--color-fg-light); }
 	/* Landing hub — title / subtitle / byline, then a grid of section cards. */
 	.hero {
 		max-width: 720px;
