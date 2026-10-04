@@ -143,6 +143,13 @@ def main():
     except Exception:  # noqa: BLE001
         pass
     coauth = {}  # co-author slug -> {(title, primary slug): [primary name, total]}
+    # The site's curated groupings (src/data/work-overrides.json: {slug: [[title,
+    # ...], ...]}) -- e.g. all 72 "Adventures of Sherlock Holmes" volumes -- so
+    # search lists those books once, too.
+    try:
+        overrides = json.loads((Path(__file__).resolve().parent.parent / "src" / "data" / "work-overrides.json").read_text())
+    except Exception:  # noqa: BLE001
+        overrides = {}
     for f in files:
         try:
             d = json.loads(Path(f).read_text())
@@ -151,6 +158,14 @@ def main():
         slug = os.path.basename(f)[:-5]
         author = d.get("name", "")
         aliases = bare_aliases([t.get("title", "") for t in d.get("titles", [])])
+        # Curated groupings: every listed title takes its group's first title's key.
+        for group in overrides.get(slug, []) or []:
+            if group:
+                head = norm_title(clean(group[0]))
+                for title in group:
+                    k0 = norm_title(clean(title))
+                    if k0 and k0 != head:
+                        aliases[k0] = head
         surname = (author.split(",")[0].split() or [""])[-1].lower()
         works = {}  # work key -> [total, best (tot, display), Counter of credit lines]
         for t in d.get("titles", []):
