@@ -296,8 +296,18 @@
 		{ label: "Colleen Hoover", slug: "colleen-hoover" },
 		{ label: "Becoming", slug: "michelle-obama-1964", title: "Becoming" },
 	];
-	// The home search box's starting comparison (Enter to run it).
-	const HOME_COMPARE = "Ulysses, Mrs. Dalloway";
+	// The home search box's starting comparison (Enter to run it), a nod to
+	// the Ngram Viewer's default. A different pair on each visit.
+	const HOME_PAIRS = [
+		[["Ulysses", "w~james-joyce-1882~Ulysses"], ["Mrs. Dalloway", "w~virginia-woolf-1882~Mrs. Dalloway"]],
+		[["Parable of the Sower", "w~octavia-e-butler~Parable of the Sower"], ["Neuromancer", "w~william-gibson-1948~Neuromancer"]],
+		[["Wuthering Heights", "w~emily-bronte-1818~Wuthering Heights"], ["Pride and Prejudice", "w~jane-austen-1775~Pride and Prejudice"]],
+	];
+	let HOME_COMPARE = $state(HOME_PAIRS[0].map(([label]) => label).join(", "));
+	onMount(() => {
+		const pair = HOME_PAIRS[Math.floor(Math.random() * HOME_PAIRS.length)];
+		HOME_COMPARE = pair.map(([label]) => label).join(", ");
+	});
 	async function homeSurprise() {
 		const a = await randomAuthor();
 		if (a) openAuthor(a.slug);
@@ -314,9 +324,8 @@
 	function remember(label, id) {
 		if (label && id) knownIds.set(label.trim().toLowerCase(), id);
 	}
-	// The home box's starter pair resolves to these exact books.
-	remember("Ulysses", "w~james-joyce-1882~Ulysses");
-	remember("Mrs. Dalloway", "w~virginia-woolf-1882~Mrs. Dalloway");
+	// The home box's starter pairs resolve to these exact books.
+	HOME_PAIRS.flat().forEach(([label, id]) => remember(label, id));
 	const labelOfRes = (r) => (r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name));
 	// Split on commas, but not inside a name we already know has one.
 	function splitNames(text) {
