@@ -1060,7 +1060,7 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
       {years, genres, data:{genre:{"<year>":[[title,author,slug,co],...],"all":[...]}}}"""
     import sys as _sys
     _sys.path.insert(0, str(PROJECT_DIR / "data-prep"))
-    from build_partition import overlap_clauses, inclusion_clauses, TOP_TAGS, GENERIC_TAGS_RE
+    from build_partition import overlap_clauses, inclusion_clauses, GENRE_SHARE
 
     years = sorted({int(m[:4]) for m in months})
 
@@ -1198,11 +1198,10 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     ).fetchall():
         full_month[wk] = c
 
-    # GENRE MEMBERSHIP, decided once per WORK: one of the genre's terms must be
-    # among the work's top TOP_TAGS subject tags, ranked by checkouts across all
-    # its editions and years -- overall, or among its "topical" tags (broad labels
-    # like "Fiction" or "Classic Literature" skipped -- GENERIC_TAGS_RE). The genre's exclusions and fiction
-    # gate still look at ALL of the work's tags. So a stray tag on a few records
+    # GENRE MEMBERSHIP, decided once per WORK: at least GENRE_SHARE of the
+    # work's checkouts (all editions, all years) must come from records tagged
+    # with one of the genre's terms; the genre's exclusions and fiction gate are
+    # checked on all of the work's tags. So a stray tag on a few records
     # ("Interplanetary voyages" on Dune -> Travel; "Fantasy" on The Goldfinch) no
     # longer files a book in a genre it isn't about. Curated additions come from
     # src/data/genre-includes.json. If any of this fails, fall back to the old
@@ -1211,36 +1210,15 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     work_members = None
     try:
         t0 = perf_counter()
-        for tbl in ("wkterm", "wktags"):
-            con.execute(f"DROP TABLE IF EXISTS {tbl}")
+        con.execute("DROP TABLE IF EXISTS wkall")
         con.execute(
             """
-            CREATE TABLE wkterm AS
-            SELECT wk, trim(u.term) AS term, CAST(sum(c) AS BIGINT) AS c
-            FROM cw, UNNEST(string_split(coalesce(subjects, ''), ',')) AS u(term)
-            WHERE trim(u.term) <> ''
-            GROUP BY 1, 2
+            CREATE TABLE wkall AS
+            SELECT wk, CAST(sum(c) AS BIGINT) AS tot,
+                   string_agg(DISTINCT coalesce(subjects, ''), ', ') AS allsub
+            FROM cw GROUP BY wk
             """
         )
-        con.execute(
-            f"""
-            CREATE TABLE wktags AS
-            WITH t AS (
-                SELECT wk, term, c, regexp_matches(lower(term), '{GENERIC_TAGS_RE}') AS generic
-                FROM wkterm),
-            r AS (
-                SELECT *,
-                       row_number() OVER (PARTITION BY wk ORDER BY c DESC, term) AS rk_all,
-                       row_number() OVER (PARTITION BY wk, generic ORDER BY c DESC, term) AS rk_topical
-                FROM t)
-            SELECT wk,
-                   string_agg(term, ', ') AS allsub,
-                   coalesce(string_agg(term, ', ') FILTER (
-                       WHERE rk_all <= {int(TOP_TAGS)} OR (NOT generic AND rk_topical <= {int(TOP_TAGS)})), '') AS topsub
-            FROM r GROUP BY wk
-            """
-        )
-        con.execute("DROP TABLE IF EXISTS wkterm")
         # Curated additions: {genre: [[title, author slug], ...]}.
         try:
             import json as _json
@@ -1255,18 +1233,24 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         for name, clause in clauses:
             if not clause:
                 continue
-            q = f"SELECT wk FROM wktags WHERE ({sub(clause, 'allsub')}) AND ({sub(incl.get(name, 'TRUE'), 'topsub')})"
+            q = f"""
+                WITH tagged AS (
+                    SELECT wk, CAST(sum(c) AS BIGINT) AS tg FROM cw
+                    WHERE {incl.get(name, 'FALSE')} GROUP BY wk)
+                SELECT a.wk FROM wkall a JOIN tagged t USING (wk)
+                WHERE t.tg >= {float(GENRE_SHARE)} * a.tot AND ({sub(clause, 'a.allsub')})
+            """
             members = {wk for (wk,) in con.execute(q).fetchall()}
             for title, slug in (adds.get(name) or []):
                 members.update(by_title_slug.get((normalize_work_key(title), slug), []))
             work_members[name] = members
-        con.execute("DROP TABLE IF EXISTS wktags")
-        print(f"  genre membership by top-{TOP_TAGS} topical tags: "
+        con.execute("DROP TABLE IF EXISTS wkall")
+        print(f"  genre membership by share of checkouts (>= {GENRE_SHARE:.0%}): "
               + ", ".join(f"{n} {len(m):,}" for n, m in list(work_members.items())[:6])
               + f" ... ({perf_counter() - t0:.2f}s)", flush=True)
     except Exception as e:  # noqa: BLE001
         work_members = None
-        print(f"  WARNING: top-tag genre membership failed ({e}); using the per-edition rule", flush=True)
+        print(f"  WARNING: per-work genre membership failed ({e}); using the per-edition rule", flush=True)
 
     t0 = perf_counter()
     genres_out, data = [], {}

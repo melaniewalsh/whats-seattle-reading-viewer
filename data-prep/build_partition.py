@@ -237,20 +237,13 @@ def _match(inc, exc, fic, nonfiction=False):
     return clause
 
 
-# Most Borrowed lists decide genre per BOOK: a genre's term must be among the
-# book's top few tags, ranked by checkouts across all its editions
-# (build_top_works) -- its top TOP_TAGS tags overall, or its top TOP_TAGS
-# "topical" ones, which skip these broad shelf / audience / format labels
-# ("Classic Literature" would otherwise crowd "Romance" out of Pride and
-# Prejudice's top tags). Keeping the overall top tags too means a genre defined
-# BY one of these labels (Young Adult, Juvenile Nonfiction, Memoir) still works.
-# Lowercased, whole-tag match.
-TOP_TAGS = 4
-GENERIC_TAGS_RE = (
-    r"^(fiction|literature|novels?|classic literature|literary|nonfiction|non-fiction|"
-    r"juvenile (fiction|literature|nonfiction)|young adult (fiction|literature|nonfiction)|"
-    r"biography & autobiography|large type books|audiobooks?|ebooks?|electronic books)$"
-)
+# Most Borrowed lists decide genre per BOOK: a book is in a genre when at least
+# GENRE_SHARE of its checkouts (all editions, all years) come from records tagged
+# with one of the genre's terms (build_top_works). A stray tag on a few records
+# no longer files a book under it: "Interplanetary voyages" is on 2% of Dune's
+# checkouts (not Travel), "Fantasy" on 17% of The Goldfinch's (not Fantasy), but
+# on 33% of The Hunger Games' (Fantasy, as well as Science Fiction at 92%).
+GENRE_SHARE = 0.25
 
 
 def inclusion_clauses():
