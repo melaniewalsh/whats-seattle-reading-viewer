@@ -360,5 +360,6 @@
 	.cmp-table .chip-by { margin-left: 6px; white-space: nowrap; }
 	@media (max-width: 600px) {
 		.cmp-table .muted { display: block; }
+		.cmp-legend { display: none; } /* the chips up top and the line-end names do it */
 	}
 </style>

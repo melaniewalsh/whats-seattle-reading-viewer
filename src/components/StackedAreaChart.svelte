@@ -62,7 +62,7 @@
 	const markerCount = $derived((markers || []).filter((mk) => months.includes(mk.month)).length);
 	const hasMarkers = $derived(mode === 'line' && (markers || []).some((mk) => months.includes(mk.month)));
 	const endLabelW = $derived.by(() => {
-		if (mode !== 'line' || !endLabels || !series.length || width < 560) return 0;
+		if (mode !== 'line' || !endLabels || !series.length) return 0;
 		const shown = series.filter((s) => s.values?.length);
 		// A single total line has no end label (the peak gets one instead).
 		if (shown.length <= 1 && (shown[0]?.isAggregate || !shown.length)) return 0;
@@ -436,8 +436,9 @@
 	// End-of-line labels. One line: its last value and month. Several lines: the
 	// name and value of each, nudged apart vertically with a small leader line.
 	const endMarks = $derived.by(() => {
-		// Phones: no end labels; the page shows a swatch legend under the chart.
-		if (mode !== 'line' || !endLabels || !lineLayers.length || months.length < 2 || width < 560) return [];
+		// Phones too (as on Our World in Data): names at the line ends, wrapped
+		// into a narrower margin.
+		if (mode !== 'line' || !endLabels || !lineLayers.length || months.length < 2) return [];
 		const last = months.length - 1;
 		// A total line gets no "latest month" label: it read as the book's size
 		// ("1 in July"). Only named lines (books, formats, genres) are labelled.
@@ -518,7 +519,7 @@
 		// Like the Ngram Viewer: full years at a round step (every year, 2, 5 or
 		// 10), the smallest that keeps to ~8 labels and ~70px apart. Labels sit on
 		// years divisible by the step (2010, 2015, 2020 ...).
-		const maxLabels = Math.max(2, Math.min(8, Math.floor(innerW / 70)));
+		const maxLabels = Math.max(2, Math.min(8, Math.floor(innerW / 60)));
 		const step = [1, 2, 5, 10, 20].find((st) => all.filter((d) => Number(d.year) % st === 0).length <= maxLabels) || 20;
 		return all
 			.filter((d) => Number(d.year) % step === 0)
@@ -959,7 +960,9 @@
 		{/if}
 	</svg>
 	<!-- Event labels: short text at the top of each band; hover/focus for the note -->
-	{#each annotationMarks as a}
+	<!-- A narrow plot (phones, beside the line names) keeps the shaded bands but
+	     drops their text labels, which would pile up over the lines. -->
+	{#each width - margin.left - margin.right < 300 ? [] : annotationMarks as a}
 		<div class="ev-wrap align-{a.anchor}" style="left: {a.lx}px; top: {a.top}px;">
 			<span class="ev-label" tabindex="0" role="button" aria-label="{a.label}: about this dip">{#each a.lines as ln}<span class="ev-line">{ln}</span>{/each}</span>
 			<div class="qmark-pop" role="tooltip" style="max-width: {a.maxw}px;">

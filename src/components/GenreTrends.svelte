@@ -515,7 +515,7 @@
 		<!-- A swatch legend under the chart (phones have no end-of-line names).
 		     Click one to show it alone; the others gray out, click to add them. -->
 		{#if series.length >= 2}
-			<div class="phone-legend">
+			<div class="phone-legend" class:off-phone={!isolatedKeys.length}>
 				{#each series as s (s.key)}
 					<button type="button" class="pl-item" class:dim={isolatedKeys.length && !isIsolated(s.key)} onclick={() => toggleIsolate(s.key)}><span class="pl-sw" style="background:{s.color}"></span>{s.name}</button>
 				{/each}
@@ -721,6 +721,9 @@
 	.pl-item.dim .pl-sw { background: #d5d8dc !important; }
 	.pl-sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
 	@media (max-width: 600px) { .phone-legend { justify-content: flex-start; gap: 4px 12px; font-size: 13px; } }
+	/* Phones: lines are named at their ends, so the legend only appears once some
+	   are picked out (to tap the others back in). */
+	@media (max-width: 600px) { .phone-legend.off-phone { display: none; } }
 	.books { margin: var(--space-6) 0 var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
 	.bk-head { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin: 0 0 10px; }
 	.bk-title { font-family: var(--font-sans); font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--color-fg); }

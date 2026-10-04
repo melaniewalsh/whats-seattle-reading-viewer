@@ -12,6 +12,9 @@
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
 	import GlobeIcon from "@lucide/svelte/icons/globe";
 	import PlusIcon from "@lucide/svelte/icons/plus";
+	import ChartAreaIcon from "@lucide/svelte/icons/chart-area";
+	import ChartLineIcon from "@lucide/svelte/icons/chart-line";
+	import SlidersIcon from "@lucide/svelte/icons/sliders-horizontal";
 	import ShoppingBagIcon from "@lucide/svelte/icons/shopping-bag";
 	import { base } from "$app/paths";
 	import { drawChartLogo, chartLogoWidth } from "$utils/chartLogo.js";
@@ -99,6 +102,7 @@
 	let isOverview = $state(false); // true when showing the library-wide "all checkouts" landing view (no per-title data)
 	let mobileTableOpen = $state(false); // on narrow screens the title table opens as a drawer
 	let tableCollapsed = $state(false); // the books table is open by default; its header still collapses it
+	let customizeOpen = $state(false); // phones: the "Customize" panel (3-month average, Compare)
 	let editMode = $state(false); // "Edit groupings": reveals drag handles, exclude, save/reset/custom work
 	let booksShowAll = $state(false); // view mode lists the top BOOKS_PREVIEW books until "Show all"
 	const BOOKS_PREVIEW = 8;
@@ -2361,8 +2365,9 @@
 							activeGroupId = null;
 							isolatedKeys = [];
 						}}
+						title="Total" aria-label="Total"
 				>
-					Total
+					<ChartAreaIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">Total</span>
 				</button>
 				<button
 						type="button"
@@ -2382,12 +2387,13 @@
 							}
 							chartMode = "area";
 						}}
+						title={isOverview ? "By format" : "By book"} aria-label={isOverview ? "By format" : "By book"}
 				>
-					{isOverview ? "By format" : "By book"}
+					<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">{isOverview ? "By format" : "By book"}</span>
 				</button>
 			</div>
 			{#if chartLineMode === "line"}
-				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
+				<label class="smooth-toggle off-phone"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 			{/if}
 			{#if chartMode === "area" && (isolatedKeys.length || hiddenKeys.length)}
 				<!-- The way back after clicking a line's name to show it alone -->
@@ -2397,9 +2403,21 @@
 					<!-- Put another author or book on this chart (the page switches to
 					     its compare view, one line each). -->
 					{#if onCompare && !isOverview && currentSlug}
-						<button type="button" class="compare-btn" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={15} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
+						<button type="button" class="compare-btn off-phone" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={15} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
 					{/if}
+					<!-- Phones: everything past Total / By book lives under "Customize". -->
+					<button type="button" class="customize-btn on-phone" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>
 					</div>
+					{#if customizeOpen}
+						<div class="customize-panel on-phone">
+							{#if chartLineMode === "line"}
+								<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
+							{/if}
+							{#if onCompare && !isOverview && currentSlug}
+								<button type="button" class="compare-btn" onclick={startCompare}><PlusIcon size={15} strokeWidth={2.2} aria-hidden="true" /> Compare with another author or book</button>
+							{/if}
+						</div>
+					{/if}
 					<!-- The chart, its slider and source line share one white panel -->
 					<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 					<div class="chart-wrap" bind:this={chartWrap}>
@@ -2413,7 +2431,7 @@
 			     (click one to show only it; once some are picked out, the rest show
 			     grayed out, click to add them back). -->
 			{#if legendItems.length >= 2}
-				<div class="format-legend">
+				<div class="format-legend" class:off-phone={chartMode === "area" && !isolatedKeys.length && !hiddenKeys.length}>
 					{#each legendItems as it}
 						{#if it.key === "other"}
 							<span class="fmt-leg other-leg" class:hidden-leg={isHidden("other")} class:dim={isolatedKeys.length}
@@ -2453,7 +2471,7 @@
 			<div class="chart-actions tb-actions foot-actions">
 				<div class="dl-wrap">
 					<button class="tb-btn" onclick={() => (downloadOpen = !downloadOpen)} title="Download the data or the chart image" aria-haspopup="true" aria-expanded={downloadOpen}>
-						<DownloadIcon size={15} strokeWidth={2} aria-hidden="true" /> Download <ChevronDownIcon size={14} strokeWidth={2} aria-hidden="true" />
+						<DownloadIcon size={15} strokeWidth={2} aria-hidden="true" /><span class="tb-txt"> Download</span><span class="tb-txt"><ChevronDownIcon size={14} strokeWidth={2} aria-hidden="true" /></span>
 					</button>
 					{#if downloadOpen}
 						<button class="share-backdrop" aria-label="Close download menu" onclick={() => (downloadOpen = false)}></button>
@@ -2471,7 +2489,7 @@
 				</div>
 				<div class="share-wrap">
 					<button class="tb-btn" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
-						<ShareIcon size={15} strokeWidth={2} aria-hidden="true" /> Share
+						<ShareIcon size={15} strokeWidth={2} aria-hidden="true" /><span class="tb-txt"> Share</span>
 					</button>
 					{#if shareOpen}
 						<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
@@ -4439,6 +4457,30 @@
 	/* chart type toggle (line vs stacked area) + title sort toggle share a look */
 	/* Row above the plot: Line/Area toggle on the left, "Show top works" on the
 	   right so it's prominent instead of buried in the panel below. */
+	/* Phones (OWID-style): just the name over the chart, icon tabs for Total /
+	   By book, the rest under "Customize", square Download / Share buttons. */
+	.on-phone { display: none !important; }
+	.mode-toggle button { display: inline-flex; align-items: center; gap: 6px; }
+	.customize-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; font-family: var(--font-sans); font-size: 14px; font-weight: 500; color: var(--color-fg); cursor: pointer; }
+	.customize-btn.on { background: var(--color-gray-100); }
+	.customize-panel .compare-btn { width: auto; height: auto; text-align: left; }
+	.customize-panel .compare-btn :global(svg), .customize-btn :global(svg), .mode-toggle :global(svg) { width: 16px !important; height: 16px !important; flex: none; }
+	.customize-panel { flex-direction: column; align-items: flex-start; gap: 12px; margin: -6px 0 14px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: 8px; background: #fafafa; }
+	@media (max-width: 600px) {
+		.on-phone { display: inline-flex !important; }
+		.customize-panel.on-phone { display: flex !important; }
+		.off-phone { display: none !important; }
+		.hd-desc, .hdr-line, .hd-subjects, .hd-cover { display: none !important; }
+		.hd-main.has-cover { display: block; }
+		.mode-toggle .mt-txt { display: none; }
+		.mode-toggle button { padding: 7px 12px; }
+		.chart-foot .tb-txt { display: none; }
+		.chart-foot .tb-btn { width: 36px; height: 36px; padding: 0; justify-content: center; }
+		.chart-foot .tb-btn :global(svg) { width: 17px; height: 17px; }
+		.chart-foot .foot-actions { margin-left: auto !important; }
+		.iso-note { display: none !important; }
+		.format-legend { justify-content: flex-start; gap: 2px 12px; font-size: 13px; }
+	}
 	.compare-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; font-family: var(--font-sans); font-size: 14px; font-weight: 500; color: var(--color-fg); cursor: pointer; }
 	.compare-btn:hover { border-color: var(--color-fg-light); }
 	.plot-toolbar {
