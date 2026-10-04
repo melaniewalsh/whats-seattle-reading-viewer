@@ -7,7 +7,7 @@ import { drawChartLogo, chartLogoWidth } from "$utils/chartLogo.js";
 // Paint the SVG's scoped CSS onto a clone, so it survives being serialized.
 const PROPS = ["fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "stroke-linejoin", "opacity", "font-family", "font-size", "font-weight", "text-anchor", "color", "paint-order", "fill-opacity", "stroke-opacity"];
 
-export async function renderChartPng(src, { title = "", subtitle = "", legend = [], source = "What Is Seattle Reading?  ·  Seattle Public Library checkouts" } = {}) {
+export async function renderChartPng(src, { title = "", subtitle = "", legend = [], source = "What’s Seattle Reading?  ·  Seattle Public Library checkouts" } = {}) {
 	if (!src) return null;
 	const clone = src.cloneNode(true);
 	const from = src.querySelectorAll("*");

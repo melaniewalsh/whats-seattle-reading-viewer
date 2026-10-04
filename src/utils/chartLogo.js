@@ -16,7 +16,7 @@ function loadLogo() {
 	return logoPromise;
 }
 
-const LABEL = "WHAT IS SEATTLE READING?";
+const LABEL = "WHAT’S SEATTLE READING?";
 const LABEL_FONT = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
 // How wide the logo + name draw (so a narrow chart can put them on their own

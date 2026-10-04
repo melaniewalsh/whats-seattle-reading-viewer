@@ -137,7 +137,7 @@
 		const link = window.location.href;
 		const who = genre === "All genres" ? "authors" : `${genreLabel(genre)} authors`;
 		const when = year === "all" ? "" : `, ${year}`;
-		const text = `What Is Seattle Reading? — Top ${who}${when}`;
+		const text = `What’s Seattle Reading? — Top ${who}${when}`;
 		return { link, text };
 	}
 
@@ -230,7 +230,7 @@
 		// Footer
 		ctx.fillStyle = "#999999";
 		ctx.font = `11px ${IMG_SANS}`;
-		ctx.fillText("What Is Seattle Reading?  ·  Seattle Public Library checkouts", padX, H - 18);
+		ctx.fillText("What’s Seattle Reading?  ·  Seattle Public Library checkouts", padX, H - 18);
 		return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 	}
 
