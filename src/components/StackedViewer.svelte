@@ -956,10 +956,13 @@
 	// "Only" is a toggle you can apply to more than one line at once: the chart
 	// shows just the isolated set, so ticking two titles' "Only" compares them
 	// head to head. Clicking an already-isolated line drops it back out.
+	// Clicking a line's name (legend or line end): one of several picked out ->
+	// show only it; the only one showing -> bring everything back; grayed out ->
+	// add it. (Taking a picked line OFF on click read as "it jumped to the other
+	// book".)
 	function toggleIsolate(key) {
-		isolatedKeys = isolatedKeys.includes(key)
-				? isolatedKeys.filter((k) => k !== key)
-				: [...isolatedKeys, key];
+		if (!isolatedKeys.includes(key)) isolatedKeys = [...isolatedKeys, key];
+		else isolatedKeys = isolatedKeys.length === 1 ? [] : [key];
 	}
 	const isIsolated = (key) => isolatedKeys.includes(key);
 	function clearIsolate() {
@@ -2547,7 +2550,7 @@
 									class="fmt-leg leg-btn"
 									class:on={isIsolated(it.key)}
 									class:dim={isolatedKeys.length && !isIsolated(it.key)}
-									title={!isolatedKeys.length ? "Show only this" : isIsolated(it.key) ? "Take this off the chart" : "Add this to the chart"}
+									title={!isolatedKeys.length ? "Show only this" : !isIsolated(it.key) ? "Add this to the chart" : isolatedKeys.length === 1 ? "Show all again" : "Show only this"}
 									onclick={() => toggleIsolate(it.key)}
 									onmouseenter={() => (legendHoverKey = isolatedKeys.length && !isIsolated(it.key) ? null : it.key)}
 									onmouseleave={() => (legendHoverKey = null)}

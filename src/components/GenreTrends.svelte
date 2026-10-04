@@ -175,8 +175,13 @@
 		if (!shown.has(name)) shown = new Set(shown).add(name);
 		toggleExpand(name);
 	}
+	// Clicking a line's name (legend or line end): one of several picked out ->
+	// show only it; the only one showing -> bring everything back; grayed out ->
+	// add it. (Taking a picked line OFF on click read as "it jumped to the other
+	// book".)
 	function toggleIsolate(k) {
-		isolatedKeys = isolatedKeys.includes(k) ? isolatedKeys.filter((x) => x !== k) : [...isolatedKeys, k];
+		if (!isolatedKeys.includes(k)) isolatedKeys = [...isolatedKeys, k];
+		else isolatedKeys = isolatedKeys.length === 1 ? [] : [k];
 	}
 	const isIsolated = (k) => isolatedKeys.includes(k);
 	const showAll = () => (shown = new Set(genreOrder));
