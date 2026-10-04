@@ -209,7 +209,21 @@ def _unpack(entry):
     return name, inc, exc, fic
 
 
-def _match(inc, exc, fic):
+# Nonfiction genres never count a record tagged as fiction: "Interplanetary
+# voyages -- Fiction" made Dune "Travel", and novels about a period land in
+# "History". (Subject ORDER can't do this: genre/form tags like "Science
+# fiction" usually come last in a record, so "first tags only" drops real ones.)
+NONFICTION_GENRES = {
+    "Memoir & Biography", "True Crime", "Cooking & Food", "Self-Help",
+    "Business & Economics", "Health & Fitness", "Psychology", "Politics & Government",
+    "History", "Science & Nature", "Religion & Spirituality", "Travel",
+    "Sports & Recreation", "Parenting & Family", "Art & Photography",
+    "Crafts & Hobbies", "Home & Garden", "Computers & Technology", "Philosophy",
+    "Essays & Society",
+}
+
+
+def _match(inc, exc, fic, nonfiction=False):
     parts = []
     if inc:
         parts.append(_like_any(inc))
@@ -218,11 +232,13 @@ def _match(inc, exc, fic):
     clause = "(" + " OR ".join(parts) + ")"
     if exc:
         clause += f" AND NOT {_like_any(exc)}"
+    if nonfiction:
+        clause += f" AND NOT {FICTION_GATE}"
     return clause
 
 
 def overlap_clauses():
-    return [(name, _match(inc, exc, fic)) for name, inc, exc, fic in map(_unpack, TAXONOMY)]
+    return [(name, _match(inc, exc, fic, name in NONFICTION_GENRES)) for name, inc, exc, fic in map(_unpack, TAXONOMY)]
 
 
 def partition_clauses():
@@ -234,7 +250,7 @@ def partition_clauses():
     both -- a small, acceptable overlap in line with the build's other approxs."""
     out, earlier = [], []
     for name, inc, exc, fic in map(_unpack, TAXONOMY):
-        m = _match(inc, exc, fic)
+        m = _match(inc, exc, fic, name in NONFICTION_GENRES)
         out.append((name, f"({m}) AND NOT {_like_any(sorted(set(earlier)))}" if earlier else m))
         earlier += inc
     return out
