@@ -297,7 +297,7 @@
 		{ label: "Becoming", slug: "michelle-obama-1964", title: "Becoming" },
 	];
 	// The home search box's starting comparison (Enter to run it).
-	const HOME_COMPARE = "Frankenstein, The Adventures of Sherlock Holmes";
+	const HOME_COMPARE = "Ulysses, Mrs. Dalloway";
 	async function homeSurprise() {
 		const a = await randomAuthor();
 		if (a) openAuthor(a.slug);
@@ -315,8 +315,8 @@
 		if (label && id) knownIds.set(label.trim().toLowerCase(), id);
 	}
 	// The home box's starter pair resolves to these exact books.
-	remember("Frankenstein", "w~mary-wollstonecraft-shelley-1797~Frankenstein");
-	remember("The Adventures of Sherlock Holmes", "w~arthur-conan-doyle-1859~The Adventures of Sherlock Holmes");
+	remember("Ulysses", "w~james-joyce-1882~Ulysses");
+	remember("Mrs. Dalloway", "w~virginia-woolf-1882~Mrs. Dalloway");
 	const labelOfRes = (r) => (r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name));
 	// Split on commas, but not inside a name we already know has one.
 	function splitNames(text) {
