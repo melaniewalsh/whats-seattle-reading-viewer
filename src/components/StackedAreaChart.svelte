@@ -25,6 +25,9 @@
 		markers = [],     // [{ month, label, sub }] — labelled moments on the main line
 		endLabels = true, // line mode: label each line at its right end
 		onSeriesClick = null, // click an end label: (key) => … (e.g. isolate that line)
+		context = [],     // line mode: series drawn as faint gray lines behind the
+		                  // others (e.g. the books not picked out); their gray end
+		                  // labels are clickable too, to add them back
 		percent = false,  // values are percentages (the genre shares), not counts
 		plotInset = $bindable(0) // out: the plot's right margin, so a page can align to its edge
 	} = $props();
@@ -63,7 +66,7 @@
 	const hasMarkers = $derived(mode === 'line' && (markers || []).some((mk) => months.includes(mk.month)));
 	const endLabelW = $derived.by(() => {
 		if (mode !== 'line' || !endLabels || !series.length || width < 560) return 0;
-		const shown = series.filter((s) => s.values?.length);
+		const shown = [...series, ...context].filter((s) => s.values?.length);
 		// A single total line has no end label (the peak gets one instead).
 		if (shown.length <= 1 && (shown[0]?.isAggregate || !shown.length)) return 0;
 		// Several named lines: labels wrap onto two lines, so the margin only
@@ -305,6 +308,11 @@
 			return { ...s, raw: s.values, values: v, bottom: null, top: v };
 		})
 	);
+	const ctxLayers = $derived(
+		mode === 'line'
+			? context.map((s) => ({ ...s, ctx: true, values: smooth ? avg3(s.values) : s.values }))
+			: []
+	);
 	// The series whose raw months are drawn as faint bars: the aggregate line
 	// (author / work total), or the only line.
 	const barLayer = $derived(
@@ -320,6 +328,7 @@
 		if (mode === 'line') {
 			let m = 0;
 			for (const s of layers) for (const v of s.values) if (v > m) m = v;
+			for (const s of ctxLayers) for (const v of s.values) if (v > m) m = v;
 			if (barLayer) for (const v of barLayer.raw) if (v > m) m = v;
 			return m || 1;
 		}
@@ -345,6 +354,15 @@
 
 	const linePaths = $derived(
 		lineLayers.map((s) => ({
+			...s,
+			d: d3line()
+				.x((_, i) => x(i))
+				.y((_, i) => y(s.values[i]))(s.values)
+		}))
+	);
+
+	const ctxPaths = $derived(
+		ctxLayers.map((s) => ({
 			...s,
 			d: d3line()
 				.x((_, i) => x(i))
@@ -438,7 +456,7 @@
 		// A total line gets no "latest month" label: it read as the book's size
 		// ("1 in July"). Only named lines (books, formats, genres) are labelled.
 		if (lineLayers.some((s) => s.isAggregate)) return [];
-		const shown = lineLayers;
+		const shown = [...lineLayers, ...ctxLayers];
 		const n = Math.max(10, Math.floor((margin.right - 45) / 6.6));
 		const items = shown.map((s) => ({ s, v: s.values[last] || 0, ey: y(s.values[last] || 0), lines: wrapName(s.label, n) }));
 		items.sort((a, b) => a.ey - b.ey);
@@ -836,6 +854,9 @@
 					{/each}
 				</g>
 			{/if}
+			{#each ctxPaths as p}
+				<path class="ctx-path" d={p.d} fill="none" stroke-linejoin="round" stroke-linecap="round" />
+			{/each}
 			{#each linePaths as p}
 				<path
 					d={p.d}
@@ -910,19 +931,20 @@
 		<!-- End-of-line labels -->
 		{#each endMarks as it}
 			{@const ex = x(months.length - 1)}
-			<circle class="end-dot" cx={ex} cy={it.ey} r="4" fill={it.s.color} />
+			{@const ec = it.s.ctx ? '#c3c7cc' : it.s.color}
+			<circle class="end-dot" cx={ex} cy={it.ey} r={it.s.ctx ? 3 : 4} fill={ec} />
 			{#if endMarks.length === 1 && it.s.isAggregate}
 				<text class="end-value" x={ex + 8} y={it.ey - 2}>{fmtEnd(it.v)}</text>
 				<text class="end-sub" x={ex + 8} y={it.ey + 12}>in {lastMonthLabel}</text>
 			{:else}
 				<!-- A thin connector in the line's color runs to a swatch before the
 				     name, like the legend (the text stays dark to read well). -->
-				<path class="end-leader" class:dim={focusKey && focusKey !== keyOf(it.s)} stroke={it.s.color} d="M{ex + 5},{it.ey} L{ex + 9},{it.ey} L{ex + 15},{it.ty - 4}" />
-				<rect class="end-swatch" class:dim={focusKey && focusKey !== keyOf(it.s)} fill={it.s.color} x={ex + 15} y={it.ty - 9} width="9" height="9" rx="2" />
-				<text class="end-name" class:dim={focusKey && focusKey !== keyOf(it.s)} class:clickable={!!onSeriesClick}
+				<path class="end-leader" class:dim={focusKey && focusKey !== keyOf(it.s)} stroke={ec} d="M{ex + 5},{it.ey} L{ex + 9},{it.ey} L{ex + 15},{it.ty - 4}" />
+				<rect class="end-swatch" class:dim={focusKey && focusKey !== keyOf(it.s)} fill={ec} x={ex + 15} y={it.ty - 9} width="9" height="9" rx="2" />
+				<text class="end-name" class:ctx={it.s.ctx} class:dim={focusKey && focusKey !== keyOf(it.s)} class:clickable={!!onSeriesClick}
 					x={ex + 29} y={it.ty} role={onSeriesClick ? 'button' : undefined} tabindex={onSeriesClick ? 0 : undefined}
-					onmouseenter={() => (endHoverKey = keyOf(it.s))} onmouseleave={() => (endHoverKey = null)}
-					onfocus={() => (endHoverKey = keyOf(it.s))} onblur={() => (endHoverKey = null)}
+					onmouseenter={() => (endHoverKey = it.s.ctx ? null : keyOf(it.s))} onmouseleave={() => (endHoverKey = null)}
+					onfocus={() => (endHoverKey = it.s.ctx ? null : keyOf(it.s))} onblur={() => (endHoverKey = null)}
 					onclick={() => onSeriesClick?.(keyOf(it.s))}
 					onkeydown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onSeriesClick) { e.preventDefault(); onSeriesClick(keyOf(it.s)); } }}>{#each it.lines as ln, k}<tspan x={ex + 29} dy={k ? 14 : 0}>{ln}</tspan>{/each}</text>
 			{/if}
@@ -1098,6 +1120,9 @@
 	.end-name.clickable { cursor: pointer; }
 	.end-name.clickable:hover { text-decoration: underline; }
 	.end-name.dim { opacity: 0.3; }
+	/* Books not picked out: faint gray lines, gray labels (click to add). */
+	.ctx-path { stroke: #d5d8dc; stroke-width: 1.5; }
+	.end-name.ctx { fill: #8a9099; }
 	.end-name:focus { outline: none; }
 	.end-num { fill: #858585; }
 

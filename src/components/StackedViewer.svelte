@@ -2107,6 +2107,25 @@
 		searchMode === "title" && !isOverview && groups.filter((g) => g.idxs.length).length === 1
 	);
 
+	// "By book": one line per plotted work, plus any individually plotted editions.
+	const bookParts = $derived.by(() => {
+		if (!current || isOverview) return [];
+		const parts = [];
+		groups.forEach((g, gi) => {
+			if (g.idxs.length) parts.push({ key: `g${g.id}`, legendKey: `g${g.id}`, label: groupLabel(g), color: groupColor(gi), values: sumSeries(g.idxs), groupIndex: gi, isGroup: true });
+		});
+		soloSingleIdxs.forEach((idx, i) => {
+			parts.push({ key: `s${idx}`, legendKey: `s${idx}`, label: `${cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title} (${formatLabel(current.titles[idx].format)})`, color: singleColor(i), values: current.titles[idx].series, isSingle: true });
+		});
+		return parts;
+	});
+	// With some books picked out ("Showing 2 of 5"), the others stay on the chart
+	// as faint gray lines; clicking one's label adds it to the picked set.
+	const contextSeries = $derived.by(() => {
+		if (!current || isOverview || chartMode !== "area" || !isolatedKeys.length) return [];
+		return bookParts.filter((p) => !isolatedKeys.includes(p.key) && !hiddenKeys.includes(p.key));
+	});
+
 	// What the chart actually draws. "line": author total + per-group and
 	// per-title lines. "area": the stacked-by-title chart (capped). Either way,
 	// when a series is isolated we show only it.
@@ -2141,13 +2160,7 @@
 		// plus any individually plotted editions — compared from a common zero
 		// baseline instead of stacked, so each book's own trend reads directly.
 		if (!isOverview) {
-			const parts = [];
-			groups.forEach((g, gi) => {
-				if (g.idxs.length) parts.push({ key: `g${g.id}`, legendKey: `g${g.id}`, label: groupLabel(g), color: groupColor(gi), values: sumSeries(g.idxs), groupIndex: gi, isGroup: true });
-			});
-			soloSingleIdxs.forEach((idx, i) => {
-				parts.push({ key: `s${idx}`, legendKey: `s${idx}`, label: `${cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title} (${formatLabel(current.titles[idx].format)})`, color: singleColor(i), values: current.titles[idx].series, isSingle: true });
-			});
+			const parts = bookParts;
 			let shown = isolatedKeys.length ? parts.filter((p) => isolatedKeys.includes(p.key)) : parts;
 			shown = shown.filter((p) => !hiddenKeys.includes(p.key));
 			return shown.length ? shown : [authorLine].filter(Boolean);
@@ -2204,6 +2217,11 @@
 		isYearFiltered
 			? displaySeries.map((s) => ({ ...s, values: s.values.slice(yearLo, yearHi + 1) }))
 			: displaySeries
+	);
+	const viewContext = $derived(
+		isYearFiltered
+			? contextSeries.map((s) => ({ ...s, values: s.values.slice(yearLo, yearHi + 1) }))
+			: contextSeries
 	);
 
 	// The year slider's context, over every month: the author's whole record on
@@ -2423,7 +2441,7 @@
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
+				<LineChart bind:plotInset months={viewMonths} series={viewSeries} context={viewContext} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
 			</div>
 
 			<!-- "By book" / "By format" lines are named at their right ends, so no
