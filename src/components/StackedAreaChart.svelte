@@ -236,8 +236,9 @@
 
 	// Event bands (COVID, ransomware): shade the affected months and put a short
 	// two-line label at the top of the band. Both events are DIPS, so the top of
-	// the band is always clear of the line. The label sits outside the band on
-	// whichever side has room; hovering/focusing it shows the full note.
+	// the band is always clear of the line. The label sits inside a wide band, or
+	// beside a narrow one on whichever side has room; hovering/focusing it shows
+	// the full note.
 	const halfStep = $derived(months.length > 1 ? (x(1) - x(0)) / 2 : 0);
 	const annotationMarks = $derived.by(() => {
 		if (!annotations?.length || months.length < 2) return [];
@@ -249,11 +250,14 @@
 				for (let k = months.length - 1; k >= 0; k--) if (months[k] <= end) { i1 = k; break; }
 				if (i0 < 0 || i1 < i0) return null;
 				const x0 = x(i0) - halfStep, x1 = x(i1) + halfStep;
-				const anchor = x0 > (width - margin.right) * 0.6 ? 'end' : 'start';
-				const lx = anchor === 'end' ? x0 - 5 : x1 + 5;
+				const lw = Math.max(...(a.short || [a.label]).map((t) => t.length)) * 6.2;
+				// A band wide enough to hold its label (Covid, Mar 2020-Apr 2021)
+				// gets it inside, at its top-left; a narrow one gets it beside it.
+				const inside = x1 - x0 >= lw + 14;
+				const anchor = inside ? 'start' : x0 > (width - margin.right) * 0.6 ? 'end' : 'start';
+				const lx = inside ? x0 + 6 : anchor === 'end' ? x0 - 5 : x1 + 5;
 				// If the label would sit on the top y-axis label ("1,200 checkouts a
 				// month", drawn at the left edge), drop it just below that label.
-				const lw = Math.max(...(a.short || [a.label]).map((t) => t.length)) * 6.2;
 				const [la, lb] = anchor === 'end' ? [lx - lw, lx] : [lx, lx + lw];
 				const topTxt = yTopTick != null ? `${fmtTick(yTopTick)}${unitText(width) ? ' ' + unitText(width) : ''}` : '';
 				const unitR = margin.left + topTxt.length * 6.6 + 8;

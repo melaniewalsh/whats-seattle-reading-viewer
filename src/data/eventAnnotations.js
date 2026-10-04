@@ -5,11 +5,11 @@
 export const EVENT_ANNOTATIONS = [
 	{
 		month: "2020-03",
-		end: "2020-03",
+		end: "2021-04",
 		year: 2020,
 		label: "COVID-19 closure",
 		short: ["Covid", "closures"],
-		blurb: "Seattle closed all physical library branches in March 2020 to slow the spread of COVID-19, so in-person checkouts dropped sharply (digital borrowing kept going).",
+		blurb: "Seattle closed all physical library branches in March 2020 to slow the spread of COVID-19, and they stayed closed to in-person browsing into spring 2021, so print checkouts dropped sharply (digital borrowing kept going).",
 		url: "https://web.archive.org/web/20241209044138/https://www.spl.org/about-us/library-impact/2020-impact-report/a-look-back"
 	},
 	{

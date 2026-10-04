@@ -543,7 +543,7 @@
 					<section class="gal-sec">
 						<div class="gal-head">
 							{#if sec.genre !== "All genres"}
-								<button class="gal-title gal-title-link" onclick={() => (genre = sec.genre)} title="See the full {sec.genre} ranking">{sec.label}</button>
+								<button class="gal-title gal-title-link" onclick={() => { genre = sec.genre; window.scrollTo({ top: 0 }); }} title="See the full {sec.genre} ranking">{sec.label}</button>
 							{:else}
 								<button class="gal-title gal-title-link" onclick={() => (overallList = true)} title="See the full top-10 overall">{sec.label}</button>
 							{/if}
