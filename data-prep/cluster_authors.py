@@ -74,6 +74,9 @@ import unicodedata
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+# A middle-name spelling ("Octavia E. Butler") names a merged author only if
+# its own checkouts are at least this share of the biggest spelling's.
+MIDDLE_NAME_MIN_SHARE = 0.25
 RAW_CSV = PROJECT_DIR / "data" / "raw" / "spl-monthly-checkouts_2005-2025.csv"
 OUT_MAP = PROJECT_DIR / "data-prep" / "author_map.json"
 PROCESSED_FILES_CSV = PROJECT_DIR / "data-prep" / "processed_files.csv"
@@ -1016,14 +1019,22 @@ def main():
     # Build the final canonical spelling for each component: prefer a
     # candidate with a middle name (more specific), then among those prefer
     # one that carries a year signature (more specific still), then break
-    # any remaining tie by checkouts.
+    # any remaining tie by checkouts. A middle-name spelling only wins if it
+    # covers a real share of the author's checkouts (MIDDLE_NAME_MIN_SHARE):
+    # a stray "John M. Green" record (a few hundred checkouts) must not rename
+    # John Green's whole 59k-checkout cluster.
     components2 = {}
     for canonical in stage1_info:
         components2.setdefault(uf2.find(canonical), []).append(canonical)
 
     stage1_to_final = {}
     for members in components2.values():
-        with_middle = [m for m in members if has_middle_name(stage1_info[m]["norm"])]
+        top = max(stage1_info[m]["checkouts"] for m in members)
+        with_middle = [
+            m for m in members
+            if has_middle_name(stage1_info[m]["norm"])
+            and stage1_info[m]["checkouts"] >= MIDDLE_NAME_MIN_SHARE * top
+        ]
         candidates = with_middle if with_middle else members
         with_date = [m for m in candidates if stage1_info[m]["date"]]
         if with_date:
