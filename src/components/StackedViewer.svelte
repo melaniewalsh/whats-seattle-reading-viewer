@@ -78,6 +78,13 @@
 	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = stacked by title
 	let titleSort = $state("work"); // 'work' = editions grouped by work; 'borrowed' = most checkouts; 'alpha' = A–Z
 	let workOrder = $state("checkouts"); // in 'work' mode, order the works by 'checkouts' (total, default) or 'name' (A–Z)
+	let workOrderFlip = $state(false); // reversed: fewest checkouts first / Z–A
+	// The table's column headers: a new column sorts its natural way (most
+	// checkouts first, A–Z); the same column again reverses it.
+	function sortBooks(by) {
+		if (workOrder === by) workOrderFlip = !workOrderFlip;
+		else { workOrder = by; workOrderFlip = false; }
+	}
 	let isolatedKeys = $state([]); // when non-empty, the chart shows ONLY these series (keys 'g<id>' | 's<idx>'); multiple = compare
 	let hiddenKeys = $state([]); // keys the user has clicked to hide/ignore from the stacked "All titles" chart
 	let showAuthorTotal = $state(true); // show the author's aggregate total line in the line view
@@ -1557,9 +1564,10 @@
 			if (workOrder === "format") {
 				return (FMT_ORDER[a.primaryFormat] ?? 9) - (FMT_ORDER[b.primaryFormat] ?? 9) || b.total - a.total;
 			}
-			return workOrder === "checkouts"
+			const order = workOrder === "checkouts"
 					? b.total - a.total
 					: a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) || (a.key < b.key ? -1 : 1);
+			return workOrderFlip ? -order : order;
 		});
 		return blocks;
 	});
@@ -2736,8 +2744,12 @@
 						</div>
 					</div>
 				{/if}
-				<div class="bk-row bk-colhead" aria-hidden="true">
-					<span></span><span>Book</span><span class="bk-sp">{booksYears}</span><span class="bk-num">Checkouts</span>
+				<!-- Click "Book" or "Checkouts" to sort by it; click again to reverse. -->
+				<div class="bk-row bk-colhead">
+					<span></span>
+					<span><button type="button" class="bk-sort" class:on={workOrder === "name"} aria-label="Sort by title" onclick={() => sortBooks("name")}>Book{#if workOrder === "name"}<span class="bk-arrow" aria-hidden="true">{workOrderFlip ? "↑" : "↓"}</span>{/if}</button></span>
+					<span class="bk-sp">{booksYears}</span>
+					<span class="bk-num"><button type="button" class="bk-sort" class:on={workOrder === "checkouts"} aria-label="Sort by checkouts" onclick={() => sortBooks("checkouts")}>Checkouts{#if workOrder === "checkouts"}<span class="bk-arrow" aria-hidden="true">{workOrderFlip ? "↑" : "↓"}</span>{/if}</button></span>
 				</div>
 				<ul class="bk-list">
 					{#if editMode}
@@ -4952,6 +4964,9 @@
 	.bk-spark path { fill: none; stroke-width: 1.5; stroke-linejoin: round; }
 	.bk-num { text-align: right; font-size: var(--text-sm); font-variant-numeric: tabular-nums; color: var(--color-fg); white-space: nowrap; }
 	.bk-colhead .bk-num, .bk-colhead .bk-sp { color: var(--color-fg-light); }
+	.bk-sort { display: inline-flex; align-items: center; gap: 3px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+	.bk-sort:hover, .bk-sort.on { color: var(--color-fg); }
+	.bk-arrow { font-size: 11px; }
 	/* editions under an open book */
 	/* An open book's editions sit on a faint warm panel, so they read as
 	   belonging to that book. */
