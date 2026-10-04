@@ -302,6 +302,8 @@
 		[["Ulysses", "w~james-joyce-1882~Ulysses"], ["Mrs. Dalloway", "w~virginia-woolf-1882~Mrs. Dalloway"]],
 		[["Parable of the Sower", "w~octavia-e-butler~Parable of the Sower"], ["Neuromancer", "w~william-gibson-1948~Neuromancer"]],
 		[["Wuthering Heights", "w~emily-bronte-1818~Wuthering Heights"], ["Pride and Prejudice", "w~jane-austen-1775~Pride and Prejudice"]],
+		[["Sally Rooney", "a~sally-rooney"], ["Ben Lerner", "a~ben-lerner-1979"]],
+		[["Beverly Cleary", "a~beverly-cleary"], ["Judy Blume", "a~judy-blume"]],
 	];
 	let HOME_COMPARE = $state(HOME_PAIRS[0].map(([label]) => label).join(", "));
 	onMount(() => {
