@@ -15,6 +15,7 @@
 		onSubmit = null,
 		multi = false,
 		value = "",
+		selectOnFocus = false, // a starter value: clicking in selects it, so typing replaces it
 		placeholder = "Search authors or books"
 	} = $props();
 
@@ -24,6 +25,7 @@
 	let flash = $state(false);
 	let inputEl;
 	let timer;
+	let justFocused = false;
 
 	// The page tells us what's on the chart; show it (unless mid-typing).
 	$effect(() => {
@@ -120,7 +122,15 @@
 		spellcheck="false"
 		bind:value={q}
 		oninput={onInput}
-		onfocus={() => (open = results.length > 0)}
+		onfocus={() => {
+			open = results.length > 0;
+			if (selectOnFocus && q === value) { justFocused = true; setTimeout(() => inputEl?.select(), 0); }
+		}}
+		onmouseup={(e) => {
+			// The click that focused the field would otherwise drop the caret
+			// in and undo the selection.
+			if (justFocused) { e.preventDefault(); justFocused = false; }
+		}}
 		onkeydown={onKey}
 	/>
 	{#if q}

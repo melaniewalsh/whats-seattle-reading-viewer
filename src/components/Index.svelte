@@ -11,6 +11,8 @@
 	import TrendingUp from "@lucide/svelte/icons/trending-up";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import SiteSearch from "$components/SiteSearch.svelte";
+	import { cleanTitleForDisplay } from "$utils/workTitle.js";
+	import { displayName } from "$utils/displayName.js";
 	import { MediaQuery } from "svelte/reactivity";
 	import { getMonths, getAuthor, searchTitles, searchAll, densify, randomAuthor } from "$components/db.js";
 	import { coverUrl } from "$utils/covers.js";
@@ -294,6 +296,8 @@
 		{ label: "Colleen Hoover", slug: "colleen-hoover" },
 		{ label: "Becoming", slug: "michelle-obama-1964", title: "Becoming" },
 	];
+	// The home search box's starting comparison (Enter to run it).
+	const HOME_COMPARE = "Frankenstein, The Adventures of Sherlock Holmes";
 	async function homeSurprise() {
 		const a = await randomAuthor();
 		if (a) openAuthor(a.slug);
@@ -310,6 +314,10 @@
 	function remember(label, id) {
 		if (label && id) knownIds.set(label.trim().toLowerCase(), id);
 	}
+	// The home box's starter pair resolves to these exact books.
+	remember("Frankenstein", "w~mary-wollstonecraft-shelley-1797~Frankenstein");
+	remember("The Adventures of Sherlock Holmes", "w~arthur-conan-doyle-1859~The Adventures of Sherlock Holmes");
+	const labelOfRes = (r) => (r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name));
 	// Split on commas, but not inside a name we already know has one.
 	function splitNames(text) {
 		let t = text;
@@ -326,13 +334,13 @@
 		else openAuthor(slug);
 	}
 	function pickSearch(res) {
-		remember(pageSearch?.labelOf(res), idOf(res));
+		remember(labelOfRes(res), idOf(res));
 		openId(idOf(res));
 	}
 	// Enter (or a suggestion) with the field's whole list: one name opens its
 	// page; two or more put them side by side.
 	async function submitSearch(text, last) {
-		if (last) remember(pageSearch?.labelOf(last), idOf(last));
+		if (last) remember(labelOfRes(last), idOf(last));
 		const ids = [];
 		for (const name of splitNames(text)) {
 			let id = knownIds.get(name.toLowerCase());
@@ -513,7 +521,9 @@
 			<!-- Looking something up is what most people come to do, so the search
 			     field leads the home page (the Explore cards follow). -->
 			<div class="home-search">
-				<SiteSearch bind:this={homeSearch} onPick={pickSearch} placeholder="Search any author or book" />
+				<!-- Starts with a comparison, a nod to the Google Books Ngram Viewer's
+				     default: press Enter to see it, or type over it. -->
+				<SiteSearch bind:this={homeSearch} multi value={HOME_COMPARE} selectOnFocus onPick={pickSearch} onSubmit={submitSearch} placeholder="Search any author or book (commas compare)" />
 				<p class="home-try">
 					<span class="ht-lead">Try</span>
 					{#each HOME_TRY as t, k}{#if k}<span class="ht-sep ht-extra" aria-hidden="true">·</span>{/if}<button class="ht-link" class:ht-extra={k > 0} class:is-title={!!t.title} onclick={() => (t.title ? openTitle(t.title, t.slug) : openAuthor(t.slug))}>{t.label}</button>{/each}
