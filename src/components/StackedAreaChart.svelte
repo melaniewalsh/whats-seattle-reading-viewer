@@ -46,7 +46,8 @@
 	const fmtTick = (t) => (percent ? fmtVal(t) : abbrevNum(t));
 	// The unit after the top y label; a phone gets only its first word ("1,200
 	// checkouts"), or none for a percentage ("12%").
-	const unitText = (w) => (!unit ? '' : w >= 560 ? unit : percent ? '' : unit.split(' ')[0]);
+	// The top y label names the unit in full ("800 checkouts a month"), phones too.
+	const unitText = (w) => (!unit ? '' : w >= 560 || !percent ? unit : '');
 
 	// Measured from the container (bind:clientWidth) so the chart fits any
 	// screen -- without this the SVG renders at a fixed 720px and pushes the

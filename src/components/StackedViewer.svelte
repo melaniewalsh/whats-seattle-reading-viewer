@@ -4480,8 +4480,10 @@
 		.on-phone { display: inline-flex !important; }
 		.customize-panel.on-phone { display: flex !important; }
 		.off-phone { display: none !important; }
-		.hd-desc, .hdr-line, .hd-subjects, .hd-cover, .hdr-actions { display: none !important; }
-		.customize-row.on-phone { display: flex !important; justify-content: flex-end; margin: 0 0 8px; }
+		/* Name, then just the byline and total ("by Robin Wall Kimmerer · 52.2k
+		   total checkouts"); no description, subjects, cover or Borrow row. */
+		.hd-desc, .hd-subjects, .hd-cover, .hdr-actions { display: none !important; }
+		.customize-row.on-phone { display: flex !important; justify-content: flex-start; margin: 0 0 10px; }
 		.hd-main.has-cover { display: block; }
 		.mode-toggle .mt-txt { display: none; }
 		.mode-toggle button { padding: 7px 12px; }
