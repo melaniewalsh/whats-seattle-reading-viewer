@@ -35,7 +35,7 @@
 	import WikiCard from "$components/WikiCard.svelte";
 	import { wikiSummary, wikiWork } from "$utils/wiki.js";
 	import Switch from "$components/ui/Switch.svelte";
-	import { getMonths, searchAuthors, searchTitles, searchAll, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks, getCoauthors } from "$components/db.js";
+	import { getMonths, searchAuthors, searchTitles, searchAll, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks, getCoauthors, getGenreTerms } from "$components/db.js";
 
 	// "author" (default): search authors. "title": reverse lookup — search a title,
 	// resolve to its author, open the author's drilldown with that work highlighted.
@@ -1941,6 +1941,28 @@
 		}
 		return out;
 	});
+	// A subject tag's genre, so the tag can open that genre's Most Borrowed list
+	// (where the genre's tags and counts are explained). The most specific
+	// matching term wins ("Science fiction" -> Science Fiction, not Science &
+	// Nature); "=term" matches the whole tag only. Catch-all buckets that have
+	// no Most Borrowed list are skipped.
+	let genreTerms = $state({});
+	onMount(() => { getGenreTerms().then((m) => (genreTerms = m || {})); });
+	const NO_LIST = new Set(["Fiction", "Nonfiction", "Art", "Illustrated Works", "Informational Works", "Instructional & Educational Works", "Readers Publications"]);
+	function genreFor(tag) {
+		const t = (tag || "").toLowerCase();
+		let best = null, bestLen = 0;
+		for (const [g, terms] of Object.entries(genreTerms)) {
+			if (NO_LIST.has(g)) continue;
+			for (const term of terms || []) {
+				const w = term.toLowerCase();
+				const hit = w.startsWith("=") ? t === w.slice(1) : t.includes(w);
+				if (hit && w.length > bestLen) { best = g; bestLen = w.length; }
+			}
+		}
+		return best;
+	}
+
 	// SPL catalog subject search for a header subject.
 	const splSubjectUrl = (t) => `https://seattle.bibliocommons.com/v2/search?query=${encodeURIComponent(t.replace(/[()]/g, ""))}&searchType=subject`;
 
@@ -2440,7 +2462,7 @@
 			</div>
 			</div><!-- /.hd-text -->
 			{#if subjectLine.length}
-				<p class="hd-subjects">{#each subjectLine as term, k}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/each}</p>
+				<p class="hd-subjects">{#each subjectLine as term, k}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if genreFor(term)}<button type="button" class="subj-genre" onclick={() => openGenre(genreFor(term))} title="The most-borrowed {genreFor(term)} books">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</p>
 			{/if}
 			</div>
 			{#if lookupLinks}
@@ -2797,7 +2819,7 @@
 						{#if open}
 							{@const subj = bookSubjects(w)}
 							{#if subj.length}
-								<li class="bk-row bk-ed bk-subj"><span></span><span class="bk-subj-list">{#each subj as term, k}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/each}</span></li>
+								<li class="bk-row bk-ed bk-subj"><span></span><span class="bk-subj-list">{#each subj as term, k}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if genreFor(term)}<button type="button" class="subj-genre" onclick={() => openGenre(genreFor(term))} title="The most-borrowed {genreFor(term)} books">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</span></li>
 							{/if}
 							{#each w.editions.slice().sort((a, b) => b.total - a.total) as t (t.idx)}
 								<li class="bk-row bk-ed" class:editing={editMode} class:hit={t.match} class:just-moved={movedIdx === t.idx} data-ed={t.idx}>
@@ -4936,6 +4958,10 @@
 		border-top: 1px solid var(--color-gray-100, #eee);
 	}
 	.bk-subj { grid-template-columns: 22px minmax(0, 1fr); padding-block: 8px 2px; }
+	/* A subject tag that opens its genre's Most Borrowed list: looks like the
+	   other tag links. */
+	.subj-genre { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
+	.subj-genre:hover { color: var(--color-fg); text-decoration-color: currentColor; }
 	.bk-subj-list { font-size: var(--text-sm); color: var(--color-fg-light); }
 	.bk-subj-list a { color: inherit; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
 	.bk-subj-list a:hover { color: var(--color-fg); text-decoration-color: currentColor; }
