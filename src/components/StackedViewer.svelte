@@ -2107,25 +2107,6 @@
 		searchMode === "title" && !isOverview && groups.filter((g) => g.idxs.length).length === 1
 	);
 
-	// "By book": one line per plotted work, plus any individually plotted editions.
-	const bookParts = $derived.by(() => {
-		if (!current || isOverview) return [];
-		const parts = [];
-		groups.forEach((g, gi) => {
-			if (g.idxs.length) parts.push({ key: `g${g.id}`, legendKey: `g${g.id}`, label: groupLabel(g), color: groupColor(gi), values: sumSeries(g.idxs), groupIndex: gi, isGroup: true });
-		});
-		soloSingleIdxs.forEach((idx, i) => {
-			parts.push({ key: `s${idx}`, legendKey: `s${idx}`, label: `${cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title} (${formatLabel(current.titles[idx].format)})`, color: singleColor(i), values: current.titles[idx].series, isSingle: true });
-		});
-		return parts;
-	});
-	// With some books picked out ("Showing 2 of 5"), the others stay on the chart
-	// as faint gray lines; clicking one's label adds it to the picked set.
-	const contextSeries = $derived.by(() => {
-		if (!current || isOverview || chartMode !== "area" || !isolatedKeys.length) return [];
-		return bookParts.filter((p) => !isolatedKeys.includes(p.key) && !hiddenKeys.includes(p.key));
-	});
-
 	// What the chart actually draws. "line": author total + per-group and
 	// per-title lines. "area": the stacked-by-title chart (capped). Either way,
 	// when a series is isolated we show only it.
@@ -2160,7 +2141,13 @@
 		// plus any individually plotted editions — compared from a common zero
 		// baseline instead of stacked, so each book's own trend reads directly.
 		if (!isOverview) {
-			const parts = bookParts;
+			const parts = [];
+			groups.forEach((g, gi) => {
+				if (g.idxs.length) parts.push({ key: `g${g.id}`, legendKey: `g${g.id}`, label: groupLabel(g), color: groupColor(gi), values: sumSeries(g.idxs), groupIndex: gi, isGroup: true });
+			});
+			soloSingleIdxs.forEach((idx, i) => {
+				parts.push({ key: `s${idx}`, legendKey: `s${idx}`, label: `${cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title} (${formatLabel(current.titles[idx].format)})`, color: singleColor(i), values: current.titles[idx].series, isSingle: true });
+			});
 			let shown = isolatedKeys.length ? parts.filter((p) => isolatedKeys.includes(p.key)) : parts;
 			shown = shown.filter((p) => !hiddenKeys.includes(p.key));
 			return shown.length ? shown : [authorLine].filter(Boolean);
@@ -2217,11 +2204,6 @@
 		isYearFiltered
 			? displaySeries.map((s) => ({ ...s, values: s.values.slice(yearLo, yearHi + 1) }))
 			: displaySeries
-	);
-	const viewContext = $derived(
-		isYearFiltered
-			? contextSeries.map((s) => ({ ...s, values: s.values.slice(yearLo, yearHi + 1) }))
-			: contextSeries
 	);
 
 	// The year slider's context, over every month: the author's whole record on
@@ -2441,14 +2423,16 @@
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart bind:plotInset months={viewMonths} series={viewSeries} context={viewContext} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
+				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
 			</div>
 
 			<!-- "By book" / "By format" lines are named at their right ends, so no
-			     legend; Total keeps one for any editions overlaid on it (those lines
-			     have no end labels). Exported images still draw the legend. -->
+			     legend, until you pick some out: then every book is listed here, the
+			     ones not shown grayed out (click to add them back). Total keeps one
+			     for any editions overlaid on it (those lines have no end labels).
+			     Exported images still draw the legend. -->
 			{#if legendItems.length >= 2}
-				<div class="format-legend" class:phone-only={chartMode === "area"}>
+				<div class="format-legend" class:phone-only={chartMode === "area" && !isolatedKeys.length && !hiddenKeys.length}>
 					{#each legendItems as it}
 						{#if it.key === "other"}
 							<span class="fmt-leg other-leg" class:hidden-leg={isHidden("other")} class:dim={isolatedKeys.length}
@@ -2461,11 +2445,11 @@
 									class="fmt-leg leg-btn"
 									class:on={isIsolated(it.key)}
 									class:dim={isolatedKeys.length && !isIsolated(it.key)}
-									title="Show only this — click again to bring the others back"
+									title={!isolatedKeys.length ? "Show only this" : isIsolated(it.key) ? "Take this off the chart" : "Add this to the chart"}
 									onclick={() => toggleIsolate(it.key)}
-									onmouseenter={() => (legendHoverKey = it.key)}
+									onmouseenter={() => (legendHoverKey = isolatedKeys.length && !isIsolated(it.key) ? null : it.key)}
 									onmouseleave={() => (legendHoverKey = null)}
-									onfocus={() => (legendHoverKey = it.key)}
+									onfocus={() => (legendHoverKey = isolatedKeys.length && !isIsolated(it.key) ? null : it.key)}
 									onblur={() => (legendHoverKey = null)}
 							><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</button>
 						{:else}
@@ -3132,8 +3116,13 @@
 	.leg-btn:hover {
 		background: var(--color-gray-100);
 	}
+	/* Not on the chart right now: gray swatch and name (click to add). */
 	.leg-btn.dim {
-		opacity: 0.38;
+		color: var(--color-fg-light);
+		font-weight: 500;
+	}
+	.leg-btn.dim .fmt-sw {
+		background: #d5d8dc !important;
 	}
 	.leg-btn.on {
 		background: var(--color-gray-100);
