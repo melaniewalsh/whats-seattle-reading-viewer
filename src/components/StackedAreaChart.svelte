@@ -511,15 +511,14 @@
 		const all = months
 			.map((m, i) => ({ i, year: m.slice(0, 4), isJan: m.endsWith('-01') }))
 			.filter((d) => d.isJan);
-		const maxLabels = Math.max(2, Math.floor(innerW / 40));
-		const step = Math.ceil(all.length / maxLabels);
-		// Full years (2022, 2023, ...) whenever they fit as many ticks as the
-		// short form would (~60px each); otherwise the first year in full, then
-		// abbreviated: 2017, '18, '19 ...
-		const full = Math.ceil(all.length / Math.max(2, Math.floor(innerW / 60))) <= step;
+		// Like the Ngram Viewer: full years at a round step (every year, 2, 5 or
+		// 10), the smallest that keeps to ~8 labels and ~70px apart. Labels sit on
+		// years divisible by the step (2010, 2015, 2020 ...).
+		const maxLabels = Math.max(2, Math.min(8, Math.floor(innerW / 70)));
+		const step = [1, 2, 5, 10, 20].find((st) => all.filter((d) => Number(d.year) % st === 0).length <= maxLabels) || 20;
 		return all
-			.filter((_, i) => i % step === 0)
-			.map((d, k) => ({ i: d.i, label: full || k === 0 ? d.year : `’${d.year.slice(2)}`, yearLabel: null }));
+			.filter((d) => Number(d.year) % step === 0)
+			.map((d) => ({ i: d.i, label: d.year, yearLabel: null }));
 	});
 
 	let hoverIndex = $state(null);
@@ -821,7 +820,8 @@
 		{#each xTicks as tick}
 			<g class="tick x-tick" transform="translate({x(tick.i)}, 0)">
 				<line class="x-tickmark" y1={height - margin.bottom} y2={height - margin.bottom + 5} />
-				<text y={height - margin.bottom + 18} text-anchor="middle">{tick.label}</text>
+				<!-- A label at the very edge hangs inward, so it isn't cut off (exported images clip at the edge). -->
+				<text y={height - margin.bottom + 18} text-anchor={x(tick.i) < 20 ? "start" : x(tick.i) > width - 20 ? "end" : "middle"}>{tick.label}</text>
 			</g>
 		{/each}
 		<!-- Month ticks: each year's label sits centered under its run of months

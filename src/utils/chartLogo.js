@@ -16,12 +16,26 @@ function loadLogo() {
 	return logoPromise;
 }
 
+const LABEL = "WHAT IS SEATTLE READING?";
+const LABEL_FONT = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+// How wide the logo + name draw (so a narrow chart can put them on their own
+// row instead of over the title).
+export function chartLogoWidth(ctx) {
+	ctx.save();
+	ctx.font = LABEL_FONT;
+	if ("letterSpacing" in ctx) ctx.letterSpacing = "0.8px";
+	const w = ctx.measureText(LABEL).width + 30;
+	ctx.restore();
+	return w;
+}
+
 // Right-aligned at xRight; vertically centered on yMid.
 export async function drawChartLogo(ctx, xRight, yMid) {
 	const logo = await loadLogo();
-	const label = "WHAT IS SEATTLE READING?";
+	const label = LABEL;
 	ctx.save();
-	ctx.font = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+	ctx.font = LABEL_FONT;
 	if ("letterSpacing" in ctx) ctx.letterSpacing = "0.8px";
 	ctx.fillStyle = "#3f88cc";
 	ctx.textAlign = "right";

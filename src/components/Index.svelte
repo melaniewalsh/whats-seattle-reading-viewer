@@ -317,7 +317,7 @@
 </script>
 
 <svelte:boundary onerror={(e) => console.error(e)}>
-	<article class:wide={tab === "compare"}>
+	<article>
 		<div class="masthead">
 			<div class="masthead-top">
 				<button class="mast-home" class:here={tab === "home"} onclick={goHome} aria-label="{copy.title} — home">
@@ -641,8 +641,6 @@
 		margin: 0 auto;
 		padding: 0 24px 80px;
 	}
-	/* Compare runs wide, like the Ngram Viewer: the chart gets the room. */
-	article.wide { max-width: 1400px; }
 	/* Landing hub — title / subtitle / byline, then a grid of section cards. */
 	.hero {
 		max-width: 720px;

@@ -13,7 +13,7 @@
 	import LinkIcon from "@lucide/svelte/icons/link";
 	import ShareIcon from "@lucide/svelte/icons/share-2";
 	import { base } from "$app/paths";
-	import { drawChartLogo } from "$utils/chartLogo.js";
+	import { drawChartLogo, chartLogoWidth } from "$utils/chartLogo.js";
 	import { compactNumber } from "$utils/format.js";
 	import DownloadIcon from "@lucide/svelte/icons/download";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
@@ -356,7 +356,7 @@
 		const clone = src.cloneNode(true);
 		const from = src.querySelectorAll("*");
 		const to = clone.querySelectorAll("*");
-		const PROPS = ["fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "stroke-linejoin", "opacity", "font-family", "font-size", "font-weight", "text-anchor", "color"];
+		const PROPS = ["fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "stroke-linejoin", "opacity", "font-family", "font-size", "font-weight", "text-anchor", "color", "paint-order", "fill-opacity", "stroke-opacity"];
 		to.forEach((node, i) => {
 			const cs = getComputedStyle(from[i]);
 			node.setAttribute("style", PROPS.map((p) => `${p}:${cs.getPropertyValue(p)}`).join(";"));
@@ -369,9 +369,15 @@
 		const svgUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(clone));
 		const img = new Image();
 		await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = svgUrl; });
-		const scale = 2, padX = 28, titleH = 68, footH = 40;
+		const scale = 2, padX = 28, footH = 40;
 		const canvas = document.createElement("canvas");
 		const ctx = canvas.getContext("2d");
+		// The logo sits top-right, beside the title, when there's room; on a
+		// narrow (phone) chart it gets its own row above the title instead.
+		const imgTitle = "What genres is Seattle checking out?";
+		ctx.font = '600 22px Georgia, "Times New Roman", serif';
+		const logoRow = ctx.measureText(imgTitle).width + 16 > w - chartLogoWidth(ctx) ? 30 : 0;
+		const titleH = 68 + logoRow;
 		// Lay out the legend (wrapped) first so we know how tall to make the canvas.
 		const LEG_FONT = '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 		// When lines are isolated, the exported chart draws only those — so the
@@ -400,11 +406,11 @@
 		ctx.textBaseline = "alphabetic";
 		ctx.fillStyle = "#1a1a1a";
 		ctx.font = '600 22px Georgia, "Times New Roman", serif';
-		ctx.fillText("What genres is Seattle checking out?", padX, 34);
+		ctx.fillText(imgTitle, padX, 34 + logoRow);
 		ctx.fillStyle = "#666666";
 		ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-		ctx.fillText(plotTitle, padX, 54);
-		await drawChartLogo(ctx, padX + w, 26);
+		ctx.fillText(plotTitle, padX, 54 + logoRow);
+		await drawChartLogo(ctx, logoRow ? padX + chartLogoWidth(ctx) : padX + w, logoRow ? 18 : 26);
 		ctx.drawImage(img, padX, titleH, w, h);
 		if (showLegend) {
 			ctx.font = LEG_FONT;
