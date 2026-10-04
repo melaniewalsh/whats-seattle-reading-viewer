@@ -542,6 +542,14 @@
 
 		// horizontal index (Month)
 		const px = (event.clientX - r.left) * (width / r.width);
+		// Past the plot's ends (over the line names on the right): no tooltip.
+		// Otherwise hovering a name snapped to the last month and showed
+		// whichever line happened to be nearest.
+		if (!pinned && (px > x(months.length - 1) + 8 || px < x(0) - 8)) {
+			hoverIndex = null;
+			hoveredSeriesKey = null;
+			return;
+		}
 		const i = Math.round(x.invert(px));
 		hoverIndex = Math.min(Math.max(i, 0), months.length - 1);
 
