@@ -142,7 +142,7 @@
 			{#each results as r}
 				<li>
 					<button type="button" class="ss-result" class:ss-sub={!!r.under} onclick={() => pick(r)}>
-						<span class="ss-name">{r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name)}</span>
+						<span class="ss-name">{labelOf(r)}{#if r.kind === "work" && !r.under && r.author}<span class="ss-by">{" · "}{displayName(r.author)}</span>{/if}</span>
 						<span class="ss-kind {r.kind === 'work' ? 'kind-book' : 'kind-author'}">{r.kind === "work" ? "Book" : "Author"}</span>
 					</button>
 				</li>
@@ -262,6 +262,8 @@
 	.ss-sub { padding: 6px 10px 6px 26px; font-size: 14px; color: var(--color-fg-light); }
 	.ss-sub .ss-name { font-style: italic; }
 	.ss-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	/* Which author a suggested book is by ("Ulysses · James Joyce"). */
+	.ss-by { color: var(--color-fg-light); font-size: 0.92em; }
 	.ss-kind {
 		flex: none;
 		font-size: 0.62rem;
