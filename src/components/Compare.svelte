@@ -294,7 +294,7 @@
 	.tb-btn:hover { background: #e4e6e8; color: var(--color-fg); }
 	.tb-btn :global(svg) { width: 13px; height: 13px; flex: none; }
 
-	.cmp-table { width: 100%; max-width: 760px; margin: 28px 0 8px; border-collapse: collapse; font-size: 15px; }
+	.cmp-table { width: 100%; margin: 28px 0 8px; border-collapse: collapse; font-size: 15px; }
 	.cmp-table th { padding: 0 8px 6px; font-size: 12.5px; font-weight: 500; color: var(--color-fg-light); text-align: left; border-bottom: 1px solid var(--color-border); }
 	.cmp-table td { padding: 9px 8px; border-bottom: 1px solid var(--color-border); vertical-align: baseline; }
 	.cmp-table td:first-child .chip-sw { margin-right: 8px; }
@@ -303,7 +303,7 @@
 	.row-link { padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
 	.row-link.is-work { font-weight: 500; }
 	.row-link:hover { text-decoration-color: currentColor; }
-	.cmp-table .chip-by { margin-left: 6px; }
+	.cmp-table .chip-by { margin-left: 6px; white-space: nowrap; }
 	@media (max-width: 600px) {
 		.cmp-table .muted { display: block; }
 	}
