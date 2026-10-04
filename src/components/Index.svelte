@@ -305,11 +305,13 @@
 		[["Sally Rooney", "a~sally-rooney"], ["Ben Lerner", "a~ben-lerner-1979"]],
 		[["Beverly Cleary", "a~beverly-cleary"], ["Judy Blume", "a~judy-blume"]],
 	];
-	let HOME_COMPARE = $state(HOME_PAIRS[0].map(([label]) => label).join(", "));
+	let homePair = $state(HOME_PAIRS[0]);
+	const HOME_COMPARE = $derived(homePair.map(([label]) => label).join(", "));
 	onMount(() => {
-		const pair = HOME_PAIRS[Math.floor(Math.random() * HOME_PAIRS.length)];
-		HOME_COMPARE = pair.map(([label]) => label).join(", ");
+		homePair = HOME_PAIRS[Math.floor(Math.random() * HOME_PAIRS.length)];
 	});
+	// The single picks after it: three, none already in the pair.
+	const homeTryShown = $derived(HOME_TRY.filter((t) => !homePair.some(([label]) => label === t.label)).slice(0, 3));
 	async function homeSurprise() {
 		const a = await randomAuthor();
 		if (a) openAuthor(a.slug);
@@ -537,7 +539,10 @@
 				<SiteSearch bind:this={homeSearch} multi value={HOME_COMPARE} selectOnFocus onPick={pickSearch} onSubmit={submitSearch} placeholder="Search any author or book (commas compare)" />
 				<p class="home-try">
 					<span class="ht-lead">Try</span>
-					{#each HOME_TRY as t, k}{#if k}<span class="ht-sep ht-extra" aria-hidden="true">·</span>{/if}<button class="ht-link" class:ht-extra={k > 0} class:is-title={!!t.title} onclick={() => (t.title ? openTitle(t.title, t.slug) : openAuthor(t.slug))}>{t.label}</button>{/each}
+					<!-- First: the comparison already in the box, one click away (in
+					     case it isn't obvious that Enter runs it). -->
+					<button class="ht-link" onclick={() => showCompare(homePair.map(([, id]) => id))}>{homePair.map(([label]) => label).join(" vs. ")}</button>
+					{#each homeTryShown as t}<span class="ht-sep ht-extra" aria-hidden="true">·</span><button class="ht-link ht-extra" class:is-title={!!t.title} onclick={() => (t.title ? openTitle(t.title, t.slug) : openAuthor(t.slug))}>{t.label}</button>{/each}
 					<span class="ht-sep" aria-hidden="true">·</span>
 					<button class="ht-link ht-surprise" onclick={homeSurprise}>Surprise me</button>
 				</p>
