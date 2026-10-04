@@ -2,6 +2,22 @@
 // Grouped by year (and month, when given) in the Publications view.
 export const publications = [
 	{
+		year: "2026",
+		title:
+			"What’s Seattle Reading? An Interactive Viewer and Open Data Pipeline for Two Decades of Public Library Circulation.",
+		url: "https://melaniewalsh.github.io/whats-seattle-reading-viewer/",
+		citation:
+			"Melanie Walsh, Neel Gupta, E. Tiago Ramos, Alexis Martin, Karalee Harris, and Lurier Bao. ACM/IEEE Joint Conference on Digital Libraries (JCDL 2026).",
+		links: [{ label: "Viewer", url: "https://melaniewalsh.github.io/whats-seattle-reading-viewer/" }],
+		bibtex: `@inproceedings{walshWhatsSeattleReading2026,
+  title = {What's {{Seattle Reading}}? {{An Interactive Viewer}} and {{Open Data Pipeline}} for {{Two Decades}} of {{Public Library Circulation}}},
+  author = {Walsh, Melanie and Gupta, Neel and Ramos, E. Tiago and Martin, Alexis and Harris, Karalee and Bao, Lurier},
+  booktitle = {ACM/IEEE Joint Conference on Digital Libraries (JCDL 2026)},
+  year = {2026},
+  url = {https://melaniewalsh.github.io/whats-seattle-reading-viewer/}
+}`,
+	},
+	{
 		year: "2025",
 		month: "December",
 		title:
