@@ -1827,7 +1827,7 @@
 	// 1991)" for an author, "2018 novel by Sally Rooney" for a book. Only shown
 	// when it plausibly describes a writer or a book (a same-named place or
 	// musician is skipped).
-	const DESC_OK = /(author|writer|novelist|poet|journalist|illustrator|cartoonist|historian|playwright|screenwriter|essayist|biographer|memoirist|scholar|critic|editor|professor|philosopher|scientist|activist|politician|comedian|chef|economist|psychologist|novel|book|memoir|collection|series|poem|play|essay|story|graphic)/i;
+	const DESC_OK = /(author|writer|novelist|poet|journalist|illustrator|cartoonist|historian|playwright|screenwriter|essayist|biographer|memoirist|scholar|critic|editor|professor|philosopher|scientist|activist|politician|president|first lady|comedian|chef|economist|psychologist|novel|book|memoir|collection|series|poem|play|essay|story|graphic)/i;
 	const DESC_PERSON = /(author|writer|novelist|poet|journalist|illustrator|cartoonist|historian|playwright|screenwriter|essayist|biographer|memoirist|scholar|critic|editor|professor|philosopher|scientist|activist|politician|comedian|chef|economist|psychologist|actor|actress|musician|singer|artist|lawyer|physician|theologian|priest|monk|teacher|educator|entrepreneur|television|personality|founder|leader|general|president|emperor|king|queen|saint|(born|died|\d{4}[–-]\d{4}))/i;
 	const DESC_WORK = /\b(novels?|novellas?|books?|memoirs?|collection|series|poems?|poetry|play|essays?|story|stories|graphic|comics?|manga|autobiography|biography|nonfiction|non-fiction|cookbook|anthology|epic|treatise|saga|trilogy)\b/i;
 	let headDesc = $state("");

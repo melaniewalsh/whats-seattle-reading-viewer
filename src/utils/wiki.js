@@ -100,6 +100,18 @@ function looksLikePerson(s) {
 	);
 }
 
+// Looser: is this an article about a PERSON at all? Good enough when the article's
+// title is exactly the author's name -- a famous author whose fame is something
+// else ("Barack Obama": "President of the United States from 2009 to 2017").
+function looksLikeAnyPerson(s) {
+	if (!s) return false;
+	if (looksLikePerson(s)) return true;
+	const hay = `${s.description || ""} ${(s.extract || "").slice(0, 300)}`.toLowerCase();
+	return /\b(politician|president|first lady|senator|governor|prime minister|actor|actress|musician|singer|rapper|comedian|activist|lawyer|judge|scientist|physician|professor|historian|philosopher|theologian|businessman|businesswoman|entrepreneur|chef|athlete|player|coach|artist|director|producer|host|personality|(19|20)\d\d)\b|\(\d{4}[–-]\d{4}\)/.test(
+		hay,
+	);
+}
+
 // Rank an author's candidate Wikipedia titles from a name-scoped, occupation-biased
 // search: an author/illustrator-qualified page first, then other qualified pages,
 // then the bare name (which for ambiguous names is usually a disambiguation) last.
@@ -145,7 +157,7 @@ function nameVariants(name) {
 // writer/illustrator — so "Peter Brown" resolves to the children's illustrator,
 // and "Lincoln C. Peirce" to the "Lincoln Peirce" cartoonist page.
 export function wikiSummary(name) {
-	return cached(`wiki6:${(name || "").trim().toLowerCase()}`, async () => {
+	return cached(`wiki7:${(name || "").trim().toLowerCase()}`, async () => {
 		const variants = nameVariants(name);
 		let firstDirect = null;
 		for (const v of variants) {
@@ -153,13 +165,20 @@ export function wikiSummary(name) {
 			if (direct && looksLikePerson(direct)) return direct;
 			if (direct && !firstDirect) firstDirect = direct;
 		}
+		// The exact-name page is about a person, just not mainly a writer
+		// (Barack Obama, Michelle Obama): that's them.
+		if (firstDirect && looksLikeAnyPerson(firstDirect)) return firstDirect;
+		// Otherwise search, but only trust pages named for this author (same
+		// surname), so a writer who merely wrote ABOUT them never stands in.
+		const surname = (name || "").trim().split(/\s+/).pop()?.toLowerCase() || "";
 		for (const v of variants) {
-			for (const t of (await authorTitleCandidates(v)).slice(0, 4)) {
+			const cands = (await authorTitleCandidates(v)).filter((t) => !surname || t.toLowerCase().includes(surname));
+			for (const t of cands.slice(0, 4)) {
 				const s = await summaryByTitle(t);
 				if (s && looksLikePerson(s)) return s;
 			}
 		}
-		return firstDirect;
+		return firstDirect && looksLikeAnyPerson(firstDirect) ? firstDirect : null;
 	});
 }
 
