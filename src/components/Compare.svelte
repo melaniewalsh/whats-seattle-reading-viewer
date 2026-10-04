@@ -6,6 +6,11 @@
 	// comparison can be shared.
 	import { onMount } from "svelte";
 	import LinkIcon from "@lucide/svelte/icons/link";
+	import DownloadIcon from "@lucide/svelte/icons/download";
+	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+	import TableIcon from "@lucide/svelte/icons/table";
+	import ImageIcon from "@lucide/svelte/icons/image";
+	import { renderChartPng, saveBlob } from "$utils/chartImage.js";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
@@ -42,6 +47,8 @@
 	let yearHi = $state(0);
 	let plotInset = $state(0);
 	let copied = $state(false);
+	let dlOpen = $state(false);
+	let chartWrap = $state(null);
 	let notFound = $state("");
 
 	// One fetch per author, shared by every pick from that author.
@@ -176,6 +183,33 @@
 		})
 	);
 
+	// Downloads: the chart as an image, or every month's checkouts as a CSV.
+	const fileStub = () =>
+		picks.map((p) => p.label).join("-vs-").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "compare";
+	async function downloadImage() {
+		dlOpen = false;
+		const labels = picks.map((p) => p.label);
+		const title = labels.length <= 3 ? labels.join(" vs. ") : `Comparing ${labels.length} authors and books`;
+		const yrs = viewMonths.length ? `, ${viewMonths[0].slice(0, 4)}–${viewMonths[viewMonths.length - 1].slice(0, 4)}` : "";
+		const blob = await renderChartPng(chartWrap?.querySelector("svg"), {
+			title,
+			subtitle: `Checkouts a month at the Seattle Public Library${yrs}${smooth ? " (3-month average)" : ""}`,
+			legend: picks.map((p) => ({ label: p.kind === "work" ? `${p.label} (${p.author})` : p.label, color: p.color }))
+		});
+		if (blob) saveBlob(blob, `${fileStub()}-spl-checkouts.png`);
+	}
+	function downloadData() {
+		dlOpen = false;
+		const cell = (v) => {
+			const t = String(v ?? "");
+			return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+		};
+		const head = ["date", ...picks.map((p) => (p.kind === "work" ? `${p.label} (${p.author})` : p.label))];
+		const rows = months.map((m, i) => [`${m}-01`, ...picks.map((p) => p.values[i] || 0)]);
+		const csv = [head, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
+		saveBlob(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }), `${fileStub()}-spl-checkouts.csv`);
+	}
+
 	function copyLink() {
 		try {
 			navigator.clipboard.writeText(window.location.href);
@@ -211,7 +245,7 @@
 		</div>
 		{#if picks.length && months.length}
 			<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
-			<LineChart bind:plotInset months={viewMonths} {series} mode="line" {smooth} annotations={EVENT_ANNOTATIONS} />
+			<div bind:this={chartWrap}><LineChart bind:plotInset months={viewMonths} {series} mode="line" {smooth} annotations={EVENT_ANNOTATIONS} /></div>
 			{#if series.length >= 2}
 				<div class="cmp-legend">
 					{#each picks as p (p.id)}<span class="cl-item"><span class="cl-sw" style="background:{p.color}"></span>{p.label}</span>{/each}
@@ -222,7 +256,19 @@
 			{/if}
 			<div class="chart-foot" style="padding-right: {plotInset}px">
 				<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>, every edition (print, ebook and audiobook).{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.</p>
-				<button class="tb-btn" onclick={copyLink}><LinkIcon size={13} strokeWidth={2} aria-hidden="true" /> {copied ? "Link copied" : "Copy link"}</button>
+				<div class="foot-actions">
+					<span class="dl-wrap">
+						<button class="tb-btn" onclick={() => (dlOpen = !dlOpen)} aria-haspopup="true" aria-expanded={dlOpen}><DownloadIcon size={13} strokeWidth={2} aria-hidden="true" /> Download <ChevronDownIcon size={12} strokeWidth={2} aria-hidden="true" /></button>
+						{#if dlOpen}
+							<button class="dl-backdrop" aria-label="Close download menu" onclick={() => (dlOpen = false)}></button>
+							<div class="dl-menu" role="menu">
+								<button role="menuitem" onclick={downloadData}><TableIcon size={15} strokeWidth={2} aria-hidden="true" /> Data <span class="dl-fmt">CSV</span></button>
+								<button role="menuitem" onclick={downloadImage}><ImageIcon size={15} strokeWidth={2} aria-hidden="true" /> Image <span class="dl-fmt">PNG</span></button>
+							</div>
+						{/if}
+					</span>
+					<button class="tb-btn" onclick={copyLink}><LinkIcon size={13} strokeWidth={2} aria-hidden="true" /> {copied ? "Link copied" : "Copy link"}</button>
+				</div>
 			</div>
 			</div>
 		{:else if loading}
@@ -293,6 +339,14 @@
 	.tb-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border: 0; border-radius: 6px; background: #f1f2f3; font: inherit; font-size: 12.5px; font-weight: 500; color: #555; cursor: pointer; }
 	.tb-btn:hover { background: #e4e6e8; color: var(--color-fg); }
 	.tb-btn :global(svg) { width: 13px; height: 13px; flex: none; }
+	.foot-actions { display: flex; gap: 8px; align-items: center; flex: none; }
+	.dl-wrap { position: relative; }
+	.dl-backdrop { position: fixed; inset: 0; z-index: 20; background: none; border: 0; cursor: default; }
+	.dl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 21; min-width: 170px; padding: 4px; background: #fff; border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.25); }
+	.dl-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 14px; color: var(--color-fg); text-align: left; cursor: pointer; }
+	.dl-menu button:hover { background: var(--color-gray-100); }
+	.dl-fmt { margin-left: auto; font-size: 12px; color: var(--color-fg-light); }
+	@media (max-width: 640px) { .dl-menu { left: 0; right: auto; } }
 
 	.cmp-table { width: 100%; margin: 28px 0 8px; border-collapse: collapse; font-size: 15px; }
 	.cmp-table th { padding: 0 8px 6px; font-size: 12.5px; font-weight: 500; color: var(--color-fg-light); text-align: left; border-bottom: 1px solid var(--color-border); }

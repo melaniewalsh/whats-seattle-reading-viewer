@@ -81,7 +81,7 @@
 				<li>
 					<button class="ss-result" class:ss-sub={!!r.under} onclick={() => pick(r)}>
 						<span class="ss-name">{r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name)}</span>
-						{#if !r.under}<span class="ss-kind {r.kind === 'work' ? 'kind-book' : 'kind-author'}">{r.kind === "work" ? "Book" : "Author"}</span>{/if}
+						<span class="ss-kind {r.kind === 'work' ? 'kind-book' : 'kind-author'}">{r.kind === "work" ? "Book" : "Author"}</span>
 					</button>
 				</li>
 			{/each}
