@@ -32,9 +32,9 @@
 	// The project (this site) and the library's dataset are cited separately.
 	// The project's citation is its JCDL 2026 paper.
 	const PROJECT_TITLE = "What’s Seattle Reading? An Interactive Viewer and Open Data Pipeline for Two Decades of Public Library Circulation";
-	const project = $derived(`Melanie Walsh, Neel Gupta, E. Tiago Ramos, Alexis Martin, Karalee Harris, and Lurier Bao. “${PROJECT_TITLE}.” ACM/IEEE Joint Conference on Digital Libraries (JCDL 2026), 2026. ${siteUrl}`);
+	const project = $derived(`Melanie Walsh, Neel Gupta, E. Tiago Ramos, Alexis Martin, Karalee Harris, and Lurier Bao. “${PROJECT_TITLE}.” ACM/IEEE Joint Conference on Digital Libraries (JCDL 2026), 2026. https://doi.org/10.1145/3805696.3848491`);
 	const projectBib = $derived(
-		`@inproceedings{walshWhatsSeattleReading2026,\n  title = {What's {{Seattle Reading}}? {{An Interactive Viewer}} and {{Open Data Pipeline}} for {{Two Decades}} of {{Public Library Circulation}}},\n  author = {Walsh, Melanie and Gupta, Neel and Ramos, E. Tiago and Martin, Alexis and Harris, Karalee and Bao, Lurier},\n  booktitle = {ACM/IEEE Joint Conference on Digital Libraries (JCDL 2026)},\n  year = {2026},\n  url = {${siteUrl}}\n}`,
+		`@inproceedings{walshWhatsSeattleReading2026,\n  title = {What's {{Seattle Reading}}? {{An Interactive Viewer}} and {{Open Data Pipeline}} for {{Two Decades}} of {{Public Library Circulation}}},\n  author = {Walsh, Melanie and Gupta, Neel and Ramos, E. Tiago and Martin, Alexis and Harris, Karalee and Bao, Lurier},\n  booktitle = {ACM/IEEE Joint Conference on Digital Libraries (JCDL 2026)},\n  year = {2026},\n  doi = {10.1145/3805696.3848491},\n  url = {${siteUrl}}\n}`,
 	);
 	// The data paper (Journal of Open Humanities Data), from the Publications list.
 	const paper = publications.find((p) => /johd/i.test(p.doi || ""));
