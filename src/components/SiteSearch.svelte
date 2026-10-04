@@ -1,12 +1,22 @@
 <script>
-	// The site's search field: a live autocomplete over authors AND books. It
-	// lives on the Checkout Trends page; the nav's magnifying glass brings you
-	// to it (Index.svelte calls focus()).
+	// The site's search field: a live autocomplete over authors AND books.
+	//
+	// With `multi` (the Checkout Trends page), it works like the Google Books
+	// Ngram Viewer: the field keeps what's on the chart ("Sally Rooney"), and a
+	// comma adds another ("Sally Rooney, Colleen Hoover") -- the suggestions are
+	// for whatever comes after the last comma. Enter (or a suggestion) hands the
+	// whole list to onSubmit(text, lastPick).
 	import { searchAll } from "$components/db.js";
 	import { cleanTitleForDisplay } from "$utils/workTitle.js";
 	import { displayName } from "$utils/displayName.js";
 
-	let { onPick = () => {}, placeholder = "Search authors or books" } = $props();
+	let {
+		onPick = () => {},
+		onSubmit = null,
+		multi = false,
+		value = "",
+		placeholder = "Search authors or books"
+	} = $props();
 
 	let q = $state("");
 	let results = $state([]);
@@ -15,10 +25,21 @@
 	let inputEl;
 	let timer;
 
+	// The page tells us what's on the chart; show it (unless mid-typing).
+	$effect(() => {
+		const v = value;
+		if (document.activeElement !== inputEl) q = v;
+	});
+
+	export const labelOf = (r) => (r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name));
+	// The part being typed: after the last comma (multi), else everything.
+	const segment = () => (multi ? q.split(",").pop() : q).trim();
+	const hasList = () => multi && q.split(",").filter((t) => t.trim()).length > 1;
+
 	function onInput() {
 		open = true;
 		clearTimeout(timer);
-		const needle = q.trim();
+		const needle = segment();
 		timer = setTimeout(async () => {
 			if (needle.length < 2) { results = []; return; }
 			try { results = await searchAll(needle, 8); } catch { results = []; }
@@ -26,8 +47,16 @@
 	}
 	function pick(res) {
 		open = false;
-		q = "";
 		results = [];
+		if (multi) {
+			// Swap the typed bit for the chosen name, and hand over the list.
+			const parts = q.split(",");
+			parts[parts.length - 1] = (parts.length > 1 ? " " : "") + labelOf(res);
+			q = parts.join(",");
+			if (onSubmit && hasList()) { inputEl?.blur(); return onSubmit(q, res); }
+			return onPick(res);
+		}
+		q = "";
 		onPick(res);
 	}
 	// We render our own × (the native one on <input type="search"> fires a
@@ -40,13 +69,25 @@
 		inputEl?.focus();
 	}
 	function onKey(e) {
-		if (e.key === "Enter" && results.length) { e.preventDefault(); pick(results[0]); }
-		else if (e.key === "Escape") open = false;
+		if (e.key === "Escape") { open = false; return; }
+		if (e.key !== "Enter") return;
+		e.preventDefault();
+		const seg = segment();
+		// A half-typed name with suggestions showing: take the top one.
+		const typedNew = seg && results.length && open && !results.some((r) => labelOf(r).toLowerCase() === seg.toLowerCase());
+		if (typedNew) return pick(results[0]);
+		open = false;
+		// Let go of the field so it can show the list as the page settles it
+		// (proper spellings: "wuthering heights" -> "Wuthering Heights").
+		if (multi && onSubmit && q.trim()) { inputEl?.blur(); return onSubmit(q, null); }
+		if (results.length) pick(results[0]);
 	}
-	// Put the cursor here; with ring=true, also pulse a blue ring around the
-	// field so it's clear where to type.
-	export function focus(ring = false) {
+	// Put the cursor here (at the end); with ring=true, also pulse a blue ring
+	// around the field so it's clear where to type. `text` replaces the value.
+	export function focus(ring = false, text = null) {
+		if (text != null) q = text;
 		inputEl?.focus({ preventScroll: true });
+		try { inputEl?.setSelectionRange(q.length, q.length); } catch {}
 		if (!ring) return;
 		flash = false;
 		setTimeout(() => (flash = true), 20);
@@ -68,13 +109,13 @@
 		spellcheck="false"
 		bind:value={q}
 		oninput={onInput}
-		onfocus={() => (open = true)}
+		onfocus={() => (open = results.length > 0)}
 		onkeydown={onKey}
 	/>
 	{#if q}
 		<button class="ss-clear" aria-label="Clear search" onclick={clear}>×</button>
 	{/if}
-	{#if open && (results.length || q.trim().length >= 2)}
+	{#if open && (results.length || segment().length >= 2)}
 		<button class="ss-backdrop" aria-label="Close search" onclick={() => (open = false)}></button>
 		<ul class="ss-results" role="listbox">
 			{#each results as r}
@@ -86,7 +127,7 @@
 				</li>
 			{/each}
 			{#if !results.length}
-				<li><p class="ss-none">Nothing found for “{q.trim()}”.</p></li>
+				<li><p class="ss-none">Nothing found for “{segment()}”.</p></li>
 			{/if}
 		</ul>
 	{/if}

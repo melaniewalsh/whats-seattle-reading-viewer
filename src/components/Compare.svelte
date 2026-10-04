@@ -24,7 +24,7 @@
 
 	// onSingle(pick): removing picks left just one -> show its own page.
 	// onEmpty(): every pick removed.
-	let { openAuthor = () => {}, openTitle = () => {}, onSingle = () => {}, onEmpty = () => {} } = $props();
+	let { openAuthor = () => {}, openTitle = () => {}, onSingle = () => {}, onEmpty = () => {}, onPicks = () => {} } = $props();
 	// Phones: the year slider and the Download/Share row run the full width
 	// (the plot itself is narrower, beside the line names).
 	const phone = new MediaQuery("max-width: 600px");
@@ -120,6 +120,7 @@
 		yearHi = Math.max(months.length - 1, 0);
 		for (const id of ids) await addPick(id);
 	}
+	export const setPicksFromIds = (ids) => setPicks(ids);
 	export function addFromSearch(res) {
 		addPick(res.kind === "work" ? `w~${res.slug}~${res.title}` : `a~${res.slug}`);
 	}
@@ -133,6 +134,8 @@
 			for (const p of picks) url.searchParams.append("c", p.id);
 			window.history.replaceState({}, "", url);
 		} catch {}
+		// The page's search field shows the list ("Sally Rooney, Colleen Hoover").
+		onPicks(picks.map((p) => ({ id: p.id, label: p.label })));
 	}
 
 	onMount(async () => {
@@ -224,19 +227,7 @@
 </script>
 
 <div class="compare">
-	{#if picks.length}
-		<ul class="chips" aria-label="On the chart">
-			{#each picks as p (p.id)}
-				<li class="chip">
-					<span class="chip-sw" style="background:{p.color}"></span>
-					<span class="chip-name" class:is-work={p.kind === "work"}>{p.label}</span>
-					{#if p.kind === "work"}<span class="chip-by">{p.author}</span>{/if}
-					<button class="chip-x" aria-label="Remove {p.label}" title="Remove" onclick={() => removePick(p.id)}>×</button>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-	{#if picks.length === 1}<p class="cmp-note">Now search above for another author or book to compare.</p>{/if}
+	{#if picks.length === 1}<p class="cmp-note">Add a comma and another author or book above to compare.</p>{/if}
 	<p class="try-row">
 		<span class="try-lead">Try</span>
 		{#each MATCHUPS as m, k}{#if k}<span class="try-sep" aria-hidden="true">·</span>{/if}<button class="try-link" onclick={() => setPicks(m.picks)}>{m.label}</button>{/each}

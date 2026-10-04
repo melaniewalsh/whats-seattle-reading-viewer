@@ -41,7 +41,7 @@
 	// resolve to its author, open the author's drilldown with that work highlighted.
 	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
 	// (the "By author" tab -> open straight to the search box).
-	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {}, onCompare = null } = $props();
+	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {}, onCompare = null, onLoaded = null } = $props();
 	// Phones: the year slider and the Download/Share row run the full width
 	// (the plot itself is narrower, beside the line names).
 	const phone = new MediaQuery("max-width: 600px");
@@ -412,6 +412,20 @@
 	}
 
 	// "Surprise me": jump to a random author (or title in title mode).
+	// Tell the page what's on the chart, so its search field can show it
+	// ("Sally Rooney") and a comma can add more.
+	$effect(() => {
+		if (!onLoaded || !current || isOverview || !currentSlug) return;
+		if (searchMode === "title") {
+			if (!searchedWork) return;
+			let t = null;
+			try { t = new URLSearchParams(window.location.search).get("title"); } catch {}
+			onLoaded({ id: `w~${currentSlug}~${t || searchedWork.name}`, label: headingText || searchedWork.name });
+		} else {
+			onLoaded({ id: `a~${currentSlug}`, label: displayName(current.name) });
+		}
+	});
+
 	// "+ Compare": hand this author (or, on a book page, this book) to the
 	// compare view, as the first line.
 	function startCompare() {

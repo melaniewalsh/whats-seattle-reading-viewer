@@ -11,7 +11,7 @@
 	import TrendingUp from "@lucide/svelte/icons/trending-up";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import SiteSearch from "$components/SiteSearch.svelte";
-	import { getMonths, getAuthor, searchTitles, densify, randomAuthor } from "$components/db.js";
+	import { getMonths, getAuthor, searchTitles, searchAll, densify, randomAuthor } from "$components/db.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { compactNumber } from "$utils/format.js";
@@ -88,6 +88,7 @@
 	function go(t) {
 		tab = t;
 		compareMode = false;
+		searchText = "";
 		menuOpen = false;
 		// Reset the URL to this tab so a stale ?title/?author from a previous
 		// drilldown doesn't linger (and hijack the view on reload / Back).
@@ -297,24 +298,76 @@
 	}
 	let cmp = $state(null); // the compare view, when it's showing
 	let compareMode = $state(false);
-	function pickSearch(res) {
-		if (compareMode && cmp) return cmp.addFromSearch(res);
-		if (res.kind === "work") openTitle(res.title, res.slug);
-		else openAuthor(res.slug);
+
+	// The Checkout Trends search field works like the Ngram Viewer: it shows
+	// what's on the chart ("Sally Rooney"), and a comma-separated list
+	// ("Sally Rooney, Colleen Hoover") puts them all on one chart.
+	let searchText = $state("");
+	const knownIds = new Map(); // lowercased name -> pick id ("a~slug" / "w~slug~title")
+	const idOf = (res) => (res.kind === "work" ? `w~${res.slug}~${res.title}` : `a~${res.slug}`);
+	function remember(label, id) {
+		if (label && id) knownIds.set(label.trim().toLowerCase(), id);
 	}
-	// "+ Compare" on an author or book page: that one becomes the first line,
-	// and the search field waits for the next. (Back returns to its page.)
-	function startCompare(id) {
+	// Split on commas, but not inside a name we already know has one.
+	function splitNames(text) {
+		let t = text;
+		const kept = [];
+		[...knownIds.keys()].filter((k) => k.includes(",")).sort((a, b) => b.length - a.length).forEach((k) => {
+			const re = new RegExp(k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+			t = t.replace(re, (m) => { kept.push(m); return `\u0000${kept.length - 1}\u0000`; });
+		});
+		return t.split(",").map((n) => n.replace(/\u0000(\d+)\u0000/g, (_, i) => kept[i]).trim()).filter(Boolean);
+	}
+	function openId(id) {
+		const [k, slug, ...rest] = id.split("~");
+		if (k === "w") openTitle(rest.join("~"), slug);
+		else openAuthor(slug);
+	}
+	function pickSearch(res) {
+		remember(pageSearch?.labelOf(res), idOf(res));
+		openId(idOf(res));
+	}
+	// Enter (or a suggestion) with the field's whole list: one name opens its
+	// page; two or more put them side by side.
+	async function submitSearch(text, last) {
+		if (last) remember(pageSearch?.labelOf(last), idOf(last));
+		const ids = [];
+		for (const name of splitNames(text)) {
+			let id = knownIds.get(name.toLowerCase());
+			if (!id) {
+				const hit = (await searchAll(name, 1).catch(() => []))[0];
+				if (hit) { id = idOf(hit); remember(name, id); }
+			}
+			if (id && !ids.includes(id)) ids.push(id);
+		}
+		if (ids.length === 1) return openId(ids[0]);
+		if (ids.length > 1) showCompare(ids);
+	}
+	function showCompare(ids) {
+		if (compareMode && cmp) return cmp.setPicksFromIds(ids);
 		try {
 			const url = new URL(window.location);
 			["tab", "kind", "genre", "year", "author", "title", "c"].forEach((k) => url.searchParams.delete(k));
-			url.searchParams.append("c", id);
+			ids.forEach((id) => url.searchParams.append("c", id));
 			window.history.pushState({}, "", url);
 		} catch {}
 		compareMode = true;
 		searchNonce++;
 		tab = "search";
-		focusSearch();
+	}
+	// What's on the chart, reported by the trends page / the compare view.
+	function onLoaded({ id, label }) {
+		remember(label, id);
+		searchText = label;
+	}
+	function onPicks(list) {
+		list.forEach((p) => remember(p.label, p.id));
+		searchText = list.map((p) => p.label).join(", ");
+	}
+	// "+ Compare": a comma after the current name, cursor ready for the next.
+	function startCompare() {
+		window.scrollTo({ top: 0 });
+		pageSearch?.focus(true, searchText ? `${searchText}, ` : "");
 	}
 	// The menu's "Compare": the compare view with a starter matchup.
 	function openCompare() {
@@ -382,7 +435,6 @@
 					<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
 						<circle cx="9" cy="9" r="6" /><line x1="13.5" y1="13.5" x2="18" y2="18" />
 					</svg>
-					<span class="msb-txt">Search</span>
 				</button>
 				<nav class="mast-meta" aria-label="Site">
 					<button class="mast-metalink" class:active={tab === "about"} aria-current={tab === "about" ? "page" : undefined} onclick={() => go("about")}>About</button>
@@ -430,7 +482,7 @@
 			<header class="section-masthead no-rule">
 				<h2 class="sec-title">Seattle's Checkout Trends</h2>
 				<p class="sec-sub">Look up any author or title's borrowing trend at the Seattle Public Library.</p>
-				<div class="page-search"><SiteSearch bind:this={pageSearch} onPick={pickSearch} placeholder={compareMode ? "Add an author or book to compare" : "Search authors or books"} /></div>
+				<div class="page-search"><SiteSearch bind:this={pageSearch} multi value={searchText} onPick={pickSearch} onSubmit={submitSearch} placeholder="Search authors or books (use commas to compare)" /></div>
 			</header>
 		{/if}
 
@@ -617,11 +669,11 @@
 			{#if compareMode}
 				<!-- Two or more authors/books: one line each (the page's search adds more). -->
 				{#key searchNonce}
-					<Compare bind:this={cmp} {openAuthor} {openTitle} onSingle={(p) => (p.kind === "work" ? openTitle(p.title, p.slug) : openAuthor(p.slug))} onEmpty={() => go("search")} />
+					<Compare bind:this={cmp} {openAuthor} {openTitle} {onPicks} onSingle={(p) => (p.kind === "work" ? openTitle(p.title, p.slug) : openAuthor(p.slug))} onEmpty={() => go("search")} />
 				{/key}
 			{:else}
 				{#key `${searchKind}-${searchNonce}`}
-					<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} {openTitle} onCompare={startCompare} />
+					<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} {openTitle} onCompare={startCompare} {onLoaded} />
 				{/key}
 			{/if}
 		{/if}
@@ -1194,27 +1246,28 @@
 		color: #3f88cc;
 		white-space: nowrap;
 	}
-	/* Nav search: a magnifying glass (plus "Search" on wider screens) that
-	   takes you to the search field on the Checkout Trends page. */
+	/* Nav search: just a magnifying glass. It takes you to a search field (the
+	   home page's, or the Checkout Trends page's). */
 	.mast-search-btn {
 		margin-left: auto;
 		display: inline-flex;
 		align-items: center;
-		gap: 7px;
-		height: 34px;
-		padding: 0 12px;
-		background: #fff;
-		border: 1.5px solid var(--color-border);
+		justify-content: center;
+		width: 36px;
+		height: 36px;
+		padding: 0;
+		background: none;
+		border: 0;
 		border-radius: 8px;
 		font-family: var(--font-sans);
 		font-size: 14px;
 		font-weight: 500;
-		color: var(--color-fg-light);
+		color: var(--color-fg);
 		cursor: pointer;
 		transition: border-color 0.12s, color 0.12s;
 	}
-	.mast-search-btn:hover { border-color: var(--color-fg-light); color: var(--color-fg); }
-	.mast-search-btn svg { width: 16px; height: 16px; flex: none; }
+	.mast-search-btn:hover { color: #3f88cc; }
+	.mast-search-btn svg { width: 20px; height: 20px; flex: none; }
 	.page-search { margin: 18px 0 0; }
 	/* Top-right meta links (About, …) — small and understated. */
 	.mast-meta {
@@ -1342,8 +1395,6 @@
 		/* About is in the hamburger menu on phones — drop the standalone link so the
 		   wordmark has room. */
 		.mast-metalink { display: none; }
-		.msb-txt { display: none; }
-		.mast-search-btn { width: 36px; padding: 0; justify-content: center; border-color: transparent; }
 	}
 
 	/* segmented sub-toggle (Author/Title, Authors/Works) beneath the main tabs */
