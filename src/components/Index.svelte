@@ -1215,12 +1215,14 @@
 	.masthead-top {
 		max-width: 1008px;
 		margin: 0 auto;
-		min-height: 46px;
+		/* A little more height, centered, with the search icon, About and the
+		   menu evenly spaced at the right. */
+		min-height: 58px;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 16px;
-		padding: 6px 24px 0;
+		gap: 22px;
+		padding: 0 24px;
 	}
 	.mast-home {
 		display: inline-flex;
@@ -1273,7 +1275,7 @@
 	.mast-meta {
 		display: flex;
 		align-items: center;
-		gap: 14px;
+		gap: 22px;
 	}
 	.mast-metalink {
 		font-family: var(--font-sans);
