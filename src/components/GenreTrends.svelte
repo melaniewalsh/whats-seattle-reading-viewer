@@ -9,6 +9,7 @@
 	// Showing both side-by-side is the point: you can see why "share of checkouts"
 	// looks like everything's rising until you make it a true partition.
 	import { onMount } from "svelte";
+	import { MediaQuery } from "svelte/reactivity";
 	import ImageIcon from "@lucide/svelte/icons/image";
 	import LinkIcon from "@lucide/svelte/icons/link";
 	import ShareIcon from "@lucide/svelte/icons/share-2";
@@ -22,6 +23,10 @@
 	import DataInfo from "$components/DataInfo.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
+
+	// Phones: the year slider and the Download/Share row run the full width
+	// (the plot itself is narrower, beside the line names).
+	const phone = new MediaQuery("max-width: 600px");
 
 	// Which table section each genre belongs to.
 	const GROUPS = [
@@ -522,14 +527,14 @@
 			</div>
 		{/if}
 
-		<YearBrush months={data.months} values={data.total} inset={plotInset} bind:lo bind:hi />
+		<YearBrush months={data.months} values={data.total} inset={phone.current ? 0 : plotInset} bind:lo bind:hi />
 		<!-- Source on the left; Download and Share as small links on the right -->
-		<div class="chart-foot" style="padding-right: {plotInset}px">
+		<div class="chart-foot" style="padding-right: {phone.current ? 0 : plotInset}px">
 			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap. <DataInfo first={data.months[0]} last={data.months[data.months.length - 1]} genres />.</p>
 			<div class="tb-right foot-actions">
 				<div class="dl-wrap">
 					<button class="tb-btn" onclick={() => (dlOpen = !dlOpen)} aria-haspopup="true" aria-expanded={dlOpen} title="Download the data or the chart">
-						<DownloadIcon size={15} strokeWidth={2} aria-hidden="true" /> Download <ChevronDownIcon size={14} strokeWidth={2} aria-hidden="true" />
+						<DownloadIcon size={15} strokeWidth={2} aria-hidden="true" /><span class="tb-txt"> Download</span><span class="tb-txt"><ChevronDownIcon size={14} strokeWidth={2} aria-hidden="true" /></span>
 					</button>
 					{#if dlOpen}
 						<button class="share-backdrop" aria-label="Close" onclick={() => (dlOpen = false)}></button>
@@ -541,7 +546,7 @@
 				</div>
 				<div class="share-wrap">
 					<button class="tb-btn" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}>
-						<ShareIcon size={15} strokeWidth={2} aria-hidden="true" /> Share
+						<ShareIcon size={15} strokeWidth={2} aria-hidden="true" /><span class="tb-txt"> Share</span>
 					</button>
 					{#if shareOpen}
 						<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
@@ -724,6 +729,13 @@
 	/* Phones: lines are named at their ends, so the legend only appears once some
 	   are picked out (to tap the others back in). */
 	@media (max-width: 600px) { .phone-legend.off-phone { display: none; } }
+	/* Phones: Download / Share as small square icon buttons, at the right. */
+	@media (max-width: 600px) {
+		.chart-foot .tb-txt { display: none; }
+		.chart-foot .tb-btn { width: 36px; height: 36px; padding: 0; justify-content: center; }
+		.chart-foot .tb-btn :global(svg) { width: 17px; height: 17px; }
+		.chart-foot .foot-actions { margin-left: auto !important; }
+	}
 	.books { margin: var(--space-6) 0 var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
 	.bk-head { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin: 0 0 10px; }
 	.bk-title { font-family: var(--font-sans); font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--color-fg); }

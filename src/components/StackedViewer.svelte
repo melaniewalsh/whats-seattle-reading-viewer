@@ -1,6 +1,7 @@
 <script>
 	// StackedViewer.svelte
 	import { onMount, tick, untrack } from "svelte";
+	import { MediaQuery } from "svelte/reactivity";
 	import { searchTitle as coreTitle } from "$utils/cleanTitle.js";
 	import ImageIcon from "@lucide/svelte/icons/image";
 	import LinkIcon from "@lucide/svelte/icons/link";
@@ -40,6 +41,9 @@
 	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
 	// (the "By author" tab -> open straight to the search box).
 	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {}, onCompare = null } = $props();
+	// Phones: the year slider and the Download/Share row run the full width
+	// (the plot itself is narrower, beside the line names).
+	const phone = new MediaQuery("max-width: 600px");
 
 	// Colors for title lines.
 	// Palette for the stacked "All titles" bands. Leads with the site blue so the
@@ -2277,6 +2281,23 @@
 		<div class="author">
 			<div class="split" class:collapsed={tableCollapsed}>
 			<div class="split-main" bind:this={titleEl}>
+			<!-- Phones: everything past Total / By book lives under "Customize",
+			     above the name. -->
+			{#if !isOverview}
+				<div class="customize-row on-phone">
+					<button type="button" class="customize-btn" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>
+				</div>
+				{#if customizeOpen}
+					<div class="customize-panel on-phone">
+						{#if chartLineMode === "line"}
+							<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
+						{/if}
+						{#if onCompare && currentSlug}
+							<button type="button" class="compare-btn" onclick={startCompare}><PlusIcon size={15} strokeWidth={2.2} aria-hidden="true" /> Compare with another author or book</button>
+						{/if}
+					</div>
+				{/if}
+			{/if}
 			<div class="hd-top">
 			<!-- A book's cover sits beside its title and byline; subjects run full
 			     width underneath. Authors get no photo here (the hover card has it). -->
@@ -2405,19 +2426,7 @@
 					{#if onCompare && !isOverview && currentSlug}
 						<button type="button" class="compare-btn off-phone" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={15} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
 					{/if}
-					<!-- Phones: everything past Total / By book lives under "Customize". -->
-					<button type="button" class="customize-btn on-phone" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>
 					</div>
-					{#if customizeOpen}
-						<div class="customize-panel on-phone">
-							{#if chartLineMode === "line"}
-								<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
-							{/if}
-							{#if onCompare && !isOverview && currentSlug}
-								<button type="button" class="compare-btn" onclick={startCompare}><PlusIcon size={15} strokeWidth={2.2} aria-hidden="true" /> Compare with another author or book</button>
-							{/if}
-						</div>
-					{/if}
 					<!-- The chart, its slider and source line share one white panel -->
 					<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 					<div class="chart-wrap" bind:this={chartWrap}>
@@ -2462,11 +2471,11 @@
 			{/if}
 
 			{#if months.length - brushStart >= 24}
-				<YearBrush {months} values={brushValues} start={brushStart} inset={plotInset} bind:lo={yearLo} bind:hi={yearHi} />
+				<YearBrush {months} values={brushValues} start={brushStart} inset={phone.current ? 0 : plotInset} bind:lo={yearLo} bind:hi={yearHi} />
 			{/if}
 
 			<!-- Source on the left; Download and Share as small links on the right -->
-			<div class="chart-foot" style="padding-right: {plotInset}px">
+			<div class="chart-foot" style="padding-right: {phone.current ? 0 : plotInset}px">
 			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>.{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.{#if bookMarkers.length && chartLineMode === "line"}{" "}Book labels mark the month each title was first checked out at SPL.{/if}</p>
 			<div class="chart-actions tb-actions foot-actions">
 				<div class="dl-wrap">
@@ -4465,12 +4474,13 @@
 	.customize-btn.on { background: var(--color-gray-100); }
 	.customize-panel .compare-btn { width: auto; height: auto; text-align: left; }
 	.customize-panel .compare-btn :global(svg), .customize-btn :global(svg), .mode-toggle :global(svg) { width: 16px !important; height: 16px !important; flex: none; }
-	.customize-panel { flex-direction: column; align-items: flex-start; gap: 12px; margin: -6px 0 14px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: 8px; background: #fafafa; }
+	.customize-panel { flex-direction: column; align-items: flex-start; gap: 12px; margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: 8px; background: #fafafa; }
 	@media (max-width: 600px) {
 		.on-phone { display: inline-flex !important; }
 		.customize-panel.on-phone { display: flex !important; }
 		.off-phone { display: none !important; }
-		.hd-desc, .hdr-line, .hd-subjects, .hd-cover { display: none !important; }
+		.hd-desc, .hdr-line, .hd-subjects, .hd-cover, .hdr-actions { display: none !important; }
+		.customize-row.on-phone { display: flex !important; justify-content: flex-end; margin: 0 0 8px; }
 		.hd-main.has-cover { display: block; }
 		.mode-toggle .mt-txt { display: none; }
 		.mode-toggle button { padding: 7px 12px; }

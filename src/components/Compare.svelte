@@ -5,6 +5,7 @@
 	// Picks live in the URL (?c=a~<author-slug>&c=w~<author-slug>~<title>) so a
 	// comparison can be shared.
 	import { onMount } from "svelte";
+	import { MediaQuery } from "svelte/reactivity";
 	import LinkIcon from "@lucide/svelte/icons/link";
 	import DownloadIcon from "@lucide/svelte/icons/download";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
@@ -24,6 +25,9 @@
 	// onSingle(pick): removing picks left just one -> show its own page.
 	// onEmpty(): every pick removed.
 	let { openAuthor = () => {}, openTitle = () => {}, onSingle = () => {}, onEmpty = () => {} } = $props();
+	// Phones: the year slider and the Download/Share row run the full width
+	// (the plot itself is narrower, beside the line names).
+	const phone = new MediaQuery("max-width: 600px");
 
 	// Same order as the trends viewer's book colors; a pick keeps its color
 	// while others come and go.
@@ -252,9 +256,9 @@
 				</div>
 			{/if}
 			{#if months.length - brushStart >= 24}
-				<YearBrush {months} values={brushValues} start={brushStart} inset={plotInset} bind:lo={yearLo} bind:hi={yearHi} />
+				<YearBrush {months} values={brushValues} start={brushStart} inset={phone.current ? 0 : plotInset} bind:lo={yearLo} bind:hi={yearHi} />
 			{/if}
-			<div class="chart-foot" style="padding-right: {plotInset}px">
+			<div class="chart-foot" style="padding-right: {phone.current ? 0 : plotInset}px">
 				<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>, every edition (print, ebook and audiobook).{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.</p>
 				<div class="foot-actions">
 					<span class="dl-wrap">
