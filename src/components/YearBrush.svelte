@@ -20,6 +20,7 @@
 
 	let width = $state(680); // measured from the container
 	const PAD = 10; // room for the round handles at either end
+	const PLOT_LEFT = 2; // the chart's left margin (its plot starts 2px in)
 	const TRACK_Y = 12;
 	const height = 24;
 
@@ -107,18 +108,49 @@
 		}
 	}
 
+	// Year labels sit under their handles (kept inside the track's ends). When
+	// the two would touch they merge into one "2019–2021" label. "All years"
+	// goes in the widest free stretch: left of, between, or right of them.
+	const YW = 32; // a four-digit year at 12.5px
+	const RW = 58; // the "All years" link
+	const labels = $derived.by(() => {
+		const loX = xOf(lo), hiX = xOf(hi);
+		const loLeft = Math.max(PAD, loX - YW / 2);
+		const hiLeft = Math.min(width - PAD - YW, hiX - YW / 2);
+		const lyr = years[loYear]?.year, hyr = years[hiYear]?.year;
+		let items;
+		if (hiLeft - (loLeft + YW) < 10) {
+			const text = lyr === hyr ? lyr : `${lyr}–${hyr}`;
+			const w = lyr === hyr ? YW : YW * 2 + 8;
+			const left = Math.max(PAD, Math.min(width - PAD - w, (loX + hiX) / 2 - w / 2));
+			items = [{ text, left, w }];
+		} else {
+			items = [{ text: lyr, left: loLeft, w: YW }, { text: hyr, left: hiLeft, w: YW }];
+		}
+		// Free stretches between the labels and the track's ends.
+		const edges = [PAD, ...items.flatMap((it) => [it.left, it.left + it.w]), width - PAD];
+		let best = null;
+		for (let i = 0; i < edges.length; i += 2) {
+			const gap = edges[i + 1] - edges[i];
+			if (!best || gap > best.gap) best = { gap, a: edges[i], b: edges[i + 1], i };
+		}
+		const last = edges.length - 2;
+		const resetLeft = best.i === 0 ? PAD : best.i === last ? width - PAD - RW : (best.a + best.b) / 2 - RW / 2;
+		return { items, resetLeft };
+	});
+
 	function reset() {
 		lo = start;
 		hi = Math.max(months.length - 1, 0);
 	}
 </script>
 
-<!-- A plain range slider (as on Our World in Data): the first and last years
-     shown sit at either end of a thin track with two round handles. Drag a
-     handle, drag the darker stretch between them, or use the arrow keys. -->
-<div class="brush" class:active={drag !== null} style="padding-right: {Math.max(0, inset - 6)}px">
-	<span class="yr" aria-hidden="true">{years[loYear]?.year}</span>
-	<div class="brush-track" bind:clientWidth={width} title="Drag to choose which years the chart shows">
+<!-- A plain range slider: a thin track exactly as wide as the plot above it
+     (the handles' centers land on the plot's first and last months), with the
+     years shown printed under its two ends. Drag a handle, drag the darker
+     stretch between them, or use the arrow keys. -->
+<div class="brush" class:active={drag !== null}>
+	<div class="brush-track" style="margin: 0 {inset - PAD}px 0 {PLOT_LEFT - PAD}px" bind:clientWidth={width} title="Drag to choose which years the chart shows">
 		<svg
 			viewBox="0 0 {width} {height}"
 			class:dragging={drag !== null}
@@ -147,15 +179,17 @@
 				/>
 			{/each}
 		</svg>
+		<div class="brush-years">
+			{#each labels.items as it}<span class="yr" style="left: {it.left}px; width: {it.w}px" aria-hidden="true">{it.text}</span>{/each}
+			{#if isFiltered}<button class="brush-reset" style="left: {labels.resetLeft}px; width: {RW}px" onclick={reset}>All years</button>{/if}
+		</div>
 	</div>
-	<span class="yr" aria-hidden="true">{years[hiYear]?.year}</span>
-	{#if isFiltered}<button class="brush-reset" onclick={reset}>All years</button>{/if}
 </div>
 
 <style>
-	.brush { display: flex; align-items: center; gap: 12px; margin: 6px 0 0; font-family: var(--font-sans); }
-	.yr { flex: none; min-width: 2.6em; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--color-fg-light); text-align: center; }
-	.brush-track { flex: 1 1 auto; min-width: 0; }
+	.brush { margin: 6px 0 0; font-family: var(--font-sans); }
+	.brush-years { position: relative; height: 18px; margin-top: 1px; }
+	.yr { position: absolute; top: 0; font-size: 12.5px; line-height: 18px; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--color-fg-light); }
 	svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: none; cursor: pointer; }
 	svg.dragging { cursor: grabbing; }
 	.hit { fill: transparent; }
@@ -164,6 +198,6 @@
 	.knob { fill: #c4c8cd; stroke: #fff; stroke-width: 2; cursor: ew-resize; outline: none; transition: fill 0.12s; }
 	.knob:hover, .brush.active .knob { fill: #8d959f; }
 	.knob:focus-visible { fill: #6b7480; stroke: #3f88cc; stroke-width: 2.5; }
-	.brush-reset { flex: none; background: none; border: 0; padding: 0; font: inherit; font-size: 12.5px; color: var(--color-fg-light); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+	.brush-reset { position: absolute; top: 0; line-height: 18px; text-align: center; white-space: nowrap; background: none; border: 0; padding: 0; font: inherit; font-size: 12.5px; color: var(--color-fg-light); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 	.brush-reset:hover { color: var(--color-fg); }
 </style>
