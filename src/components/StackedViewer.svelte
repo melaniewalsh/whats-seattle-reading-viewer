@@ -2438,7 +2438,7 @@
 					</div>
 					</div>
 					<!-- The chart, its slider and source line share one white panel -->
-					<div class="chart-panel">
+					<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 					<div class="chart-wrap" bind:this={chartWrap}>
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
@@ -4708,6 +4708,12 @@
 		margin-bottom: 8px;
 	}
 
+	/* Wide screens: the line labels hang out into the empty right margin, so the
+	   plot itself runs the full width of the column (--hang is the label room;
+	   always at least 24px from the window edge). */
+	@media (min-width: 1080px) {
+		.chart-panel { margin-right: calc(-1 * max(0px, min(var(--hang, 0px), (100vw - 960px) / 2 - 24px))); }
+	}
 	/* ---- Books table (under the chart) -------------------------------- */
 	.books {
 		margin: var(--space-6) 0 var(--space-4);

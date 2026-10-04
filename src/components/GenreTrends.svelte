@@ -500,7 +500,7 @@
 		</div>
 
 		<!-- The chart, its slider and source line share one white panel -->
-		<div class="chart-panel">
+		<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 		<div class="chartwrap" bind:this={chartWrap}>
 			<LineChart bind:plotInset months={viewMonths} series={chartSeries} mode="line" percent unit="of book checkouts"
 				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={(k) => toggleIsolate(k)} />
@@ -699,6 +699,12 @@
 	.chart-foot .tb-btn :global(svg) { width: 13px; height: 13px; color: currentColor; }
 	@media (max-width: 640px) { .chart-foot .share-menu { left: 0; right: auto; } }
 
+	/* Wide screens: the line labels hang out into the empty right margin, so the
+	   plot itself runs the full width of the column (--hang is the label room;
+	   always at least 24px from the window edge). */
+	@media (min-width: 1080px) {
+		.chart-panel { margin-right: calc(-1 * max(0px, min(var(--hang, 0px), (100vw - 960px) / 2 - 24px))); }
+	}
 	/* Genres table — same look as the author page's Books table. */
 	.phone-legend { display: none; }
 	@media (max-width: 600px) {
