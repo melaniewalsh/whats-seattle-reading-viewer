@@ -1,6 +1,6 @@
 <script>
 	// StackedViewer.svelte
-	import { onMount, tick } from "svelte";
+	import { onMount, tick, untrack } from "svelte";
 	import { searchTitle as coreTitle } from "$utils/cleanTitle.js";
 	import ImageIcon from "@lucide/svelte/icons/image";
 	import LinkIcon from "@lucide/svelte/icons/link";
@@ -1591,6 +1591,22 @@
 	function toggleExpand(key) {
 		expandedWorks = isExpanded(key) ? expandedWorks.filter((k) => k !== key) : [...expandedWorks, key];
 	}
+	// "Edit groupings" opens every book so all the editions are in view to move;
+	// "Done editing" puts back whatever was open before.
+	let expandedBeforeEdit = null;
+	let wasEditing = false;
+	$effect(() => {
+		const editing = editMode;
+		if (editing === wasEditing) return;
+		wasEditing = editing;
+		if (editing) {
+			expandedBeforeEdit = untrack(() => expandedWorks);
+			expandedWorks = untrack(() => workBlocks.map((w) => w.key));
+		} else if (expandedBeforeEdit) {
+			expandedWorks = expandedBeforeEdit;
+			expandedBeforeEdit = null;
+		}
+	});
 
 	// Currently-active group object (or null if none selected/created yet).
 	const activeGroup = $derived(groups.find((g) => g.id === activeGroupId) ?? null);
