@@ -95,7 +95,10 @@
 	}
 </script>
 
-<div class="ss" class:flash>
+<!-- A real search form (role="search", search keyboard hints) so phones treat
+     it as a search box, not a sign-in or address form: iOS then mostly skips
+     its password / card / address AutoFill bar. -->
+<form class="ss" class:flash role="search" onsubmit={(e) => e.preventDefault()}>
 	<svg class="ss-ic" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
 		<circle cx="9" cy="9" r="6" /><line x1="13.5" y1="13.5" x2="18" y2="18" />
 	</svg>
@@ -105,7 +108,15 @@
 		type="search"
 		{placeholder}
 		aria-label="Search authors or books"
+		name="site-search"
 		autocomplete="off"
+		autocorrect="off"
+		autocapitalize="off"
+		inputmode="search"
+		enterkeyhint="search"
+		data-1p-ignore
+		data-lpignore="true"
+		data-form-type="other"
 		spellcheck="false"
 		bind:value={q}
 		oninput={onInput}
@@ -113,14 +124,14 @@
 		onkeydown={onKey}
 	/>
 	{#if q}
-		<button class="ss-clear" aria-label="Clear search" onclick={clear}>×</button>
+		<button type="button" class="ss-clear" aria-label="Clear search" onclick={clear}>×</button>
 	{/if}
 	{#if open && (results.length || segment().length >= 2)}
-		<button class="ss-backdrop" aria-label="Close search" onclick={() => (open = false)}></button>
+		<button type="button" class="ss-backdrop" aria-label="Close search" onclick={() => (open = false)}></button>
 		<ul class="ss-results" role="listbox">
 			{#each results as r}
 				<li>
-					<button class="ss-result" class:ss-sub={!!r.under} onclick={() => pick(r)}>
+					<button type="button" class="ss-result" class:ss-sub={!!r.under} onclick={() => pick(r)}>
 						<span class="ss-name">{r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name)}</span>
 						<span class="ss-kind {r.kind === 'work' ? 'kind-book' : 'kind-author'}">{r.kind === "work" ? "Book" : "Author"}</span>
 					</button>
@@ -131,12 +142,13 @@
 			{/if}
 		</ul>
 	{/if}
-</div>
+</form>
 
 <style>
 	/* A plain white field with a crisp edge; a blue ring while typing. */
 	.ss {
 		position: relative;
+		margin: 0;
 		display: flex;
 		align-items: center;
 		gap: 10px;

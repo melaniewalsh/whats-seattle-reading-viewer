@@ -68,3 +68,28 @@ export function cleanTitleForDisplay(title) {
 	t = t.replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
 	return titleCase(t);
 }
+
+// A bare title ("Freakonomics") and its one subtitled version ("Freakonomics: A
+// Rogue Economist Explores the Hidden Side of Everything") are the same work --
+// the subtitle is just missing from some records, or is a translation, award or
+// marketing line. Returns a Map(bare key -> the subtitled version's key) for
+// each bare title with exactly ONE distinct subtitled version. With several
+// ("Fancy Nancy: Bonjour, Butterfly", "Fancy Nancy: Hair Dos and Hair Don'ts")
+// the subtitle names a book in a series, so each stays its own book.
+export function bareTitleAliases(titles) {
+	const keys = new Set(titles.map(normalizeWorkKey));
+	const subs = new Map();
+	for (const t of titles) {
+		const main = (t || "").split(" / ")[0];
+		const c = main.indexOf(":");
+		if (c < 0) continue;
+		const bare = normalizeWorkKey(main.slice(0, c));
+		const k = normalizeWorkKey(t);
+		if (!bare || bare === k) continue;
+		if (!subs.has(bare)) subs.set(bare, new Set());
+		subs.get(bare).add(k);
+	}
+	const out = new Map();
+	for (const [bare, set] of subs) if (keys.has(bare) && set.size === 1) out.set(bare, [...set][0]);
+	return out;
+}

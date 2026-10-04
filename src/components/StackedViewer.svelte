@@ -23,7 +23,7 @@
 	import workOverrides from "$data/work-overrides.json";
 	import { displayName } from "$utils/displayName.js";
 	import { titleCase } from "$utils/titleCase.js";
-	import { normalizeWorkKey, cleanTitleForDisplay } from "$utils/workTitle.js";
+	import { normalizeWorkKey, cleanTitleForDisplay, bareTitleAliases } from "$utils/workTitle.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { compactNumber } from "$utils/format.js";
@@ -970,6 +970,13 @@
 
 	// --- Auto-cluster titles into "works" ----------------------------------
 	// (normalizeWorkKey, in $utils/workTitle.js, collapses a book's editions to one key.)
+	// A bare title joins its one subtitled version ("Freakonomics" ->
+	// "Freakonomics: A Rogue Economist ..."); see bareTitleAliases.
+	const titleAliases = $derived(current?.titles ? bareTitleAliases(current.titles.map((t) => t.title)) : new Map());
+	function workKeyOf(title) {
+		const k = normalizeWorkKey(title);
+		return titleAliases.get(k) ?? k;
+	}
 
 
 
@@ -1059,13 +1066,13 @@
 	});
 	function effectiveKey(idx, title) {
 		for (const g of groups) if (g.idxs.includes(idx)) return `g${g.id}`;
-		return workAssign[idx] ?? overrideKeyByTitle?.get(title) ?? normalizeWorkKey(title);
+		return workAssign[idx] ?? overrideKeyByTitle?.get(title) ?? workKeyOf(title);
 	}
 	// A title's WORK identity, independent of what's plotted on the chart. The table
 	// clusters by this so plotting/selecting an edition (which moves it in/out of a
 	// chart group) never reshuffles the table — the edition stays under its work.
 	function workIdentityKey(idx, title) {
-		return workAssign[idx] ?? overrideKeyByTitle?.get(title) ?? normalizeWorkKey(title);
+		return workAssign[idx] ?? overrideKeyByTitle?.get(title) ?? workKeyOf(title);
 	}
 
 	// Pull one edition out of its work cluster into its own singleton work. Also
@@ -1224,7 +1231,7 @@
 			}
 			// An edition the user MOVED in doesn't rename the book it joined (moving
 			// the Normal People ebook into Intermezzo mustn't relabel Intermezzo).
-			const natural = overrideKeyByTitle?.get(t.title) ?? normalizeWorkKey(t.title);
+			const natural = overrideKeyByTitle?.get(t.title) ?? workKeyOf(t.title);
 			const movedIn = workAssign[idx] != null && workAssign[idx] !== natural;
 			if (!movedIn && t.total > w.nativeTop) {
 				w.nativeTop = t.total;

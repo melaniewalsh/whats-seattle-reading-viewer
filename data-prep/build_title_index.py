@@ -67,6 +67,24 @@ def norm_title(t):
     return re.sub(r"[^a-z0-9]+", "", t)
 
 
+def bare_aliases(titles):
+    """A bare title and its ONE subtitled version are the same work ("Freakonomics"
+    == "Freakonomics: A Rogue Economist ..."); several subtitled versions mean a
+    series ("Fancy Nancy: ..."), left apart. Same rule as bareTitleAliases in
+    src/utils/workTitle.js. Returns {bare key: subtitled key}."""
+    keys = {norm_title(clean(t)) for t in titles}
+    subs = {}
+    for t in titles:
+        main = (t or "").split(" / ")[0]
+        if ":" not in main:
+            continue
+        bare = norm_title(clean(main.split(":", 1)[0]))
+        k = norm_title(clean(t))
+        if bare and bare != k:
+            subs.setdefault(bare, set()).add(k)
+    return {b: next(iter(v)) for b, v in subs.items() if b in keys and len(v) == 1}
+
+
 def norm_author(a):
     """Order-insensitive author key so 'Rowling, J. K.' == 'J. K. Rowling'."""
     return " ".join(sorted(re.findall(r"[a-z0-9]+", (a or "").lower())))
@@ -84,6 +102,7 @@ def main():
             continue
         slug = os.path.basename(f)[:-5]
         author = d.get("name", "")
+        aliases = bare_aliases([t.get("title", "") for t in d.get("titles", [])])
         for t in d.get("titles", []):
             tot = int(t.get("total", 0) or 0)
             if tot <= 0:
@@ -91,7 +110,8 @@ def main():
             disp = clean(t.get("title", ""))
             if not disp:
                 continue
-            key = (norm_title(disp), norm_author(author))
+            k = norm_title(disp)
+            key = (aliases.get(k, k), norm_author(author))
             e = agg.setdefault(key, {"total": 0, "best": None})
             e["total"] += tot
             if e["best"] is None or tot > e["best"][0]:

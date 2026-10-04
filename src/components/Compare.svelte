@@ -17,7 +17,7 @@
 	import DataInfo from "$components/DataInfo.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import { getMonths, getAuthor, densify } from "$components/db.js";
-	import { normalizeWorkKey, cleanTitleForDisplay } from "$utils/workTitle.js";
+	import { normalizeWorkKey, cleanTitleForDisplay, bareTitleAliases } from "$utils/workTitle.js";
 	import { displayName } from "$utils/displayName.js";
 	import { compactNumber } from "$utils/format.js";
 	import workOverrides from "$data/work-overrides.json";
@@ -77,7 +77,8 @@
 		// automatic work key. So a book's total matches its own page.
 		const ovr = new Map();
 		(workOverrides[slug] || []).forEach((titles, i) => (titles || []).forEach((t) => ovr.set(t, `ovr-${i}`)));
-		const keyOf = (t) => ovr.get(t.title) ?? normalizeWorkKey(t.title);
+		const aliases = bareTitleAliases(a.titles.map((t) => t.title));
+		const keyOf = (t) => ovr.get(t.title) ?? (aliases.get(normalizeWorkKey(t.title)) ?? normalizeWorkKey(t.title));
 		let seed = a.titles.find((t) => normalizeWorkKey(t.title) === want);
 		// Loose fallback, as on the trends page: substring match on the work key.
 		if (!seed) seed = a.titles.find((t) => { const k = normalizeWorkKey(t.title); return want && k && (k.includes(want) || want.includes(k)); });

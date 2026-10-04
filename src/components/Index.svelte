@@ -11,6 +11,7 @@
 	import TrendingUp from "@lucide/svelte/icons/trending-up";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import SiteSearch from "$components/SiteSearch.svelte";
+	import { MediaQuery } from "svelte/reactivity";
 	import { getMonths, getAuthor, searchTitles, searchAll, densify, randomAuthor } from "$components/db.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
@@ -284,6 +285,7 @@
 
 	// --- Search (the field on the Checkout Trends page) ------------------------
 	let pageSearch = $state(null);
+	const phone = new MediaQuery("max-width: 600px"); // shorter placeholder on phones
 	let homeSearch = $state(null);
 	// Starting points under the home page's search field.
 	const HOME_TRY = [
@@ -482,7 +484,7 @@
 			<header class="section-masthead no-rule">
 				<h2 class="sec-title">Seattle's Checkout Trends</h2>
 				<p class="sec-sub">Look up any author or title's borrowing trend at the Seattle Public Library.</p>
-				<div class="page-search"><SiteSearch bind:this={pageSearch} multi value={searchText} onPick={pickSearch} onSubmit={submitSearch} placeholder="Search authors or books (use commas to compare)" /></div>
+				<div class="page-search"><SiteSearch bind:this={pageSearch} multi value={searchText} onPick={pickSearch} onSubmit={submitSearch} placeholder={phone.current ? "Search authors or books" : "Search authors or books (use commas to compare)"} /></div>
 			</header>
 		{/if}
 
