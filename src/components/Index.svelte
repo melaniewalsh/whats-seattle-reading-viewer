@@ -9,13 +9,11 @@
 	import BacklistBoomerangs from "$components/BacklistBoomerangs.svelte";
 	import TrendingUp from "@lucide/svelte/icons/trending-up";
 	import LineChart from "$components/StackedAreaChart.svelte";
-	import { getMonths, getAuthor, searchTitles, searchAll, densify } from "$components/db.js";
+	import SiteSearch from "$components/SiteSearch.svelte";
+	import { getMonths, getAuthor, searchTitles, densify } from "$components/db.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { compactNumber } from "$utils/format.js";
-	import { titleCase } from "$utils/titleCase.js";
-	import { cleanWorkTitle } from "$utils/cleanTitle.js";
-	import { displayName } from "$utils/displayName.js";
 	import { publications } from "$data/publications.js";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 
@@ -99,8 +97,7 @@
 			else url.searchParams.set("tab", t === "rankings" ? (rankKind === "authors" ? "top" : "works") : t);
 			window.history.pushState({}, "", url);
 		} catch {}
-		// The Search page has no search box of its own: the header search does it,
-		// so put the cursor there when someone heads to Search.
+		// Heading to Search puts the cursor in the page's search field.
 		// A new page starts at the top, not wherever the last one was scrolled.
 		window.scrollTo({ top: 0 });
 		if (t === "search") focusSearch();
@@ -277,55 +274,28 @@
 		tab = "search";
 	}
 
-	// --- Header search box (a real autocomplete over authors + works) ---------
-	let hq = $state("");           // header query text
-	let hResults = $state([]);     // unified searchAll results
-	let hOpen = $state(false);     // dropdown visible
-	let hTimer;
-	function onHeaderInput() {
-		hOpen = true;
-		clearTimeout(hTimer);
-		const q = hq;
-		hTimer = setTimeout(async () => {
-			const needle = q.trim();
-			if (needle.length < 2) { hResults = []; return; }
-			try { hResults = await searchAll(needle, 8); } catch { hResults = []; }
-		}, 140);
-	}
-	function pickHeader(res) {
-		hOpen = false;
-		hq = "";
-		hResults = [];
+	// --- Search (the field on the Checkout Trends page) ------------------------
+	let pageSearch = $state(null);
+	function pickSearch(res) {
 		if (res.kind === "work") openTitle(res.title, res.slug);
 		else openAuthor(res.slug);
 	}
-	// Clear the header search. We render our own × (the native one on
-	// <input type="search"> fires a `search` event, not `input`, so bind:value
-	// never updated and the dropdown kept showing stale results).
-	let hInputEl;
-	// Heading to Search: put the cursor in the header search box and briefly
+	// Heading to Search: put the cursor in the page's search field and briefly
 	// ring it, so it's clear that's where to type.
-	let hFlash = $state(false);
 	function focusSearch() {
 		setTimeout(() => {
 			window.scrollTo({ top: 0 });
-			hInputEl?.focus({ preventScroll: true });
-			hFlash = false;
-			setTimeout(() => (hFlash = true), 20);
-			setTimeout(() => (hFlash = false), 1900);
+			pageSearch?.focus(true);
 		}, 60);
 	}
-	function clearHeader() {
-		clearTimeout(hTimer);
-		hq = "";
-		hResults = [];
-		hOpen = false;
-		hInputEl?.focus();
+	// The nav's magnifying glass: go to the search page, or if already there,
+	// jump to its field.
+	function navSearch() {
+		menuOpen = false;
+		if (tab === "search") focusSearch();
+		else go("search");
 	}
-	function onHeaderKey(e) {
-		if (e.key === "Enter" && hResults.length) { e.preventDefault(); pickHeader(hResults[0]); }
-		else if (e.key === "Escape") { hOpen = false; }
-	}
+
 
 	// Open the Most Borrowed works ranking filtered to a genre, all-time (used by
 	// the "#N in Genre" badges on a searched work).
@@ -352,43 +322,14 @@
 					<img class="mast-logo" src="{base}/favicon.png" alt="" width="30" height="30" />
 					<span class="mast-title">{copy.title}</span>
 				</button>
-				<!-- Real header search: a live autocomplete over authors AND works. -->
-				<div class="mast-search" class:flash={hFlash}>
-					<svg class="mast-search-ic" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+				<!-- Search lives on the Checkout Trends page; this takes you there (or,
+				     if you're already on it, puts the cursor in its search field). -->
+				<button class="mast-search-btn" onclick={navSearch} aria-label="Search authors or books" title="Search authors or books">
+					<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
 						<circle cx="9" cy="9" r="6" /><line x1="13.5" y1="13.5" x2="18" y2="18" />
 					</svg>
-					<input
-							bind:this={hInputEl}
-							class="mast-search-input"
-							type="search"
-							placeholder="Search authors or books"
-							aria-label="Search authors or books"
-							autocomplete="off"
-							bind:value={hq}
-							oninput={onHeaderInput}
-							onfocus={() => (hOpen = true)}
-							onkeydown={onHeaderKey}
-					/>
-					{#if hq}
-						<button class="mast-search-clear" aria-label="Clear search" onclick={clearHeader}>×</button>
-					{/if}
-					{#if hOpen && (hResults.length || hq.trim().length >= 2)}
-						<button class="mast-search-backdrop" aria-label="Close search" onclick={() => (hOpen = false)}></button>
-						<ul class="mast-results" role="listbox">
-							{#each hResults as r}
-								<li>
-									<button class="mast-result" onclick={() => pickHeader(r)}>
-										<span class="mast-result-name">{r.kind === "work" ? titleCase(cleanWorkTitle(r.title)) : displayName(r.name)}</span>
-										<span class="mast-result-kind {r.kind === 'work' ? 'kind-book' : 'kind-author'}">{r.kind === "work" ? "Book" : "Author"}</span>
-									</button>
-								</li>
-							{/each}
-							{#if !hResults.length}
-								<li><p class="mast-noresults">Nothing found for “{hq.trim()}”.</p></li>
-							{/if}
-						</ul>
-					{/if}
-				</div>
+					<span class="msb-txt">Search</span>
+				</button>
 				<nav class="mast-meta" aria-label="Site">
 					<button class="mast-metalink" class:active={tab === "about"} aria-current={tab === "about" ? "page" : undefined} onclick={() => go("about")}>About</button>
 					<button class="mast-burger" aria-label="Open menu" aria-expanded={menuOpen} aria-controls="site-menu" onclick={() => (menuOpen = true)}>
@@ -434,6 +375,7 @@
 			<header class="section-masthead no-rule">
 				<h2 class="sec-title">Seattle's Checkout Trends</h2>
 				<p class="sec-sub">Look up any author or title's borrowing trend at the Seattle Public Library.</p>
+				<div class="page-search"><SiteSearch bind:this={pageSearch} onPick={pickSearch} /></div>
 			</header>
 		{/if}
 
@@ -1175,160 +1117,28 @@
 		color: #3f88cc;
 		white-space: nowrap;
 	}
-	/* Real header search box (pill wrapper around an input + autocomplete dropdown).
-	   margin-left:auto keeps it next to About + the menu. */
-	.mast-search {
-		position: relative;
-		flex: 0 1 320px;
+	/* Nav search: a magnifying glass (plus "Search" on wider screens) that
+	   takes you to the search field on the Checkout Trends page. */
+	.mast-search-btn {
 		margin-left: auto;
-		max-width: 340px;
 		display: inline-flex;
 		align-items: center;
-		gap: 8px;
-		height: 38px;
+		gap: 7px;
+		height: 34px;
 		padding: 0 12px;
 		background: #fff;
 		border: 1.5px solid var(--color-border);
 		border-radius: 8px;
-		transition: border-color 0.12s, box-shadow 0.12s;
-	}
-	/* A plain white field with a crisp edge; blue ring while typing. */
-	.mast-search:hover { border-color: var(--color-fg-light); }
-	.mast-search:focus-within {
-		border-color: #3f88cc;
-		box-shadow: 0 0 0 3px rgba(63, 136, 204, 0.18);
-	}
-	.mast-search.flash { animation: search-ring 1.6s ease-out; }
-	@keyframes search-ring {
-		0% { box-shadow: 0 0 0 0 rgba(63, 136, 204, 0.55); }
-		35% { box-shadow: 0 0 0 7px rgba(63, 136, 204, 0.22); }
-		100% { box-shadow: 0 0 0 10px rgba(63, 136, 204, 0); }
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.mast-search.flash { animation: none; box-shadow: 0 0 0 3px rgba(63, 136, 204, 0.3); }
-	}
-	.mast-search-ic {
-		width: 16px;
-		height: 16px;
-		flex: none;
-		color: var(--color-fg-light);
-	}
-	.mast-search-input {
-		flex: 1 1 auto;
-		min-width: 0;
-		border: none;
-		background: none;
-		outline: none;
 		font-family: var(--font-sans);
-		font-size: 15px;
+		font-size: 14px;
 		font-weight: 500;
-		color: var(--color-fg);
-	}
-	.mast-search-input::placeholder {
-		color: var(--color-placeholder);
-	}
-	/* Hide the browser's built-in clear button — it fires a `search` event rather
-	   than `input`, so it cleared the text without clearing our state/results. We
-	   render our own × (.mast-search-clear) instead. */
-	.mast-search-input::-webkit-search-cancel-button,
-	.mast-search-input::-webkit-search-decoration {
-		-webkit-appearance: none;
-		appearance: none;
-	}
-	.mast-search-clear {
-		flex: none;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 18px;
-		height: 18px;
-		padding: 0;
-		border: none;
-		border-radius: 50%;
-		background: var(--color-gray-300);
-		color: var(--color-white);
-		font-size: 13px;
-		line-height: 1;
-		cursor: pointer;
-	}
-	.mast-search-clear:hover {
-		background: var(--color-fg-light);
-	}
-	/* Autocomplete dropdown under the header search. */
-	.mast-search-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 60;
-		background: none;
-		border: none;
-		cursor: default;
-	}
-	.mast-results {
-		position: absolute;
-		top: calc(100% + 6px);
-		left: 0;
-		right: 0;
-		z-index: 61;
-		list-style: none;
-		margin: 0;
-		padding: 6px;
-		max-height: min(60vh, 420px);
-		overflow-y: auto;
-		background: var(--color-white);
-		border: 1px solid var(--color-border);
-		border-radius: 12px;
-		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
-	}
-	.mast-result {
-		width: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 10px;
-		padding: 8px 10px;
-		border: none;
-		border-radius: 7px;
-		background: none;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		text-align: left;
-		color: var(--color-fg);
-		cursor: pointer;
-	}
-	.mast-result:hover {
-		background: var(--color-gray-100);
-	}
-	.mast-result-name {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.mast-result-kind {
-		flex: none;
-		font-size: 0.6rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		padding: 1px 6px;
-		border-radius: 999px;
-		line-height: 1.5;
-	}
-	.mast-result-kind.kind-book {
-		background: #eaf2fb;
-		color: #2f6ea8;
-	}
-	.mast-result-kind.kind-author {
-		background: var(--color-gray-100);
 		color: var(--color-fg-light);
+		cursor: pointer;
+		transition: border-color 0.12s, color 0.12s;
 	}
-	.mast-noresults {
-		margin: 0;
-		padding: 8px 10px;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		color: var(--color-fg-light);
-	}
+	.mast-search-btn:hover { border-color: var(--color-fg-light); color: var(--color-fg); }
+	.mast-search-btn svg { width: 16px; height: 16px; flex: none; }
+	.page-search { margin: 18px 0 0; }
 	/* Top-right meta links (About, …) — small and understated. */
 	.mast-meta {
 		display: flex;
@@ -1449,18 +1259,14 @@
 	}
 	.menu-link:hover { color: #3f88cc; }
 	@media (max-width: 600px) {
-		/* Wrap so the search bar drops to its own full-width row under the
-		   wordmark + hamburger instead of crowding them. */
-		.masthead-top { flex-wrap: wrap; padding: 6px 14px 8px; }
+		/* One row on phones: wordmark, the search icon and the menu button. */
+		.masthead-top { flex-wrap: nowrap; gap: 4px; padding: 6px 10px 6px 14px; }
 		.mast-title { font-size: var(--text-sm); }
 		/* About is in the hamburger menu on phones — drop the standalone link so the
 		   wordmark has room. */
 		.mast-metalink { display: none; }
-		.mast-search {
-			order: 3;
-			flex-basis: 100%;
-			max-width: none;
-		}
+		.msb-txt { display: none; }
+		.mast-search-btn { width: 36px; padding: 0; justify-content: center; border-color: transparent; }
 	}
 
 	/* segmented sub-toggle (Author/Title, Authors/Works) beneath the main tabs */

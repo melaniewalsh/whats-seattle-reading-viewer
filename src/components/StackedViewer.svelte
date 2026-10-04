@@ -105,7 +105,6 @@
 	let shareOpen = $state(false); // whether the share-platform popover is open
 	let downloadOpen = $state(false); // whether the Download (data / image) popover is open
 	let lookupOpen = $state(false); // whether the "Look up" (Wikipedia/etc.) popover is open
-	let suggestOpen = $state(false); // whether the "Suggestions" quick-pick dropdown is open
 
 	// Wikipedia preview card on the heading (author or work). Desktop opens on hover
 	// with an intent delay; touch devices open on tap.
@@ -189,11 +188,10 @@
 			// shared link): scroll the plot's title into view so the user lands on it.
 			if (a) { await selectAuthor(a, { scroll: false }); return; }
 		}
-		// Search with nothing picked yet starts blank: the header search box gets
-		// the cursor (Index.svelte) and the suggestions open as starting points.
+		// Search with nothing picked yet starts blank: the page's search field gets
+		// the cursor (Index.svelte), with the "Try" links under it.
 		if (landing === "search") {
 			loading = false;
-			if (searchMode !== "title") suggestOpen = true;
 			return;
 		}
 		await loadOverview();
@@ -287,6 +285,16 @@
 	let mixAuthors = $state([]);
 	let mixTitles = $state([]);
 	let mixLoaded = false;
+	// The "Try" links: two authors and two books, alternating.
+	const tryPicks = $derived.by(() => {
+		const out = [];
+		for (let k = 0; k < 2; k++) {
+			const a = mixAuthors[k], t = mixTitles[k];
+			if (a) out.push({ kind: "author", slug: a.slug, label: displayName(a.name) });
+			if (t) out.push({ kind: "title", slug: t.slug, title: t.title, label: cleanTitleForDisplay(t.title) });
+		}
+		return out;
+	});
 	function buildMix(data, mode) {
 		if (!data || !data.data) return [];
 		const recentYear = data.years?.length ? String(data.years[data.years.length - 1]) : "all";
@@ -361,7 +369,7 @@
 			wantAuthor = sp.get("author");
 		} catch {}
 		// No ?title: start blank, like the author search (see onMount).
-		if (!want) { suggestOpen = true; return; }
+		if (!want) return;
 		try {
 			// A link that names the author (a book name in the Books table, a
 			// ranking) goes straight to that author's own titles: the search index
@@ -2258,43 +2266,15 @@
 
 <div class="viewer">
 	{#snippet authorPicker()}
-		<!-- No search box here: the header search (on every page) does it. Just
-		     a quiet line of starting points. -->
-		<!-- quick-pick: a varied mix (recent, classic, romance, nonfiction), tucked in a dropdown -->
-		{#if searchMode === "title"}
-			{@const picks = mixTitles.length ? mixTitles : topTitles}
-			{#if picks.length}
-				<p class="suggest-row">
-					<span class="suggest-lead">Not sure where to start?</span>
-					<button class="suggest-btn" onclick={() => (suggestOpen = !suggestOpen)} aria-expanded={suggestOpen}><span class="sb-txt">Suggestions</span> <span class="suggest-caret" class:open={suggestOpen} aria-hidden="true">▾</span></button>
-					<span class="suggest-sep" aria-hidden="true">·</span>
-					<button class="suggest-btn surprise-btn" onclick={surpriseMe}>Surprise me</button>
-				</p>
-				{#if suggestOpen}
-					<div class="top-authors suggest-pills">
-						{#each picks as t}
-							<button class="chip" onclick={() => selectTitle(t)}>{cleanTitleForDisplay(t.title)}</button>
-						{/each}
-					</div>
-				{/if}
-			{/if}
-		{:else}
-			{@const picks = mixAuthors.length ? mixAuthors : topAuthors}
-			{#if picks.length}
-				<p class="suggest-row">
-					<span class="suggest-lead">Not sure where to start?</span>
-					<button class="suggest-btn" onclick={() => (suggestOpen = !suggestOpen)} aria-expanded={suggestOpen}><span class="sb-txt">Suggestions</span> <span class="suggest-caret" class:open={suggestOpen} aria-hidden="true">▾</span></button>
-					<span class="suggest-sep" aria-hidden="true">·</span>
-					<button class="suggest-btn surprise-btn" onclick={surpriseMe}>Surprise me</button>
-				</p>
-				{#if suggestOpen}
-					<div class="top-authors suggest-pills">
-						{#each picks as a}
-							<button class="chip" class:current={current && current.name === a.name} onclick={() => selectAuthor(a)}>{displayName(a.name)}</button>
-						{/each}
-					</div>
-				{/if}
-			{/if}
+		<!-- Under the page's search field: a few starting points, half authors and
+		     half books, from a varied mix (recent, classic, romance, nonfiction). -->
+		{#if tryPicks.length}
+			<p class="try-row">
+				<span class="try-lead">Try</span>
+				{#each tryPicks as p, k}{#if k}<span class="try-sep" aria-hidden="true">·</span>{/if}<button class="try-link" class:is-title={p.kind === "title"} onclick={() => (p.kind === "title" ? openTitle(p.title, p.slug) : openAuthor(p.slug))}>{p.label}</button>{/each}
+				<span class="try-sep" aria-hidden="true">·</span>
+				<button class="try-link try-surprise" onclick={surpriseMe}>Surprise me</button>
+			</p>
 		{/if}
 	{/snippet}
 
@@ -4395,6 +4375,14 @@
 	p.suggest-row .suggest-btn:hover,
 	p.suggest-row .surprise-btn:hover { background: none; color: var(--color-fg); text-decoration-color: currentColor; }
 	/* Closes the page masthead: the intro + starting points, then the rule. */
+	.try-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 7px; margin: 10px 0 0; font-family: var(--font-sans); font-size: 14.5px; color: var(--color-fg-light); }
+	.try-lead { margin-right: 1px; }
+	.try-lead::after { content: ":"; }
+	.try-sep { color: var(--color-gray-300, #c8c8c8); }
+	.try-link { padding: 0; border: 0; background: none; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
+	.try-link:hover { text-decoration-color: currentColor; }
+	.try-link.is-title { font-style: italic; }
+	.try-link.try-surprise { color: var(--color-fg-light); }
 	.picker-block {
 		border-bottom: 3px solid var(--color-fg);
 		padding-bottom: 12px;
