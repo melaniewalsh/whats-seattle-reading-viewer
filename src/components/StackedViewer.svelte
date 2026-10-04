@@ -17,6 +17,7 @@
 	import workOverrides from "$data/work-overrides.json";
 	import { displayName } from "$utils/displayName.js";
 	import { titleCase } from "$utils/titleCase.js";
+	import { normalizeWorkKey, cleanTitleForDisplay } from "$utils/workTitle.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { compactNumber } from "$utils/format.js";
@@ -899,72 +900,9 @@
 	);
 
 	// --- Auto-cluster titles into "works" ----------------------------------
-	// The same book shows up many times (print / audio / ebook / illustrated /
-	// unabridged), differing only in cataloging boilerplate. Strip that boilerplate
-	// to a "work key" so all the editions of one work collapse to the same string.
-	// e.g. every "Harry Potter and the Sorcerer's Stone ..." variant ->
-	//      "harry potter and the sorcerers stone".
-	function normalizeWorkKey(title) {
-		let t = (title || "").toLowerCase();
-		// Fold accents to plain ASCII so "Galápagos" and "Galapagos" match
-		// (otherwise "á" gets stripped to a space and the keys diverge).
-		t = t.normalize("NFD").replace(/[̀-ͯ]/g, "");
-		t = t.split(" / ")[0]; // drop "/ by Author ; illustrations by ..."
-		// Bilingual catalog records use "Original Title = English parallel title"
-		// (e.g. "Harī Pottā ... = Harry Potter and the half-blood prince"). Keep the
-		// English parallel title so foreign editions cluster with the English work.
-		if (/\s=\s/.test(t)) t = t.split(/\s=\s/).pop();
-		// Classic alternate-title form "Main Title, or, The Alternate Title"
-		// (Slaughterhouse-Five, or, The Children's Crusade; Moby-Dick, or, The
-		// Whale) -- drop everything from ", or, " on so an edition catalogued with
-		// the alt-title clusters with plain "Slaughterhouse-Five". The SECOND comma
-		// is the tell: alt-titles write ", or, X" while lists write ", or X"
-		// ("Beg, Borrow, or Steal"), so requiring it avoids over-matching.
-		t = t.replace(/,\s+or,\s+.*$/i, "");
-		t = t.replace(/&/g, " and "); // "beasts & where" -> "beasts and where"
-		t = t.replace(/\([^)]*\)/g, " "); // drop "(unabridged)" etc.
-		// Some catalog titles have an UNCLOSED paren, e.g. "The Inn at Rose Harbor
-		// (with bonus short story: Rose Harbor Series, Book 1" -- the balanced rule
-		// above misses it, so also strip a dangling "(" clause to end of string.
-		t = t.replace(/\s*\([^)]*$/, " ");
-		t = t.replace(/\[[^\]]*\]/g, " "); // drop cataloging brackets: "[text ]", "[sound recording]", etc.
-		// Audiobooks are often split into "Title, Part 1" / "Title, Part 2" (occasionally
-		// "Title Part 1"). Strip a trailing part marker — requiring a number/number-word
-		// after "part" so real titles like "The Best Part of My Day" aren't touched — so
-		// the parts cluster with each other and with the single-file/print edition.
-		t = t.replace(/[,\s]+part\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3})\b.*$/i, " ");
-		// Repeatedly strip a trailing ":"/";" segment when it's edition/format noise
-		// (series/book/volume, "the original screenplay", "read by <narrator>",
-		// illustrated/anniversary editions, "a novel", etc.) OR an "or, ..."
-		// alternative title (e.g. "Slaughterhouse-Five: or, The Children's Crusade"
-		// is the same book). Stop at the first segment that's a real distinct
-		// subtitle (e.g. "The Crimes of Grindelwald"), so those stay separate.
-		const NOISE = /(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|autobiography|poems|essays|playscript|litrpg|gamelit|\bscript\b|\bproduction|\bserie|\blivre|\btome|\blibro|\btomo|\bedicion)/i;
-		let prev;
-		do {
-			prev = t;
-			t = t.replace(/[:;]\s*[^:;]*$/, (seg) => (NOISE.test(seg) || /[:;]\s*or[\s,]/i.test(seg) ? " " : seg));
-		} while (t !== prev);
-		t = t.replace(/\b(unabridged|abridged|audiobook|e-?book|large print|compact disc|sound recording)\b/g, " ");
-		t = t.replace(/\b(the|a|an)\b/g, " "); // drop articles so "Look at the birdie" == "Look at Birdie"
-		t = t.replace(/['’]/g, ""); // sorcerer's -> sorcerers
-		// Remove ALL non-alphanumerics INCLUDING spaces/hyphens, so word-boundary
-		// differences don't matter ("Slaughter-House Five" == "Slaughterhouse-Five").
-		t = t.replace(/[^a-z0-9]+/g, "");
-		return t;
-	}
+	// (normalizeWorkKey, in $utils/workTitle.js, collapses a book's editions to one key.)
 
-	// A readable name for a work, taken from its best-known edition's title.
-	function cleanTitleForDisplay(title) {
-		let t = (title || "").split(" / ")[0];
-		// Drop a subtitle after the first colon -- but not from a title that is
-		// itself numbers around a colon, like Ben Lerner's "10:04".
-		const clock = t.trim().match(/^\d+:\d+/);
-		t = clock ? clock[0] + t.trim().slice(clock[0].length).replace(/\s*:\s*.*$/, "") : t.replace(/\s*:\s*.*$/, "");
-		t = t.replace(/[,\s]+part\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3})\b.*$/i, ""); // drop "…, Part 1" audiobook split
-		t = t.replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
-		return titleCase(t);
-	}
+
 
 	// Cluster the current author's titles into works and seed the groups. Only
 	// works with 2+ editions are grouped (that's where the dedup value is); the
@@ -2426,13 +2364,11 @@
 				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
 			</div>
 
-			<!-- "By book" / "By format" lines are named at their right ends, so no
-			     legend, until you pick some out: then every book is listed here, the
-			     ones not shown grayed out (click to add them back). Total keeps one
-			     for any editions overlaid on it (those lines have no end labels).
-			     Exported images still draw the legend. -->
+			<!-- Several lines: a swatch legend under the chart, every book listed
+			     (click one to show only it; once some are picked out, the rest show
+			     grayed out, click to add them back). -->
 			{#if legendItems.length >= 2}
-				<div class="format-legend" class:phone-only={chartMode === "area" && !isolatedKeys.length && !hiddenKeys.length}>
+				<div class="format-legend">
 					{#each legendItems as it}
 						{#if it.key === "other"}
 							<span class="fmt-leg other-leg" class:hidden-leg={isHidden("other")} class:dim={isolatedKeys.length}
@@ -3084,8 +3020,6 @@
 	/* format legend for the overview "by format" area chart */
 	/* "By book" / "By format" lines are named at their ends on wide screens; on
 	   phones (no room for those names) this legend takes over. */
-	.format-legend.phone-only { display: none !important; }
-	@media (max-width: 600px) { .format-legend.phone-only { display: flex !important; } }
 	.format-legend {
 		display: flex;
 		justify-content: center;

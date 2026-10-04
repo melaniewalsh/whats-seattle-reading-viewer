@@ -3,6 +3,7 @@
 	import { base } from "$app/paths";
 	import Viewer from "$components/StackedViewer.svelte";
 	import GenreTrends from "$components/GenreTrends.svelte";
+	import Compare from "$components/Compare.svelte";
 	import TopAuthors from "$components/TopAuthors.svelte";
 	import TopWorks from "$components/TopWorks.svelte";
 	import NortonExplorer from "$components/NortonExplorer.svelte";
@@ -91,7 +92,7 @@
 		// drilldown doesn't linger (and hijack the view on reload / Back).
 		try {
 			const url = new URL(window.location);
-			["author", "title", "genre", "year", "kind"].forEach((k) => url.searchParams.delete(k));
+			["author", "title", "genre", "year", "kind", "c"].forEach((k) => url.searchParams.delete(k));
 			leaveMethod(url);
 			if (t === "home") url.searchParams.delete("tab");
 			else url.searchParams.set("tab", t === "rankings" ? (rankKind === "authors" ? "top" : "works") : t);
@@ -150,6 +151,7 @@
 			const t = params.get("tab");
 			const kind = params.get("kind");
 			if (t === "genres") tab = "genres";
+			else if (t === "compare") tab = "compare";
 			else if (t === "rankings" || t === "top" || t === "works") {
 				tab = "rankings";
 				rankKind = t === "top" || kind === "authors" ? "authors" : "works";
@@ -197,7 +199,7 @@
 	function clearParams() {
 		try {
 			const url = new URL(window.location);
-			["author", "title", "genre", "year", "tab", "kind"].forEach((k) => url.searchParams.delete(k));
+			["author", "title", "genre", "year", "tab", "kind", "c"].forEach((k) => url.searchParams.delete(k));
 			window.history.replaceState({}, "", url);
 		} catch {}
 	}
@@ -315,7 +317,7 @@
 </script>
 
 <svelte:boundary onerror={(e) => console.error(e)}>
-	<article>
+	<article class:wide={tab === "compare"}>
 		<div class="masthead">
 			<div class="masthead-top">
 				<button class="mast-home" class:here={tab === "home"} onclick={goHome} aria-label="{copy.title} — home">
@@ -354,6 +356,7 @@
 				<button class="menu-link" onclick={() => go("backlist")}>Backlist Boomerangs</button>
 				<button class="menu-link" onclick={() => go("search")}>Search</button>
 				<button class="menu-link" onclick={() => go("genres")}>Genres</button>
+				<button class="menu-link" onclick={() => go("compare")}>Compare</button>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">Case Studies</h3>
@@ -380,7 +383,13 @@
 		{/if}
 
 
-		{#if tab === "genres"}
+		{#if tab === "compare"}
+			<header class="section-masthead no-rule">
+				<h2 class="sec-title">Compare Checkout Trends</h2>
+				<p class="sec-sub">Put any authors and books side by side to see how Seattle Public Library borrowing compares.</p>
+			</header>
+			<Compare {openAuthor} {openTitle} />
+		{:else if tab === "genres"}
 			<GenreTrends />
 		{:else if tab === "rankings"}
 			{#if rankKind === "works"}
@@ -632,6 +641,8 @@
 		margin: 0 auto;
 		padding: 0 24px 80px;
 	}
+	/* Compare runs wide, like the Ngram Viewer: the chart gets the room. */
+	article.wide { max-width: 1400px; }
 	/* Landing hub — title / subtitle / byline, then a grid of section cards. */
 	.hero {
 		max-width: 720px;
