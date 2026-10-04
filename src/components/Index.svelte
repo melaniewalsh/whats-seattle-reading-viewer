@@ -87,6 +87,7 @@
 	// Go to a tab and close the hamburger menu (used by the menu + pills).
 	function go(t) {
 		tab = t;
+		compareMode = false;
 		menuOpen = false;
 		// Reset the URL to this tab so a stale ?title/?author from a previous
 		// drilldown doesn't linger (and hijack the view on reload / Back).
@@ -148,10 +149,12 @@
 	function applyUrlState() {
 		try {
 			const params = new URLSearchParams(window.location.search);
+			// ?c=… (or ?tab=compare): the trends page's compare view.
+			compareMode = params.getAll("c").length > 0 || params.get("tab") === "compare";
+			if (compareMode) { tab = "search"; return; }
 			const t = params.get("tab");
 			const kind = params.get("kind");
 			if (t === "genres") tab = "genres";
-			else if (t === "compare") tab = "compare";
 			else if (t === "rankings" || t === "top" || t === "works") {
 				tab = "rankings";
 				rankKind = t === "top" || kind === "authors" ? "authors" : "works";
@@ -249,10 +252,11 @@
 			leaveMethod(url);
 			window.scrollTo({ top: 0 });
 			url.searchParams.set("author", slug);
-			["tab", "kind", "genre", "year", "title"].forEach((k) => url.searchParams.delete(k));
+			["tab", "kind", "genre", "year", "title", "c"].forEach((k) => url.searchParams.delete(k));
 			window.history.pushState({}, "", url);
 		} catch {}
 		searchKind = "author";
+		compareMode = false;
 		searchNonce++;
 		tab = "search";
 	}
@@ -267,20 +271,52 @@
 			leaveMethod(url);
 			window.scrollTo({ top: 0 });
 			url.searchParams.set("title", title);
-			["tab", "kind", "genre", "year", "author"].forEach((k) => url.searchParams.delete(k));
+			["tab", "kind", "genre", "year", "author", "c"].forEach((k) => url.searchParams.delete(k));
 			if (authorSlug) url.searchParams.set("author", authorSlug);
 			window.history.pushState({}, "", url);
 		} catch {}
 		searchKind = "title";
+		compareMode = false;
 		searchNonce++;
 		tab = "search";
 	}
 
 	// --- Search (the field on the Checkout Trends page) ------------------------
 	let pageSearch = $state(null);
+	let cmp = $state(null); // the compare view, when it's showing
+	let compareMode = $state(false);
 	function pickSearch(res) {
+		if (compareMode && cmp) return cmp.addFromSearch(res);
 		if (res.kind === "work") openTitle(res.title, res.slug);
 		else openAuthor(res.slug);
+	}
+	// "+ Compare" on an author or book page: that one becomes the first line,
+	// and the search field waits for the next. (Back returns to its page.)
+	function startCompare(id) {
+		try {
+			const url = new URL(window.location);
+			["tab", "kind", "genre", "year", "author", "title", "c"].forEach((k) => url.searchParams.delete(k));
+			url.searchParams.append("c", id);
+			window.history.pushState({}, "", url);
+		} catch {}
+		compareMode = true;
+		searchNonce++;
+		tab = "search";
+		focusSearch();
+	}
+	// The menu's "Compare": the compare view with a starter matchup.
+	function openCompare() {
+		menuOpen = false;
+		try {
+			const url = new URL(window.location);
+			["kind", "genre", "year", "author", "title", "c"].forEach((k) => url.searchParams.delete(k));
+			url.searchParams.set("tab", "compare");
+			window.history.pushState({}, "", url);
+		} catch {}
+		compareMode = true;
+		searchNonce++;
+		tab = "search";
+		window.scrollTo({ top: 0 });
 	}
 	// Heading to Search: put the cursor in the page's search field and briefly
 	// ring it, so it's clear that's where to type.
@@ -356,7 +392,7 @@
 				<button class="menu-link" onclick={() => go("backlist")}>Backlist Boomerangs</button>
 				<button class="menu-link" onclick={() => go("search")}>Search</button>
 				<button class="menu-link" onclick={() => go("genres")}>Genres</button>
-				<button class="menu-link" onclick={() => go("compare")}>Compare</button>
+				<button class="menu-link" onclick={openCompare}>Compare</button>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">Case Studies</h3>
@@ -378,18 +414,12 @@
 			<header class="section-masthead no-rule">
 				<h2 class="sec-title">Seattle's Checkout Trends</h2>
 				<p class="sec-sub">Look up any author or title's borrowing trend at the Seattle Public Library.</p>
-				<div class="page-search"><SiteSearch bind:this={pageSearch} onPick={pickSearch} /></div>
+				<div class="page-search"><SiteSearch bind:this={pageSearch} onPick={pickSearch} placeholder={compareMode ? "Add an author or book to compare" : "Search authors or books"} /></div>
 			</header>
 		{/if}
 
 
-		{#if tab === "compare"}
-			<header class="section-masthead no-rule">
-				<h2 class="sec-title">Compare Checkout Trends</h2>
-				<p class="sec-sub">Put any authors and books side by side to see how Seattle Public Library borrowing compares.</p>
-			</header>
-			<Compare {openAuthor} {openTitle} />
-		{:else if tab === "genres"}
+		{#if tab === "genres"}
 			<GenreTrends />
 		{:else if tab === "rankings"}
 			{#if rankKind === "works"}
@@ -563,9 +593,16 @@
 				<p class="study-more"><a href="https://melaniewalsh.github.io/whats-seattle-reading/posts/spl-500-novels/index.html" target="_blank" rel="noopener noreferrer">Read the full data essay →</a> with the interactive explorer, the complete dataset browser, and reproducible code.</p>
 			</article>
 		{:else}
-			{#key `${searchKind}-${searchNonce}`}
-				<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} {openTitle} />
-			{/key}
+			{#if compareMode}
+				<!-- Two or more authors/books: one line each (the page's search adds more). -->
+				{#key searchNonce}
+					<Compare bind:this={cmp} {openAuthor} {openTitle} onSingle={(p) => (p.kind === "work" ? openTitle(p.title, p.slug) : openAuthor(p.slug))} onEmpty={() => go("search")} />
+				{/key}
+			{:else}
+				{#key `${searchKind}-${searchNonce}`}
+					<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} {openTitle} onCompare={startCompare} />
+				{/key}
+			{/if}
 		{/if}
 
 		<footer class="chart-footer">

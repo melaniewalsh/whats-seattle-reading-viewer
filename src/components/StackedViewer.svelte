@@ -11,6 +11,7 @@
 	import TableIcon from "@lucide/svelte/icons/table";
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
 	import GlobeIcon from "@lucide/svelte/icons/globe";
+	import PlusIcon from "@lucide/svelte/icons/plus";
 	import ShoppingBagIcon from "@lucide/svelte/icons/shopping-bag";
 	import { base } from "$app/paths";
 	import { drawChartLogo, chartLogoWidth } from "$utils/chartLogo.js";
@@ -35,7 +36,7 @@
 	// resolve to its author, open the author's drilldown with that work highlighted.
 	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
 	// (the "By author" tab -> open straight to the search box).
-	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {} } = $props();
+	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {}, onCompare = null } = $props();
 
 	// Colors for title lines.
 	// Palette for the stacked "All titles" bands. Leads with the site blue so the
@@ -402,6 +403,18 @@
 	}
 
 	// "Surprise me": jump to a random author (or title in title mode).
+	// "+ Compare": hand this author (or, on a book page, this book) to the
+	// compare view, as the first line.
+	function startCompare() {
+		if (!currentSlug) return;
+		let title = null;
+		if (searchMode === "title") {
+			try { title = new URLSearchParams(window.location.search).get("title"); } catch {}
+			title = title || searchedWork?.name || null;
+		}
+		onCompare?.(title ? `w~${currentSlug}~${title}` : `a~${currentSlug}`);
+	}
+
 	async function surpriseMe() {
 		query = "";
 		const pick = searchMode === "title" ? await randomTitle() : await randomAuthor();
@@ -2360,6 +2373,11 @@
 				<span class="iso-note">Showing {viewSeries.length} of {legendItems.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={() => { clearIsolate(); clearHidden(); }}>Show all</button></span>
 			{/if}
 					</div>
+					<!-- Put another author or book on this chart (the page switches to
+					     its compare view, one line each). -->
+					{#if onCompare && !isOverview && currentSlug}
+						<button type="button" class="compare-btn" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={15} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
+					{/if}
 					</div>
 					<!-- The chart, its slider and source line share one white panel -->
 					<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
@@ -4400,6 +4418,8 @@
 	/* chart type toggle (line vs stacked area) + title sort toggle share a look */
 	/* Row above the plot: Line/Area toggle on the left, "Show top works" on the
 	   right so it's prominent instead of buried in the panel below. */
+	.compare-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; font-family: var(--font-sans); font-size: 14px; font-weight: 500; color: var(--color-fg); cursor: pointer; }
+	.compare-btn:hover { border-color: var(--color-fg-light); }
 	.plot-toolbar {
 		margin-top: var(--space-5) !important;
 		display: flex;

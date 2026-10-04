@@ -1,14 +1,14 @@
 <script>
-	// Compare.svelte — the "Compare" tab: any authors and books on one chart,
-	// one line each (like the Google Books Ngram Viewer). Picks live in the URL
-	// (?tab=compare&c=a~<author-slug>&c=w~<author-slug>~<title>) so a comparison
-	// can be shared.
+	// Compare.svelte — the Checkout Trends page's compare view: any authors and
+	// books on one chart, one line each (like the Google Books Ngram Viewer).
+	// The page's search field adds to it (Index.svelte calls addFromSearch).
+	// Picks live in the URL (?c=a~<author-slug>&c=w~<author-slug>~<title>) so a
+	// comparison can be shared.
 	import { onMount } from "svelte";
 	import LinkIcon from "@lucide/svelte/icons/link";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
-	import SiteSearch from "$components/SiteSearch.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import { getMonths, getAuthor, densify } from "$components/db.js";
 	import { normalizeWorkKey, cleanTitleForDisplay } from "$utils/workTitle.js";
@@ -16,7 +16,9 @@
 	import { compactNumber } from "$utils/format.js";
 	import workOverrides from "$data/work-overrides.json";
 
-	let { openAuthor = () => {}, openTitle = () => {} } = $props();
+	// onSingle(pick): removing picks left just one -> show its own page.
+	// onEmpty(): every pick removed.
+	let { openAuthor = () => {}, openTitle = () => {}, onSingle = () => {}, onEmpty = () => {} } = $props();
 
 	// Same order as the trends viewer's book colors; a pick keeps its color
 	// while others come and go.
@@ -94,7 +96,11 @@
 		syncUrl();
 	}
 	function removePick(id) {
+		const was = picks.length;
 		picks = picks.filter((p) => p.id !== id);
+		// Down from a comparison to one: back to that author's or book's page.
+		if (was >= 2 && picks.length === 1) return onSingle(picks[0]);
+		if (!picks.length) return onEmpty();
 		syncUrl();
 	}
 	async function setPicks(ids) {
@@ -103,14 +109,16 @@
 		yearHi = Math.max(months.length - 1, 0);
 		for (const id of ids) await addPick(id);
 	}
-	function onSearchPick(res) {
+	export function addFromSearch(res) {
 		addPick(res.kind === "work" ? `w~${res.slug}~${res.title}` : `a~${res.slug}`);
 	}
+	export const count = () => picks.length;
+	export const full = () => picks.length >= MAX;
 
 	function syncUrl() {
 		try {
 			const url = new URL(window.location);
-			url.searchParams.delete("c");
+			["c", "tab", "author", "title"].forEach((k) => url.searchParams.delete(k));
 			for (const p of picks) url.searchParams.append("c", p.id);
 			window.history.replaceState({}, "", url);
 		} catch {}
@@ -178,10 +186,6 @@
 </script>
 
 <div class="compare">
-	<div class="cmp-add">
-		<SiteSearch onPick={onSearchPick} placeholder={picks.length >= MAX ? `Up to ${MAX} at a time` : "Add an author or book"} />
-	</div>
-
 	{#if picks.length}
 		<ul class="chips" aria-label="On the chart">
 			{#each picks as p (p.id)}
@@ -194,6 +198,7 @@
 			{/each}
 		</ul>
 	{/if}
+	{#if picks.length === 1}<p class="cmp-note">Now search above for another author or book to compare.</p>{/if}
 	<p class="try-row">
 		<span class="try-lead">Try</span>
 		{#each MATCHUPS as m, k}{#if k}<span class="try-sep" aria-hidden="true">·</span>{/if}<button class="try-link" onclick={() => setPicks(m.picks)}>{m.label}</button>{/each}
@@ -247,8 +252,6 @@
 
 <style>
 	.compare { font-family: var(--font-sans); }
-	.cmp-add { margin: 18px 0 0; }
-	.cmp-add :global(.ss) { max-width: 640px; }
 
 	/* What's on the chart: removable chips, each in its line's color. */
 	.chips { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 12px 0 0; padding: 0; }
