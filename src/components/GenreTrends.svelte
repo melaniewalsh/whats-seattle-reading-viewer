@@ -518,7 +518,7 @@
 
 		<YearBrush months={data.months} values={data.total} inset={plotInset} bind:lo bind:hi />
 		<!-- Source on the left; Download and Share as small links on the right -->
-		<div class="chart-foot" style="padding-right: {Math.max(0, plotInset - 2)}px">
+		<div class="chart-foot" style="padding-right: {plotInset}px">
 			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap. <DataInfo first={data.months[0]} last={data.months[data.months.length - 1]} genres />.</p>
 			<div class="tb-right foot-actions">
 				<div class="dl-wrap">
@@ -692,10 +692,12 @@
 	.chart-source { font-size: 12px; color: #8a8a8a; margin: 0; flex: 1 1 260px; }
 	.chart-source a { color: inherit; text-decoration: underline; text-decoration-color: #c9c9c9; text-underline-offset: 2px; }
 	.chart-source a:hover { color: var(--color-fg); text-decoration-color: currentColor; }
-	.chart-foot { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px 16px; flex-wrap: wrap; margin: 6px 0 0; }
-	.chart-foot .foot-actions { gap: 14px; flex: none; }
-	.chart-foot .tb-btn { padding: 0; border: 0; background: none; font-size: 12px; color: #6f6f6f; gap: 4px; }
-	.chart-foot .tb-btn:hover { color: var(--color-fg); text-decoration: underline; text-underline-offset: 3px; }
+	.chart-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin: 16px 0 0; }
+	.chart-foot .foot-actions { gap: 8px; flex: none; }
+	/* Download / Share: quiet gray buttons (as on Our World in Data), so they
+	   read as clickable without competing with the chart. */
+	.chart-foot .tb-btn { padding: 5px 10px; border: 0; border-radius: 6px; background: #f1f2f3; font-size: 12.5px; font-weight: 500; color: #555; gap: 5px; }
+	.chart-foot .tb-btn:hover { background: #e4e6e8; color: var(--color-fg); }
 	.chart-foot .tb-btn :global(svg) { width: 13px; height: 13px; color: currentColor; }
 	@media (max-width: 640px) { .chart-foot .share-menu { left: 0; right: auto; } }
 

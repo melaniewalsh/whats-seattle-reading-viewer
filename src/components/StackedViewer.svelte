@@ -2485,7 +2485,7 @@
 			{/if}
 
 			<!-- Source on the left; Download and Share as small links on the right -->
-			<div class="chart-foot" style="padding-right: {Math.max(0, plotInset - 2)}px">
+			<div class="chart-foot" style="padding-right: {plotInset}px">
 			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>.{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.{#if bookMarkers.length && chartLineMode === "line"}{" "}Book labels mark the month each title was first checked out at SPL.{/if}</p>
 			<div class="chart-actions tb-actions foot-actions">
 				<div class="dl-wrap">
@@ -4574,11 +4574,13 @@
 		user-select: none;
 	}
 	.smooth-toggle input { margin: 0; accent-color: var(--color-fg); }
-	.chart-foot { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px 16px; flex-wrap: wrap; margin: 6px 0 0; }
+	.chart-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin: 16px 0 0; }
 	.chart-foot .chart-source { margin: 0; flex: 1 1 260px; }
-	.chart-foot .foot-actions { display: flex; gap: 14px; align-items: center; flex: none; }
-	.chart-foot .tb-btn { padding: 0; border: 0; background: none; font-size: 12px; color: #6f6f6f; gap: 4px; }
-	.chart-foot .tb-btn:hover { color: var(--color-fg); text-decoration: underline; text-underline-offset: 3px; }
+	.chart-foot .foot-actions { display: flex; gap: 8px; align-items: center; flex: none; }
+	/* Download / Share: quiet gray buttons (as on Our World in Data), so they
+	   read as clickable without competing with the chart. */
+	.chart-foot .tb-btn { padding: 5px 10px; border: 0; border-radius: 6px; background: #f1f2f3; font-size: 12.5px; font-weight: 500; color: #555; gap: 5px; }
+	.chart-foot .tb-btn:hover { background: #e4e6e8; color: var(--color-fg); }
 	.chart-foot .tb-btn :global(svg) { width: 13px; height: 13px; color: currentColor; }
 	.chart-foot .tb-btn :global(svg.lucide-chevron-down) { width: 12px; height: 12px; }
 	.chart-foot .share-menu { left: auto; right: 0; }
