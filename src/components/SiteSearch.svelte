@@ -3,8 +3,7 @@
 	// lives on the Checkout Trends page; the nav's magnifying glass brings you
 	// to it (Index.svelte calls focus()).
 	import { searchAll } from "$components/db.js";
-	import { titleCase } from "$utils/titleCase.js";
-	import { cleanWorkTitle } from "$utils/cleanTitle.js";
+	import { cleanTitleForDisplay } from "$utils/workTitle.js";
 	import { displayName } from "$utils/displayName.js";
 
 	let { onPick = () => {}, placeholder = "Search authors or books" } = $props();
@@ -80,9 +79,9 @@
 		<ul class="ss-results" role="listbox">
 			{#each results as r}
 				<li>
-					<button class="ss-result" onclick={() => pick(r)}>
-						<span class="ss-name">{r.kind === "work" ? titleCase(cleanWorkTitle(r.title)) : displayName(r.name)}</span>
-						<span class="ss-kind {r.kind === 'work' ? 'kind-book' : 'kind-author'}">{r.kind === "work" ? "Book" : "Author"}</span>
+					<button class="ss-result" class:ss-sub={!!r.under} onclick={() => pick(r)}>
+						<span class="ss-name">{r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name)}</span>
+						{#if !r.under}<span class="ss-kind {r.kind === 'work' ? 'kind-book' : 'kind-author'}">{r.kind === "work" ? "Book" : "Author"}</span>{/if}
 					</button>
 				</li>
 			{/each}
@@ -196,6 +195,9 @@
 		cursor: pointer;
 	}
 	.ss-result:hover { background: var(--color-gray-100); }
+	/* An author's own books, listed under them: indented, a little smaller. */
+	.ss-sub { padding: 6px 10px 6px 26px; font-size: 14px; color: var(--color-fg-light); }
+	.ss-sub .ss-name { font-style: italic; }
 	.ss-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.ss-kind {
 		flex: none;

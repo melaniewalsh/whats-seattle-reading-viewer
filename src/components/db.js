@@ -357,8 +357,17 @@ function getTitleIndex() {
 	if (!titleIndexPromise) {
 		titleIndexPromise = fetch(`${DATA_BASE}/title-index.json`, FRESH)
 			.then((r) => (r.ok ? r.json() : []))
-			.then((rows) => ({ rows, lower: rows.map((r) => r[0].toLowerCase()) }))
-			.catch(() => ({ rows: [], lower: [] }));
+			.then((rows) => {
+				// Each author's indexed books, most-borrowed first (rows are sorted
+				// by total), so an author search can list their books too.
+				const bySlug = new Map();
+				rows.forEach((r) => {
+					if (!bySlug.has(r[1])) bySlug.set(r[1], []);
+					bySlug.get(r[1]).push(r);
+				});
+				return { rows, lower: rows.map((r) => r[0].toLowerCase()), bySlug };
+			})
+			.catch(() => ({ rows: [], lower: [], bySlug: new Map() }));
 	}
 	return titleIndexPromise;
 }
@@ -442,7 +451,19 @@ export async function searchAll(query, limit = 60) {
 		else if (turn++ % 2 === 0) { out.push(a); ai++; }
 		else { out.push(w); wi++; }
 	}
-	return out;
+	// Searching an author by name also lists their most-borrowed books, right
+	// under them (marked `under` so the dropdown can indent them). Only for the
+	// best-matching author, and only on a real name match ("rooney", "sally r").
+	const top = authors.find((a) => a.tier >= 2);
+	if (!top || needle.length < 3) return out;
+	const { bySlug } = await getTitleIndex();
+	const theirs = (bySlug.get(top.slug) || []).slice(0, 4)
+		.map(([title, slug, author, total]) => ({ kind: "work", slug, title, author, total, under: top.slug }));
+	if (!theirs.length) return out;
+	const same = (a, b) => a.kind === "work" && a.slug === b.slug && a.title === b.title;
+	const rest = out.filter((r) => !theirs.some((t) => same(r, t)));
+	const at = rest.indexOf(top);
+	return [...rest.slice(0, at + 1), ...theirs, ...rest.slice(at + 1)].slice(0, limit + theirs.length);
 }
 
 /**
