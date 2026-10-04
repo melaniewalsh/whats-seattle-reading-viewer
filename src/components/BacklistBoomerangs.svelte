@@ -29,7 +29,10 @@
 		loading = false;
 	});
 
-	const rows = $derived(data && year ? data.data[String(year)] || [] : []);
+	// The top 30 boomerangs for the year (biggest jump first).
+	const PER_YEAR = 30;
+	const allRows = $derived(data && year ? data.data[String(year)] || [] : []);
+	const rows = $derived(allRows.slice(0, PER_YEAR));
 
 	// Covers: a hand-picked override if there is one, else the cover baked into
 	// backlist.json at build time (r.c). Only works the build couldn't match fall
@@ -132,7 +135,7 @@
 	</div>
 
 	<p class="ta-caption">
-		<strong>{rows.length}</strong> {rows.length === 1 ? "book" : "books"} whose checkouts in {year} jumped to at least
+		{#if allRows.length > rows.length}The top <strong>{rows.length}</strong> books{:else}<strong>{rows.length}</strong> {rows.length === 1 ? "book" : "books"}{/if} whose checkouts in {year} jumped to at least
 		<strong>{rules.minRatio}×</strong> their average over the previous two years. Ranked by the size of the jump.
 		{#if String(year) === String(data.through).slice(0, 4)}<span class="ta-hint">({year} so far, through {data.through}.)</span>{/if}
 	</p>

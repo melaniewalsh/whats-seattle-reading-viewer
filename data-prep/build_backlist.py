@@ -58,7 +58,7 @@ BASELINE_MONTHS = 24
 # closures / tracking gap, and the 2024 ransomware outage (May-July 2024, when
 # recorded checkouts fell to a fraction of normal).
 SKIP_RANGES = [("2020-03", "2021-06"), ("2024-05", "2024-07")]
-PER_YEAR = 100            # keep the top N per boom year
+PER_YEAR = 30             # keep the top N per boom year
 
 # The site's work clustering lives in build_data.py, which imports duckdb/dotenv
 # at module load. Those are present in the workflow; locally, stub them so we
