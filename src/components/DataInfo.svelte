@@ -28,11 +28,11 @@
 		try { siteUrl = `${window.location.origin}${base}/`; } catch {}
 	});
 
-	const inline = $derived(`Seattle Public Library, Checkouts by Title (${y0}–${y1}) – processed by What Is Seattle Reading?`);
+	const inline = $derived(`Seattle Public Library, Checkouts by Title (${y0}–${y1}) – processed by What's Seattle Reading?`);
 	// The project (this site) and the library's dataset are cited separately.
-	const project = $derived(`Melanie Walsh and Neel Gupta. What Is Seattle Reading? University of Washington, ${y1}. ${siteUrl}`);
+	const project = $derived(`Melanie Walsh and Neel Gupta. What's Seattle Reading? University of Washington, ${y1}. ${siteUrl}`);
 	const projectBib = $derived(
-		`@misc{walshWhatSeattleReading${y1},\n  author = {Walsh, Melanie and Gupta, Neel},\n  title = {What Is Seattle Reading?},\n  year = {${y1}},\n  publisher = {University of Washington},\n  url = {${siteUrl}}\n}`,
+		`@misc{walshWhatSeattleReading${y1},\n  author = {Walsh, Melanie and Gupta, Neel},\n  title = {What's Seattle Reading?},\n  year = {${y1}},\n  publisher = {University of Washington},\n  url = {${siteUrl}}\n}`,
 	);
 	// The data paper (Journal of Open Humanities Data), from the Publications list.
 	const paper = publications.find((p) => /johd/i.test(p.doi || ""));
@@ -68,7 +68,7 @@
 		</p>
 
 		<dl class="di-facts">
-			<div class="di-wide"><dt>Source</dt><dd>Seattle Public Library, <a href={DATASET} target="_blank" rel="noopener noreferrer">Checkouts by Title</a>, processed by What Is Seattle Reading?</dd></div>
+			<div class="di-wide"><dt>Source</dt><dd>Seattle Public Library, <a href={DATASET} target="_blank" rel="noopener noreferrer">Checkouts by Title</a>, processed by What's Seattle Reading?</dd></div>
 			<div><dt>Data through</dt><dd>{monthYear(last)}</dd></div>
 			<div><dt>Updated</dt><dd>Monthly, as the library publishes each month's data</dd></div>
 			<div><dt>Date range</dt><dd>{monthYear(first)} – {monthYear(last)}</dd></div>

@@ -674,7 +674,7 @@
 			</p>
 			{/if}
 			<p class="cf-attr">
-				What Is Seattle Reading?
+				What’s Seattle Reading?
 				<span class="cf-sep">·</span>
 				<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a>
 				{#if lastUpdated}<span class="cf-sep">·</span> Last updated: {lastUpdated}{/if}

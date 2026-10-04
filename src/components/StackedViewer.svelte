@@ -563,7 +563,7 @@
 			if (currentSlug) url.searchParams.set("author", currentSlug);
 			link = url.toString();
 		} catch {}
-		const text = `What Is Seattle Reading? — ${current ? displayName(current.name) : ""}`;
+		const text = `What’s Seattle Reading? — ${current ? displayName(current.name) : ""}`;
 		return { link, text };
 	}
 
@@ -698,7 +698,7 @@
 		}
 		ctx.fillStyle = "#999999";
 		ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-		ctx.fillText("What Is Seattle Reading?  \u00b7  Seattle Public Library checkouts", padX, titleH + h + legendH + 24);
+		ctx.fillText("What’s Seattle Reading?  \u00b7  Seattle Public Library checkouts", padX, titleH + h + legendH + 24);
 		return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 	}
 

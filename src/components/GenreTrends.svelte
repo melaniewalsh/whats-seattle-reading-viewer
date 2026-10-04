@@ -290,7 +290,7 @@
 			url.searchParams.set("view", "genre");
 			link = url.toString();
 		} catch {}
-		const text = "What Is Seattle Reading? — What genres is Seattle checking out?";
+		const text = "What’s Seattle Reading? — What genres is Seattle checking out?";
 		return { link, text };
 	}
 
@@ -425,7 +425,7 @@
 		}
 		ctx.fillStyle = "#999999";
 		ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-		ctx.fillText("What Is Seattle Reading?  ·  Seattle Public Library checkouts", padX, titleH + h + legendH + 24);
+		ctx.fillText("What’s Seattle Reading?  ·  Seattle Public Library checkouts", padX, titleH + h + legendH + 24);
 		return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 	}
 

@@ -19,7 +19,7 @@ function loadLogo() {
 // Right-aligned at xRight; vertically centered on yMid.
 export async function drawChartLogo(ctx, xRight, yMid) {
 	const logo = await loadLogo();
-	const label = "WHAT IS SEATTLE READING?";
+	const label = "WHAT’S SEATTLE READING?";
 	ctx.save();
 	ctx.font = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 	if ("letterSpacing" in ctx) ctx.letterSpacing = "0.8px";
