@@ -210,6 +210,7 @@
 			<label class="smooth-toggle"><input type="checkbox" bind:checked={smooth} /> 3-month average</label>
 		</div>
 		{#if picks.length && months.length}
+			<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 			<LineChart bind:plotInset months={viewMonths} {series} mode="line" {smooth} annotations={EVENT_ANNOTATIONS} />
 			{#if series.length >= 2}
 				<div class="cmp-legend">
@@ -222,6 +223,7 @@
 			<div class="chart-foot" style="padding-right: {plotInset}px">
 				<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>, every edition (print, ebook and audiobook).{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.</p>
 				<button class="tb-btn" onclick={copyLink}><LinkIcon size={13} strokeWidth={2} aria-hidden="true" /> {copied ? "Link copied" : "Copy link"}</button>
+			</div>
 			</div>
 		{:else if loading}
 			<p class="cmp-empty" role="status">Loading…</p>
@@ -276,6 +278,11 @@
 	.smooth-toggle input { appearance: auto; -webkit-appearance: auto; width: 17px; height: 17px; margin: 0; accent-color: var(--color-fg); background: none; flex: none; cursor: pointer; }
 	.cmp-empty { margin: 40px 0; text-align: center; color: var(--color-fg-light); }
 
+	/* As on the trends page: on wide screens the line labels hang out into the
+	   empty right margin, so the plot runs the full width of the column. */
+	@media (min-width: 1080px) {
+		.chart-panel { margin-right: calc(-1 * max(0px, min(var(--hang, 0px), (100vw - 960px) / 2 - 24px))); }
+	}
 	.cmp-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; margin: 10px 0 2px; font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); }
 	.cl-item { display: inline-flex; align-items: center; gap: 6px; }
 	.cl-sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
