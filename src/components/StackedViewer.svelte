@@ -2338,7 +2338,7 @@
 		{#if tryPicks.length}
 			<p class="try-row">
 				<span class="try-lead">Try</span>
-				{#each tryPicks as p, k}{#if k}<span class="try-sep" aria-hidden="true">·</span>{/if}<button class="try-link" class:is-title={p.kind === "title"} onclick={() => (p.kind === "title" ? openTitle(p.title, p.slug) : openAuthor(p.slug))}>{p.label}</button>{/each}
+				{#each tryPicks as p, k}{#if k}<span class="try-sep try-extra" aria-hidden="true">·</span>{/if}<button class="try-link" class:try-extra={k > 0} class:is-title={p.kind === "title"} onclick={() => (p.kind === "title" ? openTitle(p.title, p.slug) : openAuthor(p.slug))}>{p.label}</button>{/each}
 				<span class="try-sep" aria-hidden="true">·</span>
 				<button class="try-link try-surprise" onclick={surpriseMe}>Surprise me</button>
 			</p>
@@ -4491,6 +4491,8 @@
 	.try-link:hover { text-decoration-color: currentColor; }
 	.try-link.is-title { font-style: italic; }
 	.try-link.try-surprise { color: var(--color-fg-light); }
+	/* Phones: one suggestion and "Surprise me". */
+	@media (max-width: 600px) { .try-extra { display: none; } }
 	.picker-block {
 		border-bottom: 3px solid var(--color-fg);
 		padding-bottom: 12px;

@@ -516,7 +516,7 @@
 				<SiteSearch bind:this={homeSearch} onPick={pickSearch} placeholder="Search any author or book" />
 				<p class="home-try">
 					<span class="ht-lead">Try</span>
-					{#each HOME_TRY as t, k}{#if k}<span class="ht-sep" aria-hidden="true">·</span>{/if}<button class="ht-link" class:is-title={!!t.title} onclick={() => (t.title ? openTitle(t.title, t.slug) : openAuthor(t.slug))}>{t.label}</button>{/each}
+					{#each HOME_TRY as t, k}{#if k}<span class="ht-sep ht-extra" aria-hidden="true">·</span>{/if}<button class="ht-link" class:ht-extra={k > 0} class:is-title={!!t.title} onclick={() => (t.title ? openTitle(t.title, t.slug) : openAuthor(t.slug))}>{t.label}</button>{/each}
 					<span class="ht-sep" aria-hidden="true">·</span>
 					<button class="ht-link ht-surprise" onclick={homeSurprise}>Surprise me</button>
 				</p>
@@ -763,6 +763,8 @@
 	.ht-link:hover { text-decoration-color: currentColor; }
 	.ht-link.is-title { font-style: italic; }
 	.ht-link.ht-surprise { color: var(--color-fg-light); }
+	/* Phones: one suggestion and "Surprise me". */
+	@media (max-width: 600px) { .ht-extra { display: none; } }
 	/* Landing hub — title / subtitle / byline, then a grid of section cards. */
 	.hero {
 		max-width: 720px;
