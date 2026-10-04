@@ -237,6 +237,33 @@ def _match(inc, exc, fic, nonfiction=False):
     return clause
 
 
+# Most Borrowed lists decide genre per BOOK: a genre's term must be among the
+# book's top few tags, ranked by checkouts across all its editions
+# (build_top_works) -- its top TOP_TAGS tags overall, or its top TOP_TAGS
+# "topical" ones, which skip these broad shelf / audience / format labels
+# ("Classic Literature" would otherwise crowd "Romance" out of Pride and
+# Prejudice's top tags). Keeping the overall top tags too means a genre defined
+# BY one of these labels (Young Adult, Juvenile Nonfiction, Memoir) still works.
+# Lowercased, whole-tag match.
+TOP_TAGS = 4
+GENERIC_TAGS_RE = (
+    r"^(fiction|literature|novels?|classic literature|literary|nonfiction|non-fiction|"
+    r"juvenile (fiction|literature|nonfiction)|young adult (fiction|literature|nonfiction)|"
+    r"biography & autobiography|large type books|audiobooks?|ebooks?|electronic books)$"
+)
+
+
+def inclusion_clauses():
+    """Per genre, just its INCLUDE terms (plain and fiction-gated), as a clause on
+    `subjects` -- no exclusions or gates. Used on a book's top tags; the full
+    overlap clause (exclusions, fiction gate) is still checked on all its tags."""
+    out = {}
+    for name, inc, exc, fic in map(_unpack, TAXONOMY):
+        terms = list(inc) + list(fic)
+        out[name] = _like_any(terms) if terms else "FALSE"
+    return out
+
+
 def overlap_clauses():
     return [(name, _match(inc, exc, fic, name in NONFICTION_GENRES)) for name, inc, exc, fic in map(_unpack, TAXONOMY)]
 

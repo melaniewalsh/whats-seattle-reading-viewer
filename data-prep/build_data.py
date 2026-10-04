@@ -1060,7 +1060,7 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
       {years, genres, data:{genre:{"<year>":[[title,author,slug,co],...],"all":[...]}}}"""
     import sys as _sys
     _sys.path.insert(0, str(PROJECT_DIR / "data-prep"))
-    from build_partition import overlap_clauses
+    from build_partition import overlap_clauses, inclusion_clauses, TOP_TAGS, GENERIC_TAGS_RE
 
     years = sorted({int(m[:4]) for m in months})
 
@@ -1198,17 +1198,97 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     ).fetchall():
         full_month[wk] = c
 
+    # GENRE MEMBERSHIP, decided once per WORK: one of the genre's terms must be
+    # among the work's top TOP_TAGS subject tags, ranked by checkouts across all
+    # its editions and years -- overall, or among its "topical" tags (broad labels
+    # like "Fiction" or "Classic Literature" skipped -- GENERIC_TAGS_RE). The genre's exclusions and fiction
+    # gate still look at ALL of the work's tags. So a stray tag on a few records
+    # ("Interplanetary voyages" on Dune -> Travel; "Fantasy" on The Goldfinch) no
+    # longer files a book in a genre it isn't about. Curated additions come from
+    # src/data/genre-includes.json. If any of this fails, fall back to the old
+    # rule (any edition tagged that period).
+    incl = inclusion_clauses()
+    work_members = None
+    try:
+        t0 = perf_counter()
+        for tbl in ("wkterm", "wktags"):
+            con.execute(f"DROP TABLE IF EXISTS {tbl}")
+        con.execute(
+            """
+            CREATE TABLE wkterm AS
+            SELECT wk, trim(u.term) AS term, CAST(sum(c) AS BIGINT) AS c
+            FROM cw, UNNEST(string_split(coalesce(subjects, ''), ',')) AS u(term)
+            WHERE trim(u.term) <> ''
+            GROUP BY 1, 2
+            """
+        )
+        con.execute(
+            f"""
+            CREATE TABLE wktags AS
+            WITH t AS (
+                SELECT wk, term, c, regexp_matches(lower(term), '{GENERIC_TAGS_RE}') AS generic
+                FROM wkterm),
+            r AS (
+                SELECT *,
+                       row_number() OVER (PARTITION BY wk ORDER BY c DESC, term) AS rk_all,
+                       row_number() OVER (PARTITION BY wk, generic ORDER BY c DESC, term) AS rk_topical
+                FROM t)
+            SELECT wk,
+                   string_agg(term, ', ') AS allsub,
+                   coalesce(string_agg(term, ', ') FILTER (
+                       WHERE rk_all <= {int(TOP_TAGS)} OR (NOT generic AND rk_topical <= {int(TOP_TAGS)})), '') AS topsub
+            FROM r GROUP BY wk
+            """
+        )
+        con.execute("DROP TABLE IF EXISTS wkterm")
+        # Curated additions: {genre: [[title, author slug], ...]}.
+        try:
+            import json as _json
+            adds = _json.load(open(PROJECT_DIR / "src" / "data" / "genre-includes.json"))
+        except Exception:  # noqa: BLE001
+            adds = {}
+        by_title_slug = {}
+        for wk, (title, author) in meta.items():
+            by_title_slug.setdefault((normalize_work_key(title), slug_by_author.get(author, "")), []).append(wk)
+        work_members = {}
+        sub = lambda clause, col: re.sub(r"\bsubjects\b", col, clause)
+        for name, clause in clauses:
+            if not clause:
+                continue
+            q = f"SELECT wk FROM wktags WHERE ({sub(clause, 'allsub')}) AND ({sub(incl.get(name, 'TRUE'), 'topsub')})"
+            members = {wk for (wk,) in con.execute(q).fetchall()}
+            for title, slug in (adds.get(name) or []):
+                members.update(by_title_slug.get((normalize_work_key(title), slug), []))
+            work_members[name] = members
+        con.execute("DROP TABLE IF EXISTS wktags")
+        print(f"  genre membership by top-{TOP_TAGS} topical tags: "
+              + ", ".join(f"{n} {len(m):,}" for n, m in list(work_members.items())[:6])
+              + f" ... ({perf_counter() - t0:.2f}s)", flush=True)
+    except Exception as e:  # noqa: BLE001
+        work_members = None
+        print(f"  WARNING: top-tag genre membership failed ({e}); using the per-edition rule", flush=True)
+
     t0 = perf_counter()
     genres_out, data = [], {}
     for name, clause in clauses:
         where = f"WHERE {clause}" if clause else ""
-        # Membership only: which works have ANY edition tagged with this genre in
-        # this period. The genre clause decides *inclusion*, never the count.
-        year_members = {}
-        for wk, year in con.execute(f"SELECT DISTINCT wk, year FROM cw {where}").fetchall():
-            year_members.setdefault(year, set()).add(wk)
-        all_members = [wk for (wk,) in con.execute(f"SELECT DISTINCT wk FROM cw {where}").fetchall()]
-        month_members = [wk for (wk,) in con.execute(f"SELECT DISTINCT wk FROM cwm {where}").fetchall()]
+        if work_members is not None and clause:
+            # Per-work membership (above); each period lists the members borrowed in it.
+            mem = work_members.get(name, set())
+            year_members = {}
+            for (wk, year) in full_year:
+                if wk in mem:
+                    year_members.setdefault(year, set()).add(wk)
+            all_members = [wk for wk in mem if wk in full_all]
+            month_members = [wk for wk in mem if wk in full_month]
+        else:
+            # Membership only: which works have ANY edition tagged with this genre in
+            # this period. The genre clause decides *inclusion*, never the count.
+            year_members = {}
+            for wk, year in con.execute(f"SELECT DISTINCT wk, year FROM cw {where}").fetchall():
+                year_members.setdefault(year, set()).add(wk)
+            all_members = [wk for (wk,) in con.execute(f"SELECT DISTINCT wk FROM cw {where}").fetchall()]
+            month_members = [wk for (wk,) in con.execute(f"SELECT DISTINCT wk FROM cwm {where}").fetchall()]
 
         def topn(pairs):
             top = sorted(pairs, key=lambda p: -p[1])[:top_n]
