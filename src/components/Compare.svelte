@@ -43,6 +43,15 @@
 		{ label: "Octavia E. Butler vs. Toni Morrison", picks: ["a~octavia-e-butler", "a~toni-morrison-1931"] },
 	];
 
+	// Under the field: comparisons AND single authors / books, to show that
+	// both work.
+	const TRY = [
+		{ label: "Sally Rooney", kind: "author", slug: "sally-rooney" },
+		MATCHUPS[0],
+		{ label: "Pachinko", kind: "work", slug: "min-jin-lee", title: "Pachinko" },
+		MATCHUPS[2],
+	];
+
 	let months = $state([]);
 	let picks = $state([]); // [{ id, kind, slug, title?, label, color, values }]
 	let loading = $state(0);
@@ -218,6 +227,15 @@
 		saveBlob(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }), `${fileStub()}-spl-checkouts.csv`);
 	}
 
+	// A line's name (at its end, or in the legend) opens that book's or
+	// author's own page.
+	function openPick(id) {
+		const p = picks.find((x) => x.id === id);
+		if (!p) return;
+		if (p.kind === "work") openTitle(p.title, p.slug);
+		else openAuthor(p.slug);
+	}
+
 	function copyLink() {
 		try {
 			navigator.clipboard.writeText(window.location.href);
@@ -231,7 +249,7 @@
 	{#if picks.length === 1}<p class="cmp-note">Add a comma and another author or book above to compare.</p>{/if}
 	<p class="try-row">
 		<span class="try-lead">Try</span>
-		{#each MATCHUPS as m, k}{#if k}<span class="try-sep" aria-hidden="true">·</span>{/if}<button class="try-link" onclick={() => setPicks(m.picks)}>{m.label}</button>{/each}
+		{#each TRY as m, k}{#if k}<span class="try-sep" aria-hidden="true">·</span>{/if}<button class="try-link" class:is-title={m.kind === "work"} onclick={() => (m.picks ? setPicks(m.picks) : m.kind === "work" ? openTitle(m.title, m.slug) : openAuthor(m.slug))}>{m.label}</button>{/each}
 	</p>
 	{#if notFound}<p class="cmp-note">Couldn't find “{notFound}”.</p>{/if}
 
@@ -241,10 +259,10 @@
 		</div>
 		{#if picks.length && months.length}
 			<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
-			<div bind:this={chartWrap}><LineChart bind:plotInset months={viewMonths} {series} mode="line" {smooth} annotations={EVENT_ANNOTATIONS} /></div>
+			<div bind:this={chartWrap}><LineChart bind:plotInset months={viewMonths} {series} mode="line" {smooth} annotations={EVENT_ANNOTATIONS} onSeriesClick={openPick} /></div>
 			{#if series.length >= 2}
 				<div class="cmp-legend">
-					{#each picks as p (p.id)}<span class="cl-item"><span class="cl-sw" style="background:{p.color}"></span>{p.label}</span>{/each}
+					{#each picks as p (p.id)}<button type="button" class="cl-item" title="See this {p.kind === 'work' ? 'book' : 'author'}'s own trends page" onclick={() => openPick(p.id)}><span class="cl-sw" style="background:{p.color}"></span>{p.label}</button>{/each}
 				</div>
 			{/if}
 			{#if months.length - brushStart >= 24}
@@ -312,6 +330,7 @@
 	.try-sep { color: var(--color-gray-300, #c8c8c8); }
 	.try-link { padding: 0; border: 0; background: none; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
 	.try-link:hover { text-decoration-color: currentColor; }
+	.try-link.is-title { font-style: italic; }
 	.cmp-note { margin: 8px 0 0; font-size: 14px; color: var(--color-fg-light); }
 
 	.cmp-chart { margin: 22px 0 0; padding-top: 16px; border-top: 3px solid var(--color-fg); }
@@ -326,7 +345,8 @@
 		.chart-panel { margin-right: calc(-1 * max(0px, min(var(--hang, 0px), (100vw - 960px) / 2 - 24px))); }
 	}
 	.cmp-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; margin: 10px 0 2px; font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); }
-	.cl-item { display: inline-flex; align-items: center; gap: 6px; }
+	.cl-item { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px; border: 0; border-radius: 6px; background: none; font: inherit; color: inherit; cursor: pointer; }
+	.cl-item:hover { background: var(--color-gray-100); }
 	.cl-sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
 
 	.chart-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin: 16px 0 0; }

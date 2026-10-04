@@ -41,7 +41,7 @@
 	// resolve to its author, open the author's drilldown with that work highlighted.
 	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
 	// (the "By author" tab -> open straight to the search box).
-	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {}, onCompare = null, onLoaded = null } = $props();
+	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {}, onCompare = null, onLoaded = null, onCompareIds = null } = $props();
 	// Phones: the year slider and the Download/Share row run the full width
 	// (the plot itself is narrower, beside the line names).
 	const phone = new MediaQuery("max-width: 600px");
@@ -310,6 +310,11 @@
 			const a = mixAuthors[k], t = mixTitles[k];
 			if (a) out.push({ kind: "author", slug: a.slug, label: displayName(a.name) });
 			if (t) out.push({ kind: "title", slug: t.slug, title: t.title, label: cleanTitleForDisplay(t.title) });
+		}
+		// One comparison among them, to show you can put several on one chart.
+		if (onCompareIds && out.length >= 2) {
+			out.splice(2, 0, { kind: "compare", label: "Wuthering Heights vs. Pride and Prejudice",
+				ids: ["w~emily-bronte-1818~Wuthering Heights", "w~jane-austen-1775~Pride and Prejudice"] });
 		}
 		return out;
 	});
@@ -2346,7 +2351,7 @@
 		{#if tryPicks.length}
 			<p class="try-row">
 				<span class="try-lead">Try</span>
-				{#each tryPicks as p, k}{#if k}<span class="try-sep try-extra" aria-hidden="true">·</span>{/if}<button class="try-link" class:try-extra={k > 0} class:is-title={p.kind === "title"} onclick={() => (p.kind === "title" ? openTitle(p.title, p.slug) : openAuthor(p.slug))}>{p.label}</button>{/each}
+				{#each tryPicks as p, k}{#if k}<span class="try-sep try-extra" aria-hidden="true">·</span>{/if}<button class="try-link" class:try-extra={k > 0} class:is-title={p.kind === "title"} onclick={() => (p.kind === "compare" ? onCompareIds(p.ids) : p.kind === "title" ? openTitle(p.title, p.slug) : openAuthor(p.slug))}>{p.label}</button>{/each}
 				<span class="try-sep" aria-hidden="true">·</span>
 				<button class="try-link try-surprise" onclick={surpriseMe}>Surprise me</button>
 			</p>

@@ -685,7 +685,7 @@
 				{/key}
 			{:else}
 				{#key `${searchKind}-${searchNonce}`}
-					<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} {openTitle} onCompare={startCompare} {onLoaded} />
+					<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} {openTitle} onCompare={startCompare} {onLoaded} onCompareIds={showCompare} />
 				{/key}
 			{/if}
 		{/if}
