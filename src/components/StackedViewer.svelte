@@ -1829,6 +1829,7 @@
 	// musician is skipped).
 	const DESC_OK = /(author|writer|novelist|poet|journalist|illustrator|cartoonist|historian|playwright|screenwriter|essayist|biographer|memoirist|scholar|critic|editor|professor|philosopher|scientist|activist|politician|comedian|chef|economist|psychologist|novel|book|memoir|collection|series|poem|play|essay|story|graphic)/i;
 	const DESC_PERSON = /(author|writer|novelist|poet|journalist|illustrator|cartoonist|historian|playwright|screenwriter|essayist|biographer|memoirist|scholar|critic|editor|professor|philosopher|scientist|activist|politician|comedian|chef|economist|psychologist|actor|actress|musician|singer|artist|lawyer|physician|theologian|priest|monk|teacher|educator|entrepreneur|television|personality|founder|leader|general|president|emperor|king|queen|saint|(born|died|\d{4}[–-]\d{4}))/i;
+	const DESC_WORK = /\b(novels?|novellas?|books?|memoirs?|collection|series|poems?|poetry|play|essays?|story|stories|graphic|comics?|manga|autobiography|biography|nonfiction|non-fiction|cookbook|anthology|epic|treatise|saga|trilogy)\b/i;
 	let headDesc = $state("");
 	let headPhoto = $state(null); // the author's Wikipedia portrait, beside the name
 	$effect(() => {
@@ -1845,7 +1846,11 @@
 				const d = (s?.description || "").trim();
 				// On an author page, skip a description of a book: an author without
 				// their own article redirects to their novel ("2026 debut novel by …").
-				const ok = d && DESC_OK.test(d) && (isTitle || (DESC_PERSON.test(d) && !/\bby\b/i.test(d)));
+				const ok = d && DESC_OK.test(d) && (isTitle || (DESC_PERSON.test(d) && !/\bby\b/i.test(d)))
+					// On a book page, only a description of a book ("1818 novel by
+					// Mary Shelley"), never of a topic around it ("Debate over the
+					// identity of an author", "2025 film").
+					&& (!isTitle || (DESC_WORK.test(d) && !/\b(debate|controversy|question|theory|film|adaptation|character|franchise)\b/i.test(d)));
 				let t = ok ? d.charAt(0).toUpperCase() + d.slice(1) : "";
 				// "2025 novel by Virginia Evans": the byline right below already names
 				// the author, so keep just "2025 novel".
