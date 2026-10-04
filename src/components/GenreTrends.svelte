@@ -710,7 +710,6 @@
 	.chart-foot .tb-btn { padding: 5px 10px; border: 0; border-radius: 6px; background: #f1f2f3; font-size: 12.5px; font-weight: 500; color: #555; gap: 5px; }
 	.chart-foot .tb-btn:hover { background: #e4e6e8; color: var(--color-fg); }
 	.chart-foot .tb-btn :global(svg) { width: 13px; height: 13px; color: currentColor; }
-	@media (max-width: 640px) { .chart-foot .share-menu { left: 0; right: auto; } }
 
 	/* Wide screens: the line labels hang out into the empty right margin, so the
 	   plot itself runs the full width of the column (--hang is the label room;

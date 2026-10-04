@@ -341,7 +341,6 @@
 	.dl-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 14px; color: var(--color-fg); text-align: left; cursor: pointer; }
 	.dl-menu button:hover { background: var(--color-gray-100); }
 	.dl-fmt { margin-left: auto; font-size: 12px; color: var(--color-fg-light); }
-	@media (max-width: 640px) { .dl-menu { left: 0; right: auto; } }
 
 	.cmp-table { width: 100%; margin: 28px 0 8px; border-collapse: collapse; font-size: 15px; }
 	.cmp-table th { padding: 0 8px 6px; font-size: 12.5px; font-weight: 500; color: var(--color-fg-light); text-align: left; border-bottom: 1px solid var(--color-border); }

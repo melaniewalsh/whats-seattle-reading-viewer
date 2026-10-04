@@ -412,6 +412,33 @@
 	}
 
 	// "Surprise me": jump to a random author (or title in title mode).
+	// Every author the catalog credits on this book, from the "/ ..." credit
+	// line of its records ("Freakonomics ... / Steven D. Levitt and Stephen J.
+	// Dubner."): the library files each record under its FIRST author, so a
+	// co-author would otherwise go unnamed. Only multi-author credit lines that
+	// include this page's author count; "; translated by ..." and the like are
+	// dropped. Empty when there's just the one author.
+	const bookAuthors = $derived.by(() => {
+		if (searchMode !== "title" || !searchedWork || !current) return [];
+		const surname = displayName(current.name).split(/\s+/).pop()?.toLowerCase() || "";
+		const tally = new Map();
+		for (const i of searchedWork.idxs) {
+			const t = current.titles[i]?.title || "";
+			const k = t.indexOf(" / ");
+			if (k < 0) continue;
+			const line = t.slice(k + 3).split(/\s*;\s*/)[0].replace(/^(written |story )?by\s+/i, "").replace(/[.\s]+$/, "").trim();
+			if (/illustrat|translat|edited|editor|introduc|foreword|with /i.test(line)) continue;
+			const names = line.split(/\s*,\s*(?:and\s+|&\s+)?|\s+and\s+|\s+&\s+/).map((n) => n.trim()).filter(Boolean);
+			if (names.length < 2 || names.length > 4) continue;
+			if (!names.every((n) => /^[A-Z][\p{L}.'’-]*(\s+[A-Z][\p{L}.'’-]*){1,3}$/u.test(n))) continue;
+			if (!names.some((n) => n.toLowerCase().includes(surname))) continue;
+			const key = names.join("|");
+			tally.set(key, (tally.get(key) || 0) + 1);
+		}
+		const best = [...tally.entries()].sort((a, b) => b[1] - a[1])[0];
+		return best ? best[0].split("|") : [];
+	});
+
 	// Tell the page what's on the chart, so its search field can show it
 	// ("Sally Rooney") and a comma can add more.
 	$effect(() => {
@@ -2350,7 +2377,7 @@
 					{#if isOverview}
 						{compactNumber(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 					{:else if searchMode === "title"}
-						by <button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} total checkouts{/if}{#if genreRanks.length}<span class="off-phone">{" · "}<button type="button" class="author-link" onclick={() => openGenre(genreRanks[0].genre)} title="See the most-borrowed {genreRanks[0].genre} books">#{genreRanks[0].rank} in {genreRanks[0].genre}</button></span>{/if}
+						by {#if bookAuthors.length}{#each bookAuthors as name, k}{#if k}{k === bookAuthors.length - 1 ? (bookAuthors.length > 2 ? ", and " : " and ") : ", "}{/if}{#if name.toLowerCase().includes(displayName(current.name).split(/\s+/).pop().toLowerCase())}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{name}</button>{:else}{name}{/if}{/each}{:else}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{/if}{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} total checkouts{/if}{#if genreRanks.length}<span class="off-phone">{" · "}<button type="button" class="author-link" onclick={() => openGenre(genreRanks[0].genre)} title="See the most-borrowed {genreRanks[0].genre} books">#{genreRanks[0].rank} in {genreRanks[0].genre}</button></span>{/if}
 					{:else}
 						{compactNumber(current.total)} total checkouts<span class="off-phone">{" · "}{workGroups.size.toLocaleString()} {workGroups.size === 1 ? "work" : "works"}</span>
 					{/if}
@@ -4630,7 +4657,6 @@
 	.chart-foot .tb-btn :global(svg.lucide-chevron-down) { width: 12px; height: 12px; }
 	.chart-foot .share-menu { left: auto; right: 0; }
 	/* On a phone the links wrap under the source, at the left: open menus rightward. */
-	@media (max-width: 640px) { .chart-foot .share-menu { left: 0; right: auto; } }
 	.chart-source a { color: inherit; text-decoration: underline; text-decoration-color: #c9c9c9; text-underline-offset: 2px; }
 	.chart-source a:hover { color: var(--color-fg); text-decoration-color: currentColor; }
 	.chart-source {
