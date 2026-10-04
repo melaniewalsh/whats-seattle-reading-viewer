@@ -2,6 +2,8 @@
 // work, and a readable display name. Shared by the trends viewer and Compare.
 import { titleCase } from "$utils/titleCase.js";
 
+const EDITION_WORDS = /^([^:;]*?)[\s,]+(?:revised and (?:expanded|updated)|revised(?: and updated)? edition|expanded(?: and updated)? edition|updated edition|new edition|special edition|deluxe edition|collector'?s edition|illustrated edition|(?:\d+(?:st|nd|rd|th)|tenth|fifteenth|twentieth|twenty-fifth|thirtieth|fortieth|fiftieth|seventy-fifth|hundredth) anniversary edition|anniversary edition|movie tie-in(?: edition)?|tie-in edition|young readers'? edition)(?=\s*(?:[:;(]|$))/i;
+
 // The same book shows up many times (print / audio / ebook / illustrated /
 // unabridged), differing only in cataloging boilerplate. Strip that boilerplate
 // to a "work key" so all the editions of one work collapse to the same string.
@@ -13,6 +15,10 @@ export function normalizeWorkKey(title) {
 	// (otherwise "á" gets stripped to a space and the keys diverge).
 	t = t.normalize("NFD").replace(/[̀-ͯ]/g, "");
 	t = t.split(" / ")[0]; // drop "/ by Author ; illustrations by ..."
+	// Edition wording in the main title ("Freakonomics Revised and Expanded: ...",
+	// "Freakonomics Twentieth Anniversary Edition", "SuperFreakonomics, Illustrated
+	// edition: ...") is the same work as the plain title.
+	t = t.replace(EDITION_WORDS, "$1");
 	// Bilingual catalog records use "Original Title = English parallel title"
 	// (e.g. "Harī Pottā ... = Harry Potter and the half-blood prince"). Keep the
 	// English parallel title so foreign editions cluster with the English work.

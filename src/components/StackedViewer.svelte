@@ -35,7 +35,7 @@
 	import WikiCard from "$components/WikiCard.svelte";
 	import { wikiSummary, wikiWork } from "$utils/wiki.js";
 	import Switch from "$components/ui/Switch.svelte";
-	import { getMonths, searchAuthors, searchTitles, searchAll, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks } from "$components/db.js";
+	import { getMonths, searchAuthors, searchTitles, searchAll, titleIndexMin, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks, getCoauthors } from "$components/db.js";
 
 	// "author" (default): search authors. "title": reverse lookup — search a title,
 	// resolve to its author, open the author's drilldown with that work highlighted.
@@ -437,6 +437,38 @@
 		}
 		const best = [...tally.entries()].sort((a, b) => b[1] - a[1])[0];
 		return best ? best[0].split("|") : [];
+	});
+
+	// On an author's page: books they're credited on that the library files
+	// under someone else (Dubner on Levitt's Freakonomics).
+	let alsoCredited = $state([]);
+	$effect(() => {
+		const slug = currentSlug;
+		const authorPage = searchMode !== "title" && !isOverview;
+		alsoCredited = [];
+		if (!slug || !authorPage) return;
+		let alive = true;
+		getCoauthors().then((d) => { if (alive) alsoCredited = d?.[slug] || []; });
+		return () => { alive = false; };
+	});
+
+	// Co-authors who have their own page on the site (Stephen J. Dubner does)
+	// get a link to it: name -> slug, looked up in the author index.
+	let coAuthorSlugs = $state({});
+	$effect(() => {
+		const names = bookAuthors;
+		const own = current ? displayName(current.name).split(/\s+/).pop().toLowerCase() : "";
+		const key = (n) => (n || "").toLowerCase().replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
+		let alive = true;
+		coAuthorSlugs = {};
+		for (const n of names) {
+			if (n.toLowerCase().includes(own)) continue;
+			searchAuthors(n, 5).then((rows) => {
+				const hit = rows.find((r) => key(displayName(r.name)) === key(n));
+				if (alive && hit) coAuthorSlugs = { ...coAuthorSlugs, [n]: hit.slug };
+			}).catch(() => {});
+		}
+		return () => { alive = false; };
 	});
 
 	// Tell the page what's on the chart, so its search field can show it
@@ -2384,7 +2416,7 @@
 					{#if isOverview}
 						{compactNumber(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 					{:else if searchMode === "title"}
-						by {#if bookAuthors.length}{#each bookAuthors as name, k}{#if k}{k === bookAuthors.length - 1 ? (bookAuthors.length > 2 ? ", and " : " and ") : ", "}{/if}{#if name.toLowerCase().includes(displayName(current.name).split(/\s+/).pop().toLowerCase())}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{name}</button>{:else}{name}{/if}{/each}{:else}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{/if}{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} total checkouts{/if}{#if genreRanks.length}<span class="off-phone">{" · "}<button type="button" class="author-link" onclick={() => openGenre(genreRanks[0].genre)} title="See the most-borrowed {genreRanks[0].genre} books">#{genreRanks[0].rank} in {genreRanks[0].genre}</button></span>{/if}
+						by {#if bookAuthors.length}{#each bookAuthors as name, k}{#if k}{k === bookAuthors.length - 1 ? (bookAuthors.length > 2 ? ", and " : " and ") : ", "}{/if}{#if name.toLowerCase().includes(displayName(current.name).split(/\s+/).pop().toLowerCase())}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{name}</button>{:else if coAuthorSlugs[name]}<button type="button" class="author-link" onclick={() => openAuthor(coAuthorSlugs[name])} title="See this author's borrowing trends">{name}</button>{:else}{name}{/if}{/each}{:else}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{/if}{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} total checkouts{/if}{#if genreRanks.length}<span class="off-phone">{" · "}<button type="button" class="author-link" onclick={() => openGenre(genreRanks[0].genre)} title="See the most-borrowed {genreRanks[0].genre} books">#{genreRanks[0].rank} in {genreRanks[0].genre}</button></span>{/if}
 					{:else}
 						{compactNumber(current.total)} total checkouts<span class="off-phone">{" · "}{workGroups.size.toLocaleString()} {workGroups.size === 1 ? "work" : "works"}</span>
 					{/if}
@@ -2776,6 +2808,20 @@
 					<button type="button" class="books-more" onclick={() => (booksShowAll = false)}>Show fewer</button>
 				{:else if hiddenWorkCount > 0}
 					<p class="titles-more">Showing the top {visibleWorkBlocks.length.toLocaleString()} books. Type in the filter to find others.</p>
+				{/if}
+				{#if alsoCredited.length}
+					{@const filers = [...new Set(alsoCredited.map((b) => displayName(b[2])))]}
+					<!-- Credited, but filed under the first author the library lists, so
+					     these checkouts count on that author's page, not this one. -->
+					<div class="also-credited">
+						<h3 class="ac-title">Also credited on</h3>
+						<ul>
+							{#each alsoCredited as [title, slug, name, total]}
+								<li><button type="button" class="ac-book" onclick={() => openTitle(title, slug)}>{cleanTitleForDisplay(title) || title}</button> <span class="ac-with">with {displayName(name)}</span> <span class="ac-n">{compactNumber(total)} checkouts</span></li>
+							{/each}
+						</ul>
+						<p class="ac-note">The library files {alsoCredited.length === 1 ? "this" : "these"} under {filers.length === 1 ? filers[0] : "the other authors"}, so {alsoCredited.length === 1 ? "its" : "their"} checkouts count there, not in the totals above.</p>
+					</div>
 				{/if}
 			</section>
 			{/if}
@@ -4542,6 +4588,15 @@
 		.iso-note { display: none !important; }
 		.format-legend { justify-content: flex-start; gap: 2px 12px; font-size: 13px; }
 	}
+	.also-credited { margin: 22px 0 0; padding-top: 14px; border-top: 1px solid var(--color-border); font-family: var(--font-sans); }
+	.ac-title { margin: 0 0 8px; font-size: 1rem; font-weight: 600; color: var(--color-fg); }
+	.also-credited ul { list-style: none; margin: 0; padding: 0; }
+	.also-credited li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 5px 0; }
+	.ac-book { padding: 0; border: 0; background: none; font-family: var(--font-serif); font-size: 1.05rem; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
+	.ac-book:hover { text-decoration-color: currentColor; }
+	.ac-with { font-size: 14px; color: var(--color-fg-light); }
+	.ac-n { margin-left: auto; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--color-fg); }
+	.ac-note { margin: 8px 0 0; font-size: 13px; color: var(--color-fg-light); }
 	.compare-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; font-family: var(--font-sans); font-size: 14px; font-weight: 500; color: var(--color-fg); cursor: pointer; }
 	.compare-btn:hover { border-color: var(--color-fg-light); }
 	.plot-toolbar {

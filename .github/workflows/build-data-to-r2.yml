@@ -184,6 +184,16 @@ jobs:
             --content-encoding gzip \
             --only-show-errors
 
+          # Co-written books filed under another author (written alongside the
+          # title index): the "Also credited on" list on author pages.
+          gzip -9 -c static/data/coauthors.json > /tmp/coauthors.json.gz
+          aws s3 cp /tmp/coauthors.json.gz \
+            "s3://${R2_DB_BUCKET}/coauthors.json" \
+            --endpoint-url "$R2_ENDPOINT_URL" \
+            --content-type application/json \
+            --content-encoding gzip \
+            --only-show-errors
+
           # Everything else: meta.json + the ~350k tiny authors/*.json files.
           # `aws s3 sync` is painfully slow at this many small files (it timed out
           # the 60-min job). rclone is built for it: parallel listing (--fast-list)
@@ -209,6 +219,7 @@ jobs:
             --transfers 128 --checkers 128 --fast-list --s3-no-check-bucket \
             --exclude "search-index.json" \
             --exclude "title-index.json" \
+            --exclude "coauthors.json" \
             --exclude "library.sqlite3" \
             --exclude "covers/**" \
             --stats 30s --stats-one-line

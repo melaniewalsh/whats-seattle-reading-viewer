@@ -63,6 +63,11 @@ jobs:
           aws s3 cp /tmp/title-index.json.gz "s3://${R2_DB_BUCKET}/title-index.json" \
             --endpoint-url "$R2_ENDPOINT_URL" --content-type application/json \
             --content-encoding gzip --only-show-errors
+          # Co-written books filed under another author ("Also credited on").
+          gzip -9 -c static/data/coauthors.json > /tmp/coauthors.json.gz
+          aws s3 cp /tmp/coauthors.json.gz "s3://${R2_DB_BUCKET}/coauthors.json" \
+            --endpoint-url "$R2_ENDPOINT_URL" --content-type application/json \
+            --content-encoding gzip --only-show-errors
           # Cover thumbnails first (immutable: a cover id's image never changes),
           # so backlist.json never points at a file that isn't there yet.
           if [ -d static/cover-thumbs ] && [ -n "$(ls -A static/cover-thumbs)" ]; then

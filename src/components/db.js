@@ -60,6 +60,19 @@ export function getTopAuthors() {
 // the monthly data workflow and uploaded to R2; a copy is bundled with the
 // site as a fallback. Missing everywhere -> null.
 let backlistPromise = null;
+// Books an author is credited on that the library files under SOMEONE ELSE
+// (co-written; build_title_index.py). { slug: [[title, author slug, author
+// name, checkouts], ...] }. Loaded once, lazily; missing file -> {}.
+let coauthorsPromise = null;
+export function getCoauthors() {
+	if (!coauthorsPromise) {
+		coauthorsPromise = fetch(`${DATA_BASE}/coauthors.json`, FRESH)
+			.then((r) => (r.ok ? r.json() : {}))
+			.catch(() => ({}));
+	}
+	return coauthorsPromise;
+}
+
 export function getBacklist() {
 	if (!backlistPromise) {
 		backlistPromise = (async () => {
