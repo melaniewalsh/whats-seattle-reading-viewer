@@ -13,6 +13,7 @@ import glob
 import json
 import os
 import re
+import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent / "static" / "data"
@@ -26,9 +27,44 @@ def clean(t):
     return re.sub(r"\s*[.,;/:]\s*$", "", t).strip()
 
 
+NOISE = re.compile(
+    r"(book|bk|series|volume|vol|part|edition|unabridged|abridged|screenplay|read by|narrated|"
+    r"illustrated|deluxe|anniversary|collector|special|movie|film|adapted|reissue|boxe?d? ?set|"
+    r"complete|novel|novella|memoir|thriller|mystery|story|stories|tale|tales|romance|biography|"
+    r"autobiography|poems|essays|playscript|litrpg|gamelit|\bscript\b|\bproduction|\bserie|"
+    r"\blivre|\btome|\blibro|\btomo|\bedicion)",
+    re.I,
+)
+
+
 def norm_title(t):
-    """Key form: main title only (drop ':' subtitle and '(' qualifiers), lowercased."""
-    return clean(t).split(":")[0].split("(")[0].strip().lower()
+    """Work key -- the same rules as normalizeWorkKey in src/utils/workTitle.js,
+    so search lists a book once ("Moby Dick" == "Moby-Dick, or, The whale")
+    exactly as the book's own page groups its editions."""
+    t = unicodedata.normalize("NFD", (t or "").lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    t = t.split(" / ")[0]
+    if re.search(r"\s=\s", t):
+        t = re.split(r"\s=\s", t)[-1]
+    t = re.sub(r",\s+or,\s+.*$", "", t, flags=re.I)
+    t = t.replace("&", " and ")
+    t = re.sub(r"\([^)]*\)", " ", t)
+    t = re.sub(r"\s*\([^)]*$", " ", t)
+    t = re.sub(r"\[[^\]]*\]", " ", t)
+    t = re.sub(r"[,\s]+part\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|i{1,3})\b.*$", " ", t, flags=re.I)
+    while True:
+        prev = t
+        t = re.sub(
+            r"[:;]\s*[^:;]*$",
+            lambda m: " " if (NOISE.search(m.group(0)) or re.search(r"[:;]\s*or[\s,]", m.group(0), re.I)) else m.group(0),
+            t,
+        )
+        if t == prev:
+            break
+    t = re.sub(r"\b(unabridged|abridged|audiobook|e-?book|large print|compact disc|sound recording)\b", " ", t)
+    t = re.sub(r"\b(the|a|an)\b", " ", t)
+    t = re.sub(r"['\u2019]", "", t)
+    return re.sub(r"[^a-z0-9]+", "", t)
 
 
 def norm_author(a):
