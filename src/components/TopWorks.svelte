@@ -446,7 +446,7 @@
 				<div class="gal-count">{compactNumber(r[3])} checkouts</div>
 				{#if !embedded}
 					{#if k in summaries}
-						<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[k] || lookupUrls(`${r[0]} ${displayName(r[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={`${r[0]} ${displayName(r[1])}`} compact /></span></p>
+						<p class="gal-sum">{#if summaries[k]}{blurb(summaries[k])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[k] || lookupUrls(`${r[0]} ${displayName(r[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">Wikipedia <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={`${r[0]} ${displayName(r[1])}`} compact /></span></p>
 					{:else}
 						<p class="gal-sum gal-sum-ph"></p>
 					{/if}
@@ -585,7 +585,7 @@
 										<button class="tw-title tw-titlelink" title="See this book's checkout trend" onclick={() => openTitle(row[0], row[2])}>{titleCase(cleanWorkTitle(row[0]))}</button>
 										<span class="tw-by">by {#if row[2]}<button class="tw-authorlink" title="See this author's checkout trend" onclick={() => openAuthor(row[2])}>{displayName(row[1])}</button>{:else}{displayName(row[1])}{/if}</span>
 											{#if coverKey(row) in summaries}
-												<p class="row-sum">{#if summaries[coverKey(row)]}{blurb(summaries[coverKey(row)])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[coverKey(row)] || lookupUrls(`${row[0]} ${displayName(row[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">More <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={`${row[0]} ${displayName(row[1])}`} compact /></span></p>
+												<p class="row-sum">{#if summaries[coverKey(row)]}{blurb(summaries[coverKey(row)])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[coverKey(row)] || lookupUrls(`${row[0]} ${displayName(row[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">Wikipedia <span class="ml-arrow" aria-hidden="true">↗</span></a><BorrowMenu q={`${row[0]} ${displayName(row[1])}`} compact /></span></p>
 											{/if}
 									</span>
 								</div>
