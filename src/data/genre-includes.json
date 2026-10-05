@@ -1,6 +1,15 @@
 {
   "_about": "Books added to a Most Borrowed genre list by hand, when too few of their checkouts are tagged with the genre (see GENRE_SHARE in data-prep/build_partition.py). [title, author slug].",
-  "Romance": [],
+  "Romance": [
+    [
+      "Pride and Prejudice",
+      "jane-austen-1775"
+    ],
+    [
+      "Wuthering Heights",
+      "emily-bronte-1818"
+    ]
+  ],
   "Travel": [
     [
       "Endurance",
