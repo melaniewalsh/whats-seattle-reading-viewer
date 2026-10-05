@@ -600,8 +600,12 @@
 	function onDown(event) {
 		if (event.pointerType !== 'touch') return; // mouse uses hover, not tap
 		event.preventDefault(); // don't let the tap turn into text selection / a click
+		// A second tap on the same month closes the tooltip (on a phone it covers
+		// most of the chart, so "tap outside" is hard to hit).
+		const before = pinned ? hoverIndex : null;
 		pinned = true;
 		locate(event);
+		if (before !== null && hoverIndex === before) dismiss();
 	}
 
 	function onLeave() {
@@ -978,7 +982,9 @@
 		</div>
 	{/each}
 	{#if hoverIndex !== null && selectedItem}
-        <div class="tooltip {pinned ? '' : 'side-' + tooltipSide}" class:below={pinned && tooltipBelow} style="left: {tooltipLeft}px; top: {tooltipTop}px;">
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div class="tooltip {pinned ? '' : 'side-' + tooltipSide}" class:below={pinned && tooltipBelow} class:pinned class:compact={width < 560} style="left: {tooltipLeft}px; top: {tooltipTop}px;" onclick={() => pinned && dismiss()}>
+            {#if pinned}<button type="button" class="tt-close" aria-label="Close" onclick={(e) => { e.stopPropagation(); dismiss(); }}>×</button>{/if}
             <div class="tt-title">
                 <span class="tt-dot" style="background-color: {selectedItem.color}"></span>
                 <span class="tt-title-text">{tooltipTitle}</span>
@@ -1229,6 +1235,13 @@
 		from { opacity: 0; }
 		to { opacity: 1; }
 	}
+	/* Tapped open (phones): tap the tooltip or its × to close it. */
+	.tooltip.pinned { pointer-events: auto; cursor: pointer; }
+	.tt-close { position: absolute; top: 4px; right: 6px; width: 24px; height: 24px; padding: 0; border: 0; background: none; font-size: 18px; line-height: 1; color: #8a8f96; cursor: pointer; }
+	/* Narrow charts: a smaller card, so it hides less of the plot. */
+	.tooltip.compact { min-width: 0; max-width: 190px; padding: 8px 26px 9px 10px; font-size: 12px; border-radius: 8px; }
+	.tooltip.compact .tt-title-text { font-size: 13px; }
+	.tooltip.compact .tt-value { font-size: 18px; }
 	/* when the point is near the top edge, drop the tooltip below the dot */
 	.tooltip.below {
 		transform: translate(-50%, 18px);
