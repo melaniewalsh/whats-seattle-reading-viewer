@@ -633,6 +633,20 @@
 		'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 	];
 
+	// Phones (as on Our World in Data): a tap docks a sheet at the bottom of the
+	// screen with every line's value that month, instead of a card over the plot.
+	const sheetMode = $derived(pinned && width < 560);
+	const sheetRows = $derived.by(() => {
+		if (!sheetMode || hoverIndex === null) return [];
+		return layers
+			.map((l) => ({
+				key: keyOf(l), label: l.label, color: l.color,
+				v: (l.raw ?? l.values)?.[hoverIndex] ?? 0,
+				avg: smooth && mode === 'line' ? l.values?.[hoverIndex] : null
+			}))
+			.sort((a, b) => b.v - a.v);
+	});
+
 	function formatMonth(ym) {
 		if (!ym) return '';
 		const parts = ym.split('-');
@@ -965,7 +979,12 @@
 		<!-- Hover marker: a thin vertical rule plus a dot on the hovered line(s) -->
 		{#if hoverIndex !== null}
 			<line class="hover-guide" x1={x(hoverIndex)} x2={x(hoverIndex)} y1={margin.top - 12} y2={height - margin.bottom} />
-			{#if selectedItem && selectedItem.values[hoverIndex] > 0}
+			{#if sheetMode}
+				<!-- Phones: a dot on every line, read off in the sheet below -->
+				{#each layers as l}
+					{#if (l.top?.[hoverIndex] ?? 0) > 0}<circle class="hover-dot" cx={x(hoverIndex)} cy={y(l.top[hoverIndex])} r="4.5" fill={l.color} />{/if}
+				{/each}
+			{:else if selectedItem && selectedItem.values[hoverIndex] > 0}
 				<circle class="hover-dot" cx={x(hoverIndex)} cy={y(selectedItem.top[hoverIndex])} r="5" fill={selectedItem.color} />
 			{/if}
 		{/if}
@@ -981,7 +1000,22 @@
 			</div>
 		</div>
 	{/each}
-	{#if hoverIndex !== null && selectedItem}
+	{#if sheetMode && hoverIndex !== null && sheetRows.length}
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<div class="tt-sheet" role="dialog" aria-label="Values for {formatMonth(months[hoverIndex])}" onclick={dismiss}>
+			<div class="ts-head"><span class="ts-month">{formatMonth(months[hoverIndex])}</span><span class="ts-unit">{percent ? "share of checkouts" : "checkouts"}</span><button type="button" class="ts-close" aria-label="Close" onclick={(e) => { e.stopPropagation(); dismiss(); }}>×</button></div>
+			<ul>
+				{#each sheetRows as r (r.key)}
+					<li class:on={hoveredSeriesKey && r.label === hoveredSeriesKey}>
+						<span class="ts-sw" style="background:{r.color}"></span>
+						<span class="ts-name">{r.label}</span>
+						<span class="ts-val">{percent ? fmtVal(r.v) : r.v.toLocaleString()}{#if r.avg != null}<span class="ts-avg">avg {percent ? fmtVal(r.avg) : Math.round(r.avg).toLocaleString()}</span>{/if}</span>
+					</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
+	{#if hoverIndex !== null && selectedItem && !sheetMode}
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
         <div class="tooltip {pinned ? '' : 'side-' + tooltipSide}" class:below={pinned && tooltipBelow} class:pinned class:compact={width < 560} style="left: {tooltipLeft}px; top: {tooltipTop}px;" onclick={() => pinned && dismiss()}>
             {#if pinned}<button type="button" class="tt-close" aria-label="Close" onclick={(e) => { e.stopPropagation(); dismiss(); }}>×</button>{/if}
@@ -1235,6 +1269,28 @@
 		from { opacity: 0; }
 		to { opacity: 1; }
 	}
+	/* Phones: the bottom sheet (tap anywhere to close). */
+	.tt-sheet {
+		position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
+		max-height: 45vh; overflow-y: auto;
+		padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+		background: #fff; border-top: 1px solid rgba(0, 0, 0, 0.1);
+		box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.12);
+		font-family: var(--font-sans, system-ui, sans-serif); color: #222;
+		animation: ts-up 0.16s ease-out;
+	}
+	@keyframes ts-up { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+	.ts-head { display: flex; align-items: baseline; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid #eee; }
+	.ts-month { font-weight: 700; font-size: 16px; }
+	.ts-unit { font-size: 13px; color: #777; }
+	.ts-close { margin-left: auto; width: 28px; height: 28px; padding: 0; border: 0; background: none; font-size: 20px; line-height: 1; color: #888; }
+	.tt-sheet ul { list-style: none; margin: 6px 0 0; padding: 0; }
+	.tt-sheet li { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 15px; }
+	.tt-sheet li.on { font-weight: 600; }
+	.ts-sw { width: 12px; height: 12px; border-radius: 2px; flex: none; }
+	.ts-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.ts-val { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+	.ts-avg { margin-left: 6px; font-weight: 400; font-size: 12px; color: #888; }
 	/* Tapped open (phones): tap the tooltip or its × to close it. */
 	.tooltip.pinned { pointer-events: auto; cursor: pointer; }
 	.tt-close { position: absolute; top: 4px; right: 6px; width: 24px; height: 24px; padding: 0; border: 0; background: none; font-size: 18px; line-height: 1; color: #8a8f96; cursor: pointer; }
