@@ -65,6 +65,11 @@
 	// names) keeps the shaded bands but drops the labels.
 	const EVENT_ROW = 34;
 	const showEventLabels = $derived(!!annotations?.length && width >= 480);
+	// Phones: no room for the labels, so each band gets a small "?" above it;
+	// tapping it opens the note (evOpen = that band's index).
+	const EVENT_Q_ROW = 22;
+	const showEventQs = $derived(!!annotations?.length && width < 480);
+	let evOpen = $state(null);
 	const markerCount = $derived((markers || []).filter((mk) => months.includes(mk.month)).length);
 	const hasMarkers = $derived(mode === 'line' && (markers || []).some((mk) => months.includes(mk.month)));
 	const endLabelW = $derived.by(() => {
@@ -81,7 +86,7 @@
 	const margin = $derived({
 		// Room for label rows above the plot: one row for a single label (e.g.
 		// just the peak), two when several might need to stagger.
-		top: (hasMarkers ? (markerCount > 1 ? (width < 560 ? 66 : 92) : (width < 560 ? 50 : 56)) : 16) + (showEventLabels ? EVENT_ROW : 0),
+		top: (hasMarkers ? (markerCount > 1 ? (width < 560 ? 66 : 92) : (width < 560 ? 50 : 56)) : 16) + (showEventLabels ? EVENT_ROW : showEventQs ? EVENT_Q_ROW : 0),
 		right: Math.max(16, endLabelW),
 		bottom: monthTickMode ? 42 : 28,
 		left: 2
@@ -1000,6 +1005,16 @@
 			</div>
 		</div>
 	{/each}
+	{#each showEventQs ? annotationMarks : [] as a, k}
+		<button type="button" class="ev-q" class:open={evOpen === k} style="left: {(a.x0 + a.x1) / 2}px; top: {margin.top - 12 - 21}px;" aria-label="{a.label}: about this dip" aria-expanded={evOpen === k} onpointerdown={(e) => e.stopPropagation()} onclick={() => (evOpen = evOpen === k ? null : k)}>?</button>
+	{/each}
+	{#if showEventQs && evOpen !== null && annotationMarks[evOpen]}
+		{@const a = annotationMarks[evOpen]}
+		<div class="ev-sheet" role="note" style="top: {margin.top - 8}px;" onpointerdown={(e) => e.stopPropagation()}>
+			<button type="button" class="ev-sheet-x" aria-label="Close" onclick={() => (evOpen = null)}>×</button>
+			<p class="qmark-body"><strong>{a.label}.</strong> {a.blurb} <a href={a.url} target="_blank" rel="noopener noreferrer">Read more</a></p>
+		</div>
+	{/if}
 	{#if sheetMode && hoverIndex !== null && sheetRows.length}
 		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 		<div class="tt-sheet" role="dialog" aria-label="Values for {formatMonth(months[hoverIndex])}" onclick={dismiss}>
@@ -1115,6 +1130,53 @@
 	.ev-wrap.align-start .qmark-pop { left: 0; transform: none; }
 	.ev-wrap:hover .qmark-pop,
 	.ev-wrap:focus-within .qmark-pop { display: block; }
+
+	/* Phones: a small "?" over each event band, and the note it opens (spans
+	   the chart, so it never runs off a narrow screen). */
+	.ev-q {
+		position: absolute;
+		z-index: 7;
+		transform: translateX(-50%);
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		border: 1px solid #c4c4c4;
+		border-radius: 50%;
+		background: #fff;
+		color: #777;
+		font: 600 11px/16px var(--font-sans, system-ui, sans-serif);
+		text-align: center;
+		cursor: pointer;
+	}
+	/* A bigger tap target than the circle itself. */
+	.ev-q::after { content: ""; position: absolute; inset: -10px; }
+	.ev-q.open { background: #555; border-color: #555; color: #fff; }
+	.ev-sheet {
+		position: absolute;
+		left: 6px;
+		right: 6px;
+		z-index: 9;
+		padding: 12px 34px 12px 14px;
+		background: var(--color-white, #fff);
+		border: 1px solid var(--color-border, #d5d9e0);
+		border-radius: 10px;
+		box-shadow: 0 8px 26px rgba(0, 0, 0, 0.16);
+	}
+	.ev-sheet .qmark-body { margin: 0; }
+	.ev-sheet-x {
+		position: absolute;
+		top: 6px;
+		right: 8px;
+		width: 24px;
+		height: 24px;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: #777;
+		font-size: 20px;
+		line-height: 1;
+		cursor: pointer;
+	}
 
 	/* Axes: horizontal hairlines, a darker zero baseline, labels inside the plot */
 	.gridline { stroke: #e8e7e2; stroke-width: 1; }
