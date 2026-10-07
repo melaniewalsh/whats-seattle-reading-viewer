@@ -392,20 +392,6 @@
 		window.scrollTo({ top: 0 });
 		pageSearch?.focus(true, searchText ? `${searchText}, ` : "");
 	}
-	// The menu's "Compare": the compare view with a starter matchup.
-	function openCompare() {
-		menuOpen = false;
-		try {
-			const url = new URL(window.location);
-			["kind", "genre", "year", "author", "title", "c"].forEach((k) => url.searchParams.delete(k));
-			url.searchParams.set("tab", "compare");
-			window.history.pushState({}, "", url);
-		} catch {}
-		compareMode = true;
-		searchNonce++;
-		tab = "search";
-		window.scrollTo({ top: 0 });
-	}
 	// Heading to Search: put the cursor in the page's search field and briefly
 	// ring it, so it's clear that's where to type.
 	function focusSearch() {
@@ -483,7 +469,6 @@
 				<button class="menu-link" onclick={() => go("backlist")}>Backlist Boomerangs</button>
 				<button class="menu-link" onclick={() => go("search")}>Search</button>
 				<button class="menu-link" onclick={() => go("genres")}>Genres</button>
-				<button class="menu-link" onclick={openCompare}>Compare</button>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">Case Studies</h3>
