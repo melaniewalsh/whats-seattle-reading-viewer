@@ -317,6 +317,9 @@
 		[["Sally Rooney", "a~sally-rooney"], ["Ben Lerner", "a~ben-lerner-1979"]],
 		[["Beverly Cleary", "a~beverly-cleary"], ["Judy Blume", "a~judy-blume"]],
 		[["1984", "w~george-orwell-1903~1984"], ["Brave New World", "w~aldous-huxley-1894~Brave New World"]],
+		[["Kindred", "w~octavia-e-butler~Kindred"], ["The Fifth Season", "w~n-k-jemisin~The Fifth Season"]],
+		[["The Fire Next Time", "w~james-baldwin-1924~The Fire Next Time"], ["Between the World and Me", "w~ta-nehisi-coates~Between the World and Me"]],
+		[["So You Want to Talk About Race", "w~ijeoma-oluo~So You Want to Talk about Race"], ["White Fragility", "w~robin-j-diangelo~White Fragility"]],
 	];
 	let homePair = $state(HOME_PAIRS[0]);
 	const HOME_COMPARE = $derived(homePair.map(([label]) => label).join(", "));
