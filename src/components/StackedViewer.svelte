@@ -1578,11 +1578,17 @@
 			blocks.push({ key, name: w.name, editions, total: w.total, matchCount, primaryFormat: editions[0]?.format || "other", filteredOut });
 		}
 		const FMT_ORDER = { print: 0, largeprint: 1, ebook: 2, audiobook: 3, other: 4 };
+		// While editing groupings, books hold the places they had when editing
+		// began, so moving an edition doesn't reshuffle the list; a book that
+		// only now exists (an edition split out) sits just below where its
+		// editions came from.
+		const rank = editRank && ((w) => editRank.b.get(w.key) ?? Math.min(...w.editions.map((e) => editRank.e.get(e.idx) ?? 1e9)) + 0.5);
 		blocks.sort((a, b) => {
 			// While filtering, matches sort first (and so stay within the display cap);
 			// filtered-out works trail behind, hidden until a drag reveals them below
 			// the matches. No effect when not filtering (filteredOut is false for all).
 			if (a.filteredOut !== b.filteredOut) return a.filteredOut ? 1 : -1;
+			if (rank) return rank(a) - rank(b) || b.total - a.total;
 			if (workOrder === "format") {
 				return (FMT_ORDER[a.primaryFormat] ?? 9) - (FMT_ORDER[b.primaryFormat] ?? 9) || b.total - a.total;
 			}
@@ -1592,6 +1598,21 @@
 			return workOrderFlip ? -order : order;
 		});
 		return blocks;
+	});
+	// The book order frozen while editing groupings (see workBlocks): each
+	// book's place, and each edition's book's place, when editing began (or the
+	// sort / filter last changed).
+	let editRank = $state(null);
+	$effect(() => {
+		const on = editMode;
+		workOrder; workOrderFlip; titleFilter; currentSlug;
+		untrack(() => (editRank = null));
+		if (!on) return;
+		tick().then(() => untrack(() => {
+			const b = new Map(), e = new Map();
+			workBlocks.forEach((w, i) => { b.set(w.key, i); w.editions.forEach((ed) => e.set(ed.idx, i)); });
+			editRank = { b, e };
+		}));
 	});
 	// "Move to…" targets in edit mode: every book (by its table key), plus any
 	// new, still-empty book made with "New book".
