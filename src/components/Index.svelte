@@ -132,8 +132,9 @@
 	}
 
 	// The Data & Methodology section sits at the bottom of the About page (open
-	// there); deep links to its subheadings (#method-…, from e.g. the works
-	// table) go to About, open it and scroll to them.
+	// there) and the Checkout Trends page (closed); deep links to its
+	// subheadings (#method-…, from e.g. the works table) open it and scroll
+	// to them, going to About from any other page.
 	let methodOpen = $state(false);
 	$effect(() => { if (tab === "about") methodOpen = true; });
 	// Moving to another page closes the section and drops its #anchor, so a
@@ -145,7 +146,7 @@
 	function scrollToMethod() {
 		const h = (window.location.hash || "").slice(1);
 		if (h === "data-methodology" || h.startsWith("method-")) {
-			if (tab !== "about") {
+			if (tab !== "about" && tab !== "search") {
 				tab = "about";
 				compareMode = false;
 				try {
@@ -730,7 +731,7 @@
 		{/if}
 
 		<footer class="chart-footer">
-		{#if tab === "about"}
+		{#if tab === "about" || tab === "search"}
 		<details class="about" id="data-methodology" bind:open={methodOpen}>
 			<summary>Data &amp; Methodology</summary>
 			<div class="about-body">
