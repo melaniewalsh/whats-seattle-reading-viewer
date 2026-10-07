@@ -121,7 +121,7 @@
 	})();
 	// Figures for the Top-500 case study are the static plots rendered on the
 	// project's Quarto essay (hotlinked from GitHub Pages).
-	const spl500Fig = "https://melaniewalsh.github.io/whats-seattle-reading/posts/spl-500-novels/index_files/figure-html/";
+	const spl500Fig = "https://essays.whats-seattle-reading.com/posts/spl-500-novels/index_files/figure-html/";
 	let copiedBib = $state(null);
 	function copyBib(p) {
 		try {
@@ -489,6 +489,7 @@
 				<h3 class="menu-h">Case Studies</h3>
 				<button class="menu-link" onclick={() => go("norton")}>Canonical American Authors</button>
 				<button class="menu-link" onclick={() => go("spl500")}>Top 500 “Greatest” Novels</button>
+				<a class="menu-link" href="https://essays.whats-seattle-reading.com/">All essays ↗</a>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">The Project</h3>
@@ -527,7 +528,7 @@
 					<h1>{copy.title}</h1>
 				</div>
 				<p class="dek">{copy.dek}</p>
-				<p class="byline">By the <a href="https://melaniewalsh.github.io/whats-seattle-reading/" target="_blank" rel="noopener noreferrer">What's Seattle Reading?</a> project</p>
+				<p class="byline">By the <a href="?tab=about" onclick={(e) => { e.preventDefault(); go("about"); }}>What's Seattle Reading?</a> project</p>
 			</header>
 			<!-- The most eye-catching thing up top: what Seattle borrowed most last
 			     month, with a link into the full Most Borrowed view. -->
@@ -554,19 +555,19 @@
 				<button class="hub-card" onclick={goOverview}>
 					<img class="hub-emoji hub-img" src="{base}/hub-overview.png" alt="" width="34" height="34" />
 					<span class="hub-h">Overview</span>
-					<span class="hub-d">The big picture — total checkouts across the whole library, over time and by format.</span>
+					<span class="hub-d">Total checkouts across the entire library, broken down by format.</span>
 					<span class="hub-go">Explore →</span>
 				</button>
 				<button class="hub-card" onclick={() => go("rankings")}>
 					<img class="hub-emoji hub-img" src="{base}/hub-borrowed.png" alt="" width="34" height="34" />
 					<span class="hub-h">Most Borrowed</span>
-					<span class="hub-d">The books and authors checked out most — all-time and year by year, by genre.</span>
+					<span class="hub-d">The books and authors most checked out, broken down by year and genre.</span>
 					<span class="hub-go">Explore →</span>
 				</button>
 				<button class="hub-card" onclick={() => go("backlist")}>
 					<span class="hub-emoji hub-lucide" aria-hidden="true"><TrendingUp size={32} strokeWidth={2.2} /></span>
 					<span class="hub-h">Backlist Boomerangs</span>
-					<span class="hub-d">Books that sat quietly for years, then suddenly took off — adaptations, BookTok, the news.</span>
+					<span class="hub-d">Books that became popular again, years after they were first checked out.</span>
 					<span class="hub-go">Explore →</span>
 				</button>
 				<button class="hub-card" onclick={() => go("genres")}>
@@ -576,7 +577,7 @@
 						<img class="hub-img hub-img-ghost" src="{base}/hub-ghost.png" alt="" width="34" height="34" />
 					</span>
 					<span class="hub-h">Genres</span>
-					<span class="hub-d">How Seattle's taste in romance, mystery, fantasy and more has shifted over the years.</span>
+					<span class="hub-d">Popularity of certain genres over time—historical fiction, romance, horror, etc.</span>
 					<span class="hub-go">Explore →</span>
 				</button>
 			</nav>
@@ -691,7 +692,7 @@
 				<h3 class="study-h">Genres</h3>
 				<p class="study-p">The dataset's genre metadata lets us run the same correlation test across genres — seeing which genres are the most internally correlated in their patterns of reception over time.</p>
 
-				<p class="study-more"><a href="https://melaniewalsh.github.io/whats-seattle-reading/posts/spl-500-novels/index.html" target="_blank" rel="noopener noreferrer">Read the full data essay →</a> with the interactive explorer, the complete dataset browser, and reproducible code.</p>
+				<p class="study-more"><a href="https://essays.whats-seattle-reading.com/posts/spl-500-novels/index.html" target="_blank" rel="noopener noreferrer">Read the full data essay →</a> with the interactive explorer, the complete dataset browser, and reproducible code.</p>
 			</article>
 		{:else}
 			{#if compareMode}

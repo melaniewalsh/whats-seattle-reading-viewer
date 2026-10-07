@@ -61,13 +61,11 @@
 		<button type="button" class="di-close" onclick={close} aria-label="Close"><XIcon size={18} strokeWidth={2} /></button>
 
 		<h2 id="di-title" class="di-title">Library checkouts <span class="di-tag">Seattle Public Library</span></h2>
-		<p class="di-lede">
-			{#if genres}
+		{#if genres}
+			<p class="di-lede">
 				Each genre's share of all book checkouts at the Seattle Public Library, by month, with genres drawn from catalog subject headings.
-			{:else}
-				How many times an author's or book's titles were checked out each month at the Seattle Public Library: print books, ebooks and audiobooks.
-			{/if}
-		</p>
+			</p>
+		{/if}
 
 		<dl class="di-facts">
 			<div class="di-wide"><dt>Source</dt><dd>Seattle Public Library, <a href={DATASET} target="_blank" rel="noopener noreferrer">Checkouts by Title</a>, processed by What's Seattle Reading?</dd></div>
@@ -103,7 +101,7 @@
 			</ul>
 		</div>
 
-		<h3 class="di-h">How to cite this project</h3>
+		<h3 class="di-h">If you use this project, you can cite the associated paper:</h3>
 		<div class="di-cite">
 			<code>{project}</code>
 			<button type="button" class="di-copy" onclick={() => copy("project", project)} aria-label="Copy the project citation">{#if copied === "project"}<CheckIcon size={16} strokeWidth={2} />{:else}<CopyIcon size={16} strokeWidth={2} />{/if}</button>
