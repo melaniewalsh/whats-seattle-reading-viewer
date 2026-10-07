@@ -34,6 +34,14 @@
 	});
 
 	export const labelOf = (r) => (r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name));
+	// In the list: two books that would read the same ("Brave New World" twice,
+	// the novel and a BBC radio drama of it) show their full titles instead.
+	const listLabels = $derived.by(() => {
+		const key = (r) => `${r.kind}|${labelOf(r)}|${r.author ?? ""}`;
+		const seen = new Map();
+		for (const r of results) seen.set(key(r), (seen.get(key(r)) || 0) + 1);
+		return results.map((r) => (r.kind === "work" && seen.get(key(r)) > 1 ? r.title : labelOf(r)));
+	});
 	// The part being typed: after the last comma (multi), else everything.
 	const segment = () => (multi ? q.split(",").pop() : q).trim();
 	const hasList = () => multi && q.split(",").filter((t) => t.trim()).length > 1;
@@ -139,10 +147,10 @@
 	{#if open && (results.length || segment().length >= 2)}
 		<button type="button" class="ss-backdrop" aria-label="Close search" onclick={() => (open = false)}></button>
 		<ul class="ss-results" role="listbox">
-			{#each results as r}
+			{#each results as r, k}
 				<li>
 					<button type="button" class="ss-result" class:ss-sub={!!r.under} onclick={() => pick(r)}>
-						<span class="ss-name">{labelOf(r)}{#if r.kind === "work" && !r.under && r.author}<span class="ss-by">{" · "}{displayName(r.author)}</span>{/if}</span>
+						<span class="ss-name">{listLabels[k]}{#if r.kind === "work" && !r.under && r.author}<span class="ss-by">{" · "}{displayName(r.author)}</span>{/if}</span>
 						<span class="ss-kind {r.kind === 'work' ? 'kind-book' : 'kind-author'}">{r.kind === "work" ? "Book" : "Author"}</span>
 					</button>
 				</li>
