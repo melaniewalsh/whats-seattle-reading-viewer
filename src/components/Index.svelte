@@ -316,6 +316,7 @@
 		[["Wuthering Heights", "w~emily-bronte-1818~Wuthering Heights"], ["Pride and Prejudice", "w~jane-austen-1775~Pride and Prejudice"]],
 		[["Sally Rooney", "a~sally-rooney"], ["Ben Lerner", "a~ben-lerner-1979"]],
 		[["Beverly Cleary", "a~beverly-cleary"], ["Judy Blume", "a~judy-blume"]],
+		[["1984", "w~george-orwell-1903~1984"], ["Brave New World", "w~aldous-huxley-1894~Brave New World"]],
 	];
 	let homePair = $state(HOME_PAIRS[0]);
 	const HOME_COMPARE = $derived(homePair.map(([label]) => label).join(", "));
