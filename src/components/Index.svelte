@@ -504,8 +504,9 @@
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">Case Studies</h3>
-				<button class="menu-link" onclick={() => go("norton")}>Canonical American Authors</button>
-				<button class="menu-link" onclick={() => go("spl500")}>Top 500 “Greatest” Novels</button>
+				<!-- The full essays, on the essays site (Quarto). -->
+				<a class="menu-link" href="https://essays.whats-seattle-reading.com/posts/norton-anthology-american/">Canonical American Authors ↗</a>
+				<a class="menu-link" href="https://essays.whats-seattle-reading.com/posts/spl-500-novels/">Top 500 “Greatest” Novels ↗</a>
 				<a class="menu-link" href="https://essays.whats-seattle-reading.com/">All essays ↗</a>
 			</div>
 			<div class="menu-group">
