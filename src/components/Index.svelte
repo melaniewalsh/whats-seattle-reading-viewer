@@ -1,5 +1,5 @@
 <script>
-	import { getContext, onMount } from "svelte";
+	import { getContext, onMount, tick } from "svelte";
 	import { base } from "$app/paths";
 	import Viewer from "$components/StackedViewer.svelte";
 	import GenreTrends from "$components/GenreTrends.svelte";
@@ -324,6 +324,26 @@
 	});
 	// The single picks after it: three, none already in the pair.
 	const homeTryShown = $derived(HOME_TRY.filter((t) => !homePair.some(([label]) => label === t.label)).slice(0, 3));
+	// The "Try" row stays on one line, as wide as the search box: it shows as
+	// many of the single picks as fit at this width (re-fit on resize).
+	let tryRow = $state(null);
+	let tryWidth = $state(0);
+	let tryFit = $state(3);
+	const tryWraps = () => {
+		if (!tryRow) return false;
+		if (tryRow.scrollWidth > tryRow.clientWidth + 1) return true; // one line, too long
+		const kids = [...tryRow.children].filter((el) => el.offsetParent);
+		return kids.length > 1 && kids[kids.length - 1].offsetTop > kids[0].offsetTop + 4;
+	};
+	$effect(() => {
+		tryWidth; homePair; // re-fit when these change
+		if (!tryRow) return;
+		(async () => {
+			tryFit = homeTryShown.length;
+			await tick();
+			while (tryFit > 0 && tryWraps()) { tryFit--; await tick(); }
+		})();
+	});
 	async function homeSurprise() {
 		const a = await randomAuthor();
 		if (a) openAuthor(a.slug);
@@ -535,12 +555,12 @@
 				<!-- Starts with a comparison, a nod to the Google Books Ngram Viewer's
 				     default: press Enter to see it, or type over it. -->
 				<SiteSearch bind:this={homeSearch} multi value={HOME_COMPARE} selectOnFocus onPick={pickSearch} onSubmit={submitSearch} placeholder="Search any author or book (commas compare)" />
-				<p class="home-try">
+				<p class="home-try" bind:this={tryRow} bind:clientWidth={tryWidth}>
 					<span class="ht-lead">Try</span>
 					<!-- First: the comparison already in the box, one click away (in
 					     case it isn't obvious that Enter runs it). -->
 					<button class="ht-link" onclick={() => showCompare(homePair.map(([, id]) => id))}>{homePair.map(([label]) => label).join(" vs. ")}</button>
-					{#each homeTryShown as t}<span class="ht-sep ht-extra" aria-hidden="true">·</span><button class="ht-link ht-extra" class:is-title={!!t.title} onclick={() => (t.title ? openTitle(t.title, t.slug) : openAuthor(t.slug))}>{t.label}</button>{/each}
+					{#each homeTryShown.slice(0, tryFit) as t}<span class="ht-sep ht-extra" aria-hidden="true">·</span><button class="ht-link ht-extra" class:is-title={!!t.title} onclick={() => (t.title ? openTitle(t.title, t.slug) : openAuthor(t.slug))}>{t.label}</button>{/each}
 					<span class="ht-sep" aria-hidden="true">·</span>
 					<button class="ht-link ht-surprise" onclick={homeSurprise}>Surprise me</button>
 				</p>
@@ -776,6 +796,8 @@ You can manually adjust the clustering in the works table at the bottom of the p
 	.ht-link.ht-surprise { color: var(--color-fg-light); }
 	/* Phones: one suggestion and "Surprise me". */
 	@media (max-width: 600px) { .ht-extra { display: none; } }
+	/* Wider screens: the one line runs the full width of the search box. */
+	@media (min-width: 601px) { .home-try { flex-wrap: nowrap; justify-content: space-between; white-space: nowrap; } }
 	/* Landing hub — title / subtitle / byline, then a grid of section cards. */
 	.hero {
 		max-width: 720px;
