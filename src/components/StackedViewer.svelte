@@ -765,7 +765,8 @@
 		const ctx = canvas.getContext("2d");
 		// The logo sits top-right, beside the title, when there's room; on a
 		// narrow (phone) chart it gets its own row above the title instead.
-		const imgTitle = current ? (isOverview ? current.name : displayName(current.name)) : "";
+		// The page's own heading: the book on a book page, else the author.
+		const imgTitle = current ? (isOverview ? current.name : headingText || displayName(current.name)) : "";
 		ctx.font = '600 22px Georgia, "Times New Roman", serif';
 		const logoRow = ctx.measureText(imgTitle).width + 16 > w - chartLogoWidth(ctx) ? 30 : 0;
 		const titleH = 68 + logoRow;
@@ -800,7 +801,10 @@
 		ctx.fillText(imgTitle, padX, 34 + logoRow);
 		ctx.fillStyle = "#666666";
 		ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-		ctx.fillText(plotTitle || (current ? `${abbrevCount(current.total)} checkouts` : ""), padX, 54 + logoRow);
+		const byline = searchMode === "title" && current && !isOverview
+			? `by ${(bookAuthors.length ? bookAuthors : [displayName(current.name)]).join(", ")}${titleCheckouts != null ? ` · ${abbrevCount(titleCheckouts)} checkouts` : ""}`
+			: current ? `${abbrevCount(current.total)} checkouts` : "";
+		ctx.fillText(plotTitle || byline, padX, 54 + logoRow);
 		await drawChartLogo(ctx, logoRow ? padX + chartLogoWidth(ctx) : padX + w, logoRow ? 18 : 26);
 		ctx.drawImage(img, padX, titleH, w, h);
 		if (showLegend) {
@@ -2763,7 +2767,7 @@
 				</div>
 				{#if editMode}
 					<div class="bk-editbar">
-						<p class="bk-editnote">Move editions between books, or split out ones that don't belong. <a class="works-why" href="#method-clustering">Why is this hard?</a></p>
+						<p class="bk-editnote">Move editions between books, or split out ones that don't belong. <a class="works-why" href="?tab=about#method-clustering" target="_blank" rel="noopener">Why is this hard?</a></p>
 						<div class="bk-editactions">
 							<button type="button" class="bk-btn" onclick={newBook}>New book</button>
 							<button type="button" class="bk-btn" onclick={clearGroupings}>Reset to automatic</button>

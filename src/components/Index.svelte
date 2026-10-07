@@ -131,9 +131,11 @@
 		} catch {}
 	}
 
-	// The Data & Methodology section is a collapsed <details>; deep links to its
-	// subheadings (#method-…, from e.g. the works table) open it and scroll to them.
+	// The Data & Methodology section sits at the bottom of the About page (open
+	// there); deep links to its subheadings (#method-…, from e.g. the works
+	// table) go to About, open it and scroll to them.
 	let methodOpen = $state(false);
+	$effect(() => { if (tab === "about") methodOpen = true; });
 	// Moving to another page closes the section and drops its #anchor, so a
 	// section left open doesn't pull every later page down to the footer.
 	function leaveMethod(url) {
@@ -143,6 +145,16 @@
 	function scrollToMethod() {
 		const h = (window.location.hash || "").slice(1);
 		if (h === "data-methodology" || h.startsWith("method-")) {
+			if (tab !== "about") {
+				tab = "about";
+				compareMode = false;
+				try {
+					const url = new URL(window.location);
+					["author", "title", "genre", "year", "kind", "c"].forEach((k) => url.searchParams.delete(k));
+					url.searchParams.set("tab", "about");
+					window.history.replaceState({}, "", url);
+				} catch {}
+			}
 			methodOpen = true;
 			setTimeout(() => document.getElementById(h)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
 		}
@@ -606,17 +618,17 @@
 				<h3 class="about-h">Team</h3>
 				<ul class="about-list">
 					<li><a href="https://melaniewalsh.org/" target="_blank" rel="noopener noreferrer">Melanie Walsh</a> — Assistant Professor, Information School, University of Washington</li>
-					<li>Neel Gupta — PhD Student, Information School, University of Washington</li>
+					<li><a href="https://neelgupta2112.github.io/" target="_blank" rel="noopener noreferrer">Neel Gupta</a> — PhD Student, Information School, University of Washington</li>
 				</ul>
 
 				<h3 class="about-h">Students</h3>
-				<p>We've worked with several undergraduate students at the University of Washington, primarily through the <a href="https://humanitiesdatalab.ds.lib.uw.edu/hdssi/" target="_blank" rel="noopener noreferrer">Humanities Data Science Summer Institute</a>: Hongyuan (Tony) Dong, Em Backstrom, Karalee Harris, and Daniella Maor.</p>
-				<p>This summer, we worked with Alexis Martin, Bob, Tiago Ramos, and Karalee Harris.</p>
+				<p>Students who have worked on this project include: Hongyuan (Tony) Dong, Em Backstrom, Karalee Harris, Daniella Maor, Alexis Martin, Bob Bao, Tiago Ramos.</p>
 
 				<h3 class="about-h">Acknowledgments</h3>
-				<p>We are thankful to David Christensen, who spearheads the SPL's open data effort and has been a very helpful collaborator and guide.</p>
+				<p>We are thankful to David Christensen, who spearheads the SPL's open data effort and has been a very helpful collaborator and guide. We are also thankful to the <a href="https://humanitiesdatalab.ds.lib.uw.edu/hdssi/" target="_blank" rel="noopener noreferrer">Humanities Data Science Summer Institute</a> and the <a href="https://calma.ischool.uw.edu/" target="_blank" rel="noopener noreferrer">Center for Advances in Libraries, Museums, and Archives (CALMA)</a>, which have provided support for this project.</p>
 
-				<p class="about-more">This is a work-in-progress — we'd love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>. For how the data is sourced and how works are clustered, see <a href="#data-methodology" onclick={() => (methodOpen = true)}>Data &amp; Methodology</a> below.</p>
+				<h3 class="about-h">Feedback</h3>
+				<p>This is a work-in-progress — we'd love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>. For how the data is sourced and how works are clustered, see <a href="#data-methodology" onclick={() => (methodOpen = true)}>Data &amp; Methodology</a> below.</p>
 			</section>
 		{:else if tab === "publications"}
 			<section class="pubs-page">
@@ -693,47 +705,31 @@
 		{/if}
 
 		<footer class="chart-footer">
+		{#if tab === "about"}
 		<details class="about" id="data-methodology" bind:open={methodOpen}>
 			<summary>Data &amp; Methodology</summary>
 			<div class="about-body">
 				<h3 id="method-checkouts">What counts as a checkout</h3>
 				<p>
-					This tool charts <strong>checkouts</strong> logged by the Seattle Public Library —
-					physical books, ebooks, and audiobooks. Each point is how many times an author's or
-					work's titles were borrowed in that month. It counts checkouts, not unique readers or
-					holds, so a single popular book can be borrowed thousands of times.
+					This tool charts anonymized and aggregated checkouts logged by the Seattle Public Library, including physical books, ebooks, and audiobooks. This website does not include information about songs, DVDs, and other items, even though the open data includes that information. The library publishes aggregate data about how many times each item in their collection was checked out each month. This data does not include information about holds or renewals, so it undercounts checkouts in some ways, and checkouts for different books can have different ceilings that are not always clear. 
+			
 				</p>
 
 				<h3 id="method-clustering">Why is clustering by work so hard?</h3>
 				<p>
-					A single <em>work</em> — say, one novel — appears in the catalog as many separate
+					A single <em>work</em>, like The Odyssey or Harry Potter and the Socrcer's Stone, appears in the catalog as many separate
 					records: print, ebook, and audiobook editions; reprints and reissues; large-print and
 					translated editions; and re-cataloged copies with slightly different title strings.
-					There's no shared identifier tying them together — the library only began recording
-					ISBNs consistently around 2021, and even those differ per edition — so we cluster by
-					<strong>normalizing and matching the title text</strong>, which is inherently fuzzy.
-					Punctuation, subtitles, series names, and inconsistent cataloging all trip it up, and
-					two genuinely different books can share a title. So clustering is automatic and
-					<strong>approximate</strong>: in the works table you can drag editions between works,
-					split one off, or merge two, and save your grouping.
+					There is no shared identifier that ties every related edition to the same work. We attempt to cluster by
+				 normalizing and matching the title text in various ways.
+				 You can read more about our approach in our JCDL paper. What's important to remember is that clustering is automatic and purposely approximate.
+You can manually adjust the clustering in the works table at the bottom of the page
 				</p>
 
-				<h3 id="method-caveats">Caveats</h3>
-				<p>
-					Author and title names come straight from library catalog records, which are
-					inconsistently formatted and occasionally merged or misspelled, so an author's
-					per-title breakdown includes long-tail variants of the same work. Genres are inferred
-					from catalog subject headings, which are themselves imperfect. Read the trends as
-					indicative, not exact.
-				</p>
-
-				<h3 id="method-ack">Acknowledgements</h3>
-				<p>
-					Thanks to <strong>David Christensen</strong>, the <strong>Seattle Public Library</strong>,
-					and the <strong>HDSSI</strong> for making this project possible.
-				</p>
+	
 			</div>
 		</details>
+		{/if}
 
 			<!-- Pages with a chart already credit (and link) the data under it. -->
 			{#if !["search", "overview", "genres"].includes(tab)}
@@ -1034,11 +1030,6 @@
 		color: var(--color-fg);
 	}
 	.about-list a { color: #3f88cc; font-weight: 600; text-decoration: underline; }
-	.about-page .about-more {
-		font-size: var(--text-base);
-		color: var(--color-fg-light);
-		margin-top: 22px;
-	}
 	/* Publications list */
 	.pubs-page {
 		max-width: 720px;

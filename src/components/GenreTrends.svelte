@@ -8,7 +8,7 @@
 	//                 shares sum to 100% and real declines appear.
 	// Showing both side-by-side is the point: you can see why "share of checkouts"
 	// looks like everything's rising until you make it a true partition.
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import { MediaQuery } from "svelte/reactivity";
 	import ImageIcon from "@lucide/svelte/icons/image";
 	import LinkIcon from "@lucide/svelte/icons/link";
@@ -70,6 +70,15 @@
 		s.has(name) ? s.delete(name) : s.add(name);
 		collapsedGroups = s;
 	}
+	// A section holding a genre that's on the chart opens, so you can see it
+	// (you can still close it again).
+	$effect(() => {
+		const on = shown;
+		untrack(() => {
+			const open = GROUPS.filter(([g, names]) => collapsedGroups.has(g) && names.some((n) => on.has(n))).map(([g]) => g);
+			if (open.length) collapsedGroups = new Set([...collapsedGroups].filter((g) => !open.includes(g)));
+		});
+	});
 	let isolatedKeys = $state([]);
 	let genreOrder = $state([]);     // stable display order (by size, for colors)
 	let genreByName = $state({});
