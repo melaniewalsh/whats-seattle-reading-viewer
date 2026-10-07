@@ -551,7 +551,6 @@
 					<h1>{copy.title}</h1>
 				</div>
 				<p class="dek">{copy.dek}</p>
-				<p class="byline">By the <a href="?tab=about" onclick={(e) => { e.preventDefault(); go("about"); }}>What's Seattle Reading?</a> project</p>
 			</header>
 			<!-- The most eye-catching thing up top: what Seattle borrowed most last
 			     month, with a link into the full Most Borrowed view. -->
@@ -839,13 +838,6 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		color: var(--color-fg-light);
 		margin: 0;
 	}
-	.byline {
-		font-family: var(--font-sans);
-		font-size: var(--text-base);
-		color: var(--color-fg-light);
-		margin: 12px 0 0;
-	}
-	.byline a { color: #3f88cc; font-weight: 600; text-decoration: underline; }
 	.featured {
 		max-width: 880px;
 		margin: 40px auto 10px;
