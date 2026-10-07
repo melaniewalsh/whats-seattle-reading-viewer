@@ -16,7 +16,7 @@
 		mode = 'area',
 		grandTotal = 0,   // the author's (or overview's) all-time total, for the share line
 		shareOf = '',     // phrase after "% of ", e.g. "J. K. Rowling's checkouts"
-		annotations = [],  // [{ month, end, label, short, blurb, url }] — shaded event bands
+		annotations = [],  // [{ month, end, label, short, tiny, blurb, url }] — shaded event bands
 		peak = null,      // { idx, value, month } — a static callout pointing at the peak
 		legendHoverKey = null,  // key of the legend entry being hovered -> light up its band(s)
 		unit = 'checkouts a month', // appended to the top y-axis label only (NYT style)
@@ -1002,7 +1002,7 @@
 			{#if showEventLabels}
 				<text class="ev-export" x={a.lx} y={a.top + 10} text-anchor={a.anchor}>{#each a.lines as ln, i}<tspan x={a.lx} dy={i ? 14 : 0}>{ln}</tspan>{/each}</text>
 			{:else}
-				{@const word = a.lines[0]}
+				{@const word = a.tiny || a.lines[0]}
 				{@const half = word.length * 3.2}
 				<text class="ev-export" x={Math.min(Math.max((a.x0 + a.x1) / 2, margin.left + half), width - 2 - half)} y={margin.top - 18} text-anchor="middle">{word}</text>
 			{/if}
