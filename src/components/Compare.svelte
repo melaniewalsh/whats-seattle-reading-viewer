@@ -203,17 +203,37 @@
 	// Downloads: the chart as an image, or every month's checkouts as a CSV.
 	const fileStub = () =>
 		picks.map((p) => p.label).join("-vs-").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "compare";
-	async function downloadImage() {
-		dlOpen = false;
+	function chartImage() {
 		const labels = picks.map((p) => p.label);
 		const title = labels.length <= 3 ? labels.join(" vs. ") : `Comparing ${labels.length} authors and books`;
 		const yrs = viewMonths.length ? `, ${viewMonths[0].slice(0, 4)}–${viewMonths[viewMonths.length - 1].slice(0, 4)}` : "";
-		const blob = await renderChartPng(chartWrap?.querySelector("svg"), {
+		return renderChartPng(chartWrap?.querySelector("svg"), {
 			title,
 			subtitle: `Checkouts a month at the Seattle Public Library${yrs}${smooth ? " (3-month average)" : ""}`,
 			legend: picks.map((p) => ({ label: p.kind === "work" ? `${p.label} (${p.author})` : p.label, color: p.color }))
 		});
+	}
+	async function downloadImage() {
+		dlOpen = false;
+		const blob = await chartImage();
 		if (blob) saveBlob(blob, `${fileStub()}-spl-checkouts.png`);
+	}
+	// Copy the chart image to paste into a post or doc; where the browser can't
+	// copy images, it downloads instead.
+	let imgCopied = $state("");
+	async function copyImage() {
+		try {
+			if (!(navigator.clipboard && window.ClipboardItem)) throw new Error("no clipboard");
+			// Hand the clipboard the promise itself (Safari needs the write to
+			// start right away, inside the click).
+			await navigator.clipboard.write([new ClipboardItem({ "image/png": chartImage() })]);
+			imgCopied = "Image copied";
+		} catch {
+			const blob = await chartImage();
+			if (blob) saveBlob(blob, `${fileStub()}-spl-checkouts.png`);
+			imgCopied = "Image saved";
+		}
+		setTimeout(() => (imgCopied = ""), 2000);
 	}
 	function downloadData() {
 		dlOpen = false;
@@ -281,6 +301,7 @@
 							</div>
 						{/if}
 					</span>
+					<button class="tb-btn" onclick={copyImage}><ImageIcon size={13} strokeWidth={2} aria-hidden="true" /> {imgCopied || "Copy image"}</button>
 					<button class="tb-btn" onclick={copyLink}><LinkIcon size={13} strokeWidth={2} aria-hidden="true" /> {copied ? "Link copied" : "Copy link"}</button>
 				</div>
 			</div>
