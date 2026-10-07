@@ -9,6 +9,7 @@
 	// Showing both side-by-side is the point: you can see why "share of checkouts"
 	// looks like everything's rising until you make it a true partition.
 	import { onMount, untrack } from "svelte";
+	import { HIDDEN_GENRES } from "$utils/rankGenres.js";
 	import { MediaQuery } from "svelte/reactivity";
 	import ImageIcon from "@lucide/svelte/icons/image";
 	import LinkIcon from "@lucide/svelte/icons/link";
@@ -99,7 +100,7 @@
 			const d = await res.json();
 			const by = {};
 			for (const g of d.genres) by[g.name] = g;
-			const order = [...d.genres].sort((a, b) => sum(b.partition) - sum(a.partition)).map((g) => g.name);
+			const order = [...d.genres].filter((g) => !HIDDEN_GENRES.has(g.name)).sort((a, b) => sum(b.partition) - sum(a.partition)).map((g) => g.name);
 			genreByName = by;
 			genreOrder = order;
 			// Plot five genres but isolate Romance: only Romance's line shows, the
@@ -590,7 +591,7 @@
 			<ul class="bk-list">
 				<li class="bk-row bk-colhead" aria-hidden="true"><span></span><span>Genre</span><span class="bk-sp">{yearRange}</span><span class="bk-num">Share</span></li>
 				{#each GROUPS as [groupName, names] (groupName)}
-					{@const inGroup = names.filter((n) => genreByName[n] && genreMatches(n)).sort((a, b) => windowShare(seriesArr(genreByName[b])) - windowShare(seriesArr(genreByName[a])))}
+					{@const inGroup = names.filter((n) => genreByName[n] && !HIDDEN_GENRES.has(n) && genreMatches(n)).sort((a, b) => windowShare(seriesArr(genreByName[b])) - windowShare(seriesArr(genreByName[a])))}
 					{#if inGroup.length}
 						{@const isCollapsed = collapsedGroups.has(groupName) && !genreFilter}
 						<li class="g-group">

@@ -27,6 +27,7 @@
 	import { lookupUrls } from "$utils/lookup.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { compactNumber } from "$utils/format.js";
+	import { HIDDEN_GENRES } from "$utils/rankGenres.js";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
@@ -1848,7 +1849,7 @@
 		const wantAuthor = displayName(current.name).toLowerCase();
 		const out = [];
 		for (const genre of topWorksData.genres) {
-			if (genre === "All genres") continue;
+			if (genre === "All genres" || HIDDEN_GENRES.has(genre)) continue;
 			const list = topWorksData.data[genre]?.["all"];
 			if (!list) continue;
 			const n = Math.min(list.length, GENRE_RANK_MAX);
@@ -1988,7 +1989,7 @@
 		const t = (tag || "").toLowerCase();
 		let best = null, bestLen = 0;
 		for (const [g, terms] of Object.entries(genreTerms)) {
-			if (NO_LIST.has(g)) continue;
+			if (NO_LIST.has(g) || HIDDEN_GENRES.has(g)) continue;
 			for (const term of terms || []) {
 				const w = term.toLowerCase();
 				const hit = w.startsWith("=") ? t === w.slice(1) : t.includes(w);

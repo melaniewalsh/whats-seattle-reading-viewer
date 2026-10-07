@@ -22,18 +22,30 @@ export const RANK_GENRES = [
 	"Poetry",
 ];
 
+// Genres left off the site for now (the data still has them): the ethnic and
+// racial fiction categories. Hidden from Most Borrowed, the Genres timeline,
+// and the genre links on book pages.
+export const HIDDEN_GENRES = new Set([
+	"African American Fiction",
+	"Asian Fiction",
+	"Hispanic & Latino Fiction",
+	"Native American Fiction",
+	"Indigenous Fiction",
+	"Jewish Fiction",
+]);
+
 // The default/curated genres present in the data, ordered; "All genres" first.
 export function curateGenres(available) {
 	const set = new Set(available || []);
 	const out = set.has("All genres") ? ["All genres"] : [];
-	for (const g of RANK_GENRES) if (set.has(g)) out.push(g);
+	for (const g of RANK_GENRES) if (set.has(g) && !HIDDEN_GENRES.has(g)) out.push(g);
 	return out;
 }
 
 // Every other genre in the data (still filterable, shown under a divider), A–Z.
 export function extraGenres(available) {
 	const shown = new Set(["All genres", ...RANK_GENRES]);
-	return (available || []).filter((g) => !shown.has(g)).sort();
+	return (available || []).filter((g) => !shown.has(g) && !HIDDEN_GENRES.has(g)).sort();
 }
 
 // Genres display under their regular names.
