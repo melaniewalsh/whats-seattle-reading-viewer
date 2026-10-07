@@ -780,7 +780,10 @@
 		padding: 0 24px 80px;
 	}
 	/* Home search: centered under the title, the page's first thing to do. */
-	.home-search { max-width: 600px; margin: 22px auto 34px; }
+	/* As wide as the title: the box gets the h1's font size (the clamp below
+	   matches .hero h1) and a width in em, so the two scale together. The
+	   search and "Try" text set their own sizes, so this only sets the width. */
+	.home-search { font-size: clamp(2.3rem, 6vw, 3.6rem); width: 11.4em; max-width: 100%; margin: 22px auto 34px; }
 	.home-search :global(.ss) { max-width: none; height: 52px; }
 	.home-try { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 7px; margin: 12px 0 0; font-family: var(--font-sans); font-size: 14.5px; color: var(--color-fg-light); }
 	.ht-lead::after { content: ":"; }

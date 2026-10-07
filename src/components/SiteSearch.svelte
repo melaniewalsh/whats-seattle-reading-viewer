@@ -193,8 +193,8 @@
 		background: none;
 		outline: none;
 		font-family: var(--font-sans);
-		font-size: 17px;
-		font-weight: 500;
+		font-size: 16px; /* any smaller and iPhones zoom in on focus */
+		font-weight: 400;
 		color: var(--color-fg);
 	}
 	.ss-input::placeholder { color: var(--color-placeholder); font-weight: 400; }
