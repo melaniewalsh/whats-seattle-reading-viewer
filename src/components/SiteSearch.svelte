@@ -23,6 +23,10 @@
 	let results = $state([]);
 	let open = $state(false);
 	let flash = $state(false);
+	let helpOpen = $state(false); // the "?" note: what search covers
+	// Books need this many all-time checkouts to be in the title search (the
+	// TITLE_MIN_CHECKOUTS setting in the data workflows).
+	const BOOK_MIN = 500;
 	let inputEl;
 	let timer;
 	let justFocused = false;
@@ -144,6 +148,13 @@
 	{#if q}
 		<button type="button" class="ss-clear" aria-label="Clear search" onclick={clear}>×</button>
 	{/if}
+	<button type="button" class="ss-help" class:on={helpOpen} aria-label="What can I search?" aria-expanded={helpOpen} onclick={() => { helpOpen = !helpOpen; open = false; }}>?</button>
+	{#if helpOpen}
+		<button type="button" class="ss-backdrop" aria-label="Close" onclick={() => (helpOpen = false)}></button>
+		<div class="ss-helppop" role="note">
+			Search finds every author, and books checked out at least {BOOK_MIN} times. Can't find a book? Search for its author: every book is on its author's page.
+		</div>
+	{/if}
 	{#if open && (results.length || segment().length >= 2)}
 		<button type="button" class="ss-backdrop" aria-label="Close search" onclick={() => (open = false)}></button>
 		<ul class="ss-results" role="listbox">
@@ -156,7 +167,7 @@
 				</li>
 			{/each}
 			{#if !results.length}
-				<li><p class="ss-none">Nothing found for “{segment()}”.</p></li>
+				<li><p class="ss-none">Nothing found for “{segment()}”. Not seeing a book? Search covers books with {BOOK_MIN}+ checkouts. Try the author's name instead.</p></li>
 			{/if}
 		</ul>
 	{/if}
@@ -225,6 +236,37 @@
 		cursor: pointer;
 	}
 	.ss-clear:hover { background: var(--color-fg-light); }
+	.ss-help {
+		flex: none;
+		width: 20px;
+		height: 20px;
+		padding: 0;
+		border: 1px solid var(--color-border);
+		border-radius: 50%;
+		background: none;
+		color: var(--color-fg-light);
+		font: 600 12px/18px var(--font-sans);
+		text-align: center;
+		cursor: pointer;
+	}
+	.ss-help:hover, .ss-help.on { border-color: var(--color-fg-light); color: var(--color-fg); }
+	.ss-helppop {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		z-index: 61;
+		width: min(320px, 100%);
+		padding: 12px 14px;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		line-height: 1.45;
+		color: var(--color-fg);
+		text-align: left;
+	}
 	.ss-backdrop {
 		position: fixed;
 		inset: 0;
