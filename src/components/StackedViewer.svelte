@@ -2622,6 +2622,10 @@
 					{#if isolatedKeys.length || hiddenKeys.length}
 						<button class="leg-showall" onclick={() => { clearIsolate(); clearHidden(); }}>Show all</button>
 					{/if}
+					<!-- Phones (no note above the chart): the way to the book's own page. -->
+					{#if soloBook}
+						<button class="leg-showall leg-book on-phone" onclick={() => openTitle(soloBook, currentSlug)}>Open this book's page →</button>
+					{/if}
 				</div>
 			{/if}
 
@@ -4780,6 +4784,7 @@
 	.iso-note { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--color-fg-light); }
 	.iso-showall { background: none; border: 0; padding: 0; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 	.iso-showall.iso-book { color: #3f88cc; font-weight: 600; }
+	.leg-showall.leg-book { color: #3f88cc; border-color: #b9d3ec; }
 	.smooth-toggle {
 		display: inline-flex;
 		align-items: center;
