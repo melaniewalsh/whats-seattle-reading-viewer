@@ -973,6 +973,14 @@
 		isolatedKeys = [];
 	}
 
+	// One book picked out on an author's page: its title, for a link to the
+	// book's own page (where the chart, and its image, are just that book).
+	const soloBook = $derived(
+		searchMode === "author" && !isOverview && currentSlug && isolatedKeys.length === 1 && /^[gs]/.test(isolatedKeys[0])
+			? keyLabel(isolatedKeys[0]) || null
+			: null
+	);
+
 	// Human label for a series key (used for the chart title while isolating).
 	function keyLabel(key) {
 		if (!current) return "";
@@ -2541,7 +2549,7 @@
 			{/if}
 			{#if chartMode === "area" && (isolatedKeys.length || hiddenKeys.length)}
 				<!-- The way back after clicking a line's name to show it alone -->
-				<span class="iso-note">Showing {viewSeries.length} of {legendItems.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={() => { clearIsolate(); clearHidden(); }}>Show all</button></span>
+				<span class="iso-note">Showing {viewSeries.length} of {legendItems.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={() => { clearIsolate(); clearHidden(); }}>Show all</button>{#if soloBook}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall iso-book" onclick={() => openTitle(soloBook, currentSlug)} title="Its own page: just this book's trend, editions and formats">Open this book's page →</button>{/if}</span>
 			{/if}
 					</div>
 					<!-- Put another author or book on this chart (the page switches to
@@ -4745,6 +4753,7 @@
 	.tb-btn :global(svg.lucide-chevron-down) { width: 14px; height: 14px; }
 	.iso-note { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--color-fg-light); }
 	.iso-showall { background: none; border: 0; padding: 0; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+	.iso-showall.iso-book { color: #3f88cc; font-weight: 600; }
 	.smooth-toggle {
 		display: inline-flex;
 		align-items: center;
