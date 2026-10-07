@@ -4654,10 +4654,12 @@
 		.customize-panel.on-phone { display: flex !important; }
 		.off-phone { display: none !important; }
 		/* Name, then just the byline and total ("by Robin Wall Kimmerer · 52.2k
-		   total checkouts"); no description, subjects, cover or Borrow row. */
-		.hd-desc, .hd-subjects, .hd-cover, .hdr-actions { display: none !important; }
+		   total checkouts"), with a book's cover small beside it; no
+		   description, subjects or Borrow row. */
+		.hd-desc, .hd-subjects, .hdr-actions { display: none !important; }
 		.customize-row.on-phone { display: flex !important; justify-content: flex-start; margin: 0 0 10px; }
-		.hd-main.has-cover { display: block; }
+		.hd-main.has-cover { grid-template-columns: 52px minmax(0, 1fr); column-gap: 12px; }
+		.hd-cover { width: 52px; margin-top: 2px; }
 		.mode-toggle .mt-txt { display: none; }
 		.mode-toggle button { padding: 7px 12px; }
 		.chart-foot .tb-txt { display: none; }
