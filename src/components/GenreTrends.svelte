@@ -375,6 +375,8 @@
 		const clone = src.cloneNode(true);
 		const from = src.querySelectorAll("*");
 		const to = clone.querySelectorAll("*");
+		// No "display" here on purpose: the event labels drawn only for images
+		// (.ev-export, hidden on screen) must show up in the export.
 		const PROPS = ["fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "stroke-linejoin", "opacity", "font-family", "font-size", "font-weight", "text-anchor", "color", "paint-order", "fill-opacity", "stroke-opacity"];
 		to.forEach((node, i) => {
 			const cs = getComputedStyle(from[i]);

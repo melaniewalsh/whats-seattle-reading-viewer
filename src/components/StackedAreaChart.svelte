@@ -993,6 +993,20 @@
 				<circle class="hover-dot" cx={x(hoverIndex)} cy={y(selectedItem.top[hoverIndex])} r="5" fill={selectedItem.color} />
 			{/if}
 		{/if}
+
+		<!-- The event labels again, drawn in the SVG for saved/copied images
+		     (the on-screen labels and "?"s are HTML, which an image leaves out).
+		     Hidden on screen; the image exporters copy only paint styles, not
+		     display, so they show up there. -->
+		{#each annotationMarks as a}
+			{#if showEventLabels}
+				<text class="ev-export" x={a.lx} y={a.top + 10} text-anchor={a.anchor}>{#each a.lines as ln, i}<tspan x={a.lx} dy={i ? 14 : 0}>{ln}</tspan>{/each}</text>
+			{:else}
+				{@const word = a.lines[0]}
+				{@const half = word.length * 3.2}
+				<text class="ev-export" x={Math.min(Math.max((a.x0 + a.x1) / 2, margin.left + half), width - 2 - half)} y={margin.top - 18} text-anchor="middle">{word}</text>
+			{/if}
+		{/each}
 	</svg>
 	<!-- Event labels: short text at the top of each band; hover/focus for the note -->
 	<!-- A narrow plot (phones, beside the line names) keeps the shaded bands but
@@ -1091,6 +1105,12 @@
 	/* Event bands + labels (COVID, ransomware). The label sits beside the band
 	   at its top; hovering or focusing it reveals the note. */
 	.ev-band { fill: rgba(0, 0, 0, 0.045); }
+	.ev-export {
+		display: none;
+		font-family: var(--font-sans, system-ui, sans-serif);
+		font-size: 11px;
+		fill: #858585;
+	}
 	.ev-wrap {
 		position: absolute;
 		z-index: 7;

@@ -5,6 +5,8 @@
 import { drawChartLogo, chartLogoWidth } from "$utils/chartLogo.js";
 
 // Paint the SVG's scoped CSS onto a clone, so it survives being serialized.
+// No "display" here on purpose: the event labels drawn only for images
+// (.ev-export, hidden on screen) must show up in the export.
 const PROPS = ["fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "stroke-linejoin", "opacity", "font-family", "font-size", "font-weight", "text-anchor", "color", "paint-order", "fill-opacity", "stroke-opacity"];
 
 export async function renderChartPng(src, { title = "", subtitle = "", legend = [], source = "What’s Seattle Reading?  ·  Seattle Public Library checkouts" } = {}) {
