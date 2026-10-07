@@ -9,14 +9,14 @@ export const publications = [
 		citation:
 			"Melanie Walsh, Neel Gupta, E. Tiago Ramos, Alexis Martin, Karalee Harris, and Lurier Bao. ACM/IEEE Joint Conference on Digital Libraries (JCDL 2026).",
 		doi: "https://doi.org/10.1145/3805696.3848491",
-		links: [{ label: "Viewer", url: "https://melaniewalsh.github.io/whats-seattle-reading-viewer/" }],
+		links: [{ label: "Viewer", url: "https://www.whats-seattle-reading.com/" }],
 		bibtex: `@inproceedings{walshWhatsSeattleReading2026,
   title = {What's {{Seattle Reading}}? {{An Interactive Viewer}} and {{Open Data Pipeline}} for {{Two Decades}} of {{Public Library Circulation}}},
   author = {Walsh, Melanie and Gupta, Neel and Ramos, E. Tiago and Martin, Alexis and Harris, Karalee and Bao, Lurier},
   booktitle = {ACM/IEEE Joint Conference on Digital Libraries (JCDL 2026)},
   year = {2026},
   doi = {10.1145/3805696.3848491},
-  url = {https://melaniewalsh.github.io/whats-seattle-reading-viewer/}
+  url = {https://www.whats-seattle-reading.com/}
 }`,
 	},
 	{

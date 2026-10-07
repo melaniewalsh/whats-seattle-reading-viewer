@@ -2,7 +2,7 @@
 	let {
 		title = "Title TK",
 		description = "Description TK",
-		url = "https://melaniewalsh.github.io/whats-seattle-reading-viewer",
+		url = "https://www.whats-seattle-reading.com",
 		keywords = "",
 		preloadFont = []
 	} = $props();

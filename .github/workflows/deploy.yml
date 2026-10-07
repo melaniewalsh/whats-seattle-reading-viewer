@@ -28,9 +28,10 @@ jobs:
       - run: npm ci
       - name: Build site
         env:
-          # The site lives at https://<user>.github.io/<repo>/, so the base
-          # path is the repo name. This is wired into svelte.config.js.
-          BASE_PATH: /${{ github.event.repository.name }}
+          # The site lives at the root of its custom domain
+          # (https://www.whats-seattle-reading.com/), so there's no base
+          # path. This is wired into svelte.config.js.
+          BASE_PATH: ""
         run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
