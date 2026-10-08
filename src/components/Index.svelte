@@ -739,13 +739,12 @@
 			<div class="about-body">
 				<h3 id="method-checkouts">What counts as a checkout</h3>
 				<p>
-					This tool charts anonymized and aggregated checkouts logged by the Seattle Public Library, including physical books, ebooks, and audiobooks. This website does not include information about songs, DVDs, and other items, even though the open data includes that information. The library publishes aggregate data about how many times each item in their collection was checked out each month. This data does not include information about holds or renewals, so it undercounts checkouts in some ways, and checkouts for different books can have different ceilings that are not always clear. 
-			
+					This tool charts anonymized and aggregated checkouts logged by the Seattle Public Library, including physical books, ebooks, and audiobooks. This website does not include information about songs, DVDs, and other items, even though the open data includes that information. The library publishes aggregate data about how many times each item in their collection was checked out each month. This data does not include information about holds or renewals, so it undercounts checkouts in some ways, and checkouts for different books can have different ceilings that are not always clear. For example, some audiobooks can only be listened to by a certain number of readers at a time, while others allow unlimited use.
 				</p>
 
 				<h3 id="method-clustering">Why is clustering by work so hard?</h3>
 				<p>
-					A single <em>work</em>, like The Odyssey or Harry Potter and the Socrcer's Stone, appears in the catalog as many separate
+					A single <em>work</em>, like The Odyssey or Harry Potter and the Sorcerer's Stone, appears in the catalog as many separate
 					records: print, ebook, and audiobook editions; reprints and reissues; large-print and
 					translated editions; and re-cataloged copies with slightly different title strings.
 					There is no shared identifier that ties every related edition to the same work. We attempt to cluster by
