@@ -773,6 +773,8 @@ You can manually adjust the clustering in the works table at the bottom of the p
 				<span class="cf-sep">·</span>
 				<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a>
 				{#if lastUpdated}<span class="cf-sep">·</span> Last updated: {lastUpdated}{/if}
+				<span class="cf-sep">·</span>
+				<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Send feedback</a>
 			</p>
 		</footer>
 	</article>
