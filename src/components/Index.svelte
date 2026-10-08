@@ -498,21 +498,18 @@
 		{/if}
 		<nav id="site-menu" class="site-menu" class:open={menuOpen} aria-label="Menu" aria-hidden={!menuOpen}>
 			<button class="menu-close" aria-label="Close menu" onclick={() => (menuOpen = false)}>×</button>
+			<!-- About on its own up top, then the sections (with their home-page
+			     icons), the case studies, and the rest of the project. -->
 			<div class="menu-group">
-				<h3 class="menu-h">The Project</h3>
 				<button class="menu-link" onclick={() => go("about")}>About</button>
-				<button class="menu-link" onclick={() => go("publications")}>Publications</button>
-				<a class="menu-link" href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Data ↗</a>
-				<a class="menu-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Feedback ↗</a>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">Explore</h3>
-				<button class="menu-link" onclick={goHome}>Home</button>
-				<button class="menu-link" onclick={goOverview}>Overview</button>
-				<button class="menu-link" onclick={() => go("rankings")}>Most Borrowed</button>
-				<button class="menu-link" onclick={() => go("backlist")}>Backlist Boomerangs</button>
-				<button class="menu-link" onclick={() => go("search")}>Search</button>
-				<button class="menu-link" onclick={() => go("genres")}>Genres</button>
+				<button class="menu-link menu-ic" onclick={goOverview}><img src="{base}/hub-overview.png" alt="" width="22" height="22" />Overview</button>
+				<button class="menu-link menu-ic" onclick={() => go("rankings")}><img src="{base}/hub-borrowed.png" alt="" width="22" height="22" />Most Borrowed</button>
+				<button class="menu-link menu-ic" onclick={() => go("backlist")}><span class="menu-lucide" aria-hidden="true"><TrendingUp size={20} strokeWidth={2.4} /></span>Backlist Boomerangs</button>
+				<button class="menu-link menu-ic" onclick={() => go("search")}><img src="{base}/hub-search.png" alt="" width="22" height="22" />Search</button>
+				<button class="menu-link menu-ic" onclick={() => go("genres")}><img src="{base}/hub-genres.png" alt="" width="22" height="22" />Genres</button>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">Case Studies</h3>
@@ -520,6 +517,12 @@
 				<a class="menu-link" href="https://essays.whats-seattle-reading.com/posts/norton-anthology-american/">Canonical American Authors ↗</a>
 				<a class="menu-link" href="https://essays.whats-seattle-reading.com/posts/spl-500-novels/">Top 500 “Greatest” Novels ↗</a>
 				<a class="menu-link" href="https://essays.whats-seattle-reading.com/">All essays ↗</a>
+			</div>
+			<div class="menu-group">
+				<h3 class="menu-h">The Project</h3>
+				<button class="menu-link" onclick={() => go("publications")}>Publications</button>
+				<a class="menu-link" href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Data ↗</a>
+				<a class="menu-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Feedback ↗</a>
 			</div>
 		</nav>
 
@@ -1422,6 +1425,10 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		text-decoration: none;
 	}
 	.menu-link:hover { color: #3f88cc; }
+	/* Explore items wear their home-page icons. */
+	.menu-link.menu-ic { display: flex; align-items: center; gap: 12px; }
+	.menu-ic img, .menu-lucide { flex: none; width: 22px; height: 22px; object-fit: contain; }
+	.menu-lucide { display: inline-flex; align-items: center; justify-content: center; color: var(--color-fg); }
 	@media (max-width: 600px) {
 		/* One row on phones: wordmark, the search icon and the menu button. */
 		.masthead-top { flex-wrap: nowrap; gap: 4px; padding: 6px 10px 6px 14px; }
