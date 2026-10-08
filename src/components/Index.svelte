@@ -744,12 +744,12 @@
 
 				<h3 id="method-clustering">Why is clustering by work so hard?</h3>
 				<p>
-					A single <em>work</em>, like The Odyssey or Harry Potter and the Sorcerer's Stone, appears in the catalog as many separate
+					A single <em>work</em>, like <em>The Odyssey</em> or <em>Harry Potter and the Sorcerer's Stone</em>, appears in the catalog as many separate
 					records: print, ebook, and audiobook editions; reprints and reissues; large-print and
 					translated editions; and re-cataloged copies with slightly different title strings.
 					There is no shared identifier that ties every related edition to the same work. We attempt to cluster by
 				 normalizing and matching the title text in various ways.
-				 You can read more about our approach in our JCDL paper. What's important to remember is that clustering is automatic and purposely approximate.
+				 You can read more about our approach in our <a href="?tab=publications" onclick={(e) => { e.preventDefault(); go("publications"); }}>JCDL paper</a> (DOI: 10.1145/3805696.3848491). What's important to remember is that clustering is automatic and purposely approximate.
 You can manually adjust the clustering in the works table at the bottom of the page
 				</p>
 
