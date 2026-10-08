@@ -529,7 +529,7 @@
 			<header class="section-masthead no-rule">
 				<h2 class="sec-title">Seattle's Checkout Trends</h2>
 				<p class="sec-sub">Look up any author or title's borrowing trend at the Seattle Public Library.</p>
-				<div class="page-search"><SiteSearch bind:this={pageSearch} multi value={searchText} onPick={pickSearch} onSubmit={submitSearch} placeholder={phone.current ? "Search authors or books" : "Search authors or books (use commas to compare)"} /></div>
+				<div class="page-search"><SiteSearch bind:this={pageSearch} multi value={searchText} onPick={pickSearch} onSubmit={submitSearch} placeholder={phone.current ? "Search authors or books" : "Search authors or books (add commas to compare)"} /></div>
 			</header>
 		{/if}
 
@@ -559,7 +559,7 @@
 			<div class="home-search">
 				<!-- Starts with a comparison, a nod to the Google Books Ngram Viewer's
 				     default: press Enter to see it, or type over it. -->
-				<SiteSearch bind:this={homeSearch} multi value={HOME_COMPARE} selectOnFocus onPick={pickSearch} onSubmit={submitSearch} placeholder="Search any author or book (commas compare)" />
+				<SiteSearch bind:this={homeSearch} multi value={HOME_COMPARE} selectOnFocus onPick={pickSearch} onSubmit={submitSearch} placeholder={phone.current ? "Search any author or book" : "Search any author or book (add commas to compare)"} />
 				<p class="home-try" bind:this={tryRow} bind:clientWidth={tryWidth}>
 					<span class="ht-lead">Try</span>
 					<!-- First: the comparison already in the box, one click away (in
