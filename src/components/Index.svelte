@@ -501,7 +501,7 @@
 			<!-- About on its own up top, then the sections (with their home-page
 			     icons), the case studies, and the rest of the project. -->
 			<div class="menu-group">
-				<button class="menu-link" onclick={() => go("about")}>About</button>
+				<button class="menu-link" onclick={() => go("about")}>About the Project</button>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">Explore</h3>
