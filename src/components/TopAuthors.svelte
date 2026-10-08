@@ -479,7 +479,7 @@
 					{/if}
 					<div class="aside-card">
 						<div class="aside-h">About these counts</div>
-						<p class="aside-p">Counts combine print books, ebooks &amp; audiobooks. These are raw checkouts — not holds or renewals — and catalog records are inconsistently formatted, so read the rankings as a good sense of what's popular, not an exact count.</p>
+						<p class="aside-p">These counts represent aggregate checkouts of each author's works as print books, ebooks, and audiobooks. Different spellings of an author's name are automatically grouped together, and these groupings are imperfect. The counts do not include holds or renewals.</p>
 					</div>
 				</aside>
 			</div>

@@ -499,6 +499,13 @@
 		<nav id="site-menu" class="site-menu" class:open={menuOpen} aria-label="Menu" aria-hidden={!menuOpen}>
 			<button class="menu-close" aria-label="Close menu" onclick={() => (menuOpen = false)}>×</button>
 			<div class="menu-group">
+				<h3 class="menu-h">The Project</h3>
+				<button class="menu-link" onclick={() => go("about")}>About</button>
+				<button class="menu-link" onclick={() => go("publications")}>Publications</button>
+				<a class="menu-link" href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Data ↗</a>
+				<a class="menu-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Feedback ↗</a>
+			</div>
+			<div class="menu-group">
 				<h3 class="menu-h">Explore</h3>
 				<button class="menu-link" onclick={goHome}>Home</button>
 				<button class="menu-link" onclick={goOverview}>Overview</button>
@@ -513,13 +520,6 @@
 				<a class="menu-link" href="https://essays.whats-seattle-reading.com/posts/norton-anthology-american/">Canonical American Authors ↗</a>
 				<a class="menu-link" href="https://essays.whats-seattle-reading.com/posts/spl-500-novels/">Top 500 “Greatest” Novels ↗</a>
 				<a class="menu-link" href="https://essays.whats-seattle-reading.com/">All essays ↗</a>
-			</div>
-			<div class="menu-group">
-				<h3 class="menu-h">The Project</h3>
-				<button class="menu-link" onclick={() => go("about")}>About</button>
-				<button class="menu-link" onclick={() => go("publications")}>Publications</button>
-				<a class="menu-link" href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Data ↗</a>
-				<a class="menu-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Feedback ↗</a>
 			</div>
 		</nav>
 
