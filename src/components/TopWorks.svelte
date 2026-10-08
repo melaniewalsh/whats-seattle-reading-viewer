@@ -610,8 +610,8 @@
 					{/if}
 					<div class="aside-card">
 						<div class="aside-h">About these counts</div>
-						<p class="aside-p">Counts combine print books, ebooks &amp; audiobooks — editions of a book are grouped into one work, automatically and approximately. These are raw checkouts, not holds or renewals, so read the rankings as a good sense of what's popular, not an exact count.</p>
-						<p class="aside-p">Cover images are from <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>, matched by title and author, so some may be missing or show a different edition.</p>
+						<p class="aside-p">These counts represent aggregate checkouts of works as print books, ebooks, and audiobooks. Different editions of a book are automatically grouped into one work, and these groupings are imperfect. The counts do not include holds or renewals.</p>
+						<p class="aside-p">Cover images are drawn from <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>, matched by title and author. Some covers may be missing or show a different edition.</p>
 					</div>
 				</aside>
 			</div>
