@@ -91,9 +91,9 @@
 		<div class="di-notes">
 			<h3 class="di-kicker">Notes on how we process it</h3>
 			<ul>
-				<li>We keep print books (including large print and comics), ebooks and audiobooks. Music, movies and other formats are left out, as are audiobooks on CD, which the catalog files with music CDs. Records with no named author are left out too.</li>
-				<li>These are checkouts, not unique readers, holds or renewals. A popular book can be borrowed thousands of times.</li>
-				<li>Authors' many catalog spellings are clustered into one author, and a book's editions (print, ebook, audiobook, reissues) are grouped automatically by title. Both are approximate; you can regroup editions yourself.</li>
+				<li>We keep print books (including large print and comics), ebooks and audiobooks. Music, movies and other formats are left out. Records with no named author are left out, too.</li>
+				<li>The data does not include holds or renewals.</li>
+				<li>Authors' various catalog spellings are clustered into one author, and a book's editions are grouped automatically by title. Both are approximate, and you can regroup editions yourself.</li>
 				{#if genres}
 					<li>Genres come from Library of Congress and BISAC subject headings. A book can count toward several genres, so the shares overlap, and the headings themselves are applied unevenly.</li>
 				{/if}
