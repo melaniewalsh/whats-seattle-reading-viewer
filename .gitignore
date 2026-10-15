@@ -27,18 +27,7 @@ __pycache__/
 access.env
 data-prep/access.env
 
-# Student evaluation assignments (kept locally, not in the repo) and the
-# Norton gold-standard CSV, which the notebooks load from its public URL.
-paper/evaluation-tasks.md
-paper/eval/README.md
-paper/eval/01-evaluating-work-clustering.ipynb
-paper/eval/02-auditing-author-clustering.ipynb
-paper/eval/03-measuring-correction-burden.md
-paper/eval/norton-anthology_spl-checkouts_2005-2025*.csv
-
-# Neel's accuracy-testing notebooks, their result CSVs and the sampling
-# notebook (kept locally; not used in the paper).
-paper/eval/accuracy_testing_*.ipynb
-paper/eval/author_*.csv
-paper/eval/title_*.csv
+# Paper drafts and the clustering evaluation (now in its own repo,
+# spl-clustering-benchmark), plus an old sampling notebook. Kept locally only.
+paper/
 sampling/
