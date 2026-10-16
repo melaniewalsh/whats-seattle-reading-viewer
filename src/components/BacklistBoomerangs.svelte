@@ -6,7 +6,7 @@
 	// news event. The list is precomputed by data-prep/build_backlist.py (see
 	// its docstring for the rule) and served as backlist.json; this view is a
 	// year picker over it.
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import { getBacklist } from "$components/db.js";
 	import { displayName } from "$utils/displayName.js";
 	import { titleCase } from "$utils/titleCase.js";
@@ -53,16 +53,21 @@
 				.finally(() => { active--; pump(); });
 		}
 	}
+	// Re-run only when the rows change (a new year), not on every cover that
+	// arrives -- that used to reset the queue and drop the pending lookups.
 	$effect(() => {
-		queue = [];
-		for (const r of rows) {
-			const k = coverKey(r);
-			if (k in covers) continue;
-			const ov = coverOverride(r.t) || r.c;
-			covers[k] = ov || null;
-			if (!ov) queue.push(r);
-		}
-		pump();
+		const list = rows;
+		untrack(() => {
+			queue = [];
+			for (const r of list) {
+				const k = coverKey(r);
+				if (k in covers) continue;
+				const ov = coverOverride(r.t) || r.c;
+				covers[k] = ov || null;
+				if (!ov) queue.push(r);
+			}
+			pump();
+		});
 	});
 	const yearIdx = $derived(data ? data.years.indexOf(year) : -1);
 	const rules = $derived(data?.rules || {});
