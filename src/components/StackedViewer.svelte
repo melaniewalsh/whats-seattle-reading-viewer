@@ -7,7 +7,6 @@
 	import LinkIcon from "@lucide/svelte/icons/link";
 	import ShareIcon from "@lucide/svelte/icons/share-2";
 	import DownloadIcon from "@lucide/svelte/icons/download";
-	import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import TableIcon from "@lucide/svelte/icons/table";
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
@@ -99,7 +98,6 @@
 	// of a cluster). Empty = pure auto-clustering.
 	let workAssign = $state({});
 	let dragWorkKey = $state(null); // work row being dragged in the table (to merge into another)
-	let dragOverWorkKey = $state(null); // work row currently under the dragged work
 	let hlWorkKey = $state(null); // work key highlighted by hovering its pill or its table row (they're linked)
 	let legendHoverKey = $state(null); // legend entry being hovered -> lights up its band on the chart
 	let autoGroupNote = $state(""); // feedback after "Group editions into works"
@@ -163,23 +161,6 @@
 		if (dy) window.scrollBy(0, dy);
 	}
 
-	// Drag a column divider in the title table to widen a column.
-	function startColResize(event, which) {
-		event.preventDefault();
-		const startX = event.clientX;
-		const startW = which === "work" ? workColW : editionColW;
-		const onMove = (e) => {
-			const w = Math.max(60, startW + (e.clientX - startX));
-			if (which === "work") workColW = w;
-			else editionColW = w;
-		};
-		const onUp = () => {
-			window.removeEventListener("pointermove", onMove);
-			window.removeEventListener("pointerup", onUp);
-		};
-		window.addEventListener("pointermove", onMove);
-		window.addEventListener("pointerup", onUp);
-	}
 
 	onMount(async () => {
 		try {
@@ -919,16 +900,6 @@
 	const isCustomBook = (key) => customBooks.some((b) => b.key === key);
 	const emptyCustomBooks = $derived(customBooks.filter((b) => !workGroups.has(b.key)));
 
-	function addGroup() {
-		const g = {id: ++groupIdCounter, name: "", idxs: [...singleIdxs]};
-		singleIdxs = [];
-		groups = [...groups, g];
-		activeGroupId = g.id;
-		// Open the works table so there's somewhere to add editions to the new work.
-		tableCollapsed = false;
-		mobileTableOpen = true;
-		return g;
-	}
 
 	function removeGroup(id) {
 		groups = groups.filter((g) => g.id !== id);
@@ -1071,26 +1042,6 @@
 	// phantom single line/legend chip, so chart + legend use this filtered list.
 	const soloSingleIdxs = $derived(singleIdxs.filter((idx) => !groups.some((g) => g.idxs.includes(idx))));
 
-	// The "Show top works" button doubles as a toggle: once works are plotted it
-	// clears them and returns to the author-only view.
-	function toggleTopWorks() {
-		if (hasPlotted) {
-			// Clear the chart back to just the author's total line. KEEP the user's
-			// work grouping (workAssign) -- that lives in the table, not the chart,
-			// so clearing the graph shouldn't discard it.
-			groups = [];
-			singleIdxs = [];
-			activeGroupId = null;
-			isolatedKeys = [];
-			autoGroupNote = "";
-			showAuthorTotal = true;
-			autoHidAuthorTotal = false;
-			chartMode = "line";
-		} else {
-			autoGroupByWork({ keepChartMode: true });
-			chartMode = "area"; // show the works stacked as an area chart
-		}
-	}
 
 	// The work key an edition actually belongs to. Precedence:
 	//   1. If it's in a selection group, that GROUP is its work -- so editing a
@@ -1130,32 +1081,6 @@
 		showMoved(idx, `Split the ${formatLabel(current.titles[idx].format)} edition out into its own book`, undo);
 	}
 
-	// Merge one work into another: reassign every edition currently in srcKey to
-	// destKey (used when a work row is dragged onto another in the table).
-	function mergeWorks(srcKey, destKey) {
-		if (!current || srcKey === destKey) return;
-		const srcIdxs = [];
-		current.titles.forEach((t, idx) => {
-			if (effectiveKey(idx, t.title) === srcKey) srcIdxs.push(idx);
-		});
-		if (!srcIdxs.length) return;
-		// If the destination work is PLOTTED (a group), fold the source editions
-		// into that group so its LINE updates -- not just the table clustering.
-		// (workAssign alone re-clusters the table but leaves the group's series,
-		// and therefore its plotted line, unchanged.)
-		if (/^g\d+$/.test(destKey)) {
-			const g = groups.find((gr) => `g${gr.id}` === destKey);
-			if (g) {
-				srcIdxs.forEach((i) => releaseTitle(i));
-				g.idxs = [...new Set([...g.idxs, ...srcIdxs])];
-				groups = groups.filter((gr) => gr.idxs.length || gr.id === activeGroupId);
-			}
-			return;
-		}
-		const updates = {};
-		srcIdxs.forEach((idx) => (updates[idx] = destKey));
-		workAssign = { ...workAssign, ...updates };
-	}
 
 	// --- Persist manual work groupings (localStorage, per author) -------------
 	// GROUPING only (not which lines are plotted). Saved as clusters of TITLE
@@ -1443,9 +1368,6 @@
 		return singleIdxs.includes(idx);
 	}
 
-	// The 15 most-borrowed authors overall (authors.json is sorted by total),
-	// shown as quick-pick buttons under the search box.
-	const topAuthors = $derived(authors.slice(0, 15));
 
 	// The title table, filtered by the little search box. Each row is annotated
 	// with its normalized "work" (so editions of the same book share a work name
@@ -1515,7 +1437,6 @@
 			return { ...r, firstOfWork };
 		});
 	});
-	const hiddenTitleCount = $derived(filteredTitles.length - visibleTitles.length);
 
 	// In "by work" sort, roll the (already work-sorted) editions up into one
 	// collapsible block per work: a single header row you can expand to see and
@@ -1703,9 +1624,6 @@
 	// While a filter is active, auto-expand any work with a matching edition so the
 	// highlighted rows are visible without a manual click.
 	const filtering = $derived(!!titleFilter.trim());
-	// A drag (a title or a whole work) is in progress -> reveal the filtered-out
-	// works so any of them can be a drop target.
-	const dragActive = $derived(dragIdx !== null || dragWorkKey !== null);
 	const workOpen = (w) => isExpanded(w.key) || (filtering && w.matchCount > 0);
 	function toggleExpand(key) {
 		expandedWorks = isExpanded(key) ? expandedWorks.filter((k) => k !== key) : [...expandedWorks, key];
@@ -2368,19 +2286,6 @@
 	// ebook and audiobook rode on print's swings. One line per format from zero.
 	const chartLineMode = "line";
 
-	// On the Total chart, label the peak month (the chart has no latest-month
-	// label, which read like the book's size: "1 in July").
-	const peakMarker = $derived.by(() => {
-		if (chartMode !== "line") return null;
-		const agg = viewSeries.find((s) => s.isAggregate);
-		const v = agg?.values;
-		if (!v || v.length < 6) return null;
-		let k = 0;
-		for (let i = 1; i < v.length; i++) if (v[i] > v[k]) k = i;
-		if (!(v[k] > 0)) return null;
-		const m = viewMonths[k];
-		return { month: m, kind: "peak", label: `Peak: ${v[k].toLocaleString()} checkouts`, sub: `${MONTH_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}` };
-	});
 </script>
 
 <div class="viewer">
