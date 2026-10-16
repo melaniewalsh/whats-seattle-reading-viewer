@@ -65,11 +65,11 @@
 	];
 	const INK = "var(--color-fg)";
 
-	let authors = $state([]); // the search index
-	let months = $state([]); // the shared month axis (from meta.json)
+	let authors = $state.raw([]); // the search index
+	let months = $state.raw([]); // the shared month axis (from meta.json)
 	let query = $state("");
 	let results = $state([]);
-	let current = $state(null); // loaded author object
+	let current = $state.raw(null); // loaded author object
 
 	let groups = $state([]); // selection groups: { id, name, idxs: [] }
 	let activeGroupId = $state(null); // which group the title checkboxes edit right now null means "single selection" mode
@@ -147,7 +147,7 @@
 	let titleEl = $state(null); // ref to the plot heading, so a search scrolls to the title
 	let workCover = $state(null); // book-cover thumbnail for the heading in work-search mode
 	let showCover = $derived(!isOverview && searchMode === "title" && !!workCover);
-	let topWorksData = $state(null); // genre-ranked top works (for the "#N in Genre" badges)
+	let topWorksData = $state.raw(null); // genre-ranked top works (for the "#N in Genre" badges)
 	let sideEl = $state(null); // ref to the titles panel, for keeping it still when ticking
 
 	// Ticking a work grows the "on the chart" panel above the (stacked) table,
@@ -1550,13 +1550,8 @@
 			// inserting DOM nodes mid-drag (node insertion moves the dragged row and
 			// cancels the native drag). The badge/total keep the work's FULL numbers.
 			const filteredOut = !!f && !nameMatch && matchCount === 0;
-			// A plotted individual edition floats to the top of its work, so the one
-			// you're looking at is visually prioritized; otherwise by checkouts.
-			editions.sort((x, y) => {
-				const xp = singleIdxs.includes(x.idx) ? 1 : 0;
-				const yp = singleIdxs.includes(y.idx) ? 1 : 0;
-				return yp - xp || y.total - x.total;
-			});
+			// Editions in checkout order, so rows don't move when you plot one.
+			editions.sort((x, y) => y.total - x.total);
 			// "Primary" format = the format of the work's most-borrowed edition, used
 			// when sorting the table by format.
 			blocks.push({ key, name: w.name, editions, total: w.total, matchCount, primaryFormat: editions[0]?.format || "other", filteredOut });
@@ -2844,7 +2839,7 @@
 							{#if subj.length}
 								<li class="bk-row bk-ed bk-subj"><span></span><span class="bk-subj-list">{#each subj as term, k}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if genreFor(term)}<button type="button" class="subj-genre" onclick={() => openGenre(genreFor(term))} title="The most-borrowed {genreFor(term)} books">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</span></li>
 							{/if}
-							{#each w.editions.slice().sort((a, b) => b.total - a.total) as t (t.idx)}
+							{#each w.editions as t (t.idx)}
 								<li class="bk-row bk-ed" class:editing={editMode} class:hit={t.match} class:just-moved={movedIdx === t.idx} data-ed={t.idx}>
 									<input type="checkbox" class="bk-check"
 										checked={activeGroupId ? groupForTitle(t.idx)?.id === activeGroupId : isSingleSelected(t.idx)}

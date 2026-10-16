@@ -53,7 +53,7 @@
 	];
 
 	let months = $state([]);
-	let picks = $state([]); // [{ id, kind, slug, title?, label, color, values }]
+	let picks = $state.raw([]); // [{ id, kind, slug, title?, label, color, values }]
 	let loading = $state(0);
 	let smooth = $state(true);
 	let yearLo = $state(0);

@@ -16,7 +16,7 @@
 	// rankKind / setRankKind drive the Type dropdown that swaps Works ⇄ Authors.
 	let { openAuthor, rankKind = "authors", setRankKind = () => {} } = $props();
 
-	let data = $state(null);
+	let data = $state.raw(null);
 	let genre = $state("All genres");
 	let year = $state("all"); // "all" or a 4-digit year string
 	let loading = $state(true);

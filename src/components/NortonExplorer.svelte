@@ -6,7 +6,7 @@
 	import { titleCase } from "$utils/titleCase.js";
 	import { compactNumber } from "$utils/format.js";
 
-	let data = $state(null);
+	let data = $state.raw(null);
 	let loadError = $state("");
 	let kind = $state("author"); // "author" | "title"
 	let selAuthor = $state(null);

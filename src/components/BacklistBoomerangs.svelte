@@ -15,7 +15,7 @@
 
 	let { openAuthor = () => {}, openTitle = () => {} } = $props();
 
-	let data = $state(null);
+	let data = $state.raw(null);
 	let year = $state(null);
 	let loading = $state(true);
 

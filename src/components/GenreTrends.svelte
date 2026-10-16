@@ -56,7 +56,7 @@
 	];
 	const DEFAULT_SHOWN = 6; // how many genres to plot on first load
 
-	let data = $state(null);
+	let data = $state.raw(null);
 	let loadError = $state("");
 	let mode = $state("overlap"); // "partition" | "overlap" — overlap only, in the UI
 	let shown = $state(new Set());  // genre names currently plotted

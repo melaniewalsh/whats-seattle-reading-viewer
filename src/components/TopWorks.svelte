@@ -30,7 +30,7 @@
 	const baked = embedded && homeTop?.rows?.length
 		? { period: homeTop.latestMonth ? "month" : "all", rows: homeTop.rows, latestMonth: homeTop.latestMonth }
 		: null;
-	let data = $state(baked ? { latestMonth: baked.latestMonth, years: [], genres: ["All genres"], data: { "All genres": { [baked.period]: baked.rows } } } : null);
+	let data = $state.raw(baked ? { latestMonth: baked.latestMonth, years: [], genres: ["All genres"], data: { "All genres": { [baked.period]: baked.rows } } } : null);
 	let genre = $state("All genres");
 	let year = $state(baked ? baked.period : "all");
 	let loading = $state(!baked);
