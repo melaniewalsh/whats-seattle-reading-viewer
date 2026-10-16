@@ -1,58 +1,24 @@
 """
-cluster_authors.py  —  STARTER TASK (unfinished on purpose)
-===========================================================
-Goal: merge the many spellings of the same author into one.
+cluster_authors.py: group the many catalog spellings of each author.
 
-The raw data spells names inconsistently, so right now the site shows three
-separate "Octavia Butler"s:
+The library's data spells author names inconsistently ("Octavia E. Butler",
+"Butler, Octavia E.", "Octavia Butler"). This script reads every creator string
+and its titles from the monthly files on R2, decides which spellings are the
+same person, and writes data-prep/author_map.json ({raw name: canonical name}).
+build_data.py applies that map before aggregating checkouts.
 
-    Octavia E. Butler        (10,630 checkouts)
-    Butler, Octavia E.       ( 1,637 checkouts)
-    Octavia Butler           (   303 checkouts)
+How names are grouped:
+1. Normalize each name (case, punctuation, "Last, First" order, accents,
+   credentials like "PhD") and group names that come out the same, keeping
+   apart names with different birth years.
+2. Reunite remaining candidates that share a first and last name, or the same
+   set of name words, only when their titles overlap.
+name_variant_remap() also reunites plain order-only variants at build time.
 
-Your job: decide which raw author strings are the same person, and write out a
-mapping from each raw name to a single canonical name. build_data.py already
-knows how to use that mapping (see "HOW THIS PLUGS IN" below) — you just have to
-produce a good `author_map.json`.
+The scan of R2 is cached (author_title_agg.json), so later runs only read new
+months. The monthly data workflow runs this before build_data.py.
 
-WHAT TO PRODUCE
----------------
-Write a JSON file at data-prep/author_map.json shaped like:
-
-    {
-      "Butler, Octavia E.": "Octavia E. Butler",
-      "Octavia Butler":     "Octavia E. Butler"
-    }
-
-Keys are raw names; values are the canonical name to use. Names not in the map
-are left as-is. Pick the canonical form however you like (e.g. the spelling with
-the most total checkouts).
-
-HOW THIS PLUGS IN
------------------
-In build_data.py, the cleaned `author` column is what everything groups by.
-After you create data-prep/author_map.json, add a step there that replaces each
-author with author_map.get(author, author) before the aggregation. There is a
-clearly-marked "CLUSTERING HOOK" comment in build_data.py showing exactly where.
-
-APPROACHES (start simple, then improve)
----------------------------------------
-1. Normalize + exact match: lowercase, strip punctuation, and flip
-   "Lastname, First" -> "First Lastname". Group strings that become identical.
-   This alone fixes a lot.
-2. Fuzzy match: use rapidfuzz (`pip install rapidfuzz`) to group names whose
-   similarity is above some threshold. Watch out for false merges
-   (e.g. "James Baldwin" vs "James Baldwin Jr.").
-3. Embeddings / authority files: match against OpenLibrary or VIAF to get a
-   canonical name and even birth/death years. Most robust, most work.
-
-Beware: don't over-merge. Two real different people can share a last name.
-When unsure, keep them separate.
-
-Run it with:
     python3 data-prep/cluster_authors.py
-then re-run the main build:
-    python3 data-prep/build_data.py
 """
 
 import csv
