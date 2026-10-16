@@ -48,8 +48,9 @@
 	const MONTHS_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 	const fmtMonthYear = (m) => `${MONTHS_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
 	let featuredLoaded = false;
+	let urlRead = $state(false); // tab starts as "home" until the URL is read
 	$effect(() => {
-		if (tab === "home" && !featuredLoaded) {
+		if (urlRead && tab === "home" && !featuredLoaded) {
 			featuredLoaded = true;
 			loadFeatured();
 		}
@@ -200,6 +201,7 @@
 	// A shared ?tab= / ?author= makes each view linkable (old tab names still work).
 	onMount(() => {
 		applyUrlState();
+		urlRead = true;
 		// A plain ?tab=search link (nothing picked yet) also gets the cursor.
 		try {
 			const sp = new URLSearchParams(window.location.search);
