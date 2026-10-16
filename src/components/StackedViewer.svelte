@@ -2686,7 +2686,7 @@
 				</div>
 				{#if editMode}
 					<div class="bk-editbar">
-						<p class="bk-editnote">Move editions between books, or split out ones that don't belong. <a class="works-why" href="?tab=about#method-clustering" target="_blank" rel="noopener">Why is this hard?</a></p>
+						<p class="bk-editnote">Move editions between books, or split out ones that don't belong. <a class="works-why" href="?tab=search#method-clustering" target="_blank" rel="noopener">Why is this hard?</a></p>
 						<div class="bk-editactions">
 							<button type="button" class="bk-btn" onclick={newBook}>New book</button>
 							<button type="button" class="bk-btn" onclick={clearGroupings}>Reset to automatic</button>

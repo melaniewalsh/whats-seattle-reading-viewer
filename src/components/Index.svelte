@@ -132,12 +132,10 @@
 		} catch {}
 	}
 
-	// The Data & Methodology section sits at the bottom of the About page (open
-	// there) and the Checkout Trends page (closed); deep links to its
-	// subheadings (#method-…, from e.g. the works table) open it and scroll
-	// to them, going to About from any other page.
+	// The Data & Methodology section sits at the bottom of the Checkout Trends
+	// page (closed); deep links to its subheadings (#method-…, from e.g. the
+	// works table) go there, open it and scroll to them.
 	let methodOpen = $state(false);
-	$effect(() => { if (tab === "about") methodOpen = true; });
 	// Moving to another page closes the section and drops its #anchor, so a
 	// section left open doesn't pull every later page down to the footer.
 	function leaveMethod(url) {
@@ -147,13 +145,13 @@
 	function scrollToMethod() {
 		const h = (window.location.hash || "").slice(1);
 		if (h === "data-methodology" || h.startsWith("method-")) {
-			if (tab !== "about" && tab !== "search") {
-				tab = "about";
+			if (tab !== "search") {
+				tab = "search";
 				compareMode = false;
 				try {
 					const url = new URL(window.location);
 					["author", "title", "genre", "year", "kind", "c"].forEach((k) => url.searchParams.delete(k));
-					url.searchParams.set("tab", "about");
+					url.searchParams.set("tab", "search");
 					window.history.replaceState({}, "", url);
 				} catch {}
 			}
@@ -658,7 +656,7 @@
 				<p>We are thankful to David Christensen, who spearheads the SPL's open data effort and has been a very helpful collaborator and guide. We are also thankful to the <a href="https://humanitiesdatalab.ds.lib.uw.edu/hdssi/" target="_blank" rel="noopener noreferrer">Humanities Data Science Summer Institute</a> and the <a href="https://calma.ischool.uw.edu/" target="_blank" rel="noopener noreferrer">Center for Advances in Libraries, Museums, and Archives (CALMA)</a>, which have provided support for this project.</p>
 
 				<h3 class="about-h">Feedback</h3>
-				<p>This is a work-in-progress — we'd love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>. For how the data is sourced and how works are clustered, see <a href="#data-methodology" onclick={() => (methodOpen = true)}>Data &amp; Methodology</a> below.</p>
+				<p>This is a work-in-progress — we'd love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>. For how the data is sourced and how works are clustered, see <a href="?tab=search#data-methodology" onclick={(e) => { e.preventDefault(); go("search"); methodOpen = true; setTimeout(() => document.getElementById("data-methodology")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}>Data &amp; Methodology</a> on the Checkout Trends page.</p>
 			</section>
 		{:else if tab === "publications"}
 			<section class="pubs-page">
@@ -735,7 +733,7 @@
 		{/if}
 
 		<footer class="chart-footer">
-		{#if tab === "about" || tab === "search"}
+		{#if tab === "search"}
 		<details class="about" id="data-methodology" bind:open={methodOpen}>
 			<summary>Data &amp; Methodology</summary>
 			<div class="about-body">
@@ -778,7 +776,7 @@ You can manually adjust the clustering in the works table at the bottom of the p
 				<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a>
 				{#if lastUpdated}<span class="cf-sep">·</span> Last updated: {lastUpdated}{/if}
 				<span class="cf-sep">·</span>
-				<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Send feedback</a>
+				<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Share feedback</a>
 			</p>
 		</footer>
 	</article>
