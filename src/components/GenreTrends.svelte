@@ -681,7 +681,7 @@
 <style>
 	.genres { margin-top: var(--space-6); font-family: var(--font-sans); }
 	.sh-refs { margin: 0 0 var(--space-3); padding-left: 1.2em; }
-	.sh-refs li { margin: 0 0 6px; }
+	.sh-refs li { margin: 0 0 6px; line-height: 1.55; color: var(--color-fg-light); }
 	.loading, .load-error { font-family: var(--font-sans); color: var(--color-fg-light); }
 
 	/* Section masthead — matches the other tabs (serif title + subtitle + rule). */
@@ -801,7 +801,7 @@
 	.sh-note { font-size: var(--text-sm); margin: 0 0 var(--space-5); }
 	.sh-note summary { cursor: pointer; color: var(--color-fg-light); list-style-position: inside; width: fit-content; }
 	.sh-note summary:hover { color: var(--color-fg); }
-	.sh-note p { font-size: var(--text-sm); line-height: 1.55; color: var(--color-fg-light); margin: 8px 0 0; max-width: 68ch; }
+	.sh-note p { font-size: var(--text-sm); line-height: 1.55; color: var(--color-fg-light); margin: 8px 0 0; }
 	.sh-note strong { color: var(--color-fg); }
 
 	@media (max-width: 640px) {
