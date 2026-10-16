@@ -2,57 +2,59 @@
 
 **An interactive viewer and open data pipeline for two decades of Seattle Public Library circulation.**
 
-🔗 **Live site:** <https://melaniewalsh.github.io/whats-seattle-reading-viewer/>
+🔗 **Website:** <https://www.whats-seattle-reading.com>
 
-The Seattle Public Library openly publishes anonymized checkout counts by title — **over 120 million checkouts** across print, e-book, and audiobook formats, from 2005 to the present. *What's Seattle Reading?* makes this dataset usable: it clusters the raw records by author and work, reduces them to compact per-author time series, and serves them through a free interactive viewer where anyone can search and explore borrowing trends over time.
+The Seattle Public Library openly publishes anonymized checkout counts for each of the titles in its collection. Our project, *What's Seattle Reading?*, makes  this data, **over 120 million checkouts** for **~600K books**, explorable across print, e-book, and audiobook formats, from 2005 to the present.  
 
-Built with [SvelteKit](https://kit.svelte.dev/) and [D3](https://d3js.org/), a Python + [DuckDB](https://duckdb.org/) data pipeline, and static data hosted on [Cloudflare R2](https://developers.cloudflare.com/r2/). All code is MIT-licensed, and the system rebuilds itself automatically each month.
+This website is built with [SvelteKit](https://kit.svelte.dev/) and [D3](https://d3js.org/), a Python + [DuckDB](https://duckdb.org/) data pipeline, and static data hosted on [Cloudflare R2](https://developers.cloudflare.com/r2/). All code is MIT-licensed.
 
 ---
 
-## The resource
+## In This Repo
 
 This repository provides three things:
 
-1. **Interactive viewer** — a static web app for searching any author, work, or genre and exploring checkout trends over time. Users can group editions into a single "work," correct clusters by hand, and download the underlying data.
-   → <https://melaniewalsh.github.io/whats-seattle-reading-viewer/>
-2. **Clustered circulation data** — the full SPL checkout dataset, clustered by author and work and reduced to compact JSON time series (one file per author), publicly hosted and rebuilt monthly.
+1. **Interactive viewer** — a static web app for searching any author, work, and some genres and exploring checkout trends over time. 
+2. **Clustered circulation data** — the full SPL checkout dataset, clustered by author and work and reduced to compact JSON time series.
 3. **Data & clustering pipeline** — a reproducible pipeline with rule-based author- and work-clustering algorithms that transform tens of millions of raw rows into the files above.
 
 ---
 
-## Data access
+## Data
 
-The derived, clustered data is publicly hosted on Cloudflare R2:
+You can access the SPL checkout data clustered by author and work. 
+
+**Bulk download:** Download the full corpus from the [**Releases**](https://github.com/melaniewalsh/whats-seattle-reading-viewer/releases) page. A dated snapshot (`data-YYYY-MM`) is published automatically each month.
+
+This data is also publicly hosted on Cloudflare R2. 
 
 ```
 https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/<file>
 ```
 
-Key files:
-
-| File | Contents |
-|------|----------|
-| `meta.json` | The shared month axis (2005–present). |
-| `search-index.json` | `[[slug, name, total], …]` for every author, most-borrowed first. |
-| `authors/<shard>/<slug>.json` | One file per author: total monthly series + per-title breakdown, sparsely encoded as `[monthIndex, count]` pairs, with format and subject tags. `<shard>` is the first two characters of the slug. |
-| `title-index.json`, `overview.json` | Supporting search/landing indexes used by the viewer. |
-
-**Fetching one author's data.** The bucket has no directory listing and slugs are normalized (and may carry a disambiguating year, e.g. `james-baldwin-1924`), so you can't guess filenames — get them from the index:
+You can grab data for a specific author by looking up the author's slug in the directory.
 
 1. Download `search-index.json` — an array of `[slug, name, total]` for every author.
 2. Look up the author's `slug` there.
 3. Fetch `authors/<first-two-characters-of-slug>/<slug>.json`.
 
-A runnable version of this is in [`examples/fetch_author.py`](examples/fetch_author.py) — it fetches the month axis and index, resolves an author's slug, downloads their file, and expands the sparse series. Each author file also has `titles` (per-title breakdown, same sparse encoding), `variants` (the raw name spellings merged into this author), and `subjects`.
 
-**Whole dataset (bulk download).** Rather than fetch ~350k files one by one, download the full corpus as a single tarball from the [**Releases**](https://github.com/melaniewalsh/whats-seattle-reading-viewer/releases) page. A dated snapshot (`data-YYYY-MM`) is published automatically each month; it holds the same files described above and doubles as a fixed, citable version.
+Files:
 
-The **raw source** is the Seattle Public Library's "Checkouts by Title" open dataset, updated monthly: <https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6>.
+| File | Contents |
+|------|----------|
+| `search-index.json` | `[[slug, name, total], …]` for every author, most-borrowed first. |
+| `authors/<shard>/<slug>.json` | One file per author. It includes total monthly series + per-title breakdown, sparsely encoded as `[monthIndex, count]` pairs, with format and subject tags. `<shard>` is the first two characters of the slug. |
+
+
+We also made a script to help you search by author in [`examples/fetch_author.py`](examples/fetch_author.py).
+
+
+The **raw data** comes from the Seattle Public Library's "Checkouts by Title" open dataset, updated monthly: <https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6>.
 
 ---
 
-## Run it locally
+## Run Locally
 
 Requires **Node 22+** and **Python 3**.
 
@@ -60,49 +62,37 @@ Requires **Node 22+** and **Python 3**.
 git clone https://github.com/melaniewalsh/whats-seattle-reading-viewer.git
 cd whats-seattle-reading-viewer
 npm install
-npm run dev        # then open the URL it prints
-```
-
-The generated data (`static/data/`) is not committed. For local development, either point `DATA_BASE` in `src/components/db.js` at the R2 URL (`R2_BASE`) to load the full live data, or build it yourself — see [MAINTAINING.md](MAINTAINING.md).
-
----
-
-## How it works
-
-The SPL dataset (~50 million rows) is too large to ship to a browser, so the work is split in two:
-
-- **Precompute (Python + DuckDB).** `data-prep/build_data.py` aggregates the raw checkouts into one small JSON file per author, plus a search index. **Authors are resolved first** — many raw name spellings (e.g. "Octavia E. Butler," "Butler, Octavia E.," "Octavia Butler") are merged into one canonical author using text-normalization rules and title-overlap evidence. **Works are clustered second, *within* each resolved author**, by normalizing catalog titles (stripping statements of responsibility, edition/format boilerplate, accents, punctuation) to a deterministic "work key" and grouping matching keys.
-- **Explore (SvelteKit).** The viewer loads the search index once, then fetches a single per-author file on demand. Every machine-proposed cluster is a *suggestion* the reader can revise in the browser — drag titles between works, split editions out, and more.
-
-Resolving authors before works keeps the problem tractable and eliminates spurious cross-author matches. The whole system rebuilds monthly via scheduled GitHub Actions and deploys for free on GitHub Pages + Cloudflare R2.
-
-For the work-clustering algorithm and its design decisions, see **[docs/title-clustering.md](docs/title-clustering.md)**. For deployment, data-rebuild, and maintenance details, see **[MAINTAINING.md](MAINTAINING.md)**.
-
----
-
-## Repository structure
-
-```
-data-prep/     Python + DuckDB pipeline (aggregation, author & work clustering)
-src/           SvelteKit viewer
-  components/    Index, StackedViewer, StackedAreaChart, GenreTrends, db.js (data layer)
-  routes/        the page
-static/        committed data (genres, overview) + generated per-author data (hosted on R2)
-.github/       scheduled workflows (pull data → rebuild → deploy)
-docs/          algorithm documentation
+npm run dev        
 ```
 
 ---
 
-## Citation & license
+## Process
 
-Released under the **MIT License** (see [LICENSE](LICENSE)). The underlying checkout data is published as open data by the Seattle Public Library.
 
-If you use this resource, please cite the project (an accompanying paper is under review — a full citation will be added here once it is published):
+- **Precompute (Python + DuckDB).** `data-prep/build_data.py` aggregates the raw checkouts into one small JSON file per author, plus a search index. **Authors are resolved first**. **Works are clustered second, *within* each resolved author**, by normalizing catalog titles (stripping statements of responsibility, edition/format boilerplate, accents, punctuation) to a deterministic "work key" and grouping matching keys.
+- **Explore (SvelteKit).** The viewer loads the search index once, then fetches a single per-author file whenever the user requests it. Every automatic cluster serves as a suggestion the user can edit in the browser.
 
-> *What's Seattle Reading? An Interactive Viewer and Open Data Pipeline for Two Decades of Public Library Circulation.* <https://github.com/melaniewalsh/whats-seattle-reading-viewer>
+---
 
-For a reproducible reference to the data, cite the specific monthly snapshot you used from the [Releases](https://github.com/melaniewalsh/whats-seattle-reading-viewer/releases) page (e.g. `data-2026-06`).
+## Citation & License
+
+We release this code under the **MIT License** (see [LICENSE](LICENSE)). The underlying checkout data is published as open data by the Seattle Public Library.
+
+If you use this resource, please cite our paper:
+
+Melanie Walsh, Neel Gupta, E. Tiago Ramos, Alexis Martin, Karalee Harris, and Lurier Bao. “What’s Seattle Reading? An Interactive Viewer and Open Data Pipeline for Two Decades of Public Library Circulation.” ACM/IEEE Joint Conference on Digital Libraries (JCDL 2026), 2026. https://doi.org/10.1145/3805696.3848491
+
+```
+@inproceedings{walshWhatsSeattleReading2026,
+  title = {What's {{Seattle Reading}}? {{An Interactive Viewer}} and {{Open Data Pipeline}} for {{Two Decades}} of {{Public Library Circulation}}},
+  author = {Walsh, Melanie and Gupta, Neel and Ramos, E. Tiago and Martin, Alexis and Harris, Karalee and Bao, Lurier},
+  booktitle = {ACM/IEEE Joint Conference on Digital Libraries (JCDL 2026)},
+  year = {2026},
+  doi = {10.1145/3805696.3848491},
+  url = {https://www.whats-seattle-reading.com/}
+}
+```
 
 ---
 
@@ -110,4 +100,4 @@ For a reproducible reference to the data, cite the specific monthly snapshot you
 
 Thanks to the Seattle Public Library and David Christensen for stewarding the open checkout data.
 
-*Visual style adapted from [The Pudding's svelte-starter](https://github.com/the-pudding/svelte-starter).*
+This template was originally adapted from [The Pudding's svelte-starter](https://github.com/the-pudding/svelte-starter).
