@@ -4,7 +4,7 @@
 
 🔗 **Website:** <https://www.whats-seattle-reading.com>
 
-The Seattle Public Library openly publishes anonymized checkout counts for each of the titles in its collection. Our project, *What's Seattle Reading?*, makes  this data, **over 120 million checkouts** for **~600K books**, explorable across print, e-book, and audiobook formats, from 2005 to the present.  
+The Seattle Public Library openly publishes anonymized checkout counts for each of the titles in its collection. Our project, *What's Seattle Reading?*, makes  this data, **over 120 million checkouts** for **~650K books**, explorable across print, e-book, and audiobook formats, from 2005 to the present.  
 
 This website is built with [SvelteKit](https://kit.svelte.dev/) and [D3](https://d3js.org/), a Python + [DuckDB](https://duckdb.org/) data pipeline, and static data hosted on [Cloudflare R2](https://developers.cloudflare.com/r2/). All code is MIT-licensed.
 

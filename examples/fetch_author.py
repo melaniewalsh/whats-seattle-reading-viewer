@@ -12,10 +12,10 @@ Data layout on R2:
   search-index.json                [[slug, name, total], ...]    -- every author
   authors/<slug[:2]>/<slug>.json   one author: total series + per-title breakdown
 
-The bucket has no directory listing and slugs are normalized (and may carry a
-disambiguating year, e.g. "james-baldwin-1924"), so you look the slug up in
-search-index.json rather than guessing it. Series are sparsely encoded as
-[[monthIndex, count], ...] against `months`, so you expand them against that axis.
+Author slugs are normalized and may carry a
+disambiguating year, e.g. "james-baldwin-1924", so you need to look up the slug in
+search-index.json rather than guessing it. 
+
 """
 import sys
 import requests
