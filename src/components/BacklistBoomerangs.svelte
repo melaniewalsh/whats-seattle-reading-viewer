@@ -175,7 +175,7 @@
 
 	<details class="bb-method">
 		<summary>How this list is made</summary>
-		<p>For every book (all editions and formats combined), we compare each calendar year — starting at least {rules.minAgeYears} years after its first checkout — with the average of the {rules.baselineMonths} months before it. The months of the 2020 branch closures and the 2024 ransomware outage are skipped when computing that baseline. A book is listed under the year of its biggest jump if that year's monthly average is at least {rules.minRatio}× the baseline, at least {rules.minDelta} checkouts a month higher, and the year had at least {rules.minPeakTotal} checkouts in total.</p>
+		<p>For every book (all editions and formats combined), we compare each calendar year — starting at least {rules.minAgeYears} years after its first checkout — with the average of the {rules.baselineMonths} months before it. The months of the 2020 branch closures and the 2024 ransomware outage are not considered. A book is listed under the year of its biggest jump, if that year's monthly average is at least {rules.minRatio}× more than the baseline, at least {rules.minDelta} checkouts a month higher, and the year had at least {rules.minPeakTotal} checkouts in total.</p>
 	</details>
 {/if}
 
