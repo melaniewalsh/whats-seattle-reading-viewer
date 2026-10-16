@@ -31,3 +31,6 @@ data-prep/access.env
 # spl-clustering-benchmark), plus an old sampling notebook. Kept locally only.
 paper/
 sampling/
+
+# Exploratory notebook (kept locally)
+data-prep/author-clustering-mandel.ipynb
