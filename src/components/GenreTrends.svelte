@@ -659,25 +659,29 @@
 		<details class="sh-note">
 			<summary>A note on how genres are defined</summary>
 			<p>
-				Genres here come from <strong>Library of Congress and BISAC subject headings</strong> in the
-				library's catalog records. Those headings are applied inconsistently, are US-centric, and have
-				been widely critiqued for how they name racial, ethnic, and other identity groups — from Sanford
-				Berman's <em>Prejudices and Antipathies</em> (1971) to more recent work on “othering” in library
-				classification and the “Illegal aliens” heading controversy.
+				Genres are aggregated from <strong>Library of Congress and BISAC subject headings</strong> in the
+				library's catalog records. Click a genre to see which headings are used. Let us know
+				(<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>)
+				if you have suggestions or feedback about how these genres are defined.
 			</p>
 			<p>
-				So categories like <em>African American</em>, <em>Asian</em>, <em>Hispanic &amp; Latino</em>,
-				<em>Native American</em>, or <em>Jewish</em> fiction reflect <strong>how books were catalogued</strong> —
-				an approximate, contested classification — not the identities of the authors. We also had to
-				<em>aggregate</em> many narrower headings (e.g. “Chinese fiction,” “Bengali Americans fiction”)
-				into one bucket, which flattens real differences. Read them as a rough lens, not an authoritative count.
+				<strong>Note:</strong> Many scholars and activists have criticized LOC and BISAC classification systems,
+				especially for the problematic ways that they represent race, ethnicity, gender, sexuality, and other
+				aspects of identity, and also for their U.S. focus. This is something that should be kept in mind when
+				using or exploring this data. For more, see:
 			</p>
+			<ul class="sh-refs">
+				<li>Sandra Littletree and Cheryl A. Metoyer, “<a href="https://doi.org/10.1080/01639374.2015.1010113" target="_blank" rel="noopener noreferrer">Knowledge Organization from an Indigenous Perspective: The Mashantucket Pequot Thesaurus of American Indian Terminology Project</a>,” <em>Cataloging &amp; Classification Quarterly</em> (2015).</li>
+				<li>B. M. Watson, C. Noland, and A. Billey, “The Homosaurus,” <em>Catalogue and Index</em> (2021). See also <a href="https://homosaurus.org/about" target="_blank" rel="noopener noreferrer">homosaurus.org</a>.</li>
+			</ul>
 		</details>
 	{/if}
 </div>
 
 <style>
 	.genres { margin-top: var(--space-6); font-family: var(--font-sans); }
+	.sh-refs { margin: 0 0 var(--space-3); padding-left: 1.2em; }
+	.sh-refs li { margin: 0 0 6px; }
 	.loading, .load-error { font-family: var(--font-sans); color: var(--color-fg-light); }
 
 	/* Section masthead — matches the other tabs (serif title + subtitle + rule). */
