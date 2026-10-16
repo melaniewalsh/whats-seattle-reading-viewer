@@ -660,8 +660,8 @@
 			<summary>A note on how genres are defined</summary>
 			<p>
 				Genres are aggregated from <strong>Library of Congress and BISAC subject headings</strong> in the
-				library's catalog records. Click a genre to see which headings are used. Let us know
-				(<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>)
+				library's catalog records. Click a genre to see which headings are used.
+				<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Let us know</a>
 				if you have suggestions or feedback about how these genres are defined.
 			</p>
 			<p>
