@@ -20,6 +20,9 @@ export const RANK_GENRES = [
 	"Politics & Government",
 	"Computers & Technology",
 	"Poetry",
+	// Not a genre: every book by the 93 authors in the Norton Anthology of
+	// American Literature, Volume E (src/data/curated-lists.json).
+	"Canonical American Authors (1945—Present)",
 ];
 
 // Genres left off the site for now (the data still has them): the ethnic and

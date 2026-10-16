@@ -915,6 +915,15 @@ def merge_name_variants(con):
     con.execute("CHECKPOINT")
 
 
+def load_curated_lists():
+    """Hand-picked author lists shown in Most Borrowed beside the genres:
+    {list name: [author slug, ...]} from src/data/curated-lists.json."""
+    try:
+        return json.load(open(PROJECT_DIR / "src" / "data" / "curated-lists.json"))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def build_top_authors(con, out_dir, slug_by_author, months, lo, top_n=20):
     """Top-N clustered authors per genre per year, by checkouts of books tagged
     with that genre (the "overlap" definition, reusing the Genres tab's term
@@ -976,6 +985,25 @@ def build_top_authors(con, out_dir, slug_by_author, months, lo, top_n=20):
         data[name] = gdata
         genres_out.append(name)
     print(f"  per-genre rankings built for {len(genres_out)} genres ({perf_counter() - t0:.2f}s)", flush=True)
+
+    # Curated author lists (e.g. the Norton Anthology authors): every book by
+    # those authors, ranked like a genre.
+    try:
+        curated = load_curated_lists()
+        rows = con.execute("SELECT author, year, CAST(sum(c) AS BIGINT) FROM ays GROUP BY author, year").fetchall() if curated else []
+        for name, slugs in curated.items():
+            keep = set(slugs)
+            per_year, all_time = {}, {}
+            for author, year, c in rows:
+                if slug_by_author.get(author) in keep:
+                    per_year.setdefault(year, []).append((author, c))
+                    all_time[author] = all_time.get(author, 0) + c
+            gdata = {str(y): topn(per_year.get(y, [])) for y in years}
+            gdata["all"] = topn(list(all_time.items()))
+            data[name] = gdata
+            genres_out.append(name)
+    except Exception as e:  # noqa: BLE001
+        print(f"  WARNING: curated author lists skipped ({e})", flush=True)
 
     con.execute("DROP TABLE IF EXISTS ays")
     (out_dir / "top-authors.json").write_bytes(
@@ -1291,6 +1319,24 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         data[name] = gdata
         genres_out.append(name)
     print(f"  per-genre rankings built for {len(genres_out)} genres ({perf_counter() - t0:.2f}s)", flush=True)
+
+    # Curated author lists: every work by those authors, ranked like a genre.
+    # A failure here only skips the list, never the genre rankings.
+    try:
+        for name, slugs in load_curated_lists().items():
+            keep = set(slugs)
+            mem = {wk for wk, (title, author) in meta.items() if slug_by_author.get(author) in keep}
+            gdata = {
+                str(y): topn([(wk, full_year.get((wk, y), 0)) for wk in mem if (wk, y) in full_year])
+                for y in years
+            }
+            gdata["all"] = topn([(wk, full_all.get(wk, 0)) for wk in mem if wk in full_all])
+            gdata["month"] = topn([(wk, full_month.get(wk, 0)) for wk in mem if wk in full_month])
+            data[name] = gdata
+            genres_out.append(name)
+            print(f"  curated list {name!r}: {len(mem):,} works", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"  WARNING: curated lists skipped ({e})", flush=True)
 
     for tbl in ("cw", "cwm", "workmeta", "titlework"):
         con.execute(f"DROP TABLE IF EXISTS {tbl}")
