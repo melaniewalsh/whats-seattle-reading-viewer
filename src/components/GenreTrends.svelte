@@ -672,7 +672,7 @@
 			</p>
 			<ul class="sh-refs">
 				<li>Sandra Littletree and Cheryl A. Metoyer, “<a href="https://doi.org/10.1080/01639374.2015.1010113" target="_blank" rel="noopener noreferrer">Knowledge Organization from an Indigenous Perspective: The Mashantucket Pequot Thesaurus of American Indian Terminology Project</a>,” <em>Cataloging &amp; Classification Quarterly</em> (2015).</li>
-				<li>D St Amour, Keahi Adolpho, Marika Cifor, Michael Radmacher, B. M. Watson, Crystal Yragui, and Travis Wagner, “<a href="https://journals.cilip.org.uk/catalogue-and-index/article/view/879" target="_blank" rel="noopener noreferrer">Building and Sustaining the Homosaurus, an Inclusive LGBTQ+ Linked Data Vocabulary</a>,” <em>Catalogue and Index</em> 214 (2026).</li>
+				<li>D St Amour, Keahi Adolpho, Marika Cifor, Michael Radmacher, B. M. Watson, Crystal Yragui, and Travis Wagner, “<a href="https://journals.cilip.org.uk/catalogue-and-index/article/view/879" target="_blank" rel="noopener noreferrer">Building and Sustaining the Homosaurus, an Inclusive LGBTQ+ Linked Data Vocabulary</a>,” <em>Catalogue and Index</em> 214 (2026). See also the <a href="https://homosaurus.org/about" target="_blank" rel="noopener noreferrer">Homosaurus website</a>.</li>
 			</ul>
 		</details>
 	{/if}
