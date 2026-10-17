@@ -79,13 +79,7 @@
 		<p>
 			The Seattle Public Library publishes how many times each title in its collection was checked out
 			in each month, for physical items and for digital ebooks and audiobooks, on the City of Seattle's
-			open data portal. Each record names the title, its creator, its format and its catalog subject
-			headings.
-			{#if paper}
-				For a full description of the dataset and what it can tell us about readers, see
-				{paperAuthors}, <a href={paper.doi} target="_blank" rel="noopener noreferrer">“{paperTitle.replace(/\.$/, "")}”</a>,
-				<em>{paperVenue}</em>.
-			{/if}
+			open data portal. Each record names the title, creator, format and subject headings.
 		</p>
 		<p>
 			Physical checkouts come from 27 branch locations across the city. Digital checkouts include SPL
@@ -93,30 +87,32 @@
 			access for teens and young adults up to age 26. In 2024, Books Unbanned was responsible for 245K
 			checkouts, a 5% share of all digital checkouts.
 		</p>
+		{#if paper}
+			<p>
+				For a fuller description of the data, see {paperAuthors},
+				<a href={paper.doi} target="_blank" rel="noopener noreferrer">“{paperTitle.replace(/\.$/, "")}”</a>,
+				<em>{paperVenue}</em>.
+			</p>
+		{/if}
 
 		<div class="di-notes">
-			<h3 class="di-kicker">Notes on how we process it</h3>
+			<h3 class="di-kicker">Notes on Data</h3>
 			<ul>
-				<li>We keep print books (including large print and comics), ebooks and audiobooks. Music, movies and other formats are left out. Records with no named author are left out, too.</li>
+				<li>This website only displays checkouts for print books (including large print and comics), ebooks and audiobooks. We do not consider music, movies and other formats. We also exclude records with no named author.</li>
 				<li>The data does not include holds or renewals.</li>
-				<li>Authors' various catalog spellings are clustered into one author, and a book's editions are grouped automatically by title. Both are approximate, and you can regroup editions yourself.</li>
+				<li>Authors' various catalog spellings are clustered into one author, and a book's editions are grouped automatically by title.</li>
 				{#if genres}
 					<li>Genres come from Library of Congress and BISAC subject headings. A book can count toward several genres, so the shares overlap, and the headings themselves are applied unevenly.</li>
 				{/if}
-				<li>The shaded bands mark the Covid closures and the 2024 ransomware outage, when checkouts weren't recorded normally.</li>
+				<li>The shaded bands mark the Covid closures and the 2024 ransomware outage, when checkouts weren't recorded normally. See more details below.</li>
 			</ul>
 		</div>
 
-		<h3 class="di-h">Important notes</h3>
-		{#if paper}
-			<p class="di-sub">Drawn from {paperAuthors}, <a href={paper.doi} target="_blank" rel="noopener noreferrer">“{paperTitle.replace(/\.$/, "")}”</a>, <em>{paperVenue}</em>.</p>
-		{/if}
+		<h3 class="di-h">Checkout Disruptions and Other Considerations</h3>
 		<p>
-			There are a few anomalies in the SPL's checkout trends and data collection procedures important to
-			consider. Checkouts dropped in 2020 during the COVID-19 pandemic. Beginning on March 13, 2020, the SPL
-			halted physical checkouts, and progressively reintroduced them over the next year until a full
-			re-opening on July 1, 2021 (The Seattle Public Library, 2024a). Many patrons turned toward ebooks and
-			audiobooks.
+			Checkouts dropped in 2020 during the COVID-19 pandemic. Beginning on March 13, 2020, the SPL halted
+			physical checkouts, and progressively reintroduced them over the next year until a full re-opening on
+			July 1, 2021 (The Seattle Public Library, 2024a). Many patrons turned toward ebooks and audiobooks.
 		</p>
 		<p>
 			Recorded checkouts also dropped between May and July of 2024, following a ransomware cyberattack on
