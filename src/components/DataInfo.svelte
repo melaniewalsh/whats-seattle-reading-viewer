@@ -125,8 +125,8 @@
 			for almost three weeks of the ransomware outage.
 		</p>
 		<p>
-			The SPL made policy changes around fines, renewals, and digital holds that likely influence checkout
-			behavior and trends across this time period. In January 2020, the library stopped fining patrons for
+			Lastly, the SPL made policy changes around fines, renewals, and digital holds that likely influence
+			checkout behavior and trends across this time period. In January 2020, the library stopped fining patrons for
 			late returns, leading to a slight lengthening of average checkout time (10 to 12 days for the 25th
 			percentile). In July 2022, patrons were allowed to renew checkouts up to three times instead of two.
 			Finally, in March 2024, the library reduced the maximum number of digital holds a specific patron can
