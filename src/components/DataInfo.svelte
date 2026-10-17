@@ -28,7 +28,6 @@
 		try { siteUrl = `${window.location.origin}${base}/`; } catch {}
 	});
 
-	const inline = $derived(`Seattle Public Library, Checkouts by Title (${y0}–${y1}) – processed by What's Seattle Reading?`);
 	// The project (this site) and the library's dataset are cited separately.
 	// The project's citation is its JCDL 2026 paper.
 	const PROJECT_TITLE = "What’s Seattle Reading? An Interactive Viewer and Open Data Pipeline for Two Decades of Public Library Circulation";
@@ -142,19 +141,14 @@
 			<button type="button" class="di-copy" onclick={() => copy("bib", projectBib)} aria-label="Copy the BibTeX">{#if copied === "bib"}<CheckIcon size={16} strokeWidth={2} />{:else}<CopyIcon size={16} strokeWidth={2} />{/if}</button>
 		</div>
 
-		<h3 class="di-h">How to cite this data</h3>
-		<p class="di-sub">In-line citation, for charts and other tight spaces:</p>
-		<div class="di-cite">
-			<code>{inline}</code>
-			<button type="button" class="di-copy" onclick={() => copy("inline", inline)} aria-label="Copy the in-line citation">{#if copied === "inline"}<CheckIcon size={16} strokeWidth={2} />{:else}<CopyIcon size={16} strokeWidth={2} />{/if}</button>
-		</div>
+		<h3 class="di-h">Citation for raw data:</h3>
 		<p class="di-sub">Full citation:</p>
 		<div class="di-cite">
 			<code>{full}</code>
 			<button type="button" class="di-copy" onclick={() => copy("full", full)} aria-label="Copy the full citation">{#if copied === "full"}<CheckIcon size={16} strokeWidth={2} />{:else}<CopyIcon size={16} strokeWidth={2} />{/if}</button>
 		</div>
 		{#if paper}
-			<p class="di-sub">And the paper describing the dataset:</p>
+			<p class="di-sub">Paper describing raw data:</p>
 			<div class="di-cite">
 				<code>{paperCite}</code>
 				<button type="button" class="di-copy" onclick={() => copy("paper", paperCite)} aria-label="Copy the data paper citation">{#if copied === "paper"}<CheckIcon size={16} strokeWidth={2} />{:else}<CopyIcon size={16} strokeWidth={2} />{/if}</button>
