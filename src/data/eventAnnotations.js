@@ -20,7 +20,7 @@ export const EVENT_ANNOTATIONS = [
 		label: "Ransomware attack",
 		short: ["Ransomware", "outage"],
 		tiny: "Outage",
-		blurb: "A May 2024 ransomware attack knocked the library's systems offline for months — including the systems that record checkouts — so this drop partly reflects lost tracking, not just lost borrowing.",
-		url: "https://www.kuow.org/stories/seattle-public-library-goes-low-tech-after-cyberattack-knocks-out-most-digital-services"
+		blurb: "Recorded checkouts dropped between May and July of 2024, following a ransomware cyberattack on May 25 that caused a prolonged service outage. As a response, the library shut down some of their data tracking systems. While checkouts continued via manual paper process, these checkouts do not show up exactly on the date of checkout in the SPL open data.",
+		url: "https://www.geekwire.com/2024/seattle-public-library-recovers-from-ransomware-attack-makes-moves-to-strengthen-tech-security/"
 	}
 ];
