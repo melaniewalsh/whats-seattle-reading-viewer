@@ -78,7 +78,8 @@
 		<p>
 			The Seattle Public Library publishes how many times each title in its collection was checked out
 			in each month, for physical items and for digital ebooks and audiobooks, on the City of Seattle's
-			open data portal. Each record names the title, creator, format and subject headings.
+			open data portal. Each record names the title, creator, format and subject headings. The data is
+			aggregated and not connected to individual patrons.
 		</p>
 		<p>
 			Physical checkouts come from 27 branch locations across the city. Digital checkouts include SPL
