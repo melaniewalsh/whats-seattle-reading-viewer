@@ -69,7 +69,7 @@
 		<dl class="di-facts">
 			<div class="di-wide"><dt>Source</dt><dd>Seattle Public Library, <a href={DATASET} target="_blank" rel="noopener noreferrer">Checkouts by Title</a>, processed by What's Seattle Reading?</dd></div>
 			<div><dt>Data through</dt><dd>{monthYear(last)}</dd></div>
-			<div><dt>Updated</dt><dd>Monthly, as the library publishes each month's data</dd></div>
+			<div><dt>Updated</dt><dd>Monthly, as the library publishes each month's data (sometimes there are delays)</dd></div>
 			<div><dt>Date range</dt><dd>{monthYear(first)} – {monthYear(last)}</dd></div>
 			<div><dt>Unit</dt><dd>{genres ? "share of book checkouts (%)" : "checkouts per month"}</dd></div>
 		</dl>
@@ -82,7 +82,7 @@
 		</p>
 		<p>
 			Physical checkouts come from 27 branch locations across the city. Digital checkouts include SPL
-			patrons, as well as checkouts from the Books Unbanned Program, which provides free nationwide ebook
+			patrons, as well as checkouts from the <a href="https://booksunbanned.com/" target="_blank" rel="noopener noreferrer">Books Unbanned Program</a>, which provides free nationwide ebook
 			access for teens and young adults up to age 26. In 2024, Books Unbanned was responsible for 245K
 			checkouts, a 5% share of all digital checkouts.
 		</p>
@@ -108,14 +108,17 @@
 		</div>
 
 		<h3 class="di-h">Checkout Disruptions and Other Considerations</h3>
+		{#if paper}
+			<p class="di-sub">Drawn from {paperAuthors}, <a href={paper.doi} target="_blank" rel="noopener noreferrer">“{paperTitle.replace(/\.$/, "")}”</a>, <em>{paperVenue}</em>.</p>
+		{/if}
 		<p>
 			Checkouts dropped in 2020 during the COVID-19 pandemic. Beginning on March 13, 2020, the SPL halted
 			physical checkouts, and progressively reintroduced them over the next year until a full re-opening on
-			July 1, 2021 (The Seattle Public Library, 2024a). Many patrons turned toward ebooks and audiobooks.
+			July 1, 2021 (<a href="https://web.archive.org/web/20241209044138/https://www.spl.org/about-us/library-impact/2020-impact-report/a-look-back" target="_blank" rel="noopener noreferrer">The Seattle Public Library, 2024</a>). Many patrons turned toward ebooks and audiobooks.
 		</p>
 		<p>
 			Recorded checkouts also dropped between May and July of 2024, following a ransomware cyberattack on
-			May 25 (Schlosser, 2024) that caused a prolonged service outage. As a response, the library shut down
+			May 25 (<a href="https://www.geekwire.com/2024/seattle-public-library-recovers-from-ransomware-attack-makes-moves-to-strengthen-tech-security/" target="_blank" rel="noopener noreferrer">Schlosser, GeekWire, 2024</a>) that caused a prolonged service outage. As a response, the library shut down
 			some of their data tracking systems. While checkouts continued via manual paper process, these
 			checkouts do not show up exactly on the date of checkout in the SPL open data. Physical holds were not
 			available from May 25 to August 8, and digital book checkouts were also unavailable for most patrons
@@ -127,7 +130,7 @@
 			late returns, leading to a slight lengthening of average checkout time (10 to 12 days for the 25th
 			percentile). In July 2022, patrons were allowed to renew checkouts up to three times instead of two.
 			Finally, in March 2024, the library reduced the maximum number of digital holds a specific patron can
-			have from 25 to 10 (in order to cut costs for high demand volumes) (Library, 2023).
+			have from 25 to 10 (in order to cut costs for high demand volumes) (<a href="https://shelftalkblog.wordpress.com/2024/03/13/the-seattle-public-library-is-reducing-our-maximum-digital-holds-heres-why/" target="_blank" rel="noopener noreferrer">The Seattle Public Library, 2024</a>).
 		</p>
 
 		<h3 class="di-h">If you use this project, you can cite the associated paper:</h3>
