@@ -10,7 +10,7 @@ export const EVENT_ANNOTATIONS = [
 		label: "COVID-19 closure",
 		short: ["Covid", "closures"],
 		tiny: "COVID", // one word, for small charts
-		blurb: "Seattle closed all physical library branches in March 2020 to slow the spread of COVID-19, and they stayed closed to in-person browsing into spring 2021, so print checkouts dropped sharply (digital borrowing kept going).",
+		blurb: "Beginning on March 13, 2020, the SPL halted physical checkouts, and progressively reintroduced them over the next year until a full re-opening on July 1, 2021.",
 		url: "https://web.archive.org/web/20241209044138/https://www.spl.org/about-us/library-impact/2020-impact-report/a-look-back"
 	},
 	{
