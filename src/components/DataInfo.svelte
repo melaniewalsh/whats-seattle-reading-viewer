@@ -87,6 +87,12 @@
 				<em>{paperVenue}</em>.
 			{/if}
 		</p>
+		<p>
+			Physical checkouts come from 27 branch locations across the city. Digital checkouts include SPL
+			patrons, as well as checkouts from the Books Unbanned Program, which provides free nationwide ebook
+			access for teens and young adults up to age 26. In 2024, Books Unbanned was responsible for 245K
+			checkouts, a 5% share of all digital checkouts.
+		</p>
 
 		<div class="di-notes">
 			<h3 class="di-kicker">Notes on how we process it</h3>
@@ -100,6 +106,34 @@
 				<li>The shaded bands mark the Covid closures and the 2024 ransomware outage, when checkouts weren't recorded normally.</li>
 			</ul>
 		</div>
+
+		<h3 class="di-h">Important notes</h3>
+		{#if paper}
+			<p class="di-sub">Drawn from {paperAuthors}, <a href={paper.doi} target="_blank" rel="noopener noreferrer">“{paperTitle.replace(/\.$/, "")}”</a>, <em>{paperVenue}</em>.</p>
+		{/if}
+		<p>
+			There are a few anomalies in the SPL's checkout trends and data collection procedures important to
+			consider. Checkouts dropped in 2020 during the COVID-19 pandemic. Beginning on March 13, 2020, the SPL
+			halted physical checkouts, and progressively reintroduced them over the next year until a full
+			re-opening on July 1, 2021 (The Seattle Public Library, 2024a). Many patrons turned toward ebooks and
+			audiobooks.
+		</p>
+		<p>
+			Recorded checkouts also dropped between May and July of 2024, following a ransomware cyberattack on
+			May 25 (Schlosser, 2024) that caused a prolonged service outage. As a response, the library shut down
+			some of their data tracking systems. While checkouts continued via manual paper process, these
+			checkouts do not show up exactly on the date of checkout in the SPL open data. Physical holds were not
+			available from May 25 to August 8, and digital book checkouts were also unavailable for most patrons
+			for almost three weeks of the ransomware outage.
+		</p>
+		<p>
+			The SPL made policy changes around fines, renewals, and digital holds that likely influence checkout
+			behavior and trends across this time period. In January 2020, the library stopped fining patrons for
+			late returns, leading to a slight lengthening of average checkout time (10 to 12 days for the 25th
+			percentile). In July 2022, patrons were allowed to renew checkouts up to three times instead of two.
+			Finally, in March 2024, the library reduced the maximum number of digital holds a specific patron can
+			have from 25 to 10 (in order to cut costs for high demand volumes) (Library, 2023).
+		</p>
 
 		<h3 class="di-h">If you use this project, you can cite the associated paper:</h3>
 		<div class="di-cite">
