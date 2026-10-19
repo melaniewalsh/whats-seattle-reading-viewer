@@ -16,6 +16,7 @@
 		multi = false,
 		value = "",
 		selectOnFocus = false, // a starter value: clicking in selects it, so typing replaces it
+		example = "", // a starter search shown in the empty box (home page); Enter runs it
 		placeholder = "Search authors or books"
 	} = $props();
 
@@ -23,6 +24,10 @@
 	let results = $state([]);
 	let open = $state(false);
 	let flash = $state(false);
+	// True while a search is in flight, so the list says "Searching…" rather
+	// than flashing "Nothing found" before the results arrive.
+	let searching = $state(false);
+	let searchSeq = 0;
 	let helpOpen = $state(false); // the "?" note: what search covers
 	// Books need this many all-time checkouts to be in the title search (the
 	// TITLE_MIN_CHECKOUTS setting in the data workflows).
@@ -54,9 +59,15 @@
 		open = true;
 		clearTimeout(timer);
 		const needle = segment();
+		const seq = ++searchSeq;
+		searching = needle.length >= 2;
 		timer = setTimeout(async () => {
-			if (needle.length < 2) { results = []; return; }
-			try { results = await searchAll(needle, 8); } catch { results = []; }
+			if (needle.length < 2) { results = []; searching = false; return; }
+			let found = [];
+			try { found = await searchAll(needle, 8); } catch {}
+			if (seq !== searchSeq) return; // a newer search has started
+			results = found;
+			searching = false;
 		}, 140);
 	}
 	function pick(res) {
@@ -77,6 +88,8 @@
 	// `search` event, not `input`, so the results never cleared).
 	function clear() {
 		clearTimeout(timer);
+		searchSeq++;
+		searching = false;
 		q = "";
 		results = [];
 		open = false;
@@ -86,6 +99,8 @@
 		if (e.key === "Escape") { open = false; return; }
 		if (e.key !== "Enter") return;
 		e.preventDefault();
+		// Empty box with a starter example: Enter runs the example.
+		if (!q.trim() && example && onSubmit) { inputEl?.blur(); return onSubmit(example, null); }
 		const seg = segment();
 		// A half-typed name with suggestions showing: take the top one.
 		const typedNew = seg && results.length && open && !results.some((r) => labelOf(r).toLowerCase() === seg.toLowerCase());
@@ -120,7 +135,7 @@
 		bind:this={inputEl}
 		class="ss-input"
 		type="search"
-		{placeholder}
+		placeholder={example || placeholder}
 		aria-label="Search authors or books"
 		name="site-search"
 		autocomplete="off"
@@ -167,7 +182,11 @@
 				</li>
 			{/each}
 			{#if !results.length}
-				<li><p class="ss-none">Nothing found for “{segment()}”. Not seeing a book? Search covers books with {BOOK_MIN}+ checkouts. Try the author's name instead.</p></li>
+				{#if searching}
+					<li><p class="ss-none">Searching…</p></li>
+				{:else}
+					<li><p class="ss-none">Nothing found for “{segment()}”. Not seeing a book? Search covers books with {BOOK_MIN}+ checkouts. Try the author's name instead.</p></li>
+				{/if}
 			{/if}
 		</ul>
 	{/if}
@@ -236,6 +255,9 @@
 		cursor: pointer;
 	}
 	.ss-clear:hover { background: var(--color-fg-light); }
+	/* Above the click-away backdrop (z-index 60), so × clears even while the
+	   suggestion list is open, instead of only closing the list. */
+	.ss-clear, .ss-help { position: relative; z-index: 62; }
 	.ss-help {
 		flex: none;
 		width: 20px;

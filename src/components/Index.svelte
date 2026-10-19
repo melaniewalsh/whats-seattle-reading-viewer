@@ -562,7 +562,7 @@
 			<div class="home-search">
 				<!-- Starts with a comparison, a nod to the Google Books Ngram Viewer's
 				     default: press Enter to see it, or type over it. -->
-				<SiteSearch bind:this={homeSearch} multi value={HOME_COMPARE} selectOnFocus onPick={pickSearch} onSubmit={submitSearch} placeholder={phone.current ? "Search any author or book" : "Search any author or book (add commas to compare)"} />
+				<SiteSearch bind:this={homeSearch} multi example={HOME_COMPARE} onPick={pickSearch} onSubmit={submitSearch} placeholder={phone.current ? "Search any author or book" : "Search any author or book (add commas to compare)"} />
 				<p class="home-try" bind:this={tryRow} bind:clientWidth={tryWidth}>
 					<span class="ht-lead">Try</span>
 					<!-- First: the comparison already in the box, one click away (in
