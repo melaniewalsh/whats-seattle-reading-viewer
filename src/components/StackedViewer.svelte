@@ -2237,6 +2237,13 @@
 	// window so the chart re-scales to just those years.
 	const isYearFiltered = $derived(months.length > 0 && (yearLo > 0 || yearHi < months.length - 1));
 	const viewMonths = $derived(isYearFiltered ? months.slice(yearLo, yearHi + 1) : months);
+	// Overview "By format": each month's total, so the tooltip can give each
+	// format's share of that month's checkouts.
+	const overviewMonthTotals = $derived(
+		isOverview && chartMode === "area" && current?.series
+			? (isYearFiltered ? current.series.slice(yearLo, yearHi + 1) : current.series)
+			: null
+	);
 	const viewSeries = $derived(
 		isYearFiltered
 			? displaySeries.map((s) => ({ ...s, values: s.values.slice(yearLo, yearHi + 1) }))
@@ -2471,7 +2478,7 @@
 				{#if plotTitle && searchMode !== "title"}
 					<p class="plot-title">{plotTitle}</p>
 				{/if}
-				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey}/>
+				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
 			</div>
 
 			<!-- Several lines: a swatch legend under the chart, every book listed

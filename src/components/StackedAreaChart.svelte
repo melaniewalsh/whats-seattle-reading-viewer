@@ -26,6 +26,7 @@
 		endLabels = true, // line mode: label each line at its right end
 		onSeriesClick = null, // click an end label: (key) => … (e.g. isolate that line)
 		percent = false,  // values are percentages (the genre shares), not counts
+		monthTotals = null, // per-month totals: the tooltip shows each line's share of that month (Overview by format)
 		plotInset = $bindable(0) // out: the plot's right margin, so a page can align to its edge
 	} = $props();
 
@@ -641,12 +642,15 @@
 	// Phones (as on Our World in Data): a tap docks a sheet at the bottom of the
 	// screen with every line's value that month, instead of a card over the plot.
 	const sheetMode = $derived(pinned && width < 560);
+	// A line's share of all checkouts that month (when monthTotals is given).
+	const monthPct = (v) => (monthTotals && hoverIndex !== null && monthTotals[hoverIndex] ? (v / monthTotals[hoverIndex]) * 100 : null);
 	const sheetRows = $derived.by(() => {
 		if (!sheetMode || hoverIndex === null) return [];
 		return layers
 			.map((l) => ({
 				key: keyOf(l), label: l.label, color: l.color,
 				v: (l.raw ?? l.values)?.[hoverIndex] ?? 0,
+				pct: monthPct((l.raw ?? l.values)?.[hoverIndex] ?? 0),
 				avg: smooth && mode === 'line' ? l.values?.[hoverIndex] : null
 			}))
 			.sort((a, b) => b.v - a.v);
@@ -1038,7 +1042,7 @@
 					<li class:on={hoveredSeriesKey && r.label === hoveredSeriesKey}>
 						<span class="ts-sw" style="background:{r.color}"></span>
 						<span class="ts-name">{r.label}</span>
-						<span class="ts-val">{percent ? fmtVal(r.v) : r.v.toLocaleString()}{#if r.avg != null}<span class="ts-avg">avg {percent ? fmtVal(r.avg) : Math.round(r.avg).toLocaleString()}</span>{/if}</span>
+						<span class="ts-val">{percent ? fmtVal(r.v) : r.v.toLocaleString()}{#if r.pct != null}<span class="ts-avg">{fmtPct(r.pct)}</span>{/if}{#if r.avg != null}<span class="ts-avg">avg {percent ? fmtVal(r.avg) : Math.round(r.avg).toLocaleString()}</span>{/if}</span>
 					</li>
 				{/each}
 			</ul>
@@ -1085,7 +1089,15 @@
                 </div>
             {/if}
 
-            {#if monthSharePct !== null}
+            {#if monthTotals && monthPct((selectedItem.raw ?? selectedItem.values)[hoverIndex]) !== null}
+                <!-- Every line's share of this month's checkouts (Overview by format). -->
+                <div class="tt-shares">
+                    <div class="tt-shares-h">Share of this month's checkouts</div>
+                    {#each layers.map((l) => ({ l, v: (l.raw ?? l.values)[hoverIndex] ?? 0 })).sort((a, b) => b.v - a.v) as { l, v } (keyOf(l))}
+                        <div class="tt-shares-row" class:on={keyOf(l) === keyOf(selectedItem)}><span class="tt-sw" style="background:{l.color}"></span><span>{l.label}</span><span class="tt-shares-pct">{fmtPct(monthPct(v))}</span></div>
+                    {/each}
+                </div>
+            {:else if monthSharePct !== null}
                 <div class="tooltip-total"><span class="tt-share" style="color: {selectedItem.color};">{fmtPct(monthSharePct)} of this month's checkouts</span></div>
             {:else if workSharePct !== null && shareOf}
                 <div class="tooltip-total">
@@ -1373,6 +1385,12 @@
 	.ts-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.ts-val { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 	.ts-avg { margin-left: 6px; font-weight: 400; font-size: 12px; color: #888; }
+	.tt-shares { margin-top: 8px; padding-top: 8px; border-top: 1px solid #ececec; font-size: 12px; color: #555; }
+	.tt-shares-h { margin-bottom: 4px; font-weight: 600; color: #777; }
+	.tt-shares-row { display: flex; align-items: center; gap: 6px; line-height: 1.6; }
+	.tt-shares-row.on { color: #1a1a1a; font-weight: 600; }
+	.tt-sw { flex: none; width: 9px; height: 9px; border-radius: 2px; }
+	.tt-shares-pct { margin-left: auto; padding-left: 12px; font-variant-numeric: tabular-nums; }
 	/* Tapped open (phones): tap the tooltip or its × to close it. */
 	.tooltip.pinned { pointer-events: auto; cursor: pointer; }
 	.tt-close { position: absolute; top: 4px; right: 6px; width: 24px; height: 24px; padding: 0; border: 0; background: none; font-size: 18px; line-height: 1; color: #8a8f96; cursor: pointer; }
