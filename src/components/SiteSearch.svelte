@@ -167,7 +167,7 @@
 	{#if helpOpen}
 		<button type="button" class="ss-backdrop" aria-label="Close" onclick={() => (helpOpen = false)}></button>
 		<div class="ss-helppop" role="note">
-			Search finds every author, and books checked out at least {BOOK_MIN} times. Can't find a book? Search for its author: every book is on its author's page.
+			Only books with {BOOK_MIN}+ checkouts are displayed. Can't find a book? Search for its author: every book is on its author's page.
 		</div>
 	{/if}
 	{#if open && (results.length || segment().length >= 2)}
