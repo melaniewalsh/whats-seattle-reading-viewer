@@ -56,7 +56,7 @@
 	{#if quiet}
 		{#if !status.loading}
 			<a class="wiki-credit" href={wikiHref} target="_blank" rel="noopener noreferrer"
-				>{status.data ? "From Wikipedia" : "Search Wikipedia"} <span aria-hidden="true">↗</span></a
+				>{status.data ? "From Wikipedia" : "Search Wikipedia"} <span aria-hidden="true">↗︎</span></a
 			>
 		{/if}
 	{:else}
@@ -68,12 +68,12 @@
 		{/if}
 		{#if links.spl}
 			<a class="wiki-spl" href={links.spl} target="_blank" rel="noopener noreferrer"
-				>Find in the Seattle Public Library catalog <span aria-hidden="true">↗</span></a
+				>Find in the Seattle Public Library catalog <span aria-hidden="true">↗︎</span></a
 			>
 		{/if}
 		{#if !status.loading}
 			<a class="wiki-wiki" href={wikiHref} target="_blank" rel="noopener noreferrer"
-				>{status.data ? "Read on Wikipedia" : "Search Wikipedia"} <span aria-hidden="true">↗</span></a
+				>{status.data ? "Read on Wikipedia" : "Search Wikipedia"} <span aria-hidden="true">↗︎</span></a
 			>
 		{/if}
 	</div>
