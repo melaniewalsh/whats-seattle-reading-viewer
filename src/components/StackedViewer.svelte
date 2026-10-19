@@ -2284,7 +2284,7 @@
 			.filter((o) => o.f >= 36 && o.f > firstActive + 6)
 			.map((o) => {
 				const m = months[o.f];
-				return { month: m, label: o.w.name, sub: `first in this data: ${MONTH_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}` };
+				return { month: m, label: o.w.name, sub: `first checkout: ${MONTH_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}` };
 			});
 	});
 

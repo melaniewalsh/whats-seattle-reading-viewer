@@ -127,7 +127,7 @@
 <!-- A real search form (role="search", search keyboard hints) so phones treat
      it as a search box, not a sign-in or address form: iOS then mostly skips
      its password / card / address AutoFill bar. -->
-<form class="ss" class:flash role="search" onsubmit={(e) => e.preventDefault()}>
+<form class="ss" class:flash class:listopen={open && (results.length || segment().length >= 2)} role="search" onsubmit={(e) => e.preventDefault()}>
 	<svg class="ss-ic" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
 		<circle cx="9" cy="9" r="6" /><line x1="13.5" y1="13.5" x2="18" y2="18" />
 	</svg>
@@ -255,9 +255,10 @@
 		cursor: pointer;
 	}
 	.ss-clear:hover { background: var(--color-fg-light); }
-	/* Above the click-away backdrop (z-index 60), so × clears even while the
-	   suggestion list is open, instead of only closing the list. */
-	.ss-clear, .ss-help { position: relative; z-index: 62; }
+	/* While the suggestion list is open, lift × and ? above its click-away
+	   backdrop (z-index 60) so × clears instead of only closing the list. Only
+	   then -- otherwise they'd sit above the sticky header when scrolled. */
+	.ss.listopen .ss-clear, .ss.listopen .ss-help { position: relative; z-index: 62; }
 	.ss-help {
 		flex: none;
 		width: 20px;

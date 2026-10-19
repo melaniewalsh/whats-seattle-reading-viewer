@@ -528,7 +528,7 @@
 			<button class="gal-arrow" onclick={() => stepYear(-1)} disabled={yearIdx <= 0} aria-label="More recent">›</button>
 		</div>
 		{#if year === "month"}
-			<p class="lag-note">The library publishes each month's data at the beginning of the next month. Sometimes there are delays. In fall 2026, the library is changing to a new ILS, and new circulation data will be published when the full pipeline is updated.</p>
+			<p class="lag-note">The library publishes each month's data at the beginning of the next month. Sometimes there are delays. (In fall 2026, the library changed to a new ILS. New circulation data will be published when the full pipeline is updated.)</p>
 		{/if}
 		{#if !galleryMode}
 			{#if overallList}
