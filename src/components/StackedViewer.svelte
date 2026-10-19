@@ -2330,15 +2330,17 @@
 			     above the name. -->
 			{#if !isOverview}
 				<div class="customize-row on-phone">
-					<button type="button" class="customize-btn" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>
+					{#if chartLineMode === "line"}
+						<button type="button" class="customize-btn" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>
+					{/if}
+					{#if onCompare && currentSlug}
+						<button type="button" class="customize-btn" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={16} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
+					{/if}
 				</div>
-				{#if customizeOpen}
+				{#if customizeOpen && chartLineMode === "line"}
 					<div class="customize-panel on-phone">
 						{#if chartLineMode === "line"}
 							<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
-						{/if}
-						{#if onCompare && currentSlug}
-							<button type="button" class="compare-btn" onclick={startCompare}><PlusIcon size={15} strokeWidth={2.2} aria-hidden="true" /> Compare with another author or book</button>
 						{/if}
 					</div>
 				{/if}
@@ -4552,14 +4554,12 @@
 		   total checkouts"), with a book's cover small beside it; no
 		   description, subjects or Borrow row. */
 		.hd-desc, .hd-subjects, .hdr-actions { display: none !important; }
-		.customize-row.on-phone { display: flex !important; justify-content: flex-start; margin: 0 0 10px; }
+		.customize-row.on-phone { display: flex !important; justify-content: flex-start; gap: 8px; margin: 0 0 10px; }
 		.hd-main.has-cover { grid-template-columns: 52px minmax(0, 1fr); column-gap: 12px; }
 		.hd-cover { width: 52px; margin-top: 2px; }
-		.mode-toggle .mt-txt { display: none; }
 		.mode-toggle button { padding: 7px 12px; }
-		.chart-foot .tb-txt { display: none; }
-		.chart-foot .tb-btn { width: 36px; height: 36px; padding: 0; justify-content: center; }
-		.chart-foot .tb-btn :global(svg) { width: 17px; height: 17px; }
+		.chart-foot .tb-btn { height: 36px; padding: 0 12px; justify-content: center; }
+		.chart-foot .tb-btn :global(svg) { width: 16px; height: 16px; }
 		.chart-foot .foot-actions { margin-left: auto !important; }
 		.iso-note { display: none !important; }
 		.format-legend { justify-content: flex-start; gap: 2px 12px; font-size: 13px; }

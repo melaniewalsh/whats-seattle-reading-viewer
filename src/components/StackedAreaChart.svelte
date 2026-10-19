@@ -71,6 +71,21 @@
 	const EVENT_Q_ROW = 22;
 	const showEventQs = $derived(!!annotations?.length && width < 480);
 	let evOpen = $state(null);
+	// Phone markers are labeled pills ("COVID ?"); centered over each band, kept
+	// inside the chart, and pushed apart if two would overlap (all years shown).
+	const EVQ_W = 66;
+	const evQLeft = $derived.by(() => {
+		const lo = EVQ_W / 2 + 2, hi = width - EVQ_W / 2 - 2;
+		const xs = annotationMarks.map((a) => Math.min(Math.max((a.x0 + a.x1) / 2, lo), hi));
+		for (let k = 1; k < xs.length; k++) {
+			if (xs[k] - xs[k - 1] < EVQ_W + 4) xs[k] = xs[k - 1] + EVQ_W + 4;
+		}
+		for (let k = xs.length - 1; k >= 0; k--) {
+			if (xs[k] > hi) xs[k] = hi;
+			if (k > 0 && xs[k] - xs[k - 1] < EVQ_W + 4) xs[k - 1] = xs[k] - EVQ_W - 4;
+		}
+		return xs;
+	});
 	const markerCount = $derived((markers || []).filter((mk) => months.includes(mk.month)).length);
 	const hasMarkers = $derived(mode === 'line' && (markers || []).some((mk) => months.includes(mk.month)));
 	const endLabelW = $derived.by(() => {
@@ -1024,7 +1039,7 @@
 		</div>
 	{/each}
 	{#each showEventQs ? annotationMarks : [] as a, k}
-		<button type="button" class="ev-q" class:open={evOpen === k} style="left: {(a.x0 + a.x1) / 2}px; top: {margin.top - 12 - 21}px;" aria-label="{a.label}: about this dip" aria-expanded={evOpen === k} onpointerdown={(e) => e.stopPropagation()} onclick={() => (evOpen = evOpen === k ? null : k)}>?</button>
+		<button type="button" class="ev-q" class:open={evOpen === k} style="left: {evQLeft[k]}px; top: {margin.top - 12 - 21}px;" aria-label="{a.label}: about this dip" aria-expanded={evOpen === k} onpointerdown={(e) => e.stopPropagation()} onclick={() => (evOpen = evOpen === k ? null : k)}>{a.tiny || a.lines[0]} <span class="ev-q-mark" aria-hidden="true">?</span></button>
 	{/each}
 	{#if showEventQs && evOpen !== null && annotationMarks[evOpen]}
 		{@const a = annotationMarks[evOpen]}
@@ -1169,17 +1184,19 @@
 		position: absolute;
 		z-index: 7;
 		transform: translateX(-50%);
-		width: 18px;
-		height: 18px;
-		padding: 0;
+		height: 20px;
+		padding: 0 7px;
 		border: 1px solid #c4c4c4;
-		border-radius: 50%;
+		border-radius: 10px;
 		background: #fff;
-		color: #777;
-		font: 600 11px/16px var(--font-sans, system-ui, sans-serif);
+		color: #666;
+		font: 600 11px/18px var(--font-sans, system-ui, sans-serif);
+		white-space: nowrap;
 		text-align: center;
 		cursor: pointer;
 	}
+	.ev-q-mark { color: #999; margin-left: 1px; }
+	.ev-q.open .ev-q-mark { color: #fff; }
 	/* A bigger tap target than the circle itself. */
 	.ev-q::after { content: ""; position: absolute; inset: -10px; }
 	.ev-q.open { background: #555; border-color: #555; color: #fff; }
