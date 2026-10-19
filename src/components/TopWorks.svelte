@@ -157,6 +157,7 @@
 	// it; older data just omits the option.
 	const latestMonth = $derived(data?.latestMonth || null);
 	const monthLabel = $derived(latestMonth ? fmtMonth(latestMonth) : "");
+	let lagOpen = $state(false); // the "?" note on when new data is published
 	// Short form ("Aug 2026") for the compact labels next to "Last month".
 	const monthShort = $derived(monthLabel ? monthLabel.replace(/^(\w{3})\w*/, "$1") : "");
 	function fmtMonth(ym) {
@@ -525,11 +526,18 @@
 		<div class="gal-yearnav">
 			<button class="gal-arrow" onclick={() => stepYear(1)} disabled={yearIdx >= yearSeq.length - 1} aria-label="Earlier year">‹</button>
 			<span class="gal-yearlabel">{year === "all" ? "All time" : year === "month" ? `Last month (${monthShort})` : year}</span>
+			{#if year === "month"}
+				<!-- Why "last month" can be a while ago: a ? that opens the note. -->
+				<span class="lag-wrap">
+					<button type="button" class="lag-q" class:on={lagOpen} aria-label="When is new data published?" aria-expanded={lagOpen} onclick={() => (lagOpen = !lagOpen)}>?</button>
+					{#if lagOpen}
+						<button type="button" class="lag-backdrop" aria-label="Close" onclick={() => (lagOpen = false)}></button>
+						<span class="lag-pop" role="note">The library publishes each month's data at the beginning of the next month. Sometimes there are delays. (In fall 2026, the library changed to a new ILS. New circulation data will be published when the full pipeline is updated.)</span>
+					{/if}
+				</span>
+			{/if}
 			<button class="gal-arrow" onclick={() => stepYear(-1)} disabled={yearIdx <= 0} aria-label="More recent">›</button>
 		</div>
-		{#if year === "month"}
-			<p class="lag-note">The library publishes each month's data at the beginning of the next month. Sometimes there are delays. (In fall 2026, the library changed to a new ILS. New circulation data will be published when the full pipeline is updated.)</p>
-		{/if}
 		{#if !galleryMode}
 			{#if overallList}
 				<button class="overall-back" onclick={() => (overallList = false)}>← All genres</button>
@@ -612,8 +620,8 @@
 						</div>
 					{/if}
 					<div class="aside-card">
-						<div class="aside-h">About these counts</div>
-						<p class="aside-p">These counts represent aggregate checkouts of works as print books, ebooks, and audiobooks. Different editions of a book are automatically grouped into one work, and these groupings are imperfect. The counts do not include holds or renewals.</p>
+						<div class="aside-h">About</div>
+						<p class="aside-p">These lists show the aggregate checkouts of works (including print books, ebooks, and audiobooks). Different editions of a book are automatically grouped into one work, and these groupings are imperfect. The counts do not include holds or renewals.</p>
 						<p class="aside-p">Cover images are drawn from <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>, matched by title and author. Some covers may be missing or show a different edition.</p>
 					</div>
 				</aside>
@@ -625,7 +633,13 @@
 </div>
 
 <style>
-	.lag-note { max-width: 640px; margin: 2px auto 14px; text-align: center; font-family: var(--font-sans); font-size: var(--text-sm); line-height: 1.45; color: var(--color-fg-light); }
+	/* The note centers under the whole year row (not the small "?"), so it
+	   stays on screen on a phone. */
+	.lag-wrap { display: inline-flex; align-items: center; }
+	.lag-q { width: 20px; height: 20px; padding: 0; border: 1px solid var(--color-border); border-radius: 50%; background: none; color: var(--color-fg-light); font: 600 12px/18px var(--font-sans); text-align: center; cursor: pointer; }
+	.lag-q:hover, .lag-q.on { border-color: var(--color-fg-light); color: var(--color-fg); }
+	.lag-backdrop { position: fixed; inset: 0; z-index: 60; background: none; border: none; cursor: default; }
+	.lag-pop { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 61; width: min(320px, calc(100vw - 32px)); padding: 12px 14px; background: var(--color-white, #fff); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16); font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 400; line-height: 1.45; color: var(--color-fg); text-align: left; }
 	/* Fills the shared article width (same as every other tab). */
 	.top-authors {
 		width: 100%;
@@ -682,6 +696,7 @@
 
 	/* Year stepper for the gallery (‹ All time › style). */
 	.gal-yearnav {
+		position: relative;
 		display: flex;
 		align-items: center;
 		justify-content: center;
