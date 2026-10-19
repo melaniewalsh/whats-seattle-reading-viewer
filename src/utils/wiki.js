@@ -236,13 +236,14 @@ function pickWorkTitle(hits, author, title = "") {
 	// The book's own article: "Title (novel)" first, then an article named
 	// exactly the title, then any work-tagged hit, then the top hit.
 	const base = (t) => t.replace(/\s*\([^)]*\)\s*$/, "").toLowerCase();
-	return (
-		usable.find((t) => good.test(t) && base(t) === titleLower) ||
-		usable.find((t) => t.toLowerCase() === titleLower) ||
-		usable.find((t) => good.test(t)) ||
-		usable[0] ||
-		null
-	);
+	// All usable hits, best first (the caller tries them in order).
+	const ordered = [
+		...usable.filter((t) => good.test(t) && base(t) === titleLower),
+		...usable.filter((t) => t.toLowerCase() === titleLower),
+		...usable.filter((t) => good.test(t)),
+		...usable,
+	];
+	return [...new Set(ordered)];
 }
 
 // Resolve a book to its English Wikipedia title via a title-scoped search that
@@ -254,11 +255,11 @@ async function enwikiTitleForWork(title, author) {
 		const res = await wfetch(
 			`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&srnamespace=0&srlimit=6&format=json&origin=*`,
 		);
-		if (!res.ok) return null;
+		if (!res.ok) return [];
 		const d = await res.json();
 		return pickWorkTitle((d?.query?.search || []).map((h) => h.title), author, title);
 	} catch {
-		return null;
+		return [];
 	}
 }
 
@@ -280,6 +281,9 @@ function looksLikeWork(s, author) {
 // Alexie's) can't win when the fallbacks aren't author-constrained.
 function mentionsAuthor(s, author) {
 	if (!s) return false;
+	// The author's own article (e.g. "Vigil (Saunders novel)" redirects to
+	// "George Saunders") is about the person, not the book.
+	if (author && (s.title || "").trim().toLowerCase() === author.trim().toLowerCase()) return false;
 	const last = (author || "").trim().split(/\s+/).pop()?.toLowerCase() || "";
 	if (last.length < 3) return true; // no usable surname -> can't verify, accept
 	const hay = `${s.title || ""} ${s.description || ""} ${s.extract || ""}`.toLowerCase();
@@ -331,12 +335,14 @@ export function wikiWork(title, author) {
 	return wikiWorkResolved(title, author);
 }
 function wikiWorkResolved(title, author) {
-	const key = `wikiwork6:${(title || "").trim().toLowerCase()}|${(author || "").trim().toLowerCase()}`;
+	const key = `wikiwork8:${(title || "").trim().toLowerCase()}|${(author || "").trim().toLowerCase()}`;
 	return cached(key, async () => {
-		const en = await enwikiTitleForWork(title, author);
-		if (en) {
+		// Try the best few search hits, checked like the fallbacks: a search for
+		// "Vigil" + "George Saunders" ranks "Halloween" first when the book has
+		// no article of its own, and "Hot Mess" above "Diary of a Wimpy Kid: Hot Mess".
+		for (const en of (await enwikiTitleForWork(title, author)).slice(0, 3)) {
 			const s = await summaryByTitle(en);
-			if (s) return s;
+			if (s && mentionsAuthor(s, author)) return s;
 		}
 		const wd = await enwikiTitleFromWikidata(title, author);
 		if (wd) {
