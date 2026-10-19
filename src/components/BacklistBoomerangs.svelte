@@ -141,7 +141,7 @@
 
 	<p class="ta-caption">
 		{#if allRows.length > rows.length}The top <strong>{rows.length}</strong> books{:else}<strong>{rows.length}</strong> {rows.length === 1 ? "book" : "books"}{/if} whose checkouts in {year} jumped to at least
-		<strong>{rules.minRatio}×</strong> their average over the previous two years. Ranked by the size of the jump.
+		<strong>{rules.minRatio}×</strong> their average over the previous two years. Ranked by how many more checkouts a month a book gained.
 		{#if String(year) === String(data.through).slice(0, 4)}<span class="ta-hint">({year} so far, through {data.through}.)</span>{/if}
 	</p>
 
@@ -159,7 +159,7 @@
 					<span class="bb-by">by <button class="bb-author" onclick={() => openAuthor(r.s)}>{displayName(r.a)}</button></span>
 					<p class="bb-stats">
 						Average checkouts per month in {r.year} were <strong>{fmtRate(r.peak)}</strong>—<span class="bb-ratio">{fmtRatio(r.ratio)}</span> more than the two years before.
-						First borrowed in {r.first} · {compactNumber(r.total)} all-time
+						In the data since {r.first} · {compactNumber(r.total)} all-time
 					</p>
 				</div>
 				<svg class="bb-spark" viewBox="0 0 {SPARK_W} {SPARK_H}" width={SPARK_W} height={SPARK_H} role="img" aria-label="Checkouts per year, {r.yr[0]?.[0]}–{r.yr[r.yr.length - 1]?.[0]}">

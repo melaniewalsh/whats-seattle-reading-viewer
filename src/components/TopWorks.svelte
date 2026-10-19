@@ -527,6 +527,9 @@
 			<span class="gal-yearlabel">{year === "all" ? "All time" : year === "month" ? `Last month (${monthShort})` : year}</span>
 			<button class="gal-arrow" onclick={() => stepYear(-1)} disabled={yearIdx <= 0} aria-label="More recent">›</button>
 		</div>
+		{#if year === "month"}
+			<p class="lag-note">The library publishes each month's data at the beginning of the next month. Sometimes there are delays. In fall 2026, the library is changing to a new ILS, and new circulation data will be published when the full pipeline is updated.</p>
+		{/if}
 		{#if !galleryMode}
 			{#if overallList}
 				<button class="overall-back" onclick={() => (overallList = false)}>← All genres</button>
@@ -622,6 +625,7 @@
 </div>
 
 <style>
+	.lag-note { max-width: 640px; margin: 2px auto 14px; text-align: center; font-family: var(--font-sans); font-size: var(--text-sm); line-height: 1.45; color: var(--color-fg-light); }
 	/* Fills the shared article width (same as every other tab). */
 	.top-authors {
 		width: 100%;

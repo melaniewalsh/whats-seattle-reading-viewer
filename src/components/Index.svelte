@@ -1377,13 +1377,20 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		box-sizing: border-box;
 		background: #fff;
 		border-left: 1px solid var(--color-border);
-		box-shadow: -12px 0 40px rgba(0, 0, 0, 0.14);
 		padding: 58px 26px 28px;
 		transform: translateX(100%);
-		transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+		/* Closed: hidden once it has slid away, so neither its shadow nor its
+		   links linger over the page. */
+		visibility: hidden;
+		transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.22s;
 		overflow-y: auto;
 	}
-	.site-menu.open { transform: translateX(0); }
+	.site-menu.open {
+		transform: translateX(0);
+		visibility: visible;
+		box-shadow: -12px 0 40px rgba(0, 0, 0, 0.14);
+		transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+	}
 	.menu-close {
 		position: absolute;
 		top: 14px;
