@@ -87,7 +87,8 @@ def load_previous(months):
 
 
 def fetch_rows(where_extra=None):
-    where = "materialtype in('BOOK','EBOOK','AUDIOBOOK')"
+    # upper(): SPL labeled August 2025's digital records "Ebook"/"Audiobook".
+    where = "upper(materialtype) in('BOOK','EBOOK','AUDIOBOOK')"
     if where_extra:
         where += f" AND ({where_extra})"
     params = urllib.parse.urlencode({
@@ -115,6 +116,9 @@ def main():
     idx = {m: i for i, m in enumerate(months)}
     known = {} if full else load_previous(months)
 
+    # A month with print but no digital checkouts is a bad earlier fetch
+    # (e.g. August 2025 before the case fix), so fetch it again.
+    known = {m: v for m, v in known.items() if not (v["print"] and not (v["ebook"] or v["audiobook"]))}
     missing = [m for m in months if m not in known]
     # Also refresh the newest few months we already have.
     have = [m for m in months if m in known]
@@ -140,7 +144,7 @@ def main():
                 continue
             i = idx[key]
             v = int(float(row.get("total", 0)))
-            bucket = FMT_BUCKET.get(row.get("materialtype"))
+            bucket = FMT_BUCKET.get((row.get("materialtype") or "").upper())
             if bucket:
                 out[bucket][i] += v
             out["total"][i] += v
