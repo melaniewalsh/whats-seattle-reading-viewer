@@ -3,6 +3,6 @@
 	"description": "Explore millions of Seattle Public Library checkouts. Search any author or title, and browse top 10 rankings.",
 	"url": "https://www.whats-seattle-reading.com",
 	"keywords": "seattle public library, books, checkouts, data, authors, titles, genres",
-	"dek": "Explore over 120 million checkouts from the Seattle Public Library",
+	"dek": "Explore 120M+ checkouts for 600K+ books from the Seattle Public Library (2006–2026)",
 	"note": "Based on a sample of SPL open checkout data, 2018–2022."
 }
