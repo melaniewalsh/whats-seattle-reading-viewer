@@ -11,6 +11,7 @@
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import TableIcon from "@lucide/svelte/icons/table";
 	import ImageIcon from "@lucide/svelte/icons/image";
+	import ShareIcon from "@lucide/svelte/icons/share-2";
 	import { renderChartPng, saveBlob } from "$utils/chartImage.js";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
@@ -59,8 +60,10 @@
 	let yearLo = $state(0);
 	let yearHi = $state(0);
 	let plotInset = $state(0);
-	let copied = $state(false);
 	let dlOpen = $state(false);
+	let shareOpen = $state(false);
+	let shareMsg = $state("");
+	const flash = (msg) => { shareMsg = msg; setTimeout(() => (shareMsg = ""), 2200); };
 	let chartWrap = $state(null);
 	let notFound = $state("");
 
@@ -220,20 +223,34 @@
 	}
 	// Copy the chart image to paste into a post or doc; where the browser can't
 	// copy images, it downloads instead.
-	let imgCopied = $state("");
 	async function copyImage() {
+		shareOpen = false;
 		try {
 			if (!(navigator.clipboard && window.ClipboardItem)) throw new Error("no clipboard");
 			// Hand the clipboard the promise itself (Safari needs the write to
 			// start right away, inside the click).
 			await navigator.clipboard.write([new ClipboardItem({ "image/png": chartImage() })]);
-			imgCopied = "Image copied";
+			flash("Image copied");
 		} catch {
 			const blob = await chartImage();
 			if (blob) saveBlob(blob, `${fileStub()}-spl-checkouts.png`);
-			imgCopied = "Image saved";
+			flash("Image saved");
 		}
-		setTimeout(() => (imgCopied = ""), 2000);
+	}
+	// The phone's share sheet with the chart image; elsewhere, save the image.
+	async function shareImage() {
+		shareOpen = false;
+		const blob = await chartImage();
+		if (!blob) return;
+		const name = `${fileStub()}-spl-checkouts.png`;
+		const file = new File([blob], name, { type: "image/png" });
+		const text = picks.map((p) => p.label).join(" vs. ") + " at the Seattle Public Library";
+		if (navigator.canShare && navigator.canShare({ files: [file] })) {
+			try { await navigator.share({ files: [file], title: text, text: `${text}\n${window.location.href}` }); } catch {}
+			return;
+		}
+		saveBlob(blob, name);
+		flash("Image saved — attach it to your post");
 	}
 	function downloadData() {
 		dlOpen = false;
@@ -257,10 +274,10 @@
 	}
 
 	function copyLink() {
+		shareOpen = false;
 		try {
 			navigator.clipboard.writeText(window.location.href);
-			copied = true;
-			setTimeout(() => (copied = false), 1800);
+			flash("Link copied");
 		} catch {}
 	}
 </script>
@@ -301,8 +318,18 @@
 							</div>
 						{/if}
 					</span>
-					<button class="tb-btn" onclick={copyImage}><ImageIcon size={13} strokeWidth={2} aria-hidden="true" /> {imgCopied || "Copy image"}</button>
-					<button class="tb-btn" onclick={copyLink}><LinkIcon size={13} strokeWidth={2} aria-hidden="true" /> {copied ? "Link copied" : "Copy link"}</button>
+					<span class="dl-wrap">
+						<button class="tb-btn" onclick={() => (shareOpen = !shareOpen)} title="Share this chart" aria-haspopup="true" aria-expanded={shareOpen}><ShareIcon size={13} strokeWidth={2} aria-hidden="true" /> Share</button>
+						{#if shareOpen}
+							<button class="dl-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
+							<div class="dl-menu" role="menu">
+								<button role="menuitem" onclick={copyImage}><ImageIcon size={15} strokeWidth={2} aria-hidden="true" /> Copy image</button>
+								<button role="menuitem" onclick={copyLink}><LinkIcon size={15} strokeWidth={2} aria-hidden="true" /> Copy link</button>
+								<button role="menuitem" onclick={shareImage}><ShareIcon size={15} strokeWidth={2} aria-hidden="true" /> Share via…</button>
+							</div>
+						{/if}
+					</span>
+					{#if shareMsg}<span class="share-msg" role="status">{shareMsg}</span>{/if}
 				</div>
 			</div>
 			</div>
@@ -379,9 +406,11 @@
 	.foot-actions { display: flex; gap: 8px; align-items: center; flex: none; }
 	.dl-wrap { position: relative; }
 	.dl-backdrop { position: fixed; inset: 0; z-index: 20; background: none; border: 0; cursor: default; }
-	.dl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 21; min-width: 170px; padding: 4px; background: #fff; border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.25); }
-	.dl-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 14px; color: var(--color-fg); text-align: left; cursor: pointer; }
+	.dl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 21; min-width: 196px; padding: 4px; background: #fff; border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1); }
+	.dl-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: var(--text-sm); font-weight: 500; color: var(--color-fg); text-align: left; cursor: pointer; }
 	.dl-menu button:hover { background: var(--color-gray-100); }
+	.dl-menu :global(svg) { flex: none; width: 15px; height: 15px; color: var(--color-fg-light); }
+	.share-msg { font-size: var(--text-sm); font-weight: 600; color: #2e7d32; }
 	.dl-fmt { margin-left: auto; font-size: 12px; color: var(--color-fg-light); }
 
 	.cmp-table { width: 100%; margin: 28px 0 8px; border-collapse: collapse; font-size: 15px; }

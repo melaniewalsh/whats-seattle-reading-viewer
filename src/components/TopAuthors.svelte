@@ -366,14 +366,14 @@
 			</label>
 			<div class="share-wrap">
 				<button class="chart-action" onclick={() => (shareOpen = !shareOpen)} title="Share this view" aria-haspopup="true" aria-expanded={shareOpen}>
-					<ShareIcon size={14} strokeWidth={2.2} aria-hidden="true" /> Share
+					<ShareIcon size={15} strokeWidth={2} aria-hidden="true" /> Share
 				</button>
 				{#if shareOpen}
 					<button class="share-backdrop" aria-label="Close share menu" onclick={() => (shareOpen = false)}></button>
 					<div class="share-menu" role="menu">
-						<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true"><ImageIcon size={14} strokeWidth={2.2} /></span> Copy image</button>
-						<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true"><LinkIcon size={14} strokeWidth={2.2} /></span> Copy link</button>
-						<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true"><ShareIcon size={14} strokeWidth={2.2} /></span> Share via…</button>
+						<button role="menuitem" class="share-item copyimg" onclick={copyImage}><span class="share-ic" aria-hidden="true"><ImageIcon size={15} strokeWidth={2} /></span> Copy image</button>
+						<button role="menuitem" class="share-item copy" onclick={copyShareLink}><span class="share-ic" aria-hidden="true"><LinkIcon size={15} strokeWidth={2} /></span> Copy link</button>
+						<button role="menuitem" class="share-item img" onclick={shareImage}><span class="share-ic" aria-hidden="true"><ShareIcon size={15} strokeWidth={2} /></span> Share via…</button>
 					</div>
 				{/if}
 			</div>
@@ -874,81 +874,27 @@
 		align-items: center;
 		gap: 6px;
 		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: 600;
+		font-size: 0.9rem;
+		font-weight: 500;
 		line-height: 1;
-		padding: 6px 14px;
+		padding: 7px 12px;
 		border: 1.5px solid var(--color-border);
-		border-radius: 999px;
+		border-radius: 8px;
 		background: var(--color-white);
 		color: var(--color-fg);
 		cursor: pointer;
-		transition: background 0.12s, border-color 0.12s;
 	}
 	.chart-action:hover {
 		border-color: var(--color-fg-light);
 	}
-	.share-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 40;
-		background: none;
-		border: none;
-		cursor: default;
-	}
-	.share-menu {
-		position: absolute;
-		top: calc(100% + 6px);
-		right: 0;
-		z-index: 41;
-		display: flex;
-		flex-direction: column;
-		min-width: 168px;
-		padding: 5px;
-		background: var(--color-white);
-		border: 1px solid var(--color-border);
-		border-radius: 10px;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-	}
-	.share-item {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 8px 10px;
-		border: none;
-		border-radius: 7px;
-		background: none;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: 600;
-		color: var(--color-fg);
-		cursor: pointer;
-		text-align: left;
-	}
-	.share-item:hover {
-		background: var(--color-gray-100);
-	}
-	.share-ic {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 22px;
-		height: 22px;
-		flex: none;
-		border-radius: 5px;
-		font-size: var(--text-xs);
-		font-weight: 700;
-		color: #fff;
-		font-style: normal;
-	}
-	.share-item.fb .share-ic { background: #1877f2; }
-	.share-item.tw .share-ic { background: #000; }
-	.share-item.bs .share-ic { background: #0a7aff; }
-	.share-item.li .share-ic { background: #0a66c2; }
-	.share-item.img .share-ic { background: #2e7d32; }
-	.share-item.copyimg .share-ic { background: #444; }
-	.share-item.dl .share-ic { background: #3f88cc; }
-	.share-item.copy .share-ic { background: #666; }
+	.chart-action :global(svg) { flex: none; width: 15px; height: 15px; color: var(--color-fg-light); }
+	/* Same menu as the chart pages' Share (StackedViewer, GenreTrends). */
+	.share-backdrop { position: fixed; inset: 0; z-index: 40; background: none; border: none; cursor: default; }
+	.share-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 41; display: flex; flex-direction: column; min-width: 196px; padding: 4px; background: var(--color-white); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1); }
+	.share-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: none; border-radius: 6px; background: none; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; color: var(--color-fg); cursor: pointer; text-align: left; }
+	.share-item:hover { background: var(--color-gray-100); }
+	.share-ic { display: inline-flex; width: 16px; height: 16px; color: var(--color-fg-light); }
+	.share-ic :global(svg) { display: block; width: 15px; height: 15px; }
 	.share-sep {
 		height: 1px;
 		margin: 4px 6px;
