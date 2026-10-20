@@ -955,7 +955,7 @@
 		const works = [...buckets.values()]
 				.map((idxs) => ({ idxs, total: idxs.reduce((s, i) => s + current.titles[i].total, 0) }))
 				// Small books aren't drawn as their own lines (see SMALL_TOTAL).
-				.filter((w) => w.total >= SMALL_TOTAL || (searchMode === "title" && !!searchedWork && w.idxs.some((i) => searchedWork.idxs.includes(i))))
+				.filter((w) => w.total >= SMALL_TOTAL)
 				.sort((a, b) => b.total - a.total)
 				.slice(0, MAX_AUTO_GROUPS);
 
@@ -1260,7 +1260,7 @@
 		for (const [key, w] of workGroups) {
 			// Books under SMALL_TOTAL checkouts aren't listed one by one (see
 			// smallWorks); editing groupings still shows every book.
-			if (!editMode && w.total < SMALL_TOTAL && !isSearchedWork(w)) continue;
+			if (!editMode && w.total < SMALL_TOTAL) continue;
 			const nameMatch = f ? w.name.toLowerCase().includes(f) : false;
 			const editions = w.idxs.map((idx) => {
 				const t = current.titles[idx];
@@ -1392,12 +1392,11 @@
 	});
 
 	// The author's books with fewer than SMALL_TOTAL checkouts, summed into one
-	// line under the table (a small book's own page still lists it).
-	const isSearchedWork = (w) => searchMode === "title" && !!searchedWork && w.idxs.some((i) => searchedWork.idxs.includes(i));
+	// line under the table.
 	const smallWorks = $derived.by(() => {
 		if (editMode || !current) return null;
 		let n = 0, total = 0;
-		for (const w of workGroups.values()) if (w.total < SMALL_TOTAL && !isSearchedWork(w)) { n++; total += w.total; }
+		for (const w of workGroups.values()) if (w.total < SMALL_TOTAL) { n++; total += w.total; }
 		return n ? { n, total } : null;
 	});
 
@@ -1903,6 +1902,19 @@
 	// A line that never reached QUIET_PEAK checkouts in a month is shown as
 	// yearly totals (small monthly counts can point to a single reader); then
 	// the whole chart goes yearly so its lines share one scale.
+	// An author (or, on a book page, the book) with under SMALL_TOTAL checkouts
+	// in all gets no chart and no exact count.
+	const subjectTotal = $derived.by(() => {
+		if (!current || isOverview) return Infinity;
+		if (searchMode === "title") return searchedWork ? searchedWork.idxs.reduce((t, i) => t + (current.titles[i]?.total || 0), 0) : Infinity;
+		return current.total;
+	});
+	const tooSmall = $derived(subjectTotal < SMALL_TOTAL);
+	const firstYear = $derived.by(() => {
+		const s = searchMode === "title" && searchedWork ? sumSeries(searchedWork.idxs) : current?.series;
+		const i = s ? s.findIndex((v) => v > 0) : -1;
+		return i >= 0 ? months[i]?.slice(0, 4) : "";
+	});
 	const yearlyView = $derived(!isOverview && displaySeries.some((s) => isQuiet(s.values)));
 	const chartData = $derived(yearlyView ? toYearly(viewMonths, viewSeries) : { months: viewMonths, series: viewSeries });
 
@@ -2028,9 +2040,9 @@
 					{#if isOverview}
 						{compactNumber(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 					{:else if searchMode === "title"}
-						by {#if bookAuthors.length}{#each bookAuthors as name, k}{#if k}{k === bookAuthors.length - 1 ? (bookAuthors.length > 2 ? ", and " : " and ") : ", "}{/if}{#if name.toLowerCase().includes(displayName(current.name).split(/\s+/).pop().toLowerCase())}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{name}</button>{:else if coAuthorSlugs[name]}<button type="button" class="author-link" onclick={() => openAuthor(coAuthorSlugs[name])} title="See this author's borrowing trends">{name}</button>{:else}{name}{/if}{/each}{:else}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{/if}{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} total checkouts{/if}{#if genreRanks.length}<span class="off-phone">{" · "}<button type="button" class="author-link" onclick={() => openGenre(genreRanks[0].genre)} title="See the most-borrowed {genreRanks[0].genre} books">#{genreRanks[0].rank} all-time in {genreRanks[0].genre}</button></span>{/if}{#if srYear}{" · "}<button type="button" class="author-link" onclick={() => openGenre(SEATTLE_READS)} title="See all the Seattle Reads picks">Seattle Reads {srYear}</button>{/if}
+						by {#if bookAuthors.length}{#each bookAuthors as name, k}{#if k}{k === bookAuthors.length - 1 ? (bookAuthors.length > 2 ? ", and " : " and ") : ", "}{/if}{#if name.toLowerCase().includes(displayName(current.name).split(/\s+/).pop().toLowerCase())}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{name}</button>{:else if coAuthorSlugs[name]}<button type="button" class="author-link" onclick={() => openAuthor(coAuthorSlugs[name])} title="See this author's borrowing trends">{name}</button>{:else}{name}{/if}{/each}{:else}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{/if}{#if tooSmall}{" · "}fewer than {SMALL_TOTAL} checkouts{:else if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} total checkouts{/if}{#if genreRanks.length}<span class="off-phone">{" · "}<button type="button" class="author-link" onclick={() => openGenre(genreRanks[0].genre)} title="See the most-borrowed {genreRanks[0].genre} books">#{genreRanks[0].rank} all-time in {genreRanks[0].genre}</button></span>{/if}{#if srYear}{" · "}<button type="button" class="author-link" onclick={() => openGenre(SEATTLE_READS)} title="See all the Seattle Reads picks">Seattle Reads {srYear}</button>{/if}
 					{:else}
-						{compactNumber(current.total)} total checkouts<span class="off-phone">{" · "}{workGroups.size.toLocaleString()} {workGroups.size === 1 ? "work" : "works"}</span>
+						{#if tooSmall}Fewer than {SMALL_TOTAL} checkouts{:else}{compactNumber(current.total)} total checkouts<span class="off-phone">{" · "}{workGroups.size.toLocaleString()} {workGroups.size === 1 ? "work" : "works"}</span>{/if}
 					{/if}
 				</span>
 			</div>
@@ -2063,6 +2075,10 @@
 			{/if}
 			</div>
 
+			{#if tooSmall}
+				<!-- Under SMALL_TOTAL checkouts in all: no chart, so a single reader can't be picked out. -->
+				<p class="too-small">Fewer than {SMALL_TOTAL} checkouts{#if firstYear}{" since "}{firstYear}{/if}. Authors and books this small aren't charted.</p>
+			{:else}
 						<div class="plot-toolbar">
 					<div class="tb-left">
 					<div class="mode-toggle" role="group" aria-label="Chart type">
@@ -2198,9 +2214,10 @@
 			</div>
 			</div>
 			</div><!-- /.chart-panel -->
+			{/if}
 			</div><!-- /.split-main -->
 
-			{#if !isOverview}
+			{#if !isOverview && !tooSmall}
 			<!-- Books: every work by this author. Reading mode lets you plot books
 			     and look inside them; "Edit groupings" adds the tools for fixing
 			     how editions are grouped into books. -->
@@ -2296,7 +2313,7 @@
 					{/each}
 				</ul>
 				{#if smallWorks && (!booksCapped || workBlocks.length <= BOOKS_PREVIEW)}
-					<p class="titles-more">{#if smallWorks.n === 1}Plus 1 more book with fewer than {SMALL_TOTAL} checkouts, not listed.{:else}Plus {smallWorks.n.toLocaleString()} books with fewer than {SMALL_TOTAL} checkouts each ({smallWorks.total.toLocaleString()} in all), not listed one by one.{/if}</p>
+					<p class="titles-more">{workBlocks.length ? "Plus " : ""}{#if smallWorks.n === 1}{workBlocks.length ? "1 more book" : "1 book"} with fewer than {SMALL_TOTAL} checkouts, not listed.{:else}{smallWorks.n.toLocaleString()} books with fewer than {SMALL_TOTAL} checkouts each{#if !tooSmall} ({smallWorks.total.toLocaleString()} in all){/if}, not listed one by one.{/if}</p>
 				{/if}
 				{#if booksCapped && workBlocks.length > BOOKS_PREVIEW}
 					<button type="button" class="books-more" onclick={() => (booksShowAll = true)}>Show all {workBlocks.length.toLocaleString()} books</button>
@@ -4540,6 +4557,7 @@
 		color: var(--color-fg-light);
 	}
 
+	.too-small { margin: 18px 0 8px; padding: 16px 18px; border: 1px solid var(--color-border); border-radius: 8px; font-family: var(--font-sans); font-size: var(--text-sm); color: var(--color-fg-light); }
 	.titles-more {
 		font-family: var(--font-sans);
 		font-size: var(--text-sm);

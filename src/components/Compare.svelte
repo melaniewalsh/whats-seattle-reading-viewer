@@ -16,7 +16,7 @@
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
-	import { isQuiet, toYearly, QUIET_PEAK } from "$utils/lowCount.js";
+	import { isQuiet, toYearly, QUIET_PEAK, SMALL_TOTAL } from "$utils/lowCount.js";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import { getMonths, getAuthor, densify } from "$components/db.js";
 	import { normalizeWorkKey, cleanTitleForDisplay, bareTitleAliases } from "$utils/workTitle.js";
@@ -160,11 +160,15 @@
 		await setPicks(ids.length ? ids : MATCHUPS[0].picks);
 	});
 
+	// Picks under SMALL_TOTAL checkouts in all aren't charted (a note says so).
+	const sumOf = (p) => p.values.reduce((t, v) => t + (v || 0), 0);
+	const charted = $derived(picks.filter((p) => sumOf(p) >= SMALL_TOTAL));
+	const tooSmall = $derived(picks.filter((p) => sumOf(p) < SMALL_TOTAL));
 	// The chart, cut to the slider's years.
 	const isYearFiltered = $derived(months.length > 0 && (yearLo > 0 || yearHi < months.length - 1));
 	const viewMonths = $derived(isYearFiltered ? months.slice(yearLo, yearHi + 1) : months);
 	const series = $derived(
-		picks.map((p) => ({
+		charted.map((p) => ({
 			key: p.id,
 			legendKey: p.id,
 			label: p.label,
@@ -174,12 +178,12 @@
 	);
 	// If any line never reached QUIET_PEAK checkouts in a month, the chart (and
 	// the table and downloads) count by year, so every line shares one scale.
-	const yearly = $derived(picks.some((p) => isQuiet(p.values)));
+	const yearly = $derived(charted.some((p) => isQuiet(p.values)));
 	const chartData = $derived(yearly ? toYearly(viewMonths, series) : { months: viewMonths, series });
 	// The slider's backdrop: everything picked, added up.
 	const brushValues = $derived.by(() => {
 		const out = new Array(months.length).fill(0);
-		for (const p of picks) p.values.forEach((v, i) => (out[i] += v));
+		for (const p of charted) p.values.forEach((v, i) => (out[i] += v));
 		return out;
 	});
 	// Start the slider at the first year anything picked was checked out.
@@ -196,7 +200,7 @@
 	// Under the chart: each pick's total and its best month (best year when
 	// the chart counts by year).
 	const rows = $derived.by(() => {
-		const per = yearly ? toYearly(months, picks) : { months, series: picks };
+		const per = yearly ? toYearly(months, charted) : { months, series: charted };
 		return per.series.map((p) => {
 			let best = 0;
 			p.values.forEach((v, i) => { if (v > p.values[best]) best = i; });
@@ -214,13 +218,13 @@
 	const fileStub = () =>
 		picks.map((p) => p.label).join("-vs-").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "compare";
 	function chartImage() {
-		const labels = picks.map((p) => p.label);
+		const labels = charted.map((p) => p.label);
 		const title = labels.length <= 3 ? labels.join(" vs. ") : `Comparing ${labels.length} authors and books`;
 		const yrs = viewMonths.length ? `, ${viewMonths[0].slice(0, 4)}–${viewMonths[viewMonths.length - 1].slice(0, 4)}` : "";
 		return renderChartPng(chartWrap?.querySelector("svg"), {
 			title,
 			subtitle: `Checkouts a ${yearly ? "year" : "month"} at the Seattle Public Library${yrs}`,
-			legend: picks.map((p) => ({ label: p.kind === "work" ? `${p.label} (${p.author})` : p.label, color: p.color }))
+			legend: charted.map((p) => ({ label: p.kind === "work" ? `${p.label} (${p.author})` : p.label, color: p.color }))
 		});
 	}
 	async function downloadImage() {
@@ -265,8 +269,8 @@
 			const t = String(v ?? "");
 			return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
 		};
-		const head = ["date", ...picks.map((p) => (p.kind === "work" ? `${p.label} (${p.author})` : p.label))];
-		const per = yearly ? toYearly(months, picks) : { months, series: picks };
+		const head = ["date", ...charted.map((p) => (p.kind === "work" ? `${p.label} (${p.author})` : p.label))];
+		const per = yearly ? toYearly(months, charted) : { months, series: charted };
 		const rows = per.months.map((m, i) => [yearly ? m.slice(0, 4) : `${m}-01`, ...per.series.map((p) => p.values[i] || 0)]);
 		const csv = [head, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
 		saveBlob(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }), `${fileStub()}-spl-checkouts.csv`);
@@ -301,12 +305,13 @@
 	{#if notFound}<p class="cmp-note">Couldn't find “{notFound}”.</p>{/if}
 
 	<div class="cmp-chart">
-		{#if picks.length && months.length}
+		{#if tooSmall.length}<p class="cmp-note">{tooSmall.map((p) => p.label).join(", ")} {tooSmall.length === 1 ? "has" : "have"} fewer than {SMALL_TOTAL} checkouts, so {tooSmall.length === 1 ? "it isn't" : "they aren't"} charted.</p>{/if}
+		{#if charted.length && months.length}
 			<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 			<div bind:this={chartWrap}><LineChart bind:plotInset months={chartData.months} series={chartData.series} {yearly} lastMonth={months[months.length - 1]} unit={yearly ? "checkouts a year" : undefined} mode="line" annotations={EVENT_ANNOTATIONS} onSeriesClick={openPick} /></div>
 			{#if series.length >= 2}
 				<div class="cmp-legend">
-					{#each picks as p (p.id)}<button type="button" class="cl-item" title="See this {p.kind === 'work' ? 'book' : 'author'}'s own trends page" onclick={() => openPick(p.id)}><span class="cl-sw" style="background:{p.color}"></span>{p.label}</button>{/each}
+					{#each charted as p (p.id)}<button type="button" class="cl-item" title="See this {p.kind === 'work' ? 'book' : 'author'}'s own trends page" onclick={() => openPick(p.id)}><span class="cl-sw" style="background:{p.color}"></span>{p.label}</button>{/each}
 				</div>
 			{/if}
 			{#if months.length - brushStart >= 24}

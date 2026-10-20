@@ -11,7 +11,7 @@
 		months: monthsProp = null,
 		series: seriesProp = null,
 		mode = 'area',
-		annotations = [],  // [{ month, end, label, short, tiny, blurb, url }] — shaded event bands
+		annotations: annotationsProp = [],  // [{ month, end, label, short, tiny, blurb, url }] — shaded event bands
 		peak = null,      // { idx, value, month } — a static callout pointing at the peak
 		legendHoverKey = null,  // key of the legend entry being hovered -> light up its band(s)
 		unit = 'checkouts a month', // appended to the top y-axis label only (NYT style)
@@ -28,6 +28,8 @@
 	} = $props();
 	const uid = $props.id(); // unique ids for the event notes (aria-describedby)
 	const months = $derived(monthsProp ?? []);
+	// Event bands mark months; a yearly chart would smear them across two years.
+	const annotations = $derived(yearly ? [] : annotationsProp);
 	const series = $derived(seriesProp ?? []);
 
 	// Numbers on the axis, end labels and tooltip: counts ("1,200") or, with
@@ -142,9 +144,10 @@
 		return lines;
 	}
 
+	// Yearly charts get half a year of room at each end, so end bars aren't cut off.
 	const x = $derived(
 		scaleLinear()
-			.domain([0, Math.max(months.length - 1, 1)])
+			.domain(yearly ? [-0.5, months.length - 0.5] : [0, Math.max(months.length - 1, 1)])
 			.range([margin.left, width - margin.right])
 	);
 
@@ -270,6 +273,9 @@
 		}))
 	);
 
+	// A single line counted by year is drawn as bars, not a line.
+	const yearBars = $derived(yearly && mode === 'line' && lineLayers.length === 1 ? lineLayers[0] : null);
+	const yearBarW = $derived(Math.max(4, Math.min(56, (months.length > 1 ? x(1) - x(0) : 80) * 0.62)));
 	// With yearly points, the current year isn't over: its segment is dashed.
 	const partialYear = $derived(
 		yearly && lastMonth && !lastMonth.endsWith('-12') && months[months.length - 1]?.slice(0, 4) === lastMonth.slice(0, 4)
@@ -754,6 +760,14 @@
 
 		<!-- Layers: overlaid lines (line mode) or stacked areas (area mode) -->
 		{#if mode === 'line'}
+			{#if yearBars}
+				<!-- One line counted by year: a bar per year (the unfinished year lighter). -->
+				<g class="year-bars" fill={yearBars.color}>
+					{#each yearBars.values as v, i}
+						{#if v > 0}<rect x={x(i) - yearBarW / 2} width={yearBarW} y={y(v)} height={Math.max(0, y(0) - y(v))} rx="2" opacity={partialYear && i === yearBars.values.length - 1 ? 0.35 : 1} />{/if}
+					{/each}
+				</g>
+			{:else}
 			{#if barLayer}
 				<g class="month-bars" fill={barLayer.color}>
 					{#each barLayer.raw as v, i}
@@ -776,6 +790,7 @@
 					<path d={p.dPartial} fill="none" stroke={p.color} stroke-width={p.isAggregate ? 2.25 : 2} stroke-dasharray="4 4" stroke-linecap="round" opacity={pathOpacity(p)} class="line-path" />
 				{/if}
 			{/each}
+			{/if}
 		{:else}
 			{#each areaPaths as p (p.eachKey)}
 				<path
