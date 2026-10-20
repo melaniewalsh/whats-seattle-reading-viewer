@@ -64,8 +64,10 @@
 	let expanded = $state(new Set());
 	let genreFilter = $state(""); // search box: filter the table by genre name OR subject term
 	let showTerms = $state(true); // subject-heading terms behind each genre (always shown)
-	// Long sections start collapsed so the table isn't a wall of rows.
-	let collapsedGroups = $state(new Set(["Kids & Young Adult", "Nonfiction"]));
+	// Long sections start collapsed to their top few rows so the table isn't a wall of rows.
+	const PREVIEW = 5;
+	const COLLAPSIBLE = new Set(["Kids & Young Adult", "Nonfiction"]);
+	let collapsedGroups = $state(new Set(COLLAPSIBLE));
 	function toggleGroup(name) {
 		const s = new Set(collapsedGroups);
 		s.has(name) ? s.delete(name) : s.add(name);
@@ -593,14 +595,13 @@
 				{#each GROUPS as [groupName, names] (groupName)}
 					{@const inGroup = names.filter((n) => genreByName[n] && !HIDDEN_GENRES.has(n) && genreMatches(n)).sort((a, b) => windowShare(seriesArr(genreByName[b])) - windowShare(seriesArr(genreByName[a])))}
 					{#if inGroup.length}
-						{@const isCollapsed = collapsedGroups.has(groupName) && !genreFilter}
+						{@const isCollapsed = collapsedGroups.has(groupName) && !genreFilter && inGroup.length > PREVIEW}
 						<li class="g-group">
 							<button type="button" aria-expanded={!isCollapsed} onclick={() => toggleGroup(groupName)}>
-								{groupName} <span class="bk-count">{inGroup.length}</span><span class="bk-caret" class:up={!isCollapsed} aria-hidden="true"></span>
+								{groupName} <span class="bk-count">{inGroup.length}</span>{#if COLLAPSIBLE.has(groupName) && inGroup.length > PREVIEW && !genreFilter}<span class="bk-caret" class:up={!isCollapsed} aria-hidden="true"></span>{/if}
 							</button>
 						</li>
-						{#if !isCollapsed}
-							{#each inGroup as name (name)}
+							{#each isCollapsed ? inGroup.slice(0, PREVIEW) : inGroup as name (name)}
 								{@const g = genreByName[name]}
 								{@const on = shown.has(name)}
 								<li class="bk-row" class:plotted={on}>
@@ -628,7 +629,9 @@
 									</li>
 								{/if}
 							{/each}
-						{/if}
+							{#if COLLAPSIBLE.has(groupName) && inGroup.length > PREVIEW && !genreFilter}
+								<li class="g-more"><button type="button" aria-expanded={!isCollapsed} onclick={() => toggleGroup(groupName)}>{isCollapsed ? `Show all ${inGroup.length} ${groupName.toLowerCase()} genres` : "Show fewer"}<span class="bk-caret" class:up={!isCollapsed} aria-hidden="true"></span></button></li>
+							{/if}
 					{/if}
 				{/each}
 				<li class="bk-row g-other" class:plotted={showOther}>
@@ -789,6 +792,8 @@
 	.g-group button { display: flex; align-items: center; gap: 6px; width: 100%; padding: 14px 8px 6px; background: none; border: 0; font: inherit; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-fg); text-align: left; cursor: pointer; }
 	.g-group .bk-count { letter-spacing: 0; }
 	.g-group .bk-caret { color: var(--color-fg-light); }
+	.g-more button { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 6px 42px; padding: 4px 0; background: none; border: 0; font: inherit; font-size: var(--text-sm); color: var(--color-fg-light); cursor: pointer; }
+	.g-more button:hover { color: var(--color-fg); text-decoration: underline; }
 
 	.g-detail { padding: 10px 8px 12px 42px; background: #f8f7f3; }
 	.g-detail-terms { font-size: var(--text-sm); line-height: 1.6; color: var(--color-fg-light); margin: 0 0 8px; }
@@ -810,5 +815,6 @@
 		.bk-filter { width: 150px; }
 		.g-ex { columns: 1; }
 		.g-detail { padding-left: 30px; }
+		.g-more button { margin-left: 30px; }
 	}
 </style>
