@@ -144,40 +144,6 @@ let allCheckoutsPromise = null;
 // MaterialType (as stored by SPL) -> the format bucket the app uses elsewhere.
 const FMT_BUCKET = { BOOK: 'print', EBOOK: 'ebook', AUDIOBOOK: 'audiobook' };
 
-// "Book" universe (print + ebook + audiobook), shared with build_genres.py.
-const BOOK_UNIVERSE =
-	"((usageclass = 'Physical' AND materialtype = 'BOOK') OR " +
-	"(usageclass = 'Digital' AND upper(materialtype) IN ('EBOOK', 'AUDIOBOOK')))";
-
-/**
- * Live monthly book-checkout counts for a genre defined by subject-heading
- * match terms (include OR'd, exclude AND-NOT'd) -- used when the user edits a
- * genre's terms in the Genres tab. Aggregated server-side, aligned to `months`.
- * This is a set-union count (each book once), so it can't be reassembled from
- * precomputed parts -- hence a live query. A few seconds per call.
- */
-export async function queryGenreMonthly(includeTerms, excludeTerms, months) {
-	const esc = (t) => t.replace(/'/g, "''").toUpperCase();
-	const anyLike = (ts) => ts.map((t) => `upper(subjects) like '%${esc(t)}%'`).join(' OR ');
-	if (!includeTerms.length) return new Array(months.length).fill(0);
-	let where = `(${anyLike(includeTerms)})`;
-	if (excludeTerms.length) where += ` AND NOT (${anyLike(excludeTerms)})`;
-	where += ` AND ${BOOK_UNIVERSE}`;
-	const soql = `SELECT checkoutyear, checkoutmonth, sum(checkouts) AS c WHERE ${where} `
-		+ `GROUP BY checkoutyear, checkoutmonth LIMIT 50000`;
-	const params = new URLSearchParams({ '$query': soql, '$$app_token': SODA_APP_TOKEN });
-	const res = await fetch(`${SODA_RESOURCE}?${params}`);
-	if (!res.ok) throw new Error(`genre query failed: ${res.status}`);
-	const rows = await res.json();
-	const idx = new Map(months.map((m, i) => [m, i]));
-	const out = new Array(months.length).fill(0);
-	for (const r of rows) {
-		const key = `${r.checkoutyear}-${String(r.checkoutmonth).padStart(2, '0')}`;
-		if (idx.has(key)) out[idx.get(key)] = Number(r.c) || 0;
-	}
-	return out;
-}
-
 /**
  * Book/ebook/audiobook checkouts per month, aligned to getMonths(). Returns
  * both the grand total (for the default line) and a per-format breakdown (for
@@ -393,14 +359,6 @@ function getTitleIndex() {
  * Search titles by name (the "By title" tab). Returns {title, slug, author,
  * total} — `slug` is the author to open. Empty query -> top titles by checkouts.
  */
-// The lowest all-time checkout count present in the title index (the build
-// threshold, i.e. only titles at/above this are searchable). Read from the data
-// so the UI note stays accurate whatever the build used.
-export async function titleIndexMin() {
-	const { rows } = await getTitleIndex();
-	return rows.length ? rows[rows.length - 1][3] : 0;
-}
-
 export async function searchTitles(query, limit = 20) {
 	const { rows, lower } = await getTitleIndex();
 	const q = (query ?? '').trim().toLowerCase();

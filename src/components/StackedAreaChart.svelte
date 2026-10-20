@@ -1,18 +1,15 @@
 <script>
     // StackedAreaChart.svelte
 	import { scaleLinear, area as d3area, line as d3line, max as d3max } from 'd3';
-	import { getMonths, searchAuthors, getAuthor, densify } from './db.js';
+	import { avg3 } from '$utils/avg3.js';
 
-	// Both props are now optional. Pass explicitly for pre-fetched/
-	// embedded/test use.
+	// Callers pass `months` (the shared x-axis) and `series` (the lines/layers).
 	// `mode` picks the chart type: 'area' stacks the series by title, 'line'
 	// overlays each series as its own (unstacked) line -- used for the default
 	// single "author's total checkouts" view.
 	let {
 		months: monthsProp = null,
 		series: seriesProp = null,
-		slug: initialSlug = null,
-		topTitles = 8,
 		mode = 'area',
 		grandTotal = 0,   // the author's (or overview's) all-time total, for the share line
 		shareOf = '',     // phrase after "% of ", e.g. "J. K. Rowling's checkouts"
@@ -30,6 +27,8 @@
 		plotInset = $bindable(0) // out: the plot's right margin, so a page can align to its edge
 	} = $props();
 	const uid = $props.id(); // unique ids for the event notes (aria-describedby)
+	const months = $derived(monthsProp ?? []);
+	const series = $derived(seriesProp ?? []);
 
 	// Numbers on the axis, end labels and tooltip: counts ("1,200") or, with
 	// `percent`, shares with just enough decimals ("12%", "2.5%", "0.15%").
@@ -143,119 +142,6 @@
 		return lines;
 	}
 
-	// Centered 3-month moving average (2 points at the ends).
-	function avg3(a) {
-		return a.map((_, i) => {
-			let sum = 0, n = 0;
-			for (let k = i - 1; k <= i + 1; k++) if (k >= 0 && k < a.length) { sum += a[k] || 0; n++; }
-			return n ? sum / n : 0;
-		});
-	}
-
-	const PALETTE = [
-		'#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
-		'#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac'
-	];
-
-	let loadedMonths = $state([]);
-	let query = $state('');
-	let searchResults = $state([]);
-	// svelte-ignore state_referenced_locally: initialSlug only
-	// seeds the starting value, activeSlug is the source after that
-	let activeSlug = $state(initialSlug);
-	let activeAuthor = $state(null);
-	let dbLoading = $state(false);
-	let dbError = $state(null);
-	let searchTimer;
-
-	// Shared x-axis: one query, cached in db.js, reused by every instance.
-	$effect(() => {
-		if (monthsProp) return;
-		getMonths()
-			.then((m) => (loadedMonths = m))
-			.catch((e) => (dbError = e?.message ?? String(e)));
-	});
-
-	// Shows before anyone has searched: the top authors by
-	// total checkouts (same "no query -> top N" behavior searchAuthors
-	// uses server-side). Auto-select the #1 author.
-	$effect(() => {
-		if (seriesProp || activeSlug) return;
-		searchAuthors('', 10)
-			.then((r) => {
-				searchResults = r;
-				if (r.length > 0) activeSlug = r[0].slug;
-			})
-			.catch((e) => (dbError = e?.message ?? String(e)));
-	});
-
-	// Load the selected author's own series + qualifying titles the moment
-	// activeSlug changes. 
-	// One query for the author row, one for their titles (see db.js:getAuthor)
-	$effect(() => {
-		if (seriesProp) return;
-		const slugToLoad = activeSlug;
-		if (!slugToLoad) return;
-		dbLoading = true;
-		dbError = null;
-		getAuthor(slugToLoad)
-			.then((a) => {
-				activeAuthor = a;
-				dbLoading = false;
-			})
-			.catch((e) => {
-				dbError = e?.message ?? String(e);
-				dbLoading = false;
-			});
-	});
-
-	function onSearchInput(event) {
-		query = event.target.value;
-		clearTimeout(searchTimer);
-		searchTimer = setTimeout(async () => {
-			try {
-				searchResults = await searchAuthors(query, 12);
-			} catch (e) {
-				dbError = e?.message ?? String(e);
-			}
-		}, 200);
-	}
-
-	function selectAuthor(slug) {
-		activeSlug = slug;
-		searchResults = [];
-		query = '';
-	}
-
-	// Turn the loaded author into stacked layers: one per qualifying title,
-	// plus a catch-all "Other titles" layer covering the gap between the
-	// author's real total and the shown titles since build_data.py only keeps
-	// per-title series for titles checked out >= MIN_TITLE_CHECKOUTS times,
-	// so without this the stack would silently under-count the long tail.
-	const derivedSeries = $derived.by(() => {
-		if (!activeAuthor || !loadedMonths.length) return [];
-		const monthCount = loadedMonths.length;
-		const shown = activeAuthor.titles.slice(0, topTitles);
-		const layers = shown.map((t, i) => ({
-			label: t.title,
-			values: densify(t.series, monthCount),
-			color: PALETTE[i % PALETTE.length],
-			groupIndex: 0
-		}));
-		const authorTotals = densify(activeAuthor.series, monthCount);
-		const otherValues = authorTotals.map((total, i) => {
-			const shownSum = layers.reduce((sum, l) => sum + l.values[i], 0);
-			return Math.max(0, total - shownSum);
-		});
-		if (otherValues.some((v) => v > 0)) {
-			layers.push({ label: 'Other titles', values: otherValues, color: '#ccc', groupIndex: -1 });
-		}
-		return layers;
-	});
-
-	const months = $derived(monthsProp ?? loadedMonths);
-	const series = $derived(seriesProp ?? derivedSeries);
-
 	const x = $derived(
 		scaleLinear()
 			.domain([0, Math.max(months.length - 1, 1)])
@@ -284,23 +170,13 @@
 				const inside = x1 - x0 >= lw + 14;
 				const anchor = inside ? 'start' : x0 > (width - margin.right) * 0.6 ? 'end' : 'start';
 				const lx = inside ? x0 + 6 : anchor === 'end' ? x0 - 5 : x1 + 5;
-				// If the label would sit on the top y-axis label ("1,200 checkouts a
-				// month", drawn at the left edge), drop it just below that label.
-				const [la, lb] = anchor === 'end' ? [lx - lw, lx] : [lx, lx + lw];
-				const topTxt = yTopTick != null ? `${fmtTick(yTopTick)}${unitText(width) ? ' ' + unitText(width) : ''}` : '';
-				const unitR = margin.left + topTxt.length * 6.6 + 8;
-				const ty = yTopTick != null ? y(yTopTick) : margin.top;
 				// In the row above the plot, just over the top of the shaded band.
-				const clash = false;
 				const top = margin.top - 12 - (a.short || [a.label]).length * 14 - 4;
-				// Dropped down among the tick numbers? Keep clear of them too.
-				const tickW = Math.max(0, ...yTicks.filter((t) => t > 0 && t !== yTopTick).map((t) => fmtTick(t).length * 6.6)) + 8;
-				const lx2 = clash && anchor === 'start' ? Math.max(lx, margin.left + tickW) : lx;
 				const pad = 8;
 				const avail = anchor === 'end' ? lx - pad : width - lx - pad;
 				const maxw = Math.max(200, Math.min(320, Math.round(avail)));
-				const [ra, rb] = anchor === 'end' ? [lx2 - lw, lx2] : [lx2, lx2 + lw];
-				return { ...a, x0, x1, lx: lx2, anchor, maxw, top, ra, rb, lines: a.short || [a.label] };
+				const [ra, rb] = anchor === 'end' ? [lx - lw, lx] : [lx, lx + lw];
+				return { ...a, x0, x1, lx, anchor, maxw, top, ra, rb, lines: a.short || [a.label] };
 			})
 			.filter(Boolean)
 			// On a narrow or zoomed-out chart two event labels can land on each
@@ -366,9 +242,24 @@
 			.range([height - margin.bottom, margin.top])
 	);
 
+	// Each-block keys: the series' key, with a counter on a repeat (a work's
+	// editions share one legend key), so every key is unique.
+	function eachKeys(list) {
+		const seen = new Map();
+		return list.map((s) => {
+			const k = String(keyOf(s));
+			const n = seen.get(k) || 0;
+			seen.set(k, n + 1);
+			return n ? `${k}#${n}` : k;
+		});
+	}
+	const stackedKeys = $derived(eachKeys(stackedSeries));
+	const lineKeys = $derived(eachKeys(lineLayers));
+
 	const areaPaths = $derived(
-		stackedSeries.map((s) => ({
+		stackedSeries.map((s, k) => ({
 			...s,
+			eachKey: stackedKeys[k],
 			d: d3area()
 				.x((_, i) => x(i))
 				.y0((_, i) => y(s.bottom[i]))
@@ -377,8 +268,9 @@
 	);
 
 	const linePaths = $derived(
-		lineLayers.map((s) => ({
+		lineLayers.map((s, k) => ({
 			...s,
+			eachKey: lineKeys[k],
 			d: d3line()
 				.x((_, i) => x(i))
 				.y((_, i) => y(s.values[i]))(s.values)
@@ -388,8 +280,9 @@
 	// The top edge of each stacked band, drawn as a line so every area gets a crisp
 	// outline in its own colour (the fill sits just under it).
 	const areaTopLines = $derived(
-		stackedSeries.map((s) => ({
+		stackedSeries.map((s, k) => ({
 			...s,
+			eachKey: stackedKeys[k],
 			d: d3line()
 				.x((_, i) => x(i))
 				.y((_, i) => y(s.top[i]))(s.values)
@@ -474,7 +367,7 @@
 		if (lineLayers.some((s) => s.isAggregate)) return [];
 		const shown = lineLayers;
 		const n = Math.max(10, Math.floor((margin.right - 45) / 6.6));
-		const items = shown.map((s) => ({ s, v: s.values[last] || 0, ey: y(s.values[last] || 0), lines: wrapName(s.label, n) }));
+		const items = shown.map((s, k) => ({ s, eachKey: lineKeys[k], v: s.values[last] || 0, ey: y(s.values[last] || 0), lines: wrapName(s.label, n) }));
 		items.sort((a, b) => a.ey - b.ey);
 		const lh = 14;
 		// Each label needs (lines × line height) + a little air below it.
@@ -822,42 +715,6 @@
 </script>
 
 <div class="chart-container" bind:clientWidth={width}>
-	{#if !seriesProp}
-		<div class="author-search">
-			<input
-				type="text"
-				placeholder="Search authors..."
-				value={query}
-				oninput={onSearchInput}
-			/>
-			{#if searchResults.length > 0}
-				<ul class="search-results">
-					{#each searchResults as r (r.slug)}
-						<li>
-							<button type="button" onclick={() => selectAuthor(r.slug)}>
-								<span class="result-name">{r.name}</span>
-								<span class="result-total">{r.total.toLocaleString()}</span>
-							</button>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		</div>
-
-		{#if dbError}
-			<p class="db-status db-error">Couldn't load data: {dbError}</p>
-		{:else if dbLoading}
-			<p class="db-status">Loading…</p>
-		{:else if activeAuthor}
-			<h3 class="author-heading">
-				{activeAuthor.name}
-				<span class="author-total">{activeAuthor.total.toLocaleString()} checkouts</span>
-			</h3>
-		{:else if !activeSlug}
-			<p class="db-status">Search for an author, or pick one below, to see checkouts over time.</p>
-		{/if}
-	{/if}
-
 	<svg
 		bind:this={svgEl}
 		class="plot-svg"
@@ -902,7 +759,7 @@
 					{/each}
 				</g>
 			{/if}
-			{#each linePaths as p}
+			{#each linePaths as p (p.eachKey)}
 				<path
 					d={p.d}
 					fill="none"
@@ -915,7 +772,7 @@
 				/>
 			{/each}
 		{:else}
-			{#each areaPaths as p}
+			{#each areaPaths as p (p.eachKey)}
 				<path
 					d={p.d}
 					fill={p.color}
@@ -925,7 +782,7 @@
 					class="area-path"
 				/>
 			{/each}
-			{#each areaTopLines as p}
+			{#each areaTopLines as p (p.eachKey)}
 				<path
 					d={p.d}
 					fill="none"
@@ -974,7 +831,7 @@
 		{/each}
 
 		<!-- End-of-line labels -->
-		{#each endMarks as it}
+		{#each endMarks as it (it.eachKey)}
 			{@const ex = x(months.length - 1)}
 			<circle class="end-dot" cx={ex} cy={it.ey} r="4" fill={it.s.color} />
 			{#if endMarks.length === 1 && it.s.isAggregate}
@@ -1034,7 +891,7 @@
 	{#each showEventLabels ? annotationMarks : [] as a, k}
 		<div class="ev-wrap align-{a.anchor}" style="left: {a.lx}px; top: {a.top}px;">
 			<!-- Focusable so keyboard users can open the note; the note describes it. -->
-			<span class="ev-label" tabindex="0" aria-describedby="{uid}-ev-{k}">{#each a.lines as ln}<span class="ev-line">{ln}</span>{/each}</span>
+			<button type="button" class="ev-label" aria-describedby="{uid}-ev-{k}">{#each a.lines as ln}<span class="ev-line">{ln}</span>{/each}</button>
 			<div class="qmark-pop" id="{uid}-ev-{k}" role="tooltip" style="max-width: {a.maxw}px;">
 				<p class="qmark-body"><strong>{a.label}.</strong> {a.blurb} <a href={a.url} target="_blank" rel="noopener noreferrer">Read more</a></p>
 			</div>
@@ -1148,6 +1005,10 @@
 	.ev-label {
 		display: inline-flex;
 		flex-direction: column;
+		padding: 0;
+		border: 0;
+		background: none;
+		text-align: inherit;
 		font-family: var(--font-sans, system-ui, sans-serif);
 		font-size: 11px;
 		line-height: 1.25;
@@ -1545,84 +1406,6 @@
 	}
 	.tooltip-total span:last-child {
 		color: #222;
-	}
-
-	.author-search {
-		position: relative;
-		margin-bottom: 10px;
-		max-width: 320px;
-	}
-
-	.author-search input {
-		width: 100%;
-		box-sizing: border-box;
-		padding: 8px 10px;
-		font-size: 14px;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-	}
-
-	.search-results {
-		position: absolute;
-		z-index: 20;
-		top: 100%;
-		left: 0;
-		right: 0;
-		margin: 4px 0 0;
-		padding: 4px;
-		list-style: none;
-		background: #fff;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-		max-height: 260px;
-		overflow-y: auto;
-	}
-
-	.search-results li button {
-		display: flex;
-		justify-content: space-between;
-		width: 100%;
-		padding: 6px 8px;
-		background: none;
-		border: none;
-		border-radius: 3px;
-		font-size: 13px;
-		text-align: left;
-		cursor: pointer;
-	}
-
-	.search-results li button:hover {
-		background: #f2f2f2;
-	}
-
-	.result-total {
-		color: #888;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.db-status {
-		font-size: 13px;
-		color: #666;
-		margin: 6px 0 10px;
-	}
-
-	.db-error {
-		color: #b00020;
-	}
-
-	.author-heading {
-		display: flex;
-		align-items: baseline;
-		gap: 10px;
-		font-size: 16px;
-		margin: 0 0 10px;
-	}
-
-	.author-total {
-		font-size: 13px;
-		font-weight: normal;
-		color: #666;
 	}
     /* stackedAreaChart.svelte */
     .area-path {

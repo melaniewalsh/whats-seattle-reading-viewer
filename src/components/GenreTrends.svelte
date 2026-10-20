@@ -1,14 +1,10 @@
 <script>
 	// GenreTrends.svelte — the "Genres" tab.
 	//
-	// 30 genres, each precomputed (build_partition.py) two ways, with a toggle:
-	//   • Overlap   — a genre's raw share of checkouts (books are multi-tagged, so
-	//                 these overlap and almost everything drifts up over time).
-	//   • Partition — each checkout assigned to the FIRST genre it matches, so the
-	//                 shares sum to 100% and real declines appear.
-	// Showing both side-by-side is the point: you can see why "share of checkouts"
-	// looks like everything's rising until you make it a true partition.
-	import { onMount, untrack } from "svelte";
+	// Each genre's raw share of checkouts, precomputed by build_partition.py
+	// (books are multi-tagged, so the shares overlap).
+	import { onMount } from "svelte";
+	import { avg3 } from "$utils/avg3.js";
 	import { HIDDEN_GENRES } from "$utils/rankGenres.js";
 	import { MediaQuery } from "svelte/reactivity";
 	import ImageIcon from "@lucide/svelte/icons/image";
@@ -58,12 +54,10 @@
 
 	let data = $state.raw(null);
 	let loadError = $state("");
-	let mode = $state("overlap"); // "partition" | "overlap" — overlap only, in the UI
 	let shown = $state(new Set());  // genre names currently plotted
 	let showOther = $state(false);  // the "Other / Unclassified" partition line
 	let expanded = $state(new Set());
 	let genreFilter = $state(""); // search box: filter the table by genre name OR subject term
-	let showTerms = $state(true); // subject-heading terms behind each genre (always shown)
 	// Long sections start collapsed to their top few rows so the table isn't a wall of rows.
 	const PREVIEW = 5;
 	const COLLAPSIBLE = new Set(["Kids & Young Adult", "Nonfiction"]);
@@ -74,17 +68,14 @@
 		collapsedGroups = s;
 	}
 	// A section holding a genre that's on the chart opens, so you can see it
-	// (you can still close it again).
-	$effect(() => {
-		const on = shown;
-		untrack(() => {
-			const open = GROUPS.filter(([g, names]) => collapsedGroups.has(g) && names.some((n) => on.has(n))).map(([g]) => g);
-			if (open.length) collapsedGroups = new Set([...collapsedGroups].filter((g) => !open.includes(g)));
-		});
-	});
+	// (you can still close it again). Called whenever `shown` changes.
+	function openGroupsFor(names) {
+		const open = GROUPS.filter(([g, list]) => collapsedGroups.has(g) && list.some((n) => names.has(n))).map(([g]) => g);
+		if (open.length) collapsedGroups = new Set([...collapsedGroups].filter((g) => !open.includes(g)));
+	}
 	let isolatedKeys = $state([]);
 	let genreOrder = $state([]);     // stable display order (by size, for colors)
-	let genreByName = $state({});
+	let genreByName = $state.raw({});
 	let lo = $state(0);              // time-slider window (month indices, inclusive)
 	let hi = $state(0);
 	let chartWrap = $state(null);    // ref to the chart container, for the PNG export
@@ -109,13 +100,14 @@
 			const d = await res.json();
 			const by = {};
 			for (const g of d.genres) by[g.name] = g;
-			const order = [...d.genres].filter((g) => !HIDDEN_GENRES.has(g.name)).sort((a, b) => sum(b.partition || b.overlap) - sum(a.partition || a.overlap)).map((g) => g.name);
+			const order = [...d.genres].filter((g) => !HIDDEN_GENRES.has(g.name)).sort((a, b) => sum(b.overlap) - sum(a.overlap)).map((g) => g.name);
 			genreByName = by;
 			genreOrder = order;
 			// Plot five genres but isolate Romance: only Romance's line shows, the
 			// other four stay in the legend, greyed out (click to bring them back).
 			const romance = by["Romance"] ? "Romance" : order[0];
 			shown = new Set([romance, ...order.filter((n) => n !== romance)].slice(0, 5));
+			openGroupsFor(shown);
 			isolatedKeys = [`g:${romance}`];
 			lo = 0;
 			hi = d.months.length - 1;
@@ -128,7 +120,7 @@
 	function sum(a) { let s = 0; for (const v of a || []) s += v; return s; }
 	const share = (arr) => arr.map((v, i) => (data.total[i] ? (100 * v) / data.total[i] : 0));
 	const overall = (arr) => (data ? (100 * sum(arr)) / Math.max(1, sum(data.total)) : 0);
-	const seriesArr = (g) => (mode === "overlap" ? g.overlap : g.partition);
+	const seriesArr = (g) => g.overlap;
 	const colorIdx = (name) => genreOrder.indexOf(name);
 	const colorOf = (name) => PALETTE[colorIdx(name) % PALETTE.length];
 
@@ -175,6 +167,7 @@
 		const adding = !n.has(name);
 		adding ? n.add(name) : n.delete(name);
 		shown = n;
+		openGroupsFor(n);
 		const k = `g:${name}`;
 		// Keep whatever is currently on the plot and just add/remove this one. If a
 		// focused subset is showing (isolatedKeys), add the ticked genre TO that
@@ -188,12 +181,6 @@
 	function toggleExpand(name) {
 		const n = new Set(expanded); n.has(name) ? n.delete(name) : n.add(name); expanded = n;
 	}
-	// Clicking a genre row plots it (if not already) and toggles its detail. Use the
-	// checkbox to remove it from the chart.
-	function clickGenre(name) {
-		if (!shown.has(name)) shown = new Set(shown).add(name);
-		toggleExpand(name);
-	}
 	// Clicking a line's name (legend or line end): one of several picked out ->
 	// show only it; the only one showing -> bring everything back; grayed out ->
 	// add it. (Taking a picked line OFF on click read as "it jumped to the other
@@ -203,7 +190,6 @@
 		else isolatedKeys = isolatedKeys.length === 1 ? [] : [k];
 	}
 	const isIsolated = (k) => isolatedKeys.includes(k);
-	const showAll = () => (shown = new Set(genreOrder));
 	const hideAll = () => { shown = new Set(); isolatedKeys = []; };
 
 	// Genre-table search: match the query against the genre name OR any of its
@@ -227,7 +213,10 @@
 	// Clicking a genre's name plots it alone (like isolating a line).
 	function pickGenre(name) {
 		if (!name) { isolatedKeys = []; return; }
-		if (!shown.has(name)) shown = new Set(shown).add(name);
+		if (!shown.has(name)) {
+			shown = new Set(shown).add(name);
+			openGroupsFor(shown);
+		}
 		isolatedKeys = [`g:${name}`];
 	}
 	const yearRange = $derived(
@@ -249,11 +238,7 @@
 		let mx = 1e-9;
 		for (const name of genreOrder) {
 			const seg = share(seriesArr(genreByName[name])).slice(lo, hi + 1);
-			for (let i = 0; i < seg.length; i++) {
-				let t = 0, n = 0;
-				for (let k = i - 1; k <= i + 1; k++) if (k >= 0 && k < seg.length) { t += seg[k]; n++; }
-				if (t / n > mx) mx = t / n;
-			}
+			for (const v of avg3(seg)) if (v > mx) mx = v;
 		}
 		return mx;
 	});
@@ -262,7 +247,7 @@
 	function sparkPath(arr, w = 84, h = 20) {
 		const seg = share(arr).slice(lo, hi + 1);
 		if (seg.length < 2) return "";
-		const avg = seg.map((_, i) => { let t = 0, n = 0; for (let k = i - 1; k <= i + 1; k++) if (k >= 0 && k < seg.length) { t += seg[k]; n++; } return t / n; });
+		const avg = avg3(seg);
 		// One scale for every genre row (small genres draw flatter lines).
 		const mx = Math.max(1e-9, sparkMax);
 		return avg.map((v, i) => `${i ? "L" : "M"}${(1 + (i * (w - 2)) / (avg.length - 1)).toFixed(1)},${(h - 1 - (v / mx) * (h - 3)).toFixed(1)}`).join("");
@@ -306,9 +291,7 @@
 	}
 
 	// --- Share / download (mirrors the "By author" tab exactly) --------------
-	const plotTitle = $derived(mode === "partition"
-		? "Share of book checkouts · each counted once, in its first genre"
-		: "Share of book checkouts · a book can count toward several genres");
+	const plotTitle = "Share of book checkouts · a book can count toward several genres";
 	const legendItems = $derived(series.map((s) => ({ label: s.name, color: s.color, key: s.key })));
 
 	// A shareable link (reopens the genre tab) plus a caption.
@@ -553,7 +536,7 @@
 			</div>
 		{/if}
 
-		<YearBrush months={data.months} values={data.total} inset={phone.current ? 0 : plotInset} bind:lo bind:hi />
+		<YearBrush months={data.months} inset={phone.current ? 0 : plotInset} bind:lo bind:hi />
 		<!-- Source on the left; Download and Share as small links on the right -->
 		<div class="chart-foot" style="padding-right: {phone.current ? 0 : plotInset}px">
 			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap. <DataInfo first={data.months[0]} last={data.months[data.months.length - 1]} genres />.</p>

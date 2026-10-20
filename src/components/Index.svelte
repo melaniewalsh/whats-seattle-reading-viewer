@@ -43,6 +43,7 @@
 
 	// "Featured trend of the month" on the home hub: this month, The Odyssey.
 	// "Last updated" = the most recent month present in the data.
+	const MONTHS_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 	let lastUpdated = $state("");
 	onMount(async () => {
 		try {
@@ -50,24 +51,20 @@
 			const last = months[months.length - 1];
 			if (last) {
 				const [y, mo] = last.split("-");
-				const names = ["January", "February", "March", "April", "May", "June",
-					"July", "August", "September", "October", "November", "December"];
-				lastUpdated = `${names[Number(mo) - 1]} ${y}`;
+				lastUpdated = `${MONTHS_FULL[Number(mo) - 1]} ${y}`;
 			}
 		} catch {}
 	});
 
-	let featured = $state(null);
-	const MONTHS_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-	const fmtMonthYear = (m) => `${MONTHS_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
+	let featured = $state.raw(null);
+	// Loaded once, the first time the home page shows (called wherever tab
+	// becomes "home": first load, Back/Forward, the logo).
 	let featuredLoaded = false;
-	let urlRead = $state(false); // tab starts as "home" until the URL is read
-	$effect(() => {
-		if (urlRead && tab === "home" && !featuredLoaded) {
-			featuredLoaded = true;
-			loadFeatured();
-		}
-	});
+	function ensureFeatured() {
+		if (tab !== "home" || featuredLoaded) return;
+		featuredLoaded = true;
+		loadFeatured();
+	}
 	async function loadFeatured() {
 		try {
 			const [months, hits] = await Promise.all([getMonths(), searchTitles("The Odyssey", 30)]);
@@ -111,7 +108,7 @@
 		// drilldown doesn't linger (and hijack the view on reload / Back).
 		try {
 			const url = new URL(window.location);
-			["author", "title", "genre", "year", "kind", "c"].forEach((k) => url.searchParams.delete(k));
+			clearViewParams(url);
 			leaveMethod(url);
 			if (t === "home") url.searchParams.delete("tab");
 			else url.searchParams.set("tab", t === "rankings" ? (rankKind === "authors" ? "top" : "works") : t);
@@ -121,6 +118,14 @@
 		// A new page starts at the top, not wherever the last one was scrolled.
 		window.scrollTo({ top: 0 });
 		if (t === "search") focusSearch();
+		ensureFeatured();
+	}
+
+	// The deep-link params naming what a view shows; cleared when moving to
+	// another view so a stale one doesn't hijack it.
+	const VIEW_PARAMS = ["author", "title", "genre", "year", "kind", "c"];
+	function clearViewParams(url) {
+		VIEW_PARAMS.forEach((k) => url.searchParams.delete(k));
 	}
 
 	// Publications, grouped by year for the Publications view.
@@ -163,7 +168,7 @@
 				compareMode = false;
 				try {
 					const url = new URL(window.location);
-					["author", "title", "genre", "year", "kind", "c"].forEach((k) => url.searchParams.delete(k));
+					clearViewParams(url);
 					url.searchParams.set("tab", "search");
 					window.history.replaceState({}, "", url);
 				} catch {}
@@ -207,12 +212,13 @@
 	function onPopState() {
 		applyUrlState();
 		if (tab === "search") searchNonce++;
+		ensureFeatured();
 	}
 
 	// A shared ?tab= / ?author= makes each view linkable (old tab names still work).
 	onMount(() => {
 		applyUrlState();
-		urlRead = true;
+		ensureFeatured();
 		// A plain ?tab=search link (nothing picked yet) also gets the cursor.
 		try {
 			const sp = new URLSearchParams(window.location.search);
@@ -232,7 +238,8 @@
 	function clearParams() {
 		try {
 			const url = new URL(window.location);
-			["author", "title", "genre", "year", "tab", "kind", "c"].forEach((k) => url.searchParams.delete(k));
+			clearViewParams(url);
+			url.searchParams.delete("tab");
 			window.history.replaceState({}, "", url);
 		} catch {}
 	}
@@ -241,6 +248,7 @@
 		clearParams();
 		tab = "home";
 		menuOpen = false;
+		ensureFeatured();
 	}
 	// The "Overview" card / menu item goes to the library-wide checkouts plot.
 	function goOverview() {
@@ -281,8 +289,9 @@
 			const url = new URL(window.location);
 			leaveMethod(url);
 			window.scrollTo({ top: 0 });
+			clearViewParams(url);
+			url.searchParams.delete("tab");
 			url.searchParams.set("author", slug);
-			["tab", "kind", "genre", "year", "title", "c"].forEach((k) => url.searchParams.delete(k));
 			window.history.pushState({}, "", url);
 		} catch {}
 		searchKind = "author";
@@ -300,8 +309,9 @@
 			const url = new URL(window.location);
 			leaveMethod(url);
 			window.scrollTo({ top: 0 });
+			clearViewParams(url);
+			url.searchParams.delete("tab");
 			url.searchParams.set("title", title);
-			["tab", "kind", "genre", "year", "author", "c"].forEach((k) => url.searchParams.delete(k));
 			if (authorSlug) url.searchParams.set("author", authorSlug);
 			window.history.pushState({}, "", url);
 		} catch {}
@@ -356,11 +366,16 @@
 	$effect(() => {
 		tryWidth; homePair; // re-fit when these change
 		if (!tryRow) return;
+		let cancelled = false; // a newer re-fit (or unmount) stops this one
 		(async () => {
 			tryFit = homeTryShown.length;
 			await tick();
-			while (tryFit > 0 && tryWraps()) { tryFit--; await tick(); }
+			while (!cancelled && tryFit > 0 && tryWraps()) {
+				tryFit--;
+				await tick();
+			}
 		})();
+		return () => (cancelled = true);
 	});
 	async function homeSurprise() {
 		const a = await randomAuthor();
@@ -420,7 +435,8 @@
 		if (compareMode && cmp) return cmp.setPicksFromIds(ids);
 		try {
 			const url = new URL(window.location);
-			["tab", "kind", "genre", "year", "author", "title", "c"].forEach((k) => url.searchParams.delete(k));
+			clearViewParams(url);
+			url.searchParams.delete("tab");
 			ids.forEach((id) => url.searchParams.append("c", id));
 			window.history.pushState({}, "", url);
 		} catch {}
@@ -444,11 +460,10 @@
 	}
 	// Heading to Search: put the cursor in the page's search field and briefly
 	// ring it, so it's clear that's where to type.
-	function focusSearch() {
-		setTimeout(() => {
-			window.scrollTo({ top: 0 });
-			pageSearch?.focus(true);
-		}, 60);
+	async function focusSearch() {
+		await tick(); // the page's search field mounts first
+		window.scrollTo({ top: 0 });
+		pageSearch?.focus(true);
 	}
 	// The nav's magnifying glass: go to the search page, or if already there,
 	// jump to its field.
@@ -643,7 +658,7 @@
 					<div class="featured-head">
 						{#if featured.cover}
 							<button class="featured-cover" onclick={() => openTitle(featured.title, featured.authorSlug)} title="See the full trend">
-								<img src={featured.cover} alt="The Odyssey" loading="lazy" />
+								<img src={featured.cover} alt="The Odyssey" width="64" height="96" loading="lazy" />
 							</button>
 						{/if}
 						<div class="featured-headtext">
@@ -734,15 +749,15 @@
 
 				<h3 class="study-h">Authorial Death</h3>
 				<p class="study-p">In <a href="https://doi.org/10.63744/P6qPH135jhY2" target="_blank" rel="noopener noreferrer">prior work</a>, we found that an author's death leads to a temporary boost in library checkouts — at least if they're famous. Plotting the checkout time series for authors who died in the last two decades bears this out.</p>
-				<figure class="study-fig"><img src="{spl500Fig}cell-5-output-1.png" alt="Checkout time series for authors who died in the last 20 years, showing spikes around each author's death" loading="lazy" /></figure>
+				<figure class="study-fig"><img src="{spl500Fig}cell-5-output-1.png" width="656" height="464" alt="Checkout time series for authors who died in the last 20 years, showing spikes around each author's death" loading="lazy" /></figure>
 
 				<h3 class="study-h">Backlist Titles</h3>
 				<p class="study-p">Do works by the same author rise and fall together? The Top 500 has 89 authors with multiple titles, so we tested whether their books get checked out at similar rates over time — the “backlist” effect, where attention to one book lifts interest in an author's earlier work. On average, books by the same author correlate at 0.42 — almost 3× higher than two random books in the dataset (0.16).</p>
-				<figure class="study-fig"><img src="{spl500Fig}cell-8-output-1.png" alt="Correlation matrix of J.K. Rowling's Harry Potter books" loading="lazy" /><figcaption>The middle four <em>Harry Potter</em> books move almost in lockstep; the first book and the final two have their own dynamics.</figcaption></figure>
+				<figure class="study-fig"><img src="{spl500Fig}cell-8-output-1.png" width="751" height="714" alt="Correlation matrix of J.K. Rowling's Harry Potter books" loading="lazy" /><figcaption>The middle four <em>Harry Potter</em> books move almost in lockstep; the first book and the final two have their own dynamics.</figcaption></figure>
 				<p class="study-p">The time-series plots show what's going on with those edge books:</p>
-				<figure class="study-fig"><img src="{spl500Fig}cell-9-output-1.png" alt="Prisoner of Azkaban vs Chamber of Secrets checkouts over time" loading="lazy" /><figcaption><em>Prisoner of Azkaban</em> and <em>Chamber of Secrets</em> track almost perfectly — a correlation of 0.97.</figcaption></figure>
-				<figure class="study-fig"><img src="{spl500Fig}cell-10-output-1.png" alt="Prisoner of Azkaban vs Sorcerer's Stone checkouts over time" loading="lazy" /><figcaption><em>Azkaban</em> and <em>Sorcerer's Stone</em> track well too — until a huge 2020 spike for <em>Sorcerer's Stone</em> throws off the correlation.</figcaption></figure>
-				<figure class="study-fig"><img src="{spl500Fig}cell-11-output-1.png" alt="Deathly Hallows vs Half-Blood Prince checkouts over time" loading="lazy" /><figcaption>Apart from their release-date peaks, the final two books follow the same dynamics.</figcaption></figure>
+				<figure class="study-fig"><img src="{spl500Fig}cell-9-output-1.png" width="577" height="435" alt="Prisoner of Azkaban vs Chamber of Secrets checkouts over time" loading="lazy" /><figcaption><em>Prisoner of Azkaban</em> and <em>Chamber of Secrets</em> track almost perfectly — a correlation of 0.97.</figcaption></figure>
+				<figure class="study-fig"><img src="{spl500Fig}cell-10-output-1.png" width="585" height="435" alt="Prisoner of Azkaban vs Sorcerer's Stone checkouts over time" loading="lazy" /><figcaption><em>Azkaban</em> and <em>Sorcerer's Stone</em> track well too — until a huge 2020 spike for <em>Sorcerer's Stone</em> throws off the correlation.</figcaption></figure>
+				<figure class="study-fig"><img src="{spl500Fig}cell-11-output-1.png" width="577" height="435" alt="Deathly Hallows vs Half-Blood Prince checkouts over time" loading="lazy" /><figcaption>Apart from their release-date peaks, the final two books follow the same dynamics.</figcaption></figure>
 
 				<h3 class="study-h">Genres</h3>
 				<p class="study-p">The dataset's genre metadata lets us run the same correlation test across genres — seeing which genres are the most internally correlated in their patterns of reception over time.</p>

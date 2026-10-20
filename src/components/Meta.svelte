@@ -3,8 +3,7 @@
 		title = "Title TK",
 		description = "Description TK",
 		url = "https://www.whats-seattle-reading.com",
-		keywords = "",
-		preloadFont = []
+		keywords = ""
 	} = $props();
 </script>
 
@@ -42,8 +41,4 @@
 		rel="stylesheet"
 		href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap"
 	/>
-
-	{#each preloadFont as href}
-		<link rel="preload" {href} as="font" type="font/woff2" crossorigin />
-	{/each}
 </svelte:head>

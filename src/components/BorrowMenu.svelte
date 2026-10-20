@@ -23,7 +23,7 @@
 	let menuPos = $state({ top: 0, left: 0 });
 	function portal(node) {
 		document.body.appendChild(node);
-		return { destroy() { node.remove(); } };
+		return () => node.remove();
 	}
 	const links = $derived(lookupUrls(q));
 	function toggle() {
@@ -59,7 +59,7 @@
 		{/if}
 	</button>
 	{#if open}
-		<div class="borrow-portal" use:portal>
+		<div class="borrow-portal" {@attach portal}>
 			<button class="borrow-backdrop" aria-label="Close" onclick={close}></button>
 			<div class="borrow-menu" role="menu" style="top:{menuPos.top}px; left:{menuPos.left}px;">
 				<a role="menuitem" href={links.spl} target="_blank" rel="noopener noreferrer" onclick={close}>

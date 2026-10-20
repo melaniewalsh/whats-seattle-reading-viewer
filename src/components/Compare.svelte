@@ -1,10 +1,10 @@
 <script>
 	// Compare.svelte — the Checkout Trends page's compare view: any authors and
 	// books on one chart, one line each (like the Google Books Ngram Viewer).
-	// The page's search field adds to it (Index.svelte calls addFromSearch).
+	// The page's search field sets its picks (Index.svelte calls setPicksFromIds).
 	// Picks live in the URL (?c=a~<author-slug>&c=w~<author-slug>~<title>) so a
 	// comparison can be shared.
-	import { onMount } from "svelte";
+	import { onMount, onDestroy } from "svelte";
 	import { MediaQuery } from "svelte/reactivity";
 	import LinkIcon from "@lucide/svelte/icons/link";
 	import DownloadIcon from "@lucide/svelte/icons/download";
@@ -69,6 +69,7 @@
 		shareMsg = msg;
 		flashTimer = setTimeout(() => (shareMsg = ""), ms);
 	}
+	onDestroy(() => clearTimeout(flashTimer));
 	let chartWrap = $state(null);
 	let notFound = $state("");
 
@@ -139,11 +140,6 @@
 		for (const id of ids) await addPick(id);
 	}
 	export const setPicksFromIds = (ids) => setPicks(ids);
-	export function addFromSearch(res) {
-		addPick(res.kind === "work" ? `w~${res.slug}~${res.title}` : `a~${res.slug}`);
-	}
-	export const count = () => picks.length;
-	export const full = () => picks.length >= MAX;
 
 	function syncUrl() {
 		try {
@@ -310,7 +306,7 @@
 				</div>
 			{/if}
 			{#if months.length - brushStart >= 24}
-				<YearBrush {months} values={brushValues} start={brushStart} inset={phone.current ? 0 : plotInset} bind:lo={yearLo} bind:hi={yearHi} />
+				<YearBrush {months} start={brushStart} inset={phone.current ? 0 : plotInset} bind:lo={yearLo} bind:hi={yearHi} />
 			{/if}
 			<div class="chart-foot" style="padding-right: {phone.current ? 0 : plotInset}px">
 				<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>, every edition (print, ebook and audiobook).{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.</p>

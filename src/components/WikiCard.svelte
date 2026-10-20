@@ -47,7 +47,7 @@
 		</div>
 	{:else if status.data}
 		{#if status.data.thumbnail}
-			<img class="wiki-thumb" src={status.data.thumbnail} alt="" />
+			<img class="wiki-thumb" src={status.data.thumbnail} alt="" decoding="async" />
 		{/if}
 		<p class="wiki-extract">{trim(status.data.extract)}</p>
 	{:else}

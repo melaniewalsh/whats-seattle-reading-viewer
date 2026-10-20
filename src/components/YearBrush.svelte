@@ -9,12 +9,11 @@
 	//
 	// Props:
 	//   months : string[]  full shared month axis, e.g. ["2006-01", ...]
-	//   values : number[]  accepted for compatibility; no longer drawn
 	//   lo, hi : bindable month indices of the selected window (inclusive)
 	//   start  : first month index the slider covers (skips the empty years
 	//            before a book or author first circulated)
 	//   inset  : the chart's right margin, so the slider stops at the plot's edge
-	let { months = [], values = [], start = 0, inset = 0, lo = $bindable(0), hi = $bindable(0) } = $props();
+	let { months = [], start = 0, inset = 0, lo = $bindable(0), hi = $bindable(0) } = $props();
 
 	const uid = $props.id();
 

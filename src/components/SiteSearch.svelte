@@ -6,9 +6,11 @@
 	// comma adds another ("Sally Rooney, Colleen Hoover") -- the suggestions are
 	// for whatever comes after the last comma. Enter (or a suggestion) hands the
 	// whole list to onSubmit(text, lastPick).
+	import { onDestroy } from "svelte";
 	import { searchAll } from "$components/db.js";
 	import { cleanTitleForDisplay } from "$utils/workTitle.js";
 	import { displayName } from "$utils/displayName.js";
+	import { eachKey } from "$utils/eachKey.js";
 
 	let {
 		onPick = () => {},
@@ -20,8 +22,15 @@
 		placeholder = "Search authors or books"
 	} = $props();
 
-	let q = $state("");
-	let results = $state([]);
+	// The page tells us what's on the chart; show it (unless mid-typing, when
+	// the box keeps what's typed). Typing and picks overwrite it until the
+	// page sends a new value.
+	let inputEl;
+	let q = $derived.by(() => {
+		const v = value;
+		return inputEl && document.activeElement === inputEl ? inputEl.value : v;
+	});
+	let results = $state.raw([]);
 	let open = $state(false);
 	let flash = $state(false);
 	// True while a search is in flight, so the list says "Searching…" rather
@@ -32,17 +41,15 @@
 	// Books need this many all-time checkouts to be in the title search (the
 	// TITLE_MIN_CHECKOUTS setting in the data workflows).
 	const BOOK_MIN = 500;
-	let inputEl;
 	let timer;
+	let ringTimers = [];
 	let justFocused = false;
-
-	// The page tells us what's on the chart; show it (unless mid-typing).
-	$effect(() => {
-		const v = value;
-		if (document.activeElement !== inputEl) q = v;
+	onDestroy(() => {
+		clearTimeout(timer);
+		ringTimers.forEach(clearTimeout);
 	});
 
-	export const labelOf = (r) => (r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name));
+	const labelOf = (r) => (r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name));
 	// In the list: two books that would read the same ("Brave New World" twice,
 	// the novel and a BBC radio drama of it) show their full titles instead.
 	const listLabels = $derived.by(() => {
@@ -51,6 +58,7 @@
 		for (const r of results) seen.set(key(r), (seen.get(key(r)) || 0) + 1);
 		return results.map((r) => (r.kind === "work" && seen.get(key(r)) > 1 ? r.title : labelOf(r)));
 	});
+	const resKey = (r) => `${r.kind}|${r.slug}|${r.title ?? ""}|${r.under ?? ""}`;
 	// The part being typed: after the last comma (multi), else everything.
 	const segment = () => (multi ? q.split(",").pop() : q).trim();
 	const hasList = () => multi && q.split(",").filter((t) => t.trim()).length > 1;
@@ -119,8 +127,8 @@
 		try { inputEl?.setSelectionRange(q.length, q.length); } catch {}
 		if (!ring) return;
 		flash = false;
-		setTimeout(() => (flash = true), 20);
-		setTimeout(() => (flash = false), 1900);
+		ringTimers.forEach(clearTimeout);
+		ringTimers = [setTimeout(() => (flash = true), 20), setTimeout(() => (flash = false), 1900)];
 	}
 </script>
 
@@ -173,7 +181,7 @@
 	{#if open && (results.length || segment().length >= 2)}
 		<button type="button" class="ss-backdrop" aria-label="Close search" onclick={() => (open = false)}></button>
 		<ul class="ss-results" role="listbox">
-			{#each results as r, k}
+			{#each results as r, k (eachKey(results, k, resKey))}
 				<li>
 					<button type="button" class="ss-result" class:ss-sub={!!r.under} onclick={() => pick(r)}>
 						<span class="ss-name">{listLabels[k]}{#if r.kind === "work" && !r.under && r.author}<span class="ss-by">{" · "}{displayName(r.author)}</span>{/if}</span>

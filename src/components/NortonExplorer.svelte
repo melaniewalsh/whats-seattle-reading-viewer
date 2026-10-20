@@ -9,8 +9,8 @@
 	let data = $state.raw(null);
 	let loadError = $state("");
 	let kind = $state("author"); // "author" | "title"
-	let selAuthor = $state(null);
-	let selTitle = $state(null);
+	let selAuthor = $state.raw(null);
+	let selTitle = $state.raw(null);
 	let query = $state("");
 	let nortonOnly = $state(false);
 	let chartWrap = $state(null);
@@ -84,7 +84,7 @@
 					<input type="search" placeholder={kind === "author" ? "Search an author" : "Search a work"} bind:value={query} autocomplete="off" />
 					{#if results.length}
 						<ul class="ne-results">
-							{#each results as r}
+							{#each results as r (r)}
 								<li>
 									{#if kind === "author"}
 										<button onclick={() => pickAuthor(r)}><span>{r.name}</span><span class="ne-count">{compactNumber(r.total)}</span></button>
@@ -101,7 +101,7 @@
 			</label>
 		</div>
 		<div class="ne-pills">
-			{#each suggestions as a}
+			{#each suggestions as a (a)}
 				<button class="ne-pill" onclick={() => pickAuthor(a)}>{a.name}</button>
 			{/each}
 		</div>
@@ -114,7 +114,7 @@
 			<div class="ne-table">
 				<h4 class="ne-th">Most-borrowed authors <span class="ne-th-n">{topAuthors.length}</span></h4>
 				<ol class="ne-list">
-					{#each topAuthors as a}
+					{#each topAuthors as a (a)}
 						<li><button onclick={() => pickAuthor(a)}><span class="ne-name">{a.name}</span><span class="ne-num">{compactNumber(a.total)}</span></button></li>
 					{/each}
 				</ol>
@@ -122,7 +122,7 @@
 			<div class="ne-table">
 				<h4 class="ne-th">Most-borrowed works <span class="ne-th-n">{topTitles.length}</span></h4>
 				<ol class="ne-list">
-					{#each topTitles as t}
+					{#each topTitles as t (t)}
 						<li><button onclick={() => pickTitle(t)}><span class="ne-name">{nameOf(t)}<span class="ne-by">·&nbsp;{t.author}</span></span><span class="ne-num">{compactNumber(t.total)}</span></button></li>
 					{/each}
 				</ol>

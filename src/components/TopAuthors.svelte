@@ -1,14 +1,15 @@
 <script>
 	import ExtArrow from "$components/ExtArrow.svelte";
-	import { onMount } from "svelte";
+	import { onMount, onDestroy, untrack } from "svelte";
 	import ImageIcon from "@lucide/svelte/icons/image";
 	import LinkIcon from "@lucide/svelte/icons/link";
 	import ShareIcon from "@lucide/svelte/icons/share-2";
-	import { base } from "$app/paths";
 	import { getTopAuthors, getGenreTerms } from "$components/db.js";
 	import { displayName } from "$utils/displayName.js";
 	import { lookupUrls } from "$utils/lookup.js";
-	import { compactNumber } from "$utils/format.js";
+	import { compactNumber, blurb } from "$utils/format.js";
+	import { renderTableBlob, shareTableImage, copyTableImage, copyPageLink } from "$utils/tableExport.js";
+	import { eachKey } from "$utils/eachKey.js";
 	import { curateGenres, extraGenres, genreLabel } from "$utils/rankGenres.js";
 	import { wikiSummary } from "$utils/wiki.js";
 	import BorrowMenu from "$components/BorrowMenu.svelte";
@@ -30,8 +31,9 @@
 		shareMsg = msg;
 		flashTimer = setTimeout(() => (shareMsg = ""), ms);
 	}
+	onDestroy(() => clearTimeout(flashTimer));
 	let shareOpen = $state(false);
-	let termsMap = $state({});
+	let termsMap = $state.raw({});
 	onMount(async () => {
 		// Read shareable filters from the URL first.
 		try {
@@ -66,9 +68,6 @@
 	// The catalog subject tags that define the selected genre (empty for "All genres").
 	const genreTags = $derived(genre !== "All genres" ? (termsMap[genre] || []) : []);
 
-	// Largest count in view — scales the in-row data bars so #1 fills the column.
-	const maxCount = $derived(rows.length ? Math.max(...rows.map((r) => r[2])) : 1);
-
 	// GALLERY (default, unfiltered view): a NYT Best Sellers–style browse where each
 	// genre gets a row of author portraits with a short bio beneath. Choosing a
 	// specific genre drops to the vertical ranking table. rows are [slug, name, count].
@@ -99,11 +98,13 @@
 
 	// Wikipedia portrait + bio for each gallery card. thumbnail | null (none) |
 	// undefined (not fetched). One request per author, shared for both.
-	let portraits = $state({});
-	let summaries = $state({});
-	let wikiUrls = $state({});
+	let portraits = $state.raw({});
+	let summaries = $state.raw({});
+	let wikiUrls = $state.raw({});
 	const cardInflight = new Set();
 	const authorKey = (r) => r[1];
+	// {#each} key for a row: the author's slug (some rows have none: their name).
+	const rowKey = (r) => r[0] || `name:${r[1]}`;
 	function loadCard(r) {
 		const k = authorKey(r);
 		if (k in portraits || cardInflight.has(k)) return;
@@ -114,17 +115,15 @@
 			wikiUrls = { ...wikiUrls, [k]: w?.url || null };
 		});
 	}
-	// Load portraits/blurbs for whatever's on screen — gallery cards or ranking rows.
+	// Load portraits/blurbs for whatever's on screen — gallery cards or ranking
+	// rows. Re-runs only when that list changes, not on every portrait that
+	// arrives (loadCard reads and writes them).
 	$effect(() => {
 		const list = galleryMode ? galleryAuthors : rows;
-		for (const r of list) loadCard(r);
+		untrack(() => {
+			for (const r of list) loadCard(r);
+		});
 	});
-	// Trim a Wikipedia extract to a short blurb, breaking on a word boundary.
-	function blurb(s, max = 200) {
-		if (!s) return "";
-		if (s.length <= max) return s;
-		return s.slice(0, max).replace(/\s+\S*$/, "") + "…";
-	}
 
 	// Keep the URL in sync so any view is shareable / reloadable.
 	$effect(() => {
@@ -150,179 +149,37 @@
 	}
 
 	// Draw the current top-10 table to a PNG so people can share the ranking as
-	// an image (the same idea as the chart views' exported image). Uses system +
-	// Georgia fonts so it renders reliably on canvas without waiting on webfonts.
-	const IMG_SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
-	function ellipsize(ctx, s, maxW) {
-		if (ctx.measureText(s).width <= maxW) return s;
-		while (s.length > 1 && ctx.measureText(s + "…").width > maxW) s = s.slice(0, -1);
-		return s + "…";
-	}
-	async function renderTableBlob() {
-		const list = rows;
-		if (!list.length) return null;
-		const scale = 2, W = 640, padX = 32;
-		const titleH = 92, headH = 30, rowH = 38, footH = 44;
-		const H = titleH + headH + rowH * list.length + footH;
-		const canvas = document.createElement("canvas");
-		canvas.width = W * scale;
-		canvas.height = H * scale;
-		const ctx = canvas.getContext("2d");
-		ctx.scale(scale, scale);
-		ctx.fillStyle = "#ffffff";
-		ctx.fillRect(0, 0, W, H);
-		ctx.textBaseline = "alphabetic";
-
-		// Title + subtitle
-		const title = genre === "All genres" ? "Most-borrowed authors" : `Top ${genreLabel(genre)} authors`;
-		ctx.fillStyle = "#1a1a1a";
-		ctx.font = '600 24px Georgia, "Times New Roman", serif';
-		ctx.fillText(ellipsize(ctx, title, W - padX * 2), padX, 46);
-		ctx.fillStyle = "#666666";
-		ctx.font = `13px ${IMG_SANS}`;
-		ctx.fillText(`Seattle Public Library · ${yearLabel(year)}`, padX, 68);
-
-		// Header row. The count column is [abbreviated number][data bar], matching
-		// the on-screen table.
-		const rightX = W - padX;
-		const barTrackW = 150;
-		const barX0 = rightX - barTrackW; // bars start here, grow rightward
-		const numX = barX0 - 14; // right edge of the right-aligned number
-		const numColLeft = numX - 54; // left edge of the number label
-		let y = titleH;
-		ctx.fillStyle = "#999999";
-		ctx.font = `700 11px ${IMG_SANS}`;
-		ctx.textAlign = "left";
-		ctx.fillText("#", padX, y);
-		ctx.fillText("AUTHOR", padX + 40, y);
-		ctx.fillText("CHECKOUTS", numColLeft, y);
-		ctx.strokeStyle = "#dddddd";
-		ctx.lineWidth = 1;
-		ctx.beginPath();
-		ctx.moveTo(padX, y + 9);
-		ctx.lineTo(rightX, y + 9);
-		ctx.stroke();
-
-		// Rows
-		y += headH;
-		const max = maxCount || 1;
-		list.forEach((r, i) => {
-			const baseY = y + rowH * i;
-			const cy = baseY + 24;
-			ctx.fillStyle = "#999999";
-			ctx.font = `13px ${IMG_SANS}`;
-			ctx.textAlign = "left";
-			ctx.fillText(String(i + 1), padX, cy);
-			// abbreviated count, right-aligned
-			ctx.fillStyle = "#1a1a1a";
-			ctx.font = `600 14px ${IMG_SANS}`;
-			ctx.textAlign = "right";
-			ctx.fillText(compactNumber(r[2]), numX, cy);
-			// data bar
-			ctx.fillStyle = "#3f88cc";
-			ctx.beginPath();
-			ctx.roundRect(barX0, cy - 13, Math.max((r[2] / max) * barTrackW, 4), 16, 3);
-			ctx.fill();
-			// name
-			ctx.textAlign = "left";
-			ctx.fillStyle = "#1a1a1a";
-			ctx.font = `600 15px ${IMG_SANS}`;
-			ctx.fillText(ellipsize(ctx, displayName(r[1]), numColLeft - 12 - (padX + 40)), padX + 40, cy);
-			ctx.strokeStyle = "#eeeeee";
-			ctx.beginPath();
-			ctx.moveTo(padX, baseY + rowH);
-			ctx.lineTo(rightX, baseY + rowH);
-			ctx.stroke();
+	// an image (the same idea as the chart views' exported image).
+	function renderTable() {
+		return renderTableBlob({
+			title: genre === "All genres" ? "Most-borrowed authors" : `Top ${genreLabel(genre)} authors`,
+			subtitle: `Seattle Public Library · ${yearLabel(year)}`,
+			column: "AUTHOR",
+			rows,
+			count: (r) => r[2],
+			name: (r) => [displayName(r[1])],
+			rowH: 38,
+			lineDy: 24,
 		});
-
-		// Footer
-		ctx.fillStyle = "#999999";
-		ctx.font = `11px ${IMG_SANS}`;
-		ctx.fillText("What’s Seattle Reading?  ·  Seattle Public Library checkouts", padX, H - 18);
-		return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 	}
 
 	function imgName() {
 		const g = genre === "All genres" ? "top-authors" : `top-${genre.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 		return `seattle-reading-${g}-${year}.png`.replace(/-+/g, "-");
 	}
-	function saveBlob(blob, name) {
-		const a = document.createElement("a");
-		a.href = URL.createObjectURL(blob);
-		a.download = name;
-		a.click();
-		setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+
+	function shareImage() {
+		shareOpen = false;
+		return shareTableImage(renderTable, imgName(), shareTarget(), flash);
 	}
 
-	// Social buttons can't attach an image, so copy the table image to the
-	// clipboard (inside the click gesture) and open the composer to paste it.
-	function shareTo(platform) {
-		const { link, text } = shareTarget();
-		let copied = false;
-		try {
-			if (navigator.clipboard && window.ClipboardItem) {
-				navigator.clipboard.write([new ClipboardItem({ "image/png": renderTableBlob() })]).catch(() => {});
-				copied = true;
-			}
-		} catch {}
-		const u = encodeURIComponent(link);
-		const t = encodeURIComponent(text);
-		const urls = {
-			facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}`,
-			twitter: `https://twitter.com/intent/tweet?url=${u}&text=${t}`,
-			bluesky: `https://bsky.app/intent/compose?text=${encodeURIComponent(text + " " + link)}`,
-			linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${u}`,
-		};
-		if (urls[platform]) window.open(urls[platform], "_blank", "noopener,noreferrer,width=600,height=540");
+	function copyImage() {
 		shareOpen = false;
-		if (copied) {
-			flash("Table image copied — paste it (⌘/Ctrl+V) into your post", 4500);
-		}
-	}
-
-	async function shareImage() {
-		shareOpen = false;
-		const blob = await renderTableBlob();
-		if (!blob) return;
-		const name = imgName();
-		const file = new File([blob], name, { type: "image/png" });
-		const { link, text } = shareTarget();
-		if (navigator.canShare && navigator.canShare({ files: [file] })) {
-			try {
-				await navigator.share({ files: [file], title: text, text: `${text}\n${link}` });
-			} catch {}
-			return;
-		}
-		saveBlob(blob, name);
-		flash("Image saved — attach it to your post", 3200);
-	}
-
-	async function copyImage() {
-		shareOpen = false;
-		try {
-			if (!(navigator.clipboard && window.ClipboardItem)) throw new Error("no clipboard");
-			await navigator.clipboard.write([new ClipboardItem({ "image/png": renderTableBlob() })]);
-			flash("Table image copied to clipboard", 2600);
-		} catch {
-			const blob = await renderTableBlob();
-			if (blob) saveBlob(blob, imgName());
-			flash("Image saved (clipboard unavailable)", 2600);
-		}
-	}
-
-	async function downloadImage() {
-		shareOpen = false;
-		const blob = await renderTableBlob();
-		if (blob) saveBlob(blob, imgName());
+		return copyTableImage(renderTable, imgName(), flash);
 	}
 
 	async function copyShareLink() {
-		try {
-			await navigator.clipboard.writeText(window.location.href);
-			flash("Link copied!", 2000);
-		} catch {
-			flash("Couldn’t copy. Copy the link from the address bar.", 3200);
-		}
+		await copyPageLink(flash);
 		shareOpen = false;
 	}
 </script>
@@ -402,14 +259,14 @@
 							{/if}
 						</div>
 						<div class="gal-row" onscroll={(e) => e.currentTarget.parentElement.classList.toggle("at-end", e.currentTarget.scrollLeft >= e.currentTarget.scrollWidth - e.currentTarget.clientWidth - 8)}>
-							{#each sec.authors as r, i (r[0] + r[1] + i)}
+							{#each sec.authors as r, i (eachKey(sec.authors, i, rowKey))}
 								{@const k = authorKey(r)}
 								<article class="gal-card">
 									<div class="gal-top">
 										<span class="gal-rank">{i + 1}</span>
 										<button class="gal-cover gal-portrait" class:has-img={!!portraits[k]} onclick={() => openAuthor(r[0])} title="See borrowing trend">
 											{#if portraits[k]}
-												<img src={portraits[k]} alt="" loading="lazy" />
+												<img src={portraits[k]} alt="" width="200" height="200" loading="lazy" />
 											{:else}
 												<span class="gal-cover-ph" aria-hidden="true">👤</span>
 											{/if}
@@ -450,7 +307,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each rows as row, i (row[0] + row[1])}
+							{#each rows as row, i (eachKey(rows, i, rowKey))}
 								<tr>
 									<td class="ta-rank">{i + 1}</td>
 									<td class="ta-name">

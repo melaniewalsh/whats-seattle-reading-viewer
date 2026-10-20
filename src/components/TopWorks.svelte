@@ -1,17 +1,18 @@
 <script>
 	import ExtArrow from "$components/ExtArrow.svelte";
-	import { onMount } from "svelte";
+	import { onMount, onDestroy, untrack } from "svelte";
 	import ImageIcon from "@lucide/svelte/icons/image";
 	import LinkIcon from "@lucide/svelte/icons/link";
 	import ShareIcon from "@lucide/svelte/icons/share-2";
-	import { base } from "$app/paths";
 	import { getTopWorks, getGenreTerms } from "$components/db.js";
 	import homeTop from "$data/home-top.json";
 	import { displayName } from "$utils/displayName.js";
 	import { coverUrl, coverOverride } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { wikiWork } from "$utils/wiki.js";
-	import { compactNumber } from "$utils/format.js";
+	import { compactNumber, blurb } from "$utils/format.js";
+	import { renderTableBlob, shareTableImage, copyTableImage, copyPageLink } from "$utils/tableExport.js";
+	import { eachKey } from "$utils/eachKey.js";
 	import { titleCase } from "$utils/titleCase.js";
 	import { cleanWorkTitle, searchTitle } from "$utils/cleanTitle.js";
 	import { curateGenres, extraGenres, genreLabel } from "$utils/rankGenres.js";
@@ -45,8 +46,9 @@
 		shareMsg = msg;
 		flashTimer = setTimeout(() => (shareMsg = ""), ms);
 	}
+	onDestroy(() => clearTimeout(flashTimer));
 	let shareOpen = $state(false);
-	let termsMap = $state({});
+	let termsMap = $state.raw({});
 	onMount(async () => {
 		if (baked) return; // the home strip already has its books
 		let yearFromUrl = false;
@@ -87,15 +89,14 @@
 	// The catalog subject tags that define the selected genre (empty for "All genres").
 	const genreTags = $derived(genre !== "All genres" ? (termsMap[genre] || []) : []);
 
-	// Largest count in view — scales the in-row data bars so #1 fills the column.
-	const maxCount = $derived(rows.length ? Math.max(...rows.map((r) => r[3])) : 1);
-
 	// Book-cover thumbnails. Open Library first; when it has nothing, fall back to
 	// the Wikipedia/Wikidata article thumbnail (usually the book's cover). covers[key]
 	// = url | null (no cover) | undefined (not fetched yet). Cached once per work.
 	const coverKey = (r) => `${r[0]}|${r[1]}`;
+	// {#each} key for a row: title + author slug.
+	const workKey = (r) => `${r[0]}|${r[2]}`;
 	// The baked home rows carry their cover URLs, so those are in the HTML too.
-	let covers = $state(baked ? Object.fromEntries(baked.rows.filter((r) => r[4]).map((r) => [coverKey(r), r[4]])) : {});
+	let covers = $state.raw(baked ? Object.fromEntries(baked.rows.filter((r) => r[4]).map((r) => [coverKey(r), r[4]])) : {});
 	const coverInflight = new Set();
 	const wikiTried = new Set();
 	// Backup cover: the Wikipedia/Wikidata article thumbnail (usually the book's
@@ -112,27 +113,6 @@
 			covers = { ...covers, [k]: w?.thumbnail || null };
 		});
 	}
-	$effect(() => {
-		for (const r of rows) {
-			const k = coverKey(r);
-			if (k in covers || coverInflight.has(k)) continue;
-			coverInflight.add(k);
-			// A manual override (covers.js) wins over everything. Otherwise r[4] = the
-			// cover baked at build time; anything else resolves at runtime.
-			const ov = coverOverride(r[0]);
-			const baked = r[4];
-			if (ov) {
-				covers = { ...covers, [k]: ov };
-			} else if (typeof baked === "string" && baked) {
-				covers = { ...covers, [k]: baked };
-			} else {
-				coverUrl(r[0], displayName(r[1])).then((u) => {
-					if (u) covers = { ...covers, [k]: u };
-					else fillFromWiki(r);
-				});
-			}
-		}
-	});
 
 	// GALLERY (default, unfiltered view): a NYT Best Sellers–style browse where each
 	// genre gets a row of large book covers with a short blurb beneath. The moment a
@@ -189,8 +169,8 @@
 	// Wikipedia blurbs for the gallery cards: extract | null (no article) | undefined
 	// (not fetched yet). One request per work, shared with the cover fallback so a work
 	// that Open Library can't cover still gets its Wikipedia thumbnail here.
-	let summaries = $state({});
-	let wikiUrls = $state({});
+	let summaries = $state.raw({});
+	let wikiUrls = $state.raw({});
 	const summaryInflight = new Set();
 	function loadCard(r) {
 		const k = coverKey(r);
@@ -218,17 +198,15 @@
 			});
 		}
 	}
-	// Load blurbs for whatever's on screen — the gallery cards or the ranking rows.
+	// Load covers + blurbs for whatever's on screen — the gallery cards or the
+	// ranking rows. Re-runs only when that list changes, not on every cover or
+	// blurb that arrives (loadCard reads and writes them).
 	$effect(() => {
 		const list = embedded ? overallBooks : galleryMode ? galleryBooks : rows;
-		for (const r of list) loadCard(r);
+		untrack(() => {
+			for (const r of list) loadCard(r);
+		});
 	});
-	// Trim a Wikipedia extract to a short blurb, breaking on a word boundary.
-	function blurb(s, max = 200) {
-		if (!s) return "";
-		if (s.length <= max) return s;
-		return s.slice(0, max).replace(/\s+\S*$/, "") + "…";
-	}
 
 	// Keep the Most Borrowed page's filters in the URL. Not for the home strip:
 	// it isn't that page, and (with its books baked in) it would rewrite the
@@ -246,7 +224,6 @@
 		} catch {}
 	});
 
-
 	const yearLabel = (y) => (y === "all" ? "all time" : y === "month" ? monthLabel : y);
 
 	function shareTarget() {
@@ -257,175 +234,36 @@
 		return { link, text };
 	}
 
-	const IMG_SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
-	function ellipsize(ctx, s, maxW) {
-		if (ctx.measureText(s).width <= maxW) return s;
-		while (s.length > 1 && ctx.measureText(s + "…").width > maxW) s = s.slice(0, -1);
-		return s + "…";
-	}
-	async function renderTableBlob() {
-		const list = rows;
-		if (!list.length) return null;
-		const scale = 2, W = 640, padX = 32;
-		const titleH = 92, headH = 30, rowH = 50, footH = 44;
-		const H = titleH + headH + rowH * list.length + footH;
-		const canvas = document.createElement("canvas");
-		canvas.width = W * scale;
-		canvas.height = H * scale;
-		const ctx = canvas.getContext("2d");
-		ctx.scale(scale, scale);
-		ctx.fillStyle = "#ffffff";
-		ctx.fillRect(0, 0, W, H);
-		ctx.textBaseline = "alphabetic";
-
-		const title = genre === "All genres" ? "Most-borrowed works" : `Top ${genreLabel(genre)} works`;
-		ctx.fillStyle = "#1a1a1a";
-		ctx.font = '600 24px Georgia, "Times New Roman", serif';
-		ctx.fillText(ellipsize(ctx, title, W - padX * 2), padX, 46);
-		ctx.fillStyle = "#666666";
-		ctx.font = `13px ${IMG_SANS}`;
-		ctx.fillText(`Seattle Public Library · ${yearLabel(year)}`, padX, 68);
-
-		// The count column is [abbreviated number][data bar], matching the on-screen table.
-		const rightX = W - padX;
-		const barTrackW = 150;
-		const barX0 = rightX - barTrackW; // bars start here, grow rightward
-		const numX = barX0 - 14; // right edge of the right-aligned number
-		const numColLeft = numX - 54; // left edge of the number label
-		let y = titleH;
-		ctx.fillStyle = "#999999";
-		ctx.font = `700 11px ${IMG_SANS}`;
-		ctx.textAlign = "left";
-		ctx.fillText("#", padX, y);
-		ctx.fillText("WORK", padX + 40, y);
-		ctx.fillText("CHECKOUTS", numColLeft, y);
-		ctx.strokeStyle = "#dddddd";
-		ctx.lineWidth = 1;
-		ctx.beginPath();
-		ctx.moveTo(padX, y + 9);
-		ctx.lineTo(rightX, y + 9);
-		ctx.stroke();
-
-		y += headH;
-		const max = maxCount || 1;
-		list.forEach((r, i) => {
-			const baseY = y + rowH * i;
-			const lineY = baseY + 22; // the title line — count/bar align to it
-			ctx.fillStyle = "#999999";
-			ctx.font = `13px ${IMG_SANS}`;
-			ctx.textAlign = "left";
-			ctx.fillText(String(i + 1), padX, lineY);
-			// abbreviated count, right-aligned
-			ctx.fillStyle = "#1a1a1a";
-			ctx.font = `600 14px ${IMG_SANS}`;
-			ctx.textAlign = "right";
-			ctx.fillText(compactNumber(r[3]), numX, lineY);
-			// data bar
-			ctx.fillStyle = "#3f88cc";
-			ctx.beginPath();
-			ctx.roundRect(barX0, lineY - 13, Math.max((r[3] / max) * barTrackW, 4), 16, 3);
-			ctx.fill();
-			// title + author
-			ctx.textAlign = "left";
-			const nameMaxW = numColLeft - 12 - (padX + 40);
-			ctx.fillStyle = "#1a1a1a";
-			ctx.font = `600 15px ${IMG_SANS}`;
-			ctx.fillText(ellipsize(ctx, titleCase(cleanWorkTitle(r[0])), nameMaxW), padX + 40, lineY);
-			ctx.fillStyle = "#777777";
-			ctx.font = `13px ${IMG_SANS}`;
-			ctx.fillText(ellipsize(ctx, "by " + displayName(r[1]), nameMaxW), padX + 40, baseY + 39);
-			ctx.strokeStyle = "#eeeeee";
-			ctx.beginPath();
-			ctx.moveTo(padX, baseY + rowH);
-			ctx.lineTo(rightX, baseY + rowH);
-			ctx.stroke();
+	function renderTable() {
+		return renderTableBlob({
+			title: genre === "All genres" ? "Most-borrowed works" : `Top ${genreLabel(genre)} works`,
+			subtitle: `Seattle Public Library · ${yearLabel(year)}`,
+			column: "WORK",
+			rows,
+			count: (r) => r[3],
+			name: (r) => [titleCase(cleanWorkTitle(r[0])), "by " + displayName(r[1])],
+			rowH: 50,
+			lineDy: 22,
 		});
-
-		ctx.fillStyle = "#999999";
-		ctx.font = `11px ${IMG_SANS}`;
-		ctx.fillText("What’s Seattle Reading?  ·  Seattle Public Library checkouts", padX, H - 18);
-		return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 	}
 
 	function imgName() {
 		const g = genre === "All genres" ? "top-works" : `top-${genre.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-works`;
 		return `seattle-reading-${g}-${year}.png`.replace(/-+/g, "-");
 	}
-	function saveBlob(blob, name) {
-		const a = document.createElement("a");
-		a.href = URL.createObjectURL(blob);
-		a.download = name;
-		a.click();
-		setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+
+	function shareImage() {
+		shareOpen = false;
+		return shareTableImage(renderTable, imgName(), shareTarget(), flash);
 	}
 
-	function shareTo(platform) {
-		const { link, text } = shareTarget();
-		let copied = false;
-		try {
-			if (navigator.clipboard && window.ClipboardItem) {
-				navigator.clipboard.write([new ClipboardItem({ "image/png": renderTableBlob() })]).catch(() => {});
-				copied = true;
-			}
-		} catch {}
-		const u = encodeURIComponent(link);
-		const t = encodeURIComponent(text);
-		const urls = {
-			facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}`,
-			twitter: `https://twitter.com/intent/tweet?url=${u}&text=${t}`,
-			bluesky: `https://bsky.app/intent/compose?text=${encodeURIComponent(text + " " + link)}`,
-			linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${u}`,
-		};
-		if (urls[platform]) window.open(urls[platform], "_blank", "noopener,noreferrer,width=600,height=540");
+	function copyImage() {
 		shareOpen = false;
-		if (copied) {
-			flash("Table image copied — paste it (⌘/Ctrl+V) into your post", 4500);
-		}
-	}
-
-	async function shareImage() {
-		shareOpen = false;
-		const blob = await renderTableBlob();
-		if (!blob) return;
-		const name = imgName();
-		const file = new File([blob], name, { type: "image/png" });
-		const { link, text } = shareTarget();
-		if (navigator.canShare && navigator.canShare({ files: [file] })) {
-			try {
-				await navigator.share({ files: [file], title: text, text: `${text}\n${link}` });
-			} catch {}
-			return;
-		}
-		saveBlob(blob, name);
-		flash("Image saved — attach it to your post", 3200);
-	}
-
-	async function copyImage() {
-		shareOpen = false;
-		try {
-			if (!(navigator.clipboard && window.ClipboardItem)) throw new Error("no clipboard");
-			await navigator.clipboard.write([new ClipboardItem({ "image/png": renderTableBlob() })]);
-			flash("Table image copied to clipboard", 2600);
-		} catch {
-			const blob = await renderTableBlob();
-			if (blob) saveBlob(blob, imgName());
-			flash("Image saved (clipboard unavailable)", 2600);
-		}
-	}
-
-	async function downloadImage() {
-		shareOpen = false;
-		const blob = await renderTableBlob();
-		if (blob) saveBlob(blob, imgName());
+		return copyTableImage(renderTable, imgName(), flash);
 	}
 
 	async function copyShareLink() {
-		try {
-			await navigator.clipboard.writeText(window.location.href);
-			flash("Link copied!", 2000);
-		} catch {
-			flash("Couldn’t copy. Copy the link from the address bar.", 3200);
-		}
+		await copyPageLink(flash);
 		shareOpen = false;
 	}
 </script>
@@ -443,7 +281,7 @@
 					<span class="gal-rank">{i + 1}</span>
 					<button class="gal-cover" class:has-img={!!covers[k]} onclick={() => openTitle(r[0], r[2])} title="See borrowing trend">
 						{#if covers[k]}
-							<img src={covers[k]} alt="" loading={embedded ? "eager" : "lazy"} onerror={() => fillFromWiki(r)} />
+							<img src={covers[k]} alt="" width="200" height="300" loading={embedded ? "eager" : "lazy"} fetchpriority={embedded && i === 0 ? "high" : undefined} onerror={() => fillFromWiki(r)} />
 						{:else}
 							<span class="gal-cover-ph" aria-hidden="true">📖</span>
 						{/if}
@@ -463,7 +301,7 @@
 		{/snippet}
 		{#snippet galRow(books)}
 			<div class="gal-row" onscroll={(e) => e.currentTarget.parentElement.classList.toggle("at-end", e.currentTarget.scrollLeft >= e.currentTarget.scrollWidth - e.currentTarget.clientWidth - 8)}>
-				{#each books as r, i (r[0] + r[2] + i)}
+				{#each books as r, i (eachKey(books, i, workKey))}
 					{@render galCard(r, i)}
 				{/each}
 			</div>
@@ -585,14 +423,14 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each rows as row, i (row[0] + row[2] + i)}
+					{#each rows as row, i (eachKey(rows, i, workKey))}
 						<tr>
 							<td class="ta-rank">{i + 1}</td>
 							<td class="ta-name">
 								<div class="tw-cell">
 									<button class="tw-cover" class:has-img={!!covers[coverKey(row)]} onclick={() => openTitle(row[0], row[2])} title="See borrowing trend">
 										{#if covers[coverKey(row)]}
-											<img src={covers[coverKey(row)]} alt="" loading="lazy" onerror={() => fillFromWiki(row)} />
+											<img src={covers[coverKey(row)]} alt="" width="70" height="105" loading="lazy" onerror={() => fillFromWiki(row)} />
 										{:else}
 											<span class="tw-cover-ph" aria-hidden="true">📖</span>
 										{/if}

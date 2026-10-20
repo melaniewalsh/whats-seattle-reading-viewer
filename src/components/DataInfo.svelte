@@ -7,11 +7,13 @@
 	// Props:
 	//   first, last : "YYYY-MM" months the data covers
 	//   genres      : true on the Genres page (adds the subject-heading note)
+	import { onDestroy } from "svelte";
 	import { base } from "$app/paths";
 	import CopyIcon from "@lucide/svelte/icons/copy";
 	import CheckIcon from "@lucide/svelte/icons/check";
 	import XIcon from "@lucide/svelte/icons/x";
 	import { publications } from "$data/publications.js";
+	import copyData from "$data/copy.json";
 
 	let { first = "", last = "", genres = false } = $props();
 
@@ -23,10 +25,10 @@
 
 	let dialog = $state(null);
 	let copied = $state("");
-	let siteUrl = $state("");
-	$effect(() => {
-		try { siteUrl = `${window.location.origin}${base}/`; } catch {}
-	});
+	// The site's address (copy.json), so the prerendered BibTeX has it too.
+	const siteUrl = `${copyData.url}/`;
+	let copiedTimer;
+	onDestroy(() => clearTimeout(copiedTimer));
 
 	// The project (this site) and the library's dataset are cited separately.
 	// The project's citation is its JCDL 2026 paper.
@@ -53,7 +55,8 @@
 			return; // nothing copied, so don't say "Copied"
 		}
 		copied = which;
-		setTimeout(() => (copied === which && (copied = "")), 1800);
+		clearTimeout(copiedTimer);
+		copiedTimer = setTimeout(() => (copied === which && (copied = "")), 1800);
 	}
 	// A click on the dimmed backdrop (outside the panel) closes it.
 	function onBackdrop(e) { if (e.target === dialog) close(); }

@@ -1,6 +1,6 @@
 <script>
 	// StackedViewer.svelte
-	import { onMount, tick, untrack } from "svelte";
+	import { onMount, onDestroy, tick } from "svelte";
 	import { MediaQuery } from "svelte/reactivity";
 	import { searchTitle as coreTitle } from "$utils/cleanTitle.js";
 	import ImageIcon from "@lucide/svelte/icons/image";
@@ -28,7 +28,6 @@
 	import { compactNumber } from "$utils/format.js";
 	import { HIDDEN_GENRES } from "$utils/rankGenres.js";
 	import { seattleReadsYear, SEATTLE_READS } from "$utils/seattleReads.js";
-	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
@@ -36,7 +35,7 @@
 	import WikiCard from "$components/WikiCard.svelte";
 	import { wikiSummary, wikiWork } from "$utils/wiki.js";
 	import Switch from "$components/ui/Switch.svelte";
-	import { getMonths, searchAuthors, searchTitles, searchAll, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks, getCoauthors, getGenreTerms } from "$components/db.js";
+	import { getMonths, searchAuthors, searchTitles, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks, getCoauthors, getGenreTerms } from "$components/db.js";
 
 	// "author" (default): search authors. "title": reverse lookup — search a title,
 	// resolve to its author, open the author's drilldown with that work highlighted.
@@ -63,18 +62,14 @@
 		"#b0813b", // warm tan
 		"#5f6b7a"  // slate
 	];
-	const INK = "var(--color-fg)";
 
 	let authors = $state.raw([]); // the search index
 	let months = $state.raw([]); // the shared month axis (from meta.json)
-	let query = $state("");
-	let results = $state([]);
 	let current = $state.raw(null); // loaded author object
 
 	let groups = $state([]); // selection groups: { id, name, idxs: [] }
-	let activeGroupId = $state(null); // which group the title checkboxes edit right now null means "single selection" mode
 	let groupIdCounter = 0; // increasing id source for groups
-	let singleIdxs = $state([]); // titles ticked while no group was active
+	let singleIdxs = $state([]); // editions plotted on their own
 	let titleFilter = $state(""); // text filter for the title list
 	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = stacked by title
 	let titleSort = $state("work"); // 'work' = editions grouped by work; 'borrowed' = most checkouts; 'alpha' = A–Z
@@ -85,34 +80,24 @@
 	function sortBooks(by) {
 		if (workOrder === by) workOrderFlip = !workOrderFlip;
 		else { workOrder = by; workOrderFlip = false; }
+		freezeBookOrder();
 	}
 	let isolatedKeys = $state([]); // when non-empty, the chart shows ONLY these series (keys 'g<id>' | 's<idx>'); multiple = compare
-	let hiddenKeys = $state([]); // keys the user has clicked to hide/ignore from the stacked "All titles" chart
 	let showAuthorTotal = $state(true); // show the author's aggregate total line in the line view
 	let smoothOn = $state(true);
 	let plotInset = $state(0); // the chart's right margin, to line the footer up with the plot's edge // draw 3-month averages (raw months as faint bars behind the total)
-	let dragIdx = $state(null); // title index currently being dragged onto a group pill
-	let dragGroupId = $state(null); // group pill currently being dragged (to merge into another)
-	let dragOverId = $state(null); // group pill currently under the dragged title/pill
 	// Manual overrides to the auto work-clustering: edition idx -> the work key it
 	// should belong to (a merge target, or its own `excl-<idx>` key when pulled out
 	// of a cluster). Empty = pure auto-clustering.
-	let workAssign = $state({});
-	let dragWorkKey = $state(null); // work row being dragged in the table (to merge into another)
-	let hlWorkKey = $state(null); // work key highlighted by hovering its pill or its table row (they're linked)
+	let workAssign = $state.raw({});
 	let legendHoverKey = $state(null); // legend entry being hovered -> lights up its band on the chart
-	let autoGroupNote = $state(""); // feedback after "Group editions into works"
 	let searchedWork = $state(null); // { name, idxs } of the work searched in title mode, so "Total" can snap back to it
 	let loadError = $state(""); // message when an author fails to load
 	let loading = $state(false); // true while an author's data is being fetched
-	let hoverTip = $state(null); // { text, x, y } instant tooltip for full edition titles
-	let workColW = $state(150); // resizable width (px) of the title-table Work column
-	let editionColW = $state(240); // min width (px) of the Edition column (drag to see full titles)
 	let yearLo = $state(0); // first month index shown (set by the YearBrush)
 	let yearHi = $state(0); // last month index shown (inclusive)
 	let currentSlug = $state(null); // slug of the selected author (for shareable URLs)
 	let isOverview = $state(false); // true when showing the library-wide "all checkouts" landing view (no per-title data)
-	let mobileTableOpen = $state(false); // on narrow screens the title table opens as a drawer
 	let tableCollapsed = $state(false); // the books table is open by default; its header still collapses it
 	let customizeOpen = $state(false); // phones: the "Customize" panel (3-month average, Compare)
 	let editMode = $state(false); // "Edit groupings": reveals drag handles, exclude, save/reset/custom work
@@ -156,11 +141,10 @@
 	let topWorksData = $state.raw(null); // genre-ranked top works (for the "#N in Genre" badges)
 	let sideEl = $state(null); // ref to the titles panel, for keeping it still when ticking
 
-	// Ticking a work grows the "on the chart" panel above the (stacked) table,
+	// Ticking a work can grow the chart and legend above the (stacked) table,
 	// which would shove the table -- and the row under the cursor -- downward.
 	// Run the change, then nudge the window scroll by however much the table
-	// moved so it stays put. (On mobile the table is a fixed drawer, so its top
-	// doesn't move and this is a no-op.)
+	// moved so it stays put.
 	async function keepTableStill(fn) {
 		const y0 = sideEl ? sideEl.getBoundingClientRect().top : 0;
 		fn();
@@ -225,12 +209,12 @@
 		currentSlug = null;
 		isOverview = true;
 		// reset the controls
-		groups = []; singleIdxs = []; activeGroupId = null; titleFilter = "";
+		groups = []; singleIdxs = []; titleFilter = "";
 		chartMode = "line"; isolatedKeys = []; showAuthorTotal = true;
-		autoHidAuthorTotal = false; autoGroupNote = ""; workAssign = {};
+		autoHidAuthorTotal = false; workAssign = {};
 		expandedWorks = []; workOrder = "checkouts"; titleSort = "work";
 		yearLo = 0; yearHi = Math.max(months.length - 1, 0);
-		mobileTableOpen = false; tableCollapsed = false; editMode = false; booksShowAll = false; query = ""; results = [];
+		tableCollapsed = false; setEditMode(false); booksShowAll = false;
 		wikiHover = false;
 		try {
 			const url = new URL(window.location.href);
@@ -260,38 +244,11 @@
 		return arr;
 	}
 
-	// The first letter of each word typed so far, e.g. "octavia b" -> ["O", "B"].
-	// build_data.py buckets each author's file under authors/<INITIALS>/ where
-	// intitals is the first letter of their first name + first letter of their
-	// last name (e.g. "OB" for Octavia Butler), so these are the letters we use
-	// to figure out which "folders" a given search could live in.
-	function typedLetters(q) {
-		return q
-				.trim()
-				.split(/\s+/)
-				.filter(Boolean)
-				.map((w) => w[0].toUpperCase());
-	}
-
-	// Filter the author list as the user types -- a full-text (or LIKE) query
-	// against the authors table in the SQLite database.
-	const runSearch = debounce(async (q) => {
-		const needle = q.trim();
-		if (needle.length < 2) {
-			results = [];
-			return;
-		}
-		// One box searches BOTH authors and works; each result carries a `kind` so
-		// the click routes to the right view (no Author/Title toggle).
-		results = await searchAll(needle, 60);
-	}, 120);
-	$effect(() => runSearch(query));
-
 	// Quick-pick chips: a curated MIX rather than just the overall top — a few
 	// recent favorites plus picks from classic literature, romance and nonfiction —
 	// so the suggestions feel varied. Built from the genre ranking data.
-	let mixAuthors = $state([]);
-	let mixTitles = $state([]);
+	let mixAuthors = $state.raw([]);
+	let mixTitles = $state.raw([]);
 	let mixLoaded = false;
 	// The "Try" links: two authors and two books, alternating.
 	const tryPicks = $derived.by(() => {
@@ -426,7 +383,7 @@
 
 	// On an author's page: books they're credited on that the library files
 	// under someone else (Dubner on Levitt's Freakonomics).
-	let alsoCredited = $state([]);
+	let alsoCredited = $state.raw([]);
 	$effect(() => {
 		const slug = currentSlug;
 		const authorPage = searchMode !== "title" && !isOverview;
@@ -439,7 +396,7 @@
 
 	// Co-authors who have their own page on the site (Stephen J. Dubner does)
 	// get a link to it: name -> slug, looked up in the author index.
-	let coAuthorSlugs = $state({});
+	let coAuthorSlugs = $state.raw({});
 	$effect(() => {
 		const names = bookAuthors;
 		const own = current ? displayName(current.name).split(/\s+/).pop().toLowerCase() : "";
@@ -483,7 +440,6 @@
 	}
 
 	async function surpriseMe() {
-		query = "";
 		const pick = searchMode === "title" ? await randomTitle() : await randomAuthor();
 		if (!pick) return;
 		if (searchMode === "title") await selectTitle(pick);
@@ -500,7 +456,6 @@
 			if (prevSearchMode === "title" && mode === "author" && current && !isOverview) {
 				groups = [];
 				singleIdxs = [];
-				activeGroupId = null;
 				isolatedKeys = [];
 				showAuthorTotal = true;
 				autoHidAuthorTotal = false;
@@ -540,7 +495,6 @@
 		idxs.forEach((i) => releaseTitle(i));
 		const name = cleanTitleForDisplay(current.titles[idxs[0]].title) || r.title;
 		groups = [...groups, { id: ++groupIdCounter, name, idxs }];
-		hlWorkKey = `g${groupIdCounter}`;
 		searchedWork = { name, idxs: [...idxs] };
 		// Open on the years this work has actually circulated (it may be much
 		// newer than the author's other books).
@@ -561,30 +515,15 @@
 		if (scroll) (titleEl || chartWrap)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
 	}
 
-	// Unified-search click: a result is either an author or a work. Route through the
-	// parent's openTitle/openAuthor, which set ?title/?author BEFORE the search view
-	// remounts — so the fresh instance loads exactly this pick. (Loading on THIS
-	// instance instead raced the remount's default-title loader, which sometimes
-	// won and flashed "The Fire Next Time".)
-	function pickResult(res) {
-		query = "";
-		results = [];
-		if (res.kind === "work") openTitle(res.title, res.slug);
-		else openAuthor(res.slug);
-	}
-
-	// When you overlay an individual edition on the "Total" line chart, auto-hide the
-	// busy author-total area so the added trend line stands out. Only fires for
-	// overlaid editions (singles) — NOT for broadened works, which in "Total" mode
-	// are summed into the total rather than drawn as their own lines, so hiding the
-	// total there would just leave the chart empty while graying the pill. Fires once
-	// per author (tracked by autoHidAuthorTotal), so the Hide/Show toggle wins after.
-	$effect(() => {
+	// When "Total" shows overlaid editions, hide the busy author-total area once
+	// per author so the edition lines stand out. Called from the Total button and
+	// Undo (ticking an edition switches to "By book", so it isn't needed there).
+	function autoHideTotal() {
 		if (chartMode === "line" && singleIdxs.length > 0 && !autoHidAuthorTotal) {
 			showAuthorTotal = false;
 			autoHidAuthorTotal = true;
 		}
-	});
+	}
 
 	async function selectAuthor(a, { scroll = true } = {}) {
 		// One author's drilldown (their series + every qualifying title) comes
@@ -607,7 +546,6 @@
 		current = data;
 		currentSlug = a.slug;
 		isOverview = false;
-		mobileTableOpen = false;
 		// reflect the author in the URL so the page is shareable / reloadable.
 		// Clear any stale ?title from a previous work drilldown; selectTitle re-adds
 		// it right after when we're actually opening a specific title.
@@ -619,26 +557,22 @@
 		} catch {}
 		// reset the controls for the new author
 		groups = [];
-		activeGroupId = null;
 		singleIdxs = [];
 		titleFilter = "";
 		chartMode = "line";
 		isolatedKeys = [];
-		hiddenKeys = [];
 		showAuthorTotal = true;
 		autoHidAuthorTotal = false;
-		autoGroupNote = "";
 		titleSort = "work";
 		workOrder = "checkouts";
 		expandedWorks = [];
 		workAssign = {};
 		yearLo = firstActiveMonth(data.series);
 		yearHi = Math.max(months.length - 1, 0);
-		query = "";
-		results = [];
 		loading = false;
 		// Re-apply any grouping the user saved for this author (localStorage).
 		restoreGroupings(a.slug);
+		freezeBookOrder();
 		// Bring the plot's title to the top of the viewport after a search.
 		if (scroll) {
 			await tick();
@@ -780,7 +714,7 @@
 		const byline = searchMode === "title" && current && !isOverview
 			? `by ${(bookAuthors.length ? bookAuthors : [displayName(current.name)]).join(", ")}${titleCheckouts != null ? ` · ${abbrevCount(titleCheckouts)} checkouts` : ""}`
 			: current ? `${abbrevCount(current.total)} checkouts` : "";
-		ctx.fillText(plotTitle || byline, padX, 54 + logoRow);
+		ctx.fillText(byline, padX, 54 + logoRow);
 		await drawChartLogo(ctx, logoRow ? padX + chartLogoWidth(ctx) : padX + w, logoRow ? 18 : 26);
 		ctx.drawImage(img, padX, titleH, w, h);
 		if (showLegend) {
@@ -897,7 +831,7 @@
 	function newBook() {
 		const key = `custom-${++customBookCounter}`;
 		customBooks = [{ key, name: "New book" }, ...customBooks];
-		editMode = true;
+		setEditMode(true);
 	}
 	function renameBook(key, name) {
 		customBooks = customBooks.map((b) => (b.key === key ? { ...b, name: name.trim() || "New book" } : b));
@@ -911,15 +845,7 @@
 
 	function removeGroup(id) {
 		groups = groups.filter((g) => g.id !== id);
-		if (activeGroupId === id) {
-			activeGroupId = groups.length ? groups[groups.length - 1].id : null;
-		}
 		isolatedKeys = isolatedKeys.filter((k) => k !== `g${id}`);
-	}
-
-	// Finish editing the active group (clearer "I'm done adding titles" action).
-	function finishGroup() {
-		activeGroupId = null;
 	}
 
 	// "Only" is a toggle you can apply to more than one line at once: the chart
@@ -972,8 +898,9 @@
 	// total, or the first plotted work band. Individually-clicked editions start
 	// AFTER the plotted groups so a clicked edition never wears the same blue as
 	// the work band it was pulled out of; it gets its own distinct hue.
-	const plottedGroupCount = $derived(groups.filter((g) => g.idxs.length).length);
-	const singleColor = (i) => TITLE_COLORS[(Math.max(plottedGroupCount, 1) + i) % TITLE_COLORS.length];
+	// The groups that have editions, i.e. the works drawn on the chart.
+	const plottedGroups = $derived(groups.filter((g) => g.idxs.length));
+	const singleColor = (i) => TITLE_COLORS[(Math.max(plottedGroups.length, 1) + i) % TITLE_COLORS.length];
 	// The colour a work's band wears on the chart (the group its editions live in),
 	// so the table row can show the same swatch. "" when the work isn't plotted.
 	function workPlotColor(w) {
@@ -982,15 +909,6 @@
 		}
 		return "";
 	}
-	// A group's color is fixed to its position in `groups` (the chart uses the
-	// same), so the pills can be displayed in any order without colors shuffling.
-	const groupColorFor = (g) => groupColor(groups.findIndex((x) => x.id === g.id));
-	// Non-empty groups, displayed alphabetically by name.
-	const sortedGroups = $derived(
-			[...groups]
-					.filter((g) => g.idxs.length)
-					.sort((a, b) => groupLabel(a).localeCompare(groupLabel(b), undefined, { sensitivity: "base", numeric: true }))
-	);
 
 	// --- Auto-cluster titles into "works" ----------------------------------
 	// (normalizeWorkKey, in $utils/workTitle.js, collapses a book's editions to one key.)
@@ -1030,19 +948,11 @@
 			return { id: ++groupIdCounter, name: cleanTitleForDisplay(current.titles[topIdx].title), idxs: [...w.idxs] };
 		});
 		singleIdxs = [];
-		activeGroupId = null;
 		isolatedKeys = [];
 		// The ✨ button jumps to the line view to show one line per work; when
 		// the stacked view triggers this automatically, stay put.
 		if (!opts.keepChartMode) chartMode = "line";
-		const merged = works.reduce((s, w) => s + w.idxs.length, 0);
-		autoGroupNote = works.length
-				? `Showing the top ${works.length} works (${merged} editions). Tick more works in the table, drag titles between works, or remove a work to adjust.`
-				: "No works to show for this author.";
 	}
-
-	// Whether anything is currently plotted on top of the author-total line.
-	const hasPlotted = $derived(groups.some((g) => g.idxs.length) || singleIdxs.length > 0);
 
 	// A "solo" single is a plotted edition that is NOT already inside a plotted
 	// group. Clicking an edition whose work is on the chart (e.g. a work search)
@@ -1107,6 +1017,7 @@
 	// Enable by visiting the site once with ?curate=1 (remembered per browser).
 	let curator = $state(false);
 	let exportNote = $state("");
+	let exportTimer;
 	onMount(() => {
 		try {
 			const p = new URLSearchParams(window.location.search);
@@ -1125,7 +1036,8 @@
 		} catch {
 			exportNote = entry;
 		}
-		setTimeout(() => (exportNote = ""), 6000);
+		clearTimeout(exportTimer);
+		exportTimer = setTimeout(() => (exportNote = ""), 6000);
 	}
 	const worksLSKey = (slug) => `spl:works:${slug}`;
 
@@ -1146,7 +1058,6 @@
 			localStorage.setItem(worksLSKey(currentSlug), JSON.stringify(currentClusters()));
 			savedGrouping = true;
 			flashSaved();
-			autoGroupNote = "Groupings saved — they'll be restored next time you open this author (in this browser).";
 		} catch {}
 	}
 
@@ -1157,14 +1068,12 @@
 		customBooks = [];
 		groups = [];
 		singleIdxs = [];
-		activeGroupId = null;
 		isolatedKeys = [];
 		expandedWorks = [];
 		chartMode = "line";
 		showAuthorTotal = true;
 		autoHidAuthorTotal = false;
 		savedGrouping = false;
-		autoGroupNote = "Reset to automatic grouping.";
 	}
 
 	// On opening an author, re-apply their saved grouping by forcing each saved
@@ -1230,35 +1139,18 @@
 		return m;
 	});
 
-	// Is every edition of this work currently on the chart (as a group, or in the
-	// group being edited)?
+	// Is every edition of this work currently on the chart (as one group)?
 	function isWorkPlotted(key) {
 		const w = workGroups.get(key);
 		if (!w || !w.idxs.length) return false;
-		if (activeGroupId) {
-			const g = groups.find((g) => g.id === activeGroupId);
-			return !!g && w.idxs.every((i) => g.idxs.includes(i));
-		}
 		return groups.some((g) => w.idxs.every((i) => g.idxs.includes(i)));
 	}
 
 	// Add (or remove) a whole work -- all its editions as one aggregated line.
-	// If a group is being edited, the editions go into that group; otherwise the
-	// work becomes its own group (named after the work).
+	// The work becomes its own group (named after the work).
 	function toggleWork(key) {
 		const w = workGroups.get(key);
 		if (!w || !w.idxs.length) return;
-		if (activeGroupId) {
-			const g = groups.find((g) => g.id === activeGroupId);
-			if (!g) return;
-			if (w.idxs.every((i) => g.idxs.includes(i))) {
-				g.idxs = g.idxs.filter((i) => !w.idxs.includes(i));
-			} else {
-				w.idxs.forEach((i) => releaseTitle(i));
-				g.idxs = [...new Set([...g.idxs, ...w.idxs])];
-			}
-			return;
-		}
 		const existing = groups.find(
 				(g) => g.idxs.length === w.idxs.length && w.idxs.every((i) => g.idxs.includes(i))
 		);
@@ -1276,25 +1168,9 @@
 		}
 	}
 
-	// Drag-and-drop onto a group pill: either a title (add it) or another group
-	// pill (merge the two groups into one).
-	function dropOnGroup(id) {
-		if (dragGroupId !== null && dragGroupId !== id) {
-			mergeGroups(dragGroupId, id);
-		} else if (dragIdx !== null) {
-			const g = groups.find((g) => g.id === id);
-			if (g && !g.idxs.includes(dragIdx)) {
-				releaseTitle(dragIdx);
-				g.idxs = [...g.idxs, dragIdx];
-			}
-		}
-		dragIdx = null;
-		dragGroupId = null;
-	}
-
-	// Drop an edition (dragged from the table) onto a work row: fold it into that
-	// work. If the work is a plotted group, join the group; otherwise reassign the
-	// edition's work key (pulling it out of any group first so it sticks).
+	// Fold an edition into a work. If the work is a plotted group, join the
+	// group; otherwise reassign the edition's work key (pulling it out of any
+	// group first so it sticks).
 	function addEditionToWork(idx, workKey) {
 		if (idx == null || !workKey) return;
 		if (/^g\d+$/.test(workKey)) {  // a plotted group key "g<id>" (not a work key like "greatgatsby")
@@ -1309,20 +1185,6 @@
 		}
 	}
 
-	// Merge the dragged group's titles into the target group, then drop the
-	// now-empty source group. Keeps the target's name.
-	function mergeGroups(srcId, destId) {
-		const src = groups.find((g) => g.id === srcId);
-		const dest = groups.find((g) => g.id === destId);
-		if (!src || !dest) return;
-		const merged = [...dest.idxs];
-		for (const i of src.idxs) if (!merged.includes(i)) merged.push(i);
-		dest.idxs = merged;
-		groups = groups.filter((g) => g.id !== srcId);
-		if (activeGroupId === srcId) activeGroupId = destId;
-		isolatedKeys = isolatedKeys.filter((k) => k !== `g${srcId}`);
-	}
-
 	// strip a title out of every group and out of the single-selection list, so it can be picked up by whichever owner is claiming it next.
 	function releaseTitle(idx) {
 		groups.forEach((g) => {
@@ -1331,38 +1193,27 @@
 		if (singleIdxs.includes(idx)) singleIdxs = singleIdxs.filter((i) => i !== idx);
 	}
 
+	// Plot this edition as its own line. releaseTitle pulls it out of the work's
+	// plotted AGGREGATE (so its checkouts aren't double-counted) — but the TABLE
+	// clusters by work identity, so the edition still shows under its work, just
+	// floated + lit up.
 	function toggleTitle(idx) {
-		if (activeGroupId) {
-			const g = groups.find((g) => g.id === activeGroupId);
-			if (!g) return;
-			if (g.idxs.includes(idx)) {
-				g.idxs = g.idxs.filter((i) => i !== idx);
-			} else {
-				releaseTitle(idx);
-				g.idxs = [...g.idxs, idx];
+		if (singleIdxs.includes(idx)) {
+			// Untick: remove the standalone edition and, if it's an edition of a
+			// plotted work, fold it back into that work's group so the work total
+			// stays whole (rather than leaving the edition orphaned).
+			singleIdxs = singleIdxs.filter((i) => i !== idx);
+			if (searchMode === "title" && searchedWork?.idxs.includes(idx)) {
+				const g = groups.find((gr) => gr.idxs.some((i) => searchedWork.idxs.includes(i)));
+				if (g) g.idxs = [...g.idxs, idx];
 			}
 		} else {
-			// single-selection mode: no group is active. Plot this edition as its own
-			// line. releaseTitle pulls it out of the work's plotted AGGREGATE (so its
-			// checkouts aren't double-counted) — but the TABLE clusters by work
-			// identity, so the edition still shows under its work, just floated + lit up.
-			if (singleIdxs.includes(idx)) {
-				// Untick: remove the standalone edition and, if it's an edition of a
-				// plotted work, fold it back into that work's group so the work total
-				// stays whole (rather than leaving the edition orphaned).
-				singleIdxs = singleIdxs.filter((i) => i !== idx);
-				if (searchMode === "title" && searchedWork?.idxs.includes(idx)) {
-					const g = groups.find((gr) => gr.idxs.some((i) => searchedWork.idxs.includes(i)));
-					if (g) g.idxs = [...g.idxs, idx];
-				}
-			} else {
-				// Pull it out of the work's aggregate so it shows as its own band (no
-				// double-count); the table still clusters it under its work (identity).
-				releaseTitle(idx);
-				singleIdxs = [...singleIdxs, idx];
-				// Flip to the stacked "All titles" view so the edition is visible there.
-				if (chartMode !== "area") chartMode = "area";
-			}
+			// Pull it out of the work's aggregate so it shows as its own band (no
+			// double-count); the table still clusters it under its work (identity).
+			releaseTitle(idx);
+			singleIdxs = [...singleIdxs, idx];
+			// Flip to the stacked "All titles" view so the edition is visible there.
+			if (chartMode !== "area") chartMode = "area";
 		}
 	}
 
@@ -1376,75 +1227,6 @@
 		return singleIdxs.includes(idx);
 	}
 
-
-	// The title table, filtered by the little search box. Each row is annotated
-	// with its normalized "work" (so editions of the same book share a work name
-	// and key) and can be sorted three ways: by work (editions of a book grouped
-	// together -- the clustering view), most borrowed, or A–Z.
-	const filteredTitles = $derived.by(() => {
-		if (!current) return [];
-		let rows = current.titles.map((t, idx) => ({
-			...t,
-			idx,
-			workKey: workIdentityKey(idx, t.title),
-			workName: cleanTitleForDisplay(t.title) || t.title
-		}));
-
-		const f = titleFilter.trim().toLowerCase();
-		if (f) rows = rows.filter((r) => r.title.toLowerCase().includes(f) || r.workName.toLowerCase().includes(f));
-
-		if (titleSort === "alpha") {
-			rows.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }));
-		} else if (titleSort === "work") {
-			// Group editions of a work together, ordered A–Z by the work's name or
-			// by its combined checkouts. CRITICAL: sort on a *per-work* value (from
-			// workGroups), not the per-edition workName -- editions of one work have
-			// different display names, so sorting by those would scatter them and
-			// break the "consecutive editions" grouping the table relies on.
-			// Editions within a work lead with the best-known (most-borrowed).
-			const wName = (key) => workGroups.get(key)?.name ?? key;
-			const wTotal = (key) => workGroups.get(key)?.total ?? 0;
-			rows.sort((a, b) => {
-				const cmp =
-						workOrder === "checkouts"
-								? wTotal(b.workKey) - wTotal(a.workKey)
-								: wName(a.workKey).localeCompare(wName(b.workKey), undefined, { sensitivity: "base", numeric: true });
-				if (cmp) return cmp;
-				if (a.workKey !== b.workKey) return a.workKey < b.workKey ? -1 : 1;
-				return b.total - a.total;
-			});
-		} else {
-			rows.sort((a, b) => b.total - a.total);
-		}
-		return rows;
-	});
-
-	// Prolific authors have hundreds-to-thousands of titles (J.K. Rowling ~190,
-	// James Patterson ~1500). Rendering a DOM row for every one janks or hangs
-	// the tab, so only render the first slice and let the filter box find the
-	// rest. Selected titles are always shown so a selection never "disappears".
-	// Also flag the first row of each work so the table can show the work name
-	// once and draw a divider between works (only meaningful in "by work" sort).
-	const TITLE_RENDER_CAP = 400;
-	const visibleTitles = $derived.by(() => {
-		let rows;
-		if (filteredTitles.length <= TITLE_RENDER_CAP) {
-			rows = filteredTitles;
-		} else {
-			const head = filteredTitles.slice(0, TITLE_RENDER_CAP);
-			const seen = new Set(head.map((t) => t.idx));
-			const selectedTail = filteredTitles
-					.slice(TITLE_RENDER_CAP)
-					.filter((t) => !seen.has(t.idx) && (isSingleSelected(t.idx) || groupForTitle(t.idx)));
-			rows = [...head, ...selectedTail];
-		}
-		let prevWork = null;
-		return rows.map((r) => {
-			const firstOfWork = titleSort === "work" ? r.workKey !== prevWork : true;
-			prevWork = r.workKey;
-			return { ...r, firstOfWork };
-		});
-	});
 
 	// In "by work" sort, roll the (already work-sorted) editions up into one
 	// collapsible block per work: a single header row you can expand to see and
@@ -1509,19 +1291,16 @@
 	});
 	// The book order frozen while editing groupings (see workBlocks): each
 	// book's place, and each edition's book's place, when editing began (or the
-	// sort / filter last changed).
+	// sort / filter / author last changed). null when not editing.
 	let editRank = $state(null);
-	$effect(() => {
-		const on = editMode;
-		workOrder; workOrderFlip; titleFilter; currentSlug;
-		untrack(() => (editRank = null));
-		if (!on) return;
-		tick().then(() => untrack(() => {
-			const b = new Map(), e = new Map();
-			workBlocks.forEach((w, i) => { b.set(w.key, i); w.editions.forEach((ed) => e.set(ed.idx, i)); });
-			editRank = { b, e };
-		}));
-	});
+	function freezeBookOrder() {
+		editRank = null;
+		if (!editMode) return;
+		// workBlocks, read with editRank cleared, is the plain sorted order.
+		const b = new Map(), e = new Map();
+		workBlocks.forEach((w, i) => { b.set(w.key, i); w.editions.forEach((ed) => e.set(ed.idx, i)); });
+		editRank = { b, e };
+	}
 	// "Move to…" targets in edit mode: every book (by its table key), plus any
 	// new, still-empty book made with "New book".
 	const moveTargets = $derived.by(() => {
@@ -1549,7 +1328,7 @@
 	// Feedback for a move or split: the edition flashes in its new place (scrolled
 	// into view), and a short note at the bottom says what happened, with Undo.
 	let movedIdx = $state(null);
-	let moveNote = $state(null); // { text, undo }
+	let moveNote = $state.raw(null); // { text, undo }
 	let moveTimers = [];
 	function groupingSnapshot() {
 		return {
@@ -1576,6 +1355,7 @@
 		moveTimers.forEach(clearTimeout);
 		moveNote = null;
 		movedIdx = null;
+		autoHideTotal();
 	}
 	// Table totals at one precision: "14.0k" beside "13.1k", not "14k".
 	function tableNumber(n) {
@@ -1639,22 +1419,18 @@
 	// "Edit groupings" opens every book so all the editions are in view to move;
 	// "Done editing" puts back whatever was open before.
 	let expandedBeforeEdit = null;
-	let wasEditing = false;
-	$effect(() => {
-		const editing = editMode;
-		if (editing === wasEditing) return;
-		wasEditing = editing;
-		if (editing) {
-			expandedBeforeEdit = untrack(() => expandedWorks);
-			expandedWorks = untrack(() => workBlocks.map((w) => w.key));
+	function setEditMode(on) {
+		if (on === editMode) return;
+		editMode = on;
+		if (on) {
+			expandedBeforeEdit = expandedWorks;
+			expandedWorks = workBlocks.map((w) => w.key);
 		} else if (expandedBeforeEdit) {
 			expandedWorks = expandedBeforeEdit;
 			expandedBeforeEdit = null;
 		}
-	});
-
-	// Currently-active group object (or null if none selected/created yet).
-	const activeGroup = $derived(groups.find((g) => g.id === activeGroupId) ?? null);
+		freezeBookOrder();
+	}
 
 	// Name a group is whatever the user typed, otherwise auto-name it after its
 	// most-borrowed member (lowest original index = most checkouts), plus a
@@ -1668,20 +1444,6 @@
 		return extra > 0 ? `${firstTitle}  +${extra} more` : firstTitle;
 	}
 
-	// Chart title. When a series is isolated ("Only"), name it. Otherwise, in the
-	// stacked-area view, show the group name(s).
-	// Only title the chart when exactly one line/work is on screen -- naming it.
-	// When several are shown (a comparison), the legend does the labeling and a
-	// long concatenated title just clutters, so leave it blank.
-	const plotTitle = $derived.by(() => {
-		if (!current) return "";
-		// "Total" (line mode) is the author's overall trend, so a lingering
-		// isolated-title caption doesn't belong — only caption the stacked view.
-		if (chartMode === "line") return "";
-		if (isolatedKeys.length === 1 && isOverview) return keyLabel(isolatedKeys[0]);
-		return "";
-	});
-
 	// In "By title" mode the chart is about a specific book, so the heading names
 	// the TITLE (not its author) when exactly one work is plotted; with several
 	// works plotted it's a comparison, so the legend labels them and the heading
@@ -1690,7 +1452,7 @@
 		if (!current) return "";
 		if (isOverview) return current.name;
 		if (searchMode === "title") {
-			const gs = groups.filter((g) => g.idxs.length);
+			const gs = plottedGroups;
 			// Show the FULL edition title ONLY when a single clicked edition is the sole
 			// thing on the chart (nothing else plotted). If a work band or other titles
 			// are also shown, the bare edition title would misrepresent the chart, so we
@@ -1728,7 +1490,7 @@
 		// Only when exactly one work is on the plot (so the heading IS a book title).
 		// When "All titles" broadened the chart the heading is the AUTHOR name — no
 		// cover then, and never in author-search mode.
-		const singleWork = groups.filter((g) => g.idxs.length).length + singleIdxs.length === 1;
+		const singleWork = plottedGroups.length + singleIdxs.length === 1;
 		if (searchMode !== "title" || !singleWork || !title) { workCover = null; return; }
 		let cancelled = false;
 		workCover = null;
@@ -1777,7 +1539,7 @@
 	// title heading is blank anyway, so there's no single count to report.
 	const titleCheckouts = $derived.by(() => {
 		if (!current || isOverview || searchMode !== "title") return null;
-		const gs = groups.filter((g) => g.idxs.length);
+		const gs = plottedGroups;
 		let idxs = null;
 		if (gs.length === 1 && !singleIdxs.length) idxs = gs[0].idxs;
 		else if (!gs.length && singleIdxs.length === 1) idxs = singleIdxs;
@@ -1862,7 +1624,7 @@
 		if (!current || isOverview) return [];
 		const m = new Map();
 		if (searchMode === "title") {
-			const gs = groups.filter((g) => g.idxs.length);
+			const gs = plottedGroups;
 			const idxs = gs.length === 1 && !singleIdxs.length ? gs[0].idxs : !gs.length && singleIdxs.length === 1 ? singleIdxs : null;
 			if (!idxs) return [];
 			for (const i of idxs) poolSubjects(m, current.titles[i]?.subjects);
@@ -1889,7 +1651,7 @@
 	// matching term wins ("Science fiction" -> Science Fiction, not Science &
 	// Nature); "=term" matches the whole tag only. Catch-all buckets that have
 	// no Most Borrowed list are skipped.
-	let genreTerms = $state({});
+	let genreTerms = $state.raw({});
 	onMount(() => { getGenreTerms().then((m) => (genreTerms = m || {})); });
 	const NO_LIST = new Set(["Fiction", "Nonfiction", "Art", "Illustrated Works", "Informational Works", "Instructional & Educational Works", "Readers Publications"]);
 	function genreFor(tag) {
@@ -1917,13 +1679,11 @@
 	const DESC_PERSON = /(author|writer|novelist|poet|journalist|illustrator|cartoonist|historian|playwright|screenwriter|essayist|biographer|memoirist|scholar|critic|editor|professor|philosopher|scientist|activist|politician|comedian|chef|economist|psychologist|actor|actress|musician|singer|artist|lawyer|physician|theologian|priest|monk|teacher|educator|entrepreneur|television|personality|founder|leader|general|president|emperor|king|queen|saint|(born|died|\d{4}[–-]\d{4}))/i;
 	const DESC_WORK = /\b(novels?|novellas?|books?|memoirs?|collection|series|poems?|poetry|play|essays?|story|stories|graphic|comics?|manga|autobiography|biography|nonfiction|non-fiction|cookbook|anthology|epic|treatise|saga|trilogy)\b/i;
 	let headDesc = $state("");
-	let headPhoto = $state(null); // the author's Wikipedia portrait, beside the name
 	$effect(() => {
 		const isTitle = searchMode === "title";
 		const nm = current && !isOverview ? (isTitle ? headingText : displayName(current.name)) : "";
 		const au = current ? displayName(current.name) : "";
 		headDesc = "";
-		headPhoto = null;
 		if (!nm) return;
 		let alive = true;
 		(isTitle ? wikiWork(nm, au) : wikiSummary(nm))
@@ -1942,65 +1702,9 @@
 				// the author, so keep just "2025 novel".
 				if (isTitle) t = t.replace(/\s+by\s+[^,;()]+$/i, "");
 				headDesc = t;
-				// Same check for the photo, so a novel's cover (or a namesake) never
-				// stands in for the author.
-				if (!isTitle && ok) headPhoto = s?.thumbnail || null;
 			})
 			.catch(() => {});
 		return () => { alive = false; };
-	});
-
-
-	// StackedViewer.svelte
-	const chartSeries = $derived.by(() => {
-		if (!current) return [];
-
-		const groupIndexOf = new Map();
-		groups.forEach((g, gi) => {
-			g.idxs.forEach((idx) => groupIndexOf.set(idx, gi));
-		});
-
-		const singleColorOf = new Map();
-		soloSingleIdxs.forEach((idx, i) => {
-			singleColorOf.set(idx, singleColor(i));
-		});
-
-		// Each group's all-time total (summed over its editions), for the tooltip's
-		// "X% of the author's checkouts" line.
-		const groupTotals = new Map();
-		groups.forEach((g, gi) => groupTotals.set(gi, g.idxs.reduce((s, idx) => s + current.titles[idx].total, 0)));
-
-		let mapped = current.titles.map((t, idx) => {
-			const gi = groupIndexOf.has(idx) ? groupIndexOf.get(idx) : -1;
-			const isGrouped = gi !== -1;
-			const isSingle = singleColorOf.has(idx);
-			let color = "var(--color-gray-200)";
-			if (isGrouped) color = TITLE_COLORS[gi % TITLE_COLORS.length];
-			else if (isSingle) color = singleColorOf.get(idx);
-			return {
-				label: t.title,
-				color,
-				values: t.series,
-				format: t.format, // ebook / audiobook / print -- shown as edition pills in the area tooltip
-				groupName: isGrouped ? groupLabel(groups[gi]) : (isSingle ? cleanTitleForDisplay(t.title) : null), // work title for the tooltip
-				workTotal: isGrouped ? groupTotals.get(gi) : (isSingle ? t.total : null), // work's all-time total, for the "% of author" line
-				isSelected: isGrouped || isSingle, // Expose this flag for sorting and tooltip logic
-				groupIndex: gi, // which group this book belongs to (-1 if none/single)
-				titleIdx: idx, // original title index, for isolate filtering
-				// Which legend entry this layer belongs to, so hovering a legend item can
-				// light up its band(s) on the chart. Unselected titles map to "other".
-				legendKey: isGrouped ? `g${groups[gi].id}` : (isSingle ? `s${idx}` : "other")
-			};
-		});
-
-		// Grouped/single-selected books sink to the bottom of the stack grouped ones cluster by group
-		mapped.sort((a, b) => {
-			if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
-			if (a.isSelected && a.groupIndex !== b.groupIndex) return a.groupIndex - b.groupIndex;
-			return 0;
-		});
-
-		return mapped;
 	});
 
 	// The author's own total checkouts as one bold line -- the default view.
@@ -2044,79 +1748,6 @@
 		return parts;
 	});
 
-	// The union of title indices the isolated keys refer to (null = show all).
-	function isolatedIdxSet() {
-		if (!isolatedKeys.length) return null;
-		const set = new Set();
-		for (const key of isolatedKeys) {
-			if (key.startsWith("g")) {
-				const g = groups.find((g) => g.id === Number(key.slice(1)));
-				if (g) g.idxs.forEach((i) => set.add(i));
-			} else if (key.startsWith("s")) {
-				set.add(Number(key.slice(1)));
-			}
-		}
-		return set;
-	}
-
-	// Clicking a legend entry hides that band from the stacked "All titles" chart.
-	const isHidden = (key) => hiddenKeys.includes(key);
-	function toggleHidden(key) {
-		hiddenKeys = hiddenKeys.includes(key)
-				? hiddenKeys.filter((k) => k !== key)
-				: [...hiddenKeys, key];
-	}
-	function clearHidden() { hiddenKeys = []; }
-	// The title indices the hidden keys refer to (null = hide nothing).
-	function hiddenIdxSet() {
-		if (!hiddenKeys.length) return null;
-		const set = new Set();
-		for (const key of hiddenKeys) {
-			if (key.startsWith("g")) {
-				const g = groups.find((g) => g.id === Number(key.slice(1)));
-				if (g) g.idxs.forEach((i) => set.add(i));
-			} else if (key.startsWith("s")) {
-				set.add(Number(key.slice(1)));
-			}
-		}
-		return set;
-	}
-
-	// A prolific author can have 1000+ qualifying titles; drawing a stacked-area
-	// layer for each one janks/hangs the tab. Keep the biggest AREA_LAYER_CAP
-	// layers (plus anything the user selected) and roll the rest into one "Other
-	// titles" band, so the stack total is preserved but stays fast to render.
-	const AREA_LAYER_CAP = 30;
-	function capAreaLayers(all) {
-		if (all.length <= AREA_LAYER_CAP) return all;
-		const kept = [];
-		const rest = [];
-		for (const s of all) {
-			if (s.isSelected || kept.length < AREA_LAYER_CAP) kept.push(s);
-			else rest.push(s);
-		}
-		if (!rest.length) return kept;
-		const monthCount = months.length;
-		const otherValues = new Array(monthCount).fill(0);
-		for (const s of rest) for (let i = 0; i < monthCount; i++) otherValues[i] += s.values[i];
-		kept.push({
-			label: `Other titles (${rest.length})`,
-			color: "var(--color-gray-200)",
-			values: otherValues,
-			isSelected: false,
-			groupIndex: -1,
-			titleIdx: -1,
-			legendKey: "other",
-			// The titles rolled into this band, biggest first, so the tooltip can
-			// name what's inside "Other".
-			otherTitles: rest
-				.slice()
-				.sort((a, b) => b.values.reduce((s, v) => s + v, 0) - a.values.reduce((s, v) => s + v, 0))
-				.map((s) => cleanTitleForDisplay(s.label))
-		});
-		return kept;
-	}
-
 	// The default overview's stacked-by-format area series (print / ebook /
 	// audiobook), built from the per-format monthly totals fetched from the API.
 	const OVERVIEW_FORMATS = [
@@ -2152,7 +1783,7 @@
 	// focus of the view and is never decluttered away. Only the author aggregate
 	// (author mode, or a broadened multi-work view) gets the hide/declutter behavior.
 	const lineBaseIsWork = $derived(
-		searchMode === "title" && !isOverview && groups.filter((g) => g.idxs.length).length === 1
+		searchMode === "title" && !isOverview && plottedGroups.length === 1
 	);
 
 	// What the chart actually draws. "line": author total + per-group and
@@ -2173,7 +1804,7 @@
 			const singles = lineParts.filter((s) => s.isSingle);
 			let base = authorLine;
 			if (lineBaseIsWork) {
-				const gs = groups.filter((g) => g.idxs.length);
+				const gs = plottedGroups;
 				// The searched work's FULL total — all its editions, including any you
 				// clicked out to overlay — so "Total" always shows the whole work, with
 				// the clicked edition drawn on top for comparison.
@@ -2188,27 +1819,15 @@
 		// "By book" (the non-overview 'area' state): one line per plotted work,
 		// plus any individually plotted editions — compared from a common zero
 		// baseline instead of stacked, so each book's own trend reads directly.
-		if (!isOverview) {
-			const parts = [];
-			groups.forEach((g, gi) => {
-				if (g.idxs.length) parts.push({ key: `g${g.id}`, legendKey: `g${g.id}`, label: groupLabel(g), color: groupColor(gi), values: sumSeries(g.idxs), groupIndex: gi, isGroup: true });
-			});
-			soloSingleIdxs.forEach((idx, i) => {
-				parts.push({ key: `s${idx}`, legendKey: `s${idx}`, label: `${cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title} (${formatLabel(current.titles[idx].format)})`, color: singleColor(i), values: current.titles[idx].series, isSingle: true });
-			});
-			let shown = isolatedKeys.length ? parts.filter((p) => isolatedKeys.includes(p.key)) : parts;
-			shown = shown.filter((p) => !hiddenKeys.includes(p.key));
-			return shown.length ? shown : [authorLine].filter(Boolean);
-		}
-		// area mode (overview "By format")
-		const only = isolatedIdxSet();
-		const hidden = hiddenIdxSet();
-		let areaAll = only ? chartSeries.filter((s) => only.has(s.titleIdx)) : chartSeries;
-		if (hidden) areaAll = areaAll.filter((s) => !hidden.has(s.titleIdx));
-		// "Other" is the rolled-up band of unselected titles — hide it by dropping
-		// everything that isn't an individually-labeled work.
-		if (hiddenKeys.includes("other")) areaAll = areaAll.filter((s) => s.isSelected);
-		return capAreaLayers(areaAll);
+		const parts = [];
+		groups.forEach((g, gi) => {
+			if (g.idxs.length) parts.push({ key: `g${g.id}`, legendKey: `g${g.id}`, label: groupLabel(g), color: groupColor(gi), values: sumSeries(g.idxs), groupIndex: gi, isGroup: true });
+		});
+		soloSingleIdxs.forEach((idx, i) => {
+			parts.push({ key: `s${idx}`, legendKey: `s${idx}`, label: `${cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title} (${formatLabel(current.titles[idx].format)})`, color: singleColor(i), values: current.titles[idx].series, isSingle: true });
+		});
+		const shown = isolatedKeys.length ? parts.filter((p) => isolatedKeys.includes(p.key)) : parts;
+		return shown.length ? shown : [authorLine].filter(Boolean);
 	});
 
 	// Legend for what's on the chart -- one swatch + label per line (line mode),
@@ -2232,14 +1851,6 @@
 		// Full edition title (not the cleaned work name): if you plotted one specific
 		// edition, the legend should name exactly which one.
 		soloSingleIdxs.forEach((idx, i) => out.push({ label: titleCase(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
-		// Everything not individually labeled is drawn in one gray band — label it
-		// "Other" so the color is accounted for in the legend (and the shared image).
-		// Based on chartSeries (not displaySeries) so the entry stays put — and
-		// clickable to un-hide — even after "Other" is hidden. key "other" makes it
-		// a toggle like the rest.
-		if (isOverview && out.length && chartSeries.some((s) => !s.isSelected)) {
-			out.push({ label: "Other", color: "oklch(92.2% 0 0)", key: "other" });
-		}
 		return out;
 	});
 
@@ -2299,11 +1910,14 @@
 			});
 	});
 
-	// Every chart is drawn as lines now. The overview's "By format" used to be a
-	// stacked area, but only its bottom band (print) could be read accurately:
-	// ebook and audiobook rode on print's swings. One line per format from zero.
-	const chartLineMode = "line";
-
+	// Drop any pending timers when the view goes away (e.g. switching tabs).
+	onDestroy(() => {
+		clearTimeout(flashTimer);
+		clearTimeout(wikiTimer);
+		clearTimeout(savedFlashTimer);
+		clearTimeout(exportTimer);
+		moveTimers.forEach(clearTimeout);
+	});
 </script>
 
 <div class="viewer">
@@ -2341,18 +1955,14 @@
 			     above the name. -->
 			{#if !isOverview}
 				<div class="customize-row on-phone">
-					{#if chartLineMode === "line"}
-						<button type="button" class="customize-btn" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>
-					{/if}
+					<button type="button" class="customize-btn" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>
 					{#if onCompare && currentSlug}
 						<button type="button" class="customize-btn" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={16} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
 					{/if}
 				</div>
-				{#if customizeOpen && chartLineMode === "line"}
+				{#if customizeOpen}
 					<div class="customize-panel on-phone">
-						{#if chartLineMode === "line"}
-							<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
-						{/if}
+						<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 					</div>
 				{/if}
 			{/if}
@@ -2401,7 +2011,7 @@
 			</div>
 			</div><!-- /.hd-text -->
 			{#if subjectLine.length}
-				<p class="hd-subjects">{#each subjectLine as term, k}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if genreFor(term)}<button type="button" class="subj-genre" onclick={() => openGenre(genreFor(term))} title="The most-borrowed {genreFor(term)} books">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</p>
+				<p class="hd-subjects">{#each subjectLine as term, k}{@const g = genreFor(term)}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if g}<button type="button" class="subj-genre" onclick={() => openGenre(g)} title="The most-borrowed {g} books">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</p>
 			{/if}
 			</div>
 			{#if lookupLinks}
@@ -2441,8 +2051,8 @@
 							// clicking "All titles" again restores exactly what you had. It no
 							// longer collapses the broadened set back to the searched work.
 							chartMode = "line";
-							activeGroupId = null;
 							isolatedKeys = [];
+							autoHideTotal();
 						}}
 						title="Total" aria-label="Total"
 				>
@@ -2471,12 +2081,10 @@
 					{#if isOverview}<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" />{:else}<BookCopyIcon size={17} strokeWidth={2} aria-hidden="true" />{/if}<span class="mt-txt">{isOverview ? "By format" : "By book"}</span>
 				</button>
 			</div>
-			{#if chartLineMode === "line"}
-				<label class="smooth-toggle off-phone"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
-			{/if}
-			{#if chartMode === "area" && (isolatedKeys.length || hiddenKeys.length)}
+			<label class="smooth-toggle off-phone"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
+			{#if chartMode === "area" && isolatedKeys.length}
 				<!-- The way back after clicking a line's name to show it alone -->
-				<span class="iso-note">Showing {viewSeries.length} of {legendItems.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={() => { clearIsolate(); clearHidden(); }}>Show all</button>{#if soloBook}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall iso-book" onclick={() => openTitle(soloBook, currentSlug)} title="Its own page: just this book's trend, editions and formats">Open this book's page →</button>{/if}</span>
+				<span class="iso-note">Showing {viewSeries.length} of {legendItems.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={clearIsolate}>Show all</button>{#if soloBook}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall iso-book" onclick={() => openTitle(soloBook, currentSlug)} title="Its own page: just this book's trend, editions and formats">Open this book's page →</button>{/if}</span>
 			{/if}
 					</div>
 					<!-- Put another author or book on this chart (the page switches to
@@ -2488,25 +2096,16 @@
 					<!-- The chart, its slider and source line share one white panel -->
 					<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 					<div class="chart-wrap" bind:this={chartWrap}>
-				{#if plotTitle && searchMode !== "title"}
-					<p class="plot-title">{plotTitle}</p>
-				{/if}
-				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode={chartLineMode} smooth={smoothOn && chartLineMode === "line"} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
+				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode="line" smooth={smoothOn} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
 			</div>
 
 			<!-- Several lines: a swatch legend under the chart, every book listed
 			     (click one to show only it; once some are picked out, the rest show
 			     grayed out, click to add them back). -->
 			{#if legendItems.length >= 2}
-				<div class="format-legend" class:off-phone={chartMode === "area" && !isolatedKeys.length && !hiddenKeys.length}>
-					{#each legendItems as it}
-						{#if it.key === "other"}
-							<span class="fmt-leg other-leg" class:hidden-leg={isHidden("other")} class:dim={isolatedKeys.length}
-									onmouseenter={() => (legendHoverKey = "other")} onmouseleave={() => (legendHoverKey = null)}>
-								<span class="fmt-sw" style="background:{it.color}"></span>{it.label}
-								<button class="leg-x" title={isHidden("other") ? "Show “Other” again" : "Hide “Other”"} onclick={() => toggleHidden("other")}>×</button>
-							</span>
-						{:else if it.key}
+				<div class="format-legend" class:off-phone={chartMode === "area" && !isolatedKeys.length}>
+					{#each legendItems as it (it.key ?? it.label)}
+						{#if it.key}
 							<button
 									class="fmt-leg leg-btn"
 									class:on={isIsolated(it.key)}
@@ -2522,8 +2121,8 @@
 							<span class="fmt-leg"><span class="fmt-sw" style="background:{it.color}"></span>{it.label}</span>
 						{/if}
 					{/each}
-					{#if isolatedKeys.length || hiddenKeys.length}
-						<button class="leg-showall" onclick={() => { clearIsolate(); clearHidden(); }}>Show all</button>
+					{#if isolatedKeys.length}
+						<button class="leg-showall" onclick={clearIsolate}>Show all</button>
 					{/if}
 					<!-- Phones (no note above the chart): the way to the book's own page. -->
 					{#if soloBook}
@@ -2533,12 +2132,12 @@
 			{/if}
 
 			{#if months.length - brushStart >= 24}
-				<YearBrush {months} values={brushValues} start={brushStart} inset={phone.current ? 0 : plotInset} bind:lo={yearLo} bind:hi={yearHi} />
+				<YearBrush {months} start={brushStart} inset={phone.current ? 0 : plotInset} bind:lo={yearLo} bind:hi={yearHi} />
 			{/if}
 
 			<!-- Source on the left; Download and Share as small links on the right -->
 			<div class="chart-foot" style="padding-right: {phone.current ? 0 : plotInset}px">
-			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>.{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.{#if bookMarkers.length && chartLineMode === "line"}{" "}Book labels mark the month each title first appears in this data.{/if}</p>
+			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>.{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.{#if bookMarkers.length}{" "}Book labels mark the month each title first appears in this data.{/if}</p>
 			<div class="chart-actions tb-actions foot-actions">
 				<div class="dl-wrap">
 					<button class="tb-btn" onclick={() => (downloadOpen = !downloadOpen)} title="Download the data or the chart image" aria-haspopup="true" aria-expanded={downloadOpen}>
@@ -2575,121 +2174,6 @@
 			</div>
 			</div>
 			</div><!-- /.chart-panel -->
-
-
-
-			<!-- Only while building a "New book": name it and tick editions into it. -->
-			{#if !isOverview && activeGroup}
-			<div class="groups-panel">
-				<div class="groups-header">
-					<span class="groups-label">On the chart</span>
-				</div>
-				{#if autoGroupNote}
-					<p class="auto-group-note">{autoGroupNote}</p>
-				{/if}
-
-				{#if chartMode === "line" || groups.some((g) => g.idxs.length) || singleIdxs.length}
-					<!-- This doubles as the chart legend: every line on the chart is a row
-					     here, with its color, an "Only" toggle to isolate it, and controls. -->
-					<ul class="group-chips">
-						{#if chartMode === "line" && !lineBaseIsWork}
-							<li class="group-chip-row" class:dim={!authorTotalShown || isolatedKeys.length}>
-								<span class="group-chip static-chip" style="--chip-color: {INK}">
-									<span class="chip-sw"></span>
-									<span class="chip-name">Author total</span>
-								</span>
-								<!-- Hiding the total only makes sense when there are overlaid
-								     edition lines to see instead; with nothing else it's the whole
-								     chart, so we drop the toggle rather than gray a visible series. -->
-								{#if singleIdxs.length}
-									<button
-											class="chip-only end"
-											title={showAuthorTotal ? "Hide the author's total line" : "Show the author's total line"}
-											onclick={() => (showAuthorTotal = !showAuthorTotal)}
-									>{showAuthorTotal ? "Hide" : "Show"}</button>
-								{/if}
-							</li>
-						{/if}
-						{#each sortedGroups as g (g.id)}
-							<li
-									class="group-chip-row"
-									class:dim={(chartMode === "line" && !lineBaseIsWork) || (isolatedKeys.length && !isIsolated(`g${g.id}`))}
-									class:hl={hlWorkKey === `g${g.id}`}
-									onmouseenter={() => (hlWorkKey = `g${g.id}`)}
-									onmouseleave={() => (hlWorkKey === `g${g.id}` && (hlWorkKey = null))}
-							>
-								<button
-										type="button"
-										class="group-chip work-chip"
-										class:active={g.id === activeGroupId}
-										class:drag-over={dragOverId === g.id}
-										style="--chip-color: {groupColorFor(g)}"
-										title="Show only this work — or drag onto another work to merge them"
-										draggable="true"
-										onclick={() => { if (chartMode === "line") chartMode = "area"; toggleIsolate(`g${g.id}`); }}
-										ondragstart={(e) => { dragGroupId = g.id; try { e.dataTransfer.setData("text/plain", String(g.id)); e.dataTransfer.effectAllowed = "move"; } catch {} }}
-										ondragend={() => { dragGroupId = null; dragOverId = null; }}
-										ondragover={(e) => { e.preventDefault(); if (dragGroupId !== g.id) dragOverId = g.id; }}
-										ondragleave={() => (dragOverId === g.id && (dragOverId = null))}
-										ondrop={(e) => { e.preventDefault(); dropOnGroup(g.id); dragOverId = null; }}
-								>
-									<span class="chip-sw"></span>
-									<span
-											class="chip-name"
-											onmousemove={(e) => (hoverTip = { text: groupLabel(g), x: e.clientX, y: e.clientY })}
-											onmouseleave={() => (hoverTip = null)}
-									>{groupLabel(g)}</span>
-								</button>
-								<button
-										class="chip-edit"
-										class:on={g.id === activeGroupId}
-										aria-label={g.id === activeGroupId ? "Done editing this work" : "Edit which editions are in this work"}
-										title={g.id === activeGroupId ? "Done editing" : "Edit which editions are in this work"}
-										onclick={() => {
-											const editing = activeGroupId !== g.id;
-											activeGroupId = editing ? g.id : null;
-											// Opening "Edit" should reveal the works table you're editing in.
-											if (editing) tableCollapsed = false;
-										}}
-								>{g.id === activeGroupId ? "✓" : "✎"}</button>
-							</li>
-						{/each}
-						{#each singleIdxs as idx, i (idx)}
-							<li class="group-chip-row" class:dim={isolatedKeys.length && !isIsolated(`s${idx}`)}>
-								<span class="group-chip static-chip" style="--chip-color: {singleColor(i)}">
-									<span class="chip-sw"></span>
-									<span
-											class="chip-name"
-											onmousemove={(e) => (hoverTip = { text: current.titles[idx].title, x: e.clientX, y: e.clientY })}
-											onmouseleave={() => (hoverTip = null)}
-									>{titleCase(current.titles[idx].title)}</span>
-								</span>
-								<button class="chip-remove" title="Remove this title" onclick={() => toggleTitle(idx)}>×</button>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-
-				{#if activeGroup}
-					<div class="editing-banner">
-						<span class="editing-text">
-							Adding titles to <strong>{groupLabel(activeGroup)}</strong> — tick titles below,
-							or drag them onto the work.
-						</span>
-						<button class="done-btn" onclick={finishGroup}>Done</button>
-					</div>
-					<div class="bundle-name">
-						<label for="group-name-input">Name this work</label>
-						<input
-								id="group-name-input"
-								type="text"
-								bind:value={activeGroup.name}
-								placeholder={groupLabel(activeGroup)}
-						/>
-					</div>
-				{/if}
-			</div>
-			{/if}
 			</div><!-- /.split-main -->
 
 			{#if !isOverview}
@@ -2700,8 +2184,8 @@
 				<div class="bk-head">
 					<h3 class="bk-title">Books <span class="bk-count">({workGroups.size.toLocaleString()})</span></h3>
 					<div class="bk-tools">
-						<input class="bk-filter" type="search" placeholder="Filter books" bind:value={titleFilter} autocomplete="off" aria-label="Filter books" />
-						<button type="button" class="bk-btn" class:on={editMode} aria-pressed={editMode} onclick={() => (editMode = !editMode)}>{editMode ? "Done editing" : "Edit groupings"}</button>
+						<input class="bk-filter" type="search" placeholder="Filter books" bind:value={() => titleFilter, (v) => { titleFilter = v; freezeBookOrder(); }} autocomplete="off" aria-label="Filter books" />
+						<button type="button" class="bk-btn" class:on={editMode} aria-pressed={editMode} onclick={() => setEditMode(!editMode)}>{editMode ? "Done editing" : "Edit groupings"}</button>
 					</div>
 				</div>
 				{#if editMode}
@@ -2740,7 +2224,7 @@
 					{/if}
 					{#each visibleWorkBlocks as w (w.key)}
 						{@const wColor = workPlotColor(w)}
-						{@const open = isExpanded(w.key) || (titleFilter.trim() && w.matchCount > 0)}
+						{@const open = workOpen(w)}
 						{#if !w.filteredOut}
 						<li class="bk-row bk-book" class:plotted={!!wColor}>
 							<input type="checkbox" class="bk-check" checked={isWorkPlotted(w.key)}
@@ -2762,12 +2246,12 @@
 						{#if open}
 							{@const subj = bookSubjects(w)}
 							{#if subj.length}
-								<li class="bk-row bk-ed bk-subj"><span></span><span class="bk-subj-list">{#each subj as term, k}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if genreFor(term)}<button type="button" class="subj-genre" onclick={() => openGenre(genreFor(term))} title="The most-borrowed {genreFor(term)} books">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</span></li>
+								<li class="bk-row bk-ed bk-subj"><span></span><span class="bk-subj-list">{#each subj as term, k}{@const g = genreFor(term)}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if g}<button type="button" class="subj-genre" onclick={() => openGenre(g)} title="The most-borrowed {g} books">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</span></li>
 							{/if}
 							{#each w.editions as t (t.idx)}
 								<li class="bk-row bk-ed" class:editing={editMode} class:hit={t.match} class:just-moved={movedIdx === t.idx} data-ed={t.idx}>
 									<input type="checkbox" class="bk-check"
-										checked={activeGroupId ? groupForTitle(t.idx)?.id === activeGroupId : isSingleSelected(t.idx)}
+										checked={isSingleSelected(t.idx)}
 										onchange={() => keepTableStill(() => toggleTitle(t.idx))}
 										aria-label="Plot this edition on its own: {t.title}" />
 									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}</span>
@@ -2801,7 +2285,7 @@
 					<div class="also-credited">
 						<h3 class="ac-title">Also credited on</h3>
 						<ul>
-							{#each alsoCredited as [title, slug, name, total]}
+							{#each alsoCredited as [title, slug, name, total] (slug + "~" + title)}
 								<li><button type="button" class="ac-book" onclick={() => openTitle(title, slug)}>{cleanTitleForDisplay(title) || title}</button> <span class="ac-with">with {displayName(name)}</span> <span class="ac-n">{compactNumber(total)} checkouts</span></li>
 							{/each}
 						</ul>
@@ -2821,9 +2305,6 @@
 		</div>
 	{/if}
 
-	{#if hoverTip}
-		<div class="title-tip" style="left:{hoverTip.x + 14}px; top:{hoverTip.y + 16}px">{hoverTip.text}</div>
-	{/if}
 </div>
 
 
@@ -2890,101 +2371,6 @@
 		background: var(--color-white);
 		cursor: pointer;
 		min-width: 0;
-	}
-	.search {
-		position: relative;
-	}
-
-	/* A clean white box, matching the field dropdowns' height. */
-	.search input {
-		width: 100%;
-		box-sizing: border-box;
-		padding: 9px 12px;
-		font-family: var(--font-sans);
-		font-size: var(--text-base);
-		background: var(--color-white);
-		color: var(--color-fg);
-		border: 1px solid var(--color-border);
-		border-radius: 8px;
-		outline: none; /* override the global reset's 1px box outline */
-	}
-
-	.search input:focus {
-		outline: none;
-		border-color: #3f88cc;
-		box-shadow: 0 0 0 3px rgba(63, 136, 204, 0.15);
-	}
-
-	.results {
-		list-style: none;
-		margin: 6px 0 0;
-		padding: 6px;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-white);
-		max-height: 340px;
-		overflow-y: auto;
-		position: absolute;
-		width: 100%;
-		z-index: var(--z-top);
-		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-	}
-
-	.results button {
-		width: 100%;
-		display: flex;
-		justify-content: space-between;
-		gap: 12px;
-		padding: 9px 12px;
-		background: none;
-		border: none;
-		border-radius: var(--radius-sm);
-		font-family: var(--font-sans);
-		font-size: var(--text-base);
-		text-align: left;
-		cursor: pointer;
-		color: var(--color-fg);
-	}
-
-	.results button:hover {
-		background: var(--color-gray-100);
-	}
-
-	.results .count {
-		color: var(--color-fg-light);
-		font-variant-numeric: tabular-nums;
-		flex: none;
-	}
-	/* Unified results: name/title + a small "Author"/"Book" tag on one line. */
-	.res-line {
-		display: inline-flex;
-		align-items: baseline;
-		gap: 8px;
-		min-width: 0;
-		flex: 1 1 auto;
-	}
-	.res-line > :first-child {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.res-kind {
-		flex: none;
-		font-size: 0.6rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		padding: 1px 6px;
-		border-radius: 999px;
-		line-height: 1.5;
-	}
-	.kind-book {
-		background: #eaf2fb;
-		color: #2f6ea8;
-	}
-	.kind-author {
-		background: var(--color-gray-100);
-		color: var(--color-fg-light);
 	}
 
 	.author {
@@ -3221,37 +2607,6 @@
 	}
 	.leg-btn.hidden-leg .fmt-sw {
 		background: var(--color-gray-300, #ccc) !important;
-	}
-	/* "Other" band: not isolatable, but has a small × to hide it. */
-	.other-leg {
-		gap: 4px;
-		padding: 2px 2px 2px 4px;
-	}
-	.other-leg.dim {
-		opacity: 0.38;
-	}
-	.other-leg.hidden-leg {
-		opacity: 0.55;
-		text-decoration: line-through;
-	}
-	.other-leg.hidden-leg .fmt-sw {
-		background: var(--color-gray-300, #ccc) !important;
-	}
-	.leg-x {
-		border: none;
-		background: none;
-		padding: 0 3px;
-		font-size: 1rem;
-		line-height: 1;
-		color: var(--color-fg-light);
-		cursor: pointer;
-		border-radius: 4px;
-		text-decoration: none;
-		display: inline-block;
-	}
-	.leg-x:hover {
-		background: var(--color-gray-100);
-		color: var(--color-fg);
 	}
 	.fmt-sw {
 		width: 12px;
@@ -3537,21 +2892,6 @@
 			padding: 10px 14px 48px;
 			overflow: auto;
 			box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.22);
-		}
-		/* drawer header (with Done) only when popped up... */
-		.split-side.open .side-mobile-head {
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			position: sticky;
-			top: 0;
-			background: var(--color-white);
-			padding: 6px 0 10px;
-			margin-bottom: 8px;
-			border-bottom: 1px solid var(--color-border);
-			font-family: var(--font-sans);
-			font-weight: 700;
-			font-size: var(--text-base);
 		}
 		/* ...inline, the same small-uppercase toggle as desktop (matching the "On
 		   the chart" panel); the underline only appears once the table is open. */
@@ -3857,15 +3197,6 @@
 		color: var(--color-fg-light);
 	}
 
-	.plot-title {
-		font-family: var(--font-serif);
-		font-size: 1.3rem;
-		line-height: 1.2;
-		text-align: center;
-		margin: 0 0 8px;
-	}
-
-
 	.legend {
 		list-style: none;
 		display: flex;
@@ -3956,48 +3287,6 @@
 		margin: 6px 2px 0;
 	}
 
-	.editing-banner {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		margin: 12px 0 0;
-		padding: 10px 12px;
-		border-radius: var(--radius-sm);
-		background: var(--color-white);
-		border: 1.5px solid var(--color-fg);
-	}
-
-	.editing-text {
-		flex: 1;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		color: var(--color-fg);
-	}
-
-	.done-btn {
-		flex: none;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: 600;
-		padding: 6px 18px;
-		border-radius: 999px;
-		border: none;
-		background: var(--color-fg);
-		color: var(--color-white);
-		cursor: pointer;
-	}
-
-	.done-btn:hover {
-		opacity: 0.85;
-	}
-
-	.group-chip.drag-over {
-		border-color: var(--chip-color, var(--color-fg));
-		background: var(--chip-color, var(--color-fg));
-		color: var(--color-white);
-		box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
-	}
-
 	.title-row[draggable="true"] {
 		cursor: grab;
 	}
@@ -4015,317 +3304,6 @@
 		margin: 18px 0 14px;
 		font-family: var(--font-sans);
 		font-size: var(--text-base);
-	}
-
-	.bundle-name {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		margin: 12px 0 0;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-	}
-
-	.bundle-name label {
-		font-weight: 600;
-		white-space: nowrap;
-	}
-
-	.bundle-name input {
-		flex: 1;
-		min-width: 0;
-		padding: 8px 12px;
-		font-family: var(--font-sans);
-		font-size: var(--text-base);
-		background: var(--color-input-bg);
-		border: 1.5px solid var(--color-border);
-		border-radius: var(--radius-sm);
-	}
-
-	.bundle-name input:focus {
-		outline: none;
-		border-color: #e3120b;
-	}
-
-	.groups-panel {
-		margin: var(--space-1) 0 var(--space-5);
-		padding: var(--space-4);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-gray-100);
-	}
-
-	.groups-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 10px;
-	}
-
-	.groups-label {
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: 700;
-		color: var(--color-fg-light);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-	}
-
-	.groups-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-	}
-
-	.new-group {
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: 600;
-		padding: 6px 14px;
-		border-radius: 999px;
-		border: 1.5px solid var(--color-fg);
-		background: var(--color-fg);
-		color: var(--color-white);
-		cursor: pointer;
-	}
-
-	.new-group:hover {
-		opacity: 0.85;
-	}
-
-	.auto-group {
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: 600;
-		padding: 6px 14px;
-		border-radius: 999px;
-		border: 1.5px solid #6a4c93;
-		background: #6a4c93;
-		color: var(--color-white);
-		cursor: pointer;
-	}
-
-	.auto-group:hover {
-		opacity: 0.85;
-	}
-
-	.auto-group-note {
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		color: var(--color-fg-light);
-		margin: 10px 0 0;
-	}
-
-	.group-chips {
-		list-style: none;
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		margin: 12px 0 0;
-		padding: 0;
-	}
-
-	.group-chip-row {
-		display: flex;
-		align-items: center;
-		gap: 0;
-	}
-
-	/* linked highlight (see .work-header.hl): ring the WHOLE pill when its work row
-	   is hovered, and vice versa. The ring lives on the ROW so it wraps both the
-	   name and the pencil as one stadium — not just the name segment (whose square
-	   right edge left the pencil sticking out past the ring). */
-	.group-chip-row.hl {
-		border-radius: 999px;
-		box-shadow: 0 0 0 2px #e58a00;
-	}
-	.group-chip-row.hl .group-chip,
-	.group-chip-row.hl .chip-edit {
-		border-color: #e58a00;
-	}
-
-	/* The name is a self-contained rounded pill; Edit (✎) and × are separate ghost
-	   icon buttons that sit just after it — no heavy segment dividers. */
-	.group-chip {
-		display: flex;
-		align-items: center;
-		gap: 7px;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		padding: 6px 12px 6px 8px;
-		border-radius: 999px;
-		border: 1.5px solid var(--color-border);
-		background: var(--color-white);
-		color: var(--color-fg);
-		cursor: pointer;
-		max-width: 420px;
-		transition: background 0.12s, border-color 0.12s, color 0.12s;
-	}
-
-	.group-chip:hover {
-		border-color: var(--chip-color, var(--color-fg-light));
-	}
-
-	.group-chip.active {
-		border-color: var(--chip-color);
-		background: var(--chip-color);
-		color: var(--color-white);
-	}
-
-	.group-chip.active .chip-sw {
-		background: var(--color-white);
-	}
-
-	/* the "Single selection" chip stands alone (no remove button beside it)
-	   and has no group color of its own, so it gets its own shape + active
-	   treatment */
-	.group-chip.single-chip {
-		border-radius: 999px;
-		border-right: 1.5px solid var(--color-border);
-		border-style: dashed;
-		padding: 6px 14px;
-	}
-
-	.group-chip.single-chip:hover {
-		border-color: var(--color-fg-light);
-	}
-
-	.group-chip.single-chip.active {
-		background: var(--color-fg);
-		border-color: var(--color-fg);
-		border-style: solid;
-		color: var(--color-white);
-	}
-
-	.chip-sw {
-		width: 9px;
-		height: 9px;
-		border-radius: 2px;
-		flex: none;
-		background: var(--chip-color);
-	}
-
-	.chip-name {
-		/* One line with an ellipsis so every pill stays the same tidy height. Long
-		   titles used to wrap to 2-3 lines, making tall lopsided pills and stretching
-		   the pencil segment. The full title still shows on hover (hoverTip) and in
-		   the works table below. */
-		max-width: 230px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.chip-count {
-		flex: none;
-		opacity: 0.75;
-		font-variant-numeric: tabular-nums;
-	}
-
-	/* Work chip: the name and the pencil form ONE seamless pill — the name is the
-	   left segment (rounded left, no right border), the pencil the right segment
-	   (rounded right, no left border), so nothing floats separately beside it. */
-	.group-chip.work-chip {
-		border-radius: 999px 0 0 999px;
-		border-right: none;
-		padding-right: 3px;
-	}
-	.chip-edit {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 30px;
-		align-self: stretch;
-		flex: none;
-		padding: 0;
-		border: 1.5px solid var(--color-border);
-		border-left: none;
-		border-radius: 0 999px 999px 0;
-		background: var(--color-white);
-		color: var(--color-fg-light);
-		font-size: var(--text-base);
-		line-height: 1;
-		cursor: pointer;
-		transition: background 0.12s, color 0.12s, border-color 0.12s;
-	}
-	.group-chip.work-chip:hover,
-	.group-chip.work-chip:hover + .chip-edit {
-		border-color: var(--chip-color, var(--color-fg-light));
-	}
-	.chip-edit:hover {
-		background: var(--color-gray-100);
-		color: var(--color-fg);
-	}
-	/* Editing: the whole pill fills with the work's colour. */
-	.group-chip.work-chip.active + .chip-edit,
-	.chip-edit.on {
-		background: var(--chip-color, var(--color-fg));
-		border-color: var(--chip-color, var(--color-fg));
-		color: var(--color-white);
-	}
-
-	/* row dims when another line is isolated / the author total is hidden */
-	.group-chip-row.dim {
-		opacity: 0.4;
-	}
-
-	/* non-interactive pill (author-total + single-title legend rows) */
-	.static-chip {
-		cursor: default;
-	}
-
-	.static-chip:hover {
-		border-color: var(--color-border);
-	}
-
-	/* the "Only" isolate toggle, between the pill and the × */
-	.chip-only {
-		display: flex;
-		align-items: center;
-		font-family: var(--font-sans);
-		font-size: var(--text-xs);
-		font-weight: 600;
-		padding: 0 10px;
-		border: 1.5px solid var(--color-border);
-		border-right: none;
-		background: var(--color-white);
-		color: var(--color-fg-light);
-		cursor: pointer;
-	}
-
-	.chip-only:hover {
-		color: var(--color-fg);
-	}
-
-	.chip-only.on {
-		background: var(--color-fg);
-		border-color: var(--color-fg);
-		color: var(--color-white);
-	}
-
-	/* when the button is the last thing in the row (author total's Hide/Show) */
-	.chip-only.end {
-		border-right: 1.5px solid var(--color-border);
-		border-radius: 0 999px 999px 0;
-	}
-
-	.editing-hint {
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		color: var(--color-fg-light);
-		margin: 12px 0 0;
-	}
-
-	.editing-hint strong {
-		color: var(--color-fg);
-	}
-
-	.other-group-dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		flex: none;
-		background: var(--chip-color, var(--color-fg-light));
 	}
 
 	/* subtle hover hint instead of a boxed info panel */
@@ -5608,23 +4586,6 @@
 		margin-top: 28px;
 	}
 
-	/* instant, cursor-following tooltip showing a title's full text */
-	.title-tip {
-		position: fixed;
-		z-index: 100;
-		max-width: 360px;
-		padding: 7px 10px;
-		background: var(--color-fg);
-		color: var(--color-white);
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		line-height: 1.35;
-		border-radius: 6px;
-		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
-		pointer-events: none;
-		word-break: break-word;
-	}
-
 	.load-error {
 		font-family: var(--font-sans);
 		font-size: var(--text-base);
@@ -5647,13 +4608,6 @@
 		clip: rect(0 0 0 0);
 		white-space: nowrap;
 		border: 0;
-	}
-
-	.no-results {
-		font-family: var(--font-sans);
-		font-size: var(--text-base);
-		color: var(--color-fg-light);
-		margin: 8px 4px 0;
 	}
 
 	.loading {
@@ -5695,20 +4649,6 @@
 
 		.author h2 {
 			font-size: 1.6rem;
-		}
-
-		.groups-panel {
-			padding: 12px;
-			/* Give the panel room below the Download / Share row on phones. */
-			margin-top: var(--space-5);
-		}
-
-		.group-chip {
-			max-width: 160px;
-		}
-
-		.chip-name {
-			max-width: 120px;
 		}
 
 		.title-table {

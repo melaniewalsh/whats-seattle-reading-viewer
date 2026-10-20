@@ -15,3 +15,10 @@ export function compactNumber(n) {
 	}
 	return n.toLocaleString();
 }
+
+// Trim a Wikipedia extract to a short blurb, breaking on a word boundary.
+export function blurb(s, max = 200) {
+	if (!s) return "";
+	if (s.length <= max) return s;
+	return s.slice(0, max).replace(/\s+\S*$/, "") + "…";
+}
