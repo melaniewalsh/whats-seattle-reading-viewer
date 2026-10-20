@@ -63,7 +63,12 @@
 	let dlOpen = $state(false);
 	let shareOpen = $state(false);
 	let shareMsg = $state("");
-	const flash = (msg) => { shareMsg = msg; setTimeout(() => (shareMsg = ""), 2200); };
+	let flashTimer;
+	function flash(msg, ms = 2200) {
+		clearTimeout(flashTimer);
+		shareMsg = msg;
+		flashTimer = setTimeout(() => (shareMsg = ""), ms);
+	}
 	let chartWrap = $state(null);
 	let notFound = $state("");
 
@@ -273,12 +278,14 @@
 		else openAuthor(p.slug);
 	}
 
-	function copyLink() {
+	async function copyLink() {
 		shareOpen = false;
 		try {
-			navigator.clipboard.writeText(window.location.href);
+			await navigator.clipboard.writeText(window.location.href);
 			flash("Link copied");
-		} catch {}
+		} catch {
+			flash("Couldn’t copy. Copy the link from the address bar.", 3200);
+		}
 	}
 </script>
 

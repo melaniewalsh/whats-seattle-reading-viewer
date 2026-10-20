@@ -29,6 +29,7 @@
 		monthTotals = null, // per-month totals: the tooltip shows each line's share of that month (Overview by format)
 		plotInset = $bindable(0) // out: the plot's right margin, so a page can align to its edge
 	} = $props();
+	const uid = $props.id(); // unique ids for the event notes (aria-describedby)
 
 	// Numbers on the axis, end labels and tooltip: counts ("1,200") or, with
 	// `percent`, shares with just enough decimals ("12%", "2.5%", "0.15%").
@@ -861,8 +862,8 @@
 		bind:this={svgEl}
 		class="plot-svg"
 		viewBox="0 0 {width} {height}"
-		role="img"
-		aria-label="Checkouts over time"
+		role="group"
+		aria-label="Chart of checkouts over time"
 		onpointerdown={onDown}
 		onpointermove={onMove}
 		onpointerleave={onLeave}
@@ -1030,10 +1031,11 @@
 	<!-- Event labels: short text at the top of each band; hover/focus for the note -->
 	<!-- A narrow plot (phones, beside the line names) keeps the shaded bands but
 	     drops their text labels, which would pile up over the lines. -->
-	{#each showEventLabels ? annotationMarks : [] as a}
+	{#each showEventLabels ? annotationMarks : [] as a, k}
 		<div class="ev-wrap align-{a.anchor}" style="left: {a.lx}px; top: {a.top}px;">
-			<span class="ev-label" tabindex="0" role="button" aria-label="{a.label}: about this dip">{#each a.lines as ln}<span class="ev-line">{ln}</span>{/each}</span>
-			<div class="qmark-pop" role="tooltip" style="max-width: {a.maxw}px;">
+			<!-- Focusable so keyboard users can open the note; the note describes it. -->
+			<span class="ev-label" tabindex="0" aria-describedby="{uid}-ev-{k}">{#each a.lines as ln}<span class="ev-line">{ln}</span>{/each}</span>
+			<div class="qmark-pop" id="{uid}-ev-{k}" role="tooltip" style="max-width: {a.maxw}px;">
 				<p class="qmark-body"><strong>{a.label}.</strong> {a.blurb} <a href={a.url} target="_blank" rel="noopener noreferrer">Read more</a></p>
 			</div>
 		</div>

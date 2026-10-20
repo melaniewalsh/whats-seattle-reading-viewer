@@ -23,6 +23,13 @@
 	let loading = $state(true);
 	let loadError = $state("");
 	let shareMsg = $state("");
+	// One timer for the toast, so a second message isn't cleared early by the first one's timer.
+	let flashTimer;
+	function flash(msg, ms = 2600) {
+		clearTimeout(flashTimer);
+		shareMsg = msg;
+		flashTimer = setTimeout(() => (shareMsg = ""), ms);
+	}
 	let shareOpen = $state(false);
 	let termsMap = $state({});
 	onMount(async () => {
@@ -269,8 +276,7 @@
 		if (urls[platform]) window.open(urls[platform], "_blank", "noopener,noreferrer,width=600,height=540");
 		shareOpen = false;
 		if (copied) {
-			shareMsg = "Table image copied — paste it (⌘/Ctrl+V) into your post";
-			setTimeout(() => (shareMsg = ""), 4500);
+			flash("Table image copied — paste it (⌘/Ctrl+V) into your post", 4500);
 		}
 	}
 
@@ -288,8 +294,7 @@
 			return;
 		}
 		saveBlob(blob, name);
-		shareMsg = "Image saved — attach it to your post";
-		setTimeout(() => (shareMsg = ""), 3200);
+		flash("Image saved — attach it to your post", 3200);
 	}
 
 	async function copyImage() {
@@ -297,13 +302,12 @@
 		try {
 			if (!(navigator.clipboard && window.ClipboardItem)) throw new Error("no clipboard");
 			await navigator.clipboard.write([new ClipboardItem({ "image/png": renderTableBlob() })]);
-			shareMsg = "Table image copied to clipboard";
+			flash("Table image copied to clipboard", 2600);
 		} catch {
 			const blob = await renderTableBlob();
 			if (blob) saveBlob(blob, imgName());
-			shareMsg = "Image saved (clipboard unavailable)";
+			flash("Image saved (clipboard unavailable)", 2600);
 		}
-		setTimeout(() => (shareMsg = ""), 2600);
 	}
 
 	async function downloadImage() {
@@ -315,9 +319,10 @@
 	async function copyShareLink() {
 		try {
 			await navigator.clipboard.writeText(window.location.href);
-		} catch {}
-		shareMsg = "Link copied!";
-		setTimeout(() => (shareMsg = ""), 2000);
+			flash("Link copied!", 2000);
+		} catch {
+			flash("Couldn’t copy. Copy the link from the address bar.", 3200);
+		}
 		shareOpen = false;
 	}
 </script>

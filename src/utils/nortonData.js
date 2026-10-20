@@ -72,6 +72,6 @@ export function getNortonData() {
 		titles.sort((x, y) => y.total - x.total);
 
 		return { months, titles, authors };
-	})();
+	})().catch((e) => { promise = null; throw e; });
 	return promise;
 }

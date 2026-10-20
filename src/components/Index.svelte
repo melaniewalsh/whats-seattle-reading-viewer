@@ -29,6 +29,18 @@
 	let rankKind = $state("works"); // Rankings tab: "authors" | "works"
 	let menuOpen = $state(false); // the slide-out hamburger menu
 
+	// The browser-tab title names what's on screen ("Octavia E. Butler · What’s
+	// Seattle Reading?"); the home page uses the site name alone.
+	const TAB_TITLES = { overview: "Overview", genres: "Genre Trends", backlist: "Backlist Boomerangs",
+		about: "About the Project", publications: "Publications", norton: "Canonical American Authors" };
+	const docTitle = $derived.by(() => {
+		let page = "";
+		if (tab === "search") page = compareMode ? searchText.split(", ").join(" vs. ") : searchText;
+		else if (tab === "rankings") page = rankKind === "authors" ? "Most Borrowed Authors" : "Most Borrowed Books";
+		else page = TAB_TITLES[tab] || "";
+		return page ? `${page} · ${copy.title}` : copy.title;
+	});
+
 	// "Featured trend of the month" on the home hub: this month, The Odyssey.
 	// "Last updated" = the most recent month present in the data.
 	let lastUpdated = $state("");
@@ -125,9 +137,9 @@
 	// project's Quarto essay (hotlinked from GitHub Pages).
 	const spl500Fig = "https://essays.whats-seattle-reading.com/posts/spl-500-novels/index_files/figure-html/";
 	let copiedBib = $state(null);
-	function copyBib(p) {
+	async function copyBib(p) {
 		try {
-			navigator.clipboard.writeText(p.bibtex);
+			await navigator.clipboard.writeText(p.bibtex);
 			copiedBib = p.title;
 			setTimeout(() => (copiedBib === p.title && (copiedBib = null)), 2000);
 		} catch {}
@@ -468,7 +480,14 @@
 	}
 </script>
 
+<svelte:head><title>{docTitle}</title></svelte:head>
+
 <svelte:boundary onerror={(e) => console.error(e)}>
+	{#snippet failed()}
+		<div class="view-error" role="alert">
+			<p>Something went wrong. <button type="button" onclick={() => location.reload()}>Reload the page</button></p>
+		</div>
+	{/snippet}
 	<article>
 		<div class="masthead">
 			<div class="masthead-top">
@@ -527,6 +546,16 @@
 			</div>
 		</nav>
 
+		<!-- One view failing shows a message instead of blanking the page; the
+		     masthead and menu stay, and switching views starts fresh. -->
+		{#key tab}
+		<svelte:boundary onerror={(e) => console.error(e)}>
+		{#snippet failed(error, reset)}
+			<div class="view-error" role="alert">
+				<p>Something went wrong loading this page.</p>
+				<p><button type="button" onclick={reset}>Try again</button> or <button type="button" onclick={() => location.reload()}>reload the page</button>.</p>
+			</div>
+		{/snippet}
 		{#if tab === "search"}
 			<!-- The rule under this masthead is drawn by the viewer, below its
 			     "Not sure where to start?" line, which belongs with the intro. -->
@@ -732,6 +761,8 @@
 				{/key}
 			{/if}
 		{/if}
+		</svelte:boundary>
+		{/key}
 
 		<footer class="chart-footer">
 		{#if tab === "search"}
@@ -784,6 +815,9 @@ You can manually adjust the clustering in the works table at the bottom of the p
 </svelte:boundary>
 
 <style>
+	.view-error { max-width: 640px; margin: 48px auto; padding: 18px 20px; border: 1px solid var(--color-border); border-radius: 8px; font-family: var(--font-sans); font-size: var(--text-sm); color: var(--color-fg); }
+	.view-error p { margin: 0 0 6px; }
+	.view-error button { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 	/* One shared content width for every tab, so Search / Genres / Most Borrowed
 	   all line up at the same width and left edge. */
 	article {

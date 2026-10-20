@@ -19,14 +19,6 @@ const config = {
 		// The deploy workflow passes BASE_PATH; locally it's empty (served at /).
 		paths: {
 			base: process.env.BASE_PATH || ""
-		},
-		prerender: {
-			// The starter's optional social-share <meta> images aren't present;
-			// don't fail the build over them.
-			handleHttpError: ({ path, message }) => {
-				if (path.includes("/assets/social-")) return;
-				throw new Error(message);
-			}
 		}
 	}
 };

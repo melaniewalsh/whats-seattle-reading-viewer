@@ -90,6 +90,13 @@
 	let chartWrap = $state(null);    // ref to the chart container, for the PNG export
 	let shareOpen = $state(false);   // whether the share popover is open
 	let shareMsg = $state("");       // transient toast after copy/save
+	// One timer for the toast, so a second message isn't cleared early by the first one's timer.
+	let flashTimer;
+	function flash(msg, ms = 2600) {
+		clearTimeout(flashTimer);
+		shareMsg = msg;
+		flashTimer = setTimeout(() => (shareMsg = ""), ms);
+	}
 	let dlOpen = $state(false);      // Download menu (Data / Image)
 	let smoothOn = $state(true);     // 3-month averages, as on the author pages
 	let legendHoverKey = $state(null);
@@ -340,16 +347,18 @@
 		if (urls[platform]) window.open(urls[platform], "_blank", "noopener,noreferrer,width=600,height=540");
 		shareOpen = false;
 		if (copied) {
-			shareMsg = "Chart image copied — paste it (⌘/Ctrl+V) into your post";
-			setTimeout(() => (shareMsg = ""), 4500);
+			flash("Chart image copied — paste it (⌘/Ctrl+V) into your post", 4500);
 		}
 	}
 
 	async function copyShareLink() {
 		const { link } = shareTarget();
-		try { await navigator.clipboard.writeText(link); } catch {}
-		shareMsg = "Link copied!";
-		setTimeout(() => (shareMsg = ""), 2000);
+		try {
+			await navigator.clipboard.writeText(link);
+			flash("Link copied!", 2000);
+		} catch {
+			flash("Couldn’t copy. Copy the link from the address bar.", 3200);
+		}
 		shareOpen = false;
 	}
 
@@ -360,13 +369,12 @@
 		try {
 			if (!(navigator.clipboard && window.ClipboardItem)) throw new Error("no clipboard");
 			await navigator.clipboard.write([new ClipboardItem({ "image/png": renderChartBlob() })]);
-			shareMsg = "Chart image copied to clipboard";
+			flash("Chart image copied to clipboard", 2600);
 		} catch {
 			const blob = await renderChartBlob();
 			if (blob) saveBlob(blob, "seattle-reading-genres.png");
-			shareMsg = "Image saved (clipboard unavailable)";
+			flash("Image saved (clipboard unavailable)", 2600);
 		}
-		setTimeout(() => (shareMsg = ""), 2600);
 	}
 
 	// Rasterize the chart SVG to a titled PNG (Blob), reused by download + share.
@@ -488,8 +496,7 @@
 			return;
 		}
 		saveBlob(blob, name);
-		shareMsg = "Image saved — attach it to your post";
-		setTimeout(() => (shareMsg = ""), 3200);
+		flash("Image saved — attach it to your post", 3200);
 	}
 </script>
 

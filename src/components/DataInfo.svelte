@@ -47,7 +47,11 @@
 	function open() { dialog?.showModal(); }
 	function close() { dialog?.close(); }
 	async function copy(which, text) {
-		try { await navigator.clipboard.writeText(text); } catch {}
+		try {
+			await navigator.clipboard.writeText(text);
+		} catch {
+			return; // nothing copied, so don't say "Copied"
+		}
 		copied = which;
 		setTimeout(() => (copied === which && (copied = "")), 1800);
 	}

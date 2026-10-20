@@ -41,6 +41,14 @@ function shardFor(slug) {
 
 let monthsPromise = null;
 
+// A failed download is never cached: each getter below clears its promise on
+// failure, so the next call tries again instead of staying broken all session.
+async function fetchJson(url) {
+	const r = await fetch(url, FRESH);
+	if (!r.ok) throw new Error(`${url}: ${r.status}`);
+	return r.json();
+}
+
 /** Shared x-axis for every chart. Fetched once and cached for the session. */
 // The "Top authors" tab dataset: top-N clustered authors per genre per year.
 // { years:[...], genres:[...], data:{ genre:{ "<year>":[[slug,name,co],...],
@@ -48,9 +56,8 @@ let monthsPromise = null;
 let topAuthorsPromise = null;
 export function getTopAuthors() {
 	if (!topAuthorsPromise) {
-		topAuthorsPromise = fetch(`${DATA_BASE}/top-authors.json`, FRESH)
-			.then((r) => (r.ok ? r.json() : null))
-			.catch(() => null);
+		topAuthorsPromise = fetchJson(`${DATA_BASE}/top-authors.json`)
+			.catch(() => { topAuthorsPromise = null; return null; });
 	}
 	return topAuthorsPromise;
 }
@@ -66,9 +73,8 @@ let backlistPromise = null;
 let coauthorsPromise = null;
 export function getCoauthors() {
 	if (!coauthorsPromise) {
-		coauthorsPromise = fetch(`${DATA_BASE}/coauthors.json`, FRESH)
-			.then((r) => (r.ok ? r.json() : {}))
-			.catch(() => ({}));
+		coauthorsPromise = fetchJson(`${DATA_BASE}/coauthors.json`)
+			.catch(() => { coauthorsPromise = null; return {}; });
 	}
 	return coauthorsPromise;
 }
@@ -82,6 +88,7 @@ export function getBacklist() {
 					if (r.ok) return await r.json();
 				} catch { /* try the next source */ }
 			}
+			backlistPromise = null;
 			return null;
 		})();
 	}
@@ -93,9 +100,8 @@ export function getBacklist() {
 let topWorksPromise = null;
 export function getTopWorks() {
 	if (!topWorksPromise) {
-		topWorksPromise = fetch(`${DATA_BASE}/top-works.json`, FRESH)
-			.then((r) => (r.ok ? r.json() : null))
-			.catch(() => null);
+		topWorksPromise = fetchJson(`${DATA_BASE}/top-works.json`)
+			.catch(() => { topWorksPromise = null; return null; });
 	}
 	return topWorksPromise;
 }
@@ -105,23 +111,22 @@ export function getTopWorks() {
 let genreTermsPromise = null;
 export function getGenreTerms() {
 	if (!genreTermsPromise) {
-		genreTermsPromise = fetch(`${base}/genres.json`, FRESH)
-			.then((r) => (r.ok ? r.json() : null))
+		genreTermsPromise = fetchJson(`${base}/genres.json`)
 			.then((g) => {
 				const m = {};
 				for (const x of g?.genres || []) m[x.name] = [...(x.terms || []), ...(x.ficTerms || [])];
 				return m;
 			})
-			.catch(() => ({}));
+			.catch(() => { genreTermsPromise = null; return {}; });
 	}
 	return genreTermsPromise;
 }
 
 export async function getMonths() {
 	if (!monthsPromise) {
-		monthsPromise = fetch(`${DATA_BASE}/meta.json`, FRESH)
-			.then((r) => r.json())
-			.then((m) => m.months);
+		monthsPromise = fetchJson(`${DATA_BASE}/meta.json`)
+			.then((m) => m.months)
+			.catch((e) => { monthsPromise = null; throw e; });
 	}
 	return monthsPromise;
 }
@@ -271,7 +276,7 @@ export async function getAllCheckouts() {
 				}
 			}
 			return out;
-		})();
+		})().catch((e) => { allCheckoutsPromise = null; throw e; });
 	}
 	return allCheckoutsPromise;
 }
@@ -292,15 +297,15 @@ const JUNK_AUTHOR_NAMES = new Set(['', 'NA', 'N/A', 'Unknown', 'unknown', 'Vario
 let indexPromise = null;
 function getIndex() {
 	if (!indexPromise) {
-		indexPromise = fetch(`${DATA_BASE}/search-index.json`, FRESH)
-			.then((r) => r.json())
+		indexPromise = fetchJson(`${DATA_BASE}/search-index.json`)
 			.then((all) => {
 				const rows = all.filter((r) => !JUNK_AUTHOR_NAMES.has(r[1]));
 				// Precompute each name's alphanumeric "words" (punctuation + dates
 				// split out) for punctuation-insensitive word matching in search.
 				const words = rows.map((r) => r[1].toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
 				return { rows, words };
-			});
+			})
+			.catch((e) => { indexPromise = null; throw e; });
 	}
 	return indexPromise;
 }
@@ -368,8 +373,7 @@ export async function searchAuthors(query, limit = 20) {
 let titleIndexPromise = null;
 function getTitleIndex() {
 	if (!titleIndexPromise) {
-		titleIndexPromise = fetch(`${DATA_BASE}/title-index.json`, FRESH)
-			.then((r) => (r.ok ? r.json() : []))
+		titleIndexPromise = fetchJson(`${DATA_BASE}/title-index.json`)
 			.then((rows) => {
 				// Each author's indexed books, most-borrowed first (rows are sorted
 				// by total), so an author search can list their books too.
@@ -380,7 +384,7 @@ function getTitleIndex() {
 				});
 				return { rows, lower: rows.map((r) => r[0].toLowerCase()), bySlug };
 			})
-			.catch(() => ({ rows: [], lower: [], bySlug: new Map() }));
+			.catch(() => { titleIndexPromise = null; return { rows: [], lower: [], bySlug: new Map() }; });
 	}
 	return titleIndexPromise;
 }
