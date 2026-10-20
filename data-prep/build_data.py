@@ -1342,9 +1342,11 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     # pick, not just a top 20).
     try:
         picks = json.load(open(PROJECT_DIR / "src" / "data" / "seattle-reads.json"))["picks"]
-        want = {(normalize_work_key(t), s) for _, t, s in picks}
+        # Matched on the main title: display titles often drop the subtitle.
+        main = lambda t: normalize_work_key((t or "").split(":")[0])
+        want = {(main(t), s) for _, t, s in picks}
         mem = {wk for wk, (title, author) in meta.items()
-               if (normalize_work_key(title), slug_by_author.get(author, "")) in want}
+               if (main(title), slug_by_author.get(author, "")) in want}
         rank = lambda pairs: [[*meta[wk], slug_by_author.get(meta[wk][1], ""), c]
                               for wk, c in sorted(pairs, key=lambda p: -p[1]) if c]
         gdata = {str(y): rank([(wk, full_year.get((wk, y), 0)) for wk in mem]) for y in years}
