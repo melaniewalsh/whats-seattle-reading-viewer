@@ -89,7 +89,8 @@
 		flashTimer = setTimeout(() => (shareMsg = ""), ms);
 	}
 	let dlOpen = $state(false);      // Download menu (Data / Image)
-	let smoothOn = $state(true);     // 3-month averages, as on the author pages
+	// Genre shares wobble month to month, so this chart always draws 3-month
+	// averages (the book and author charts show raw months).
 	let legendHoverKey = $state(null);
 	let plotInset = $state(0); // the chart's right margin, to line the footer up with the plot's edge
 
@@ -291,7 +292,7 @@
 	}
 
 	// --- Share / download (mirrors the "By author" tab exactly) --------------
-	const plotTitle = "Share of book checkouts · a book can count toward several genres";
+	const plotTitle = "Share of book checkouts (3-month average) · a book can count toward several genres";
 	const legendItems = $derived(series.map((s) => ({ label: s.name, color: s.color, key: s.key })));
 
 	// A shareable link (reopens the genre tab) plus a caption.
@@ -504,7 +505,7 @@
 				{/if}
 			{:else if plotGenres.length}
 				<!-- Several genres: a plain line, not a second big title under the page's -->
-				<p class="g-meta g-compare">{plotGenres.length <= 3 ? listGenres(plotGenres) : `${plotGenres.length} genres`}: share of book checkouts, {yearRange}. Click a genre's name to show it alone.</p>
+				<p class="g-meta g-compare">{plotGenres.length <= 3 ? listGenres(plotGenres) : `${plotGenres.length} genres`}: share of book checkouts (3-month average), {yearRange}. Click a genre's name to show it alone.</p>
 			{:else}
 				<p class="g-meta">Tick genres in the table below to plot them.</p>
 			{/if}
@@ -512,7 +513,6 @@
 
 		<div class="plot-toolbar">
 			<div class="tb-left">
-				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 				{#if isolatedKeys.length && series.length >= 2}
 					<span class="iso-note">Showing {chartSeries.length} of {series.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={() => (isolatedKeys = [])}>Show all</button></span>
 				{/if}
@@ -523,7 +523,7 @@
 		<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 		<div class="chartwrap" bind:this={chartWrap}>
 			<LineChart bind:plotInset months={viewMonths} series={chartSeries} mode="line" percent unit="of book checkouts"
-				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={(k) => toggleIsolate(k)} />
+				smooth annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={(k) => toggleIsolate(k)} />
 		</div>
 
 		<!-- A swatch legend under the chart (phones have no end-of-line names).
@@ -539,7 +539,7 @@
 		<YearBrush months={data.months} inset={phone.current ? 0 : plotInset} bind:lo bind:hi />
 		<!-- Source on the left; Download and Share as small links on the right -->
 		<div class="chart-foot" style="padding-right: {phone.current ? 0 : plotInset}px">
-			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap. <DataInfo first={data.months[0]} last={data.months[data.months.length - 1]} genres />.</p>
+			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>. Genres come from Library of Congress and BISAC subject headings; a book can count toward several genres, so the shares overlap. Lines show 3-month averages. <DataInfo first={data.months[0]} last={data.months[data.months.length - 1]} genres />.</p>
 			<div class="tb-right foot-actions">
 				<div class="dl-wrap">
 					<button class="tb-btn" onclick={() => (dlOpen = !dlOpen)} aria-haspopup="true" aria-expanded={dlOpen} title="Download the data or the chart">
@@ -693,13 +693,11 @@
 	.g-sep { color: #aaa; }
 	.g-lead { margin-right: 2px; }
 
-	/* Toolbar: 3-month average on the left; Download and Share on the right. */
+	/* Toolbar: the "Showing 2 of 6" note on the left. */
 	.plot-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin: var(--space-5) 0 var(--space-4); }
 	.tb-left, .tb-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 	.iso-note { font-size: var(--text-sm); color: var(--color-fg-light); }
 	.iso-showall { background: none; border: 0; padding: 0; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-	.smooth-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-fg-light); cursor: pointer; user-select: none; }
-	.smooth-toggle input { margin: 0; width: 16px; height: 16px; accent-color: var(--color-fg); appearance: auto; -webkit-appearance: auto; }
 	.tb-btn { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; line-height: 1; padding: 7px 11px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white); color: var(--color-fg); cursor: pointer; white-space: nowrap; }
 	.tb-btn:hover { border-color: var(--color-fg-light); }
 	.tb-btn :global(svg) { flex: none; width: 15px; height: 15px; color: var(--color-fg-light); }

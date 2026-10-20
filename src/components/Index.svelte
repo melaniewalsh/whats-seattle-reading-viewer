@@ -671,7 +671,7 @@
 					</div>
 					<div class="featured-chart">
 						<!-- Same style as the trend pages. -->
-						<LineChart months={featured.months} series={featured.series} mode="line" smooth
+						<LineChart months={featured.months} series={featured.series} mode="line"
 							annotations={EVENT_ANNOTATIONS} />
 					</div>
 					<div class="featured-actions">

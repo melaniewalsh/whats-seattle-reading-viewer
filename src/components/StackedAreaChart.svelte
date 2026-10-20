@@ -11,8 +11,6 @@
 		months: monthsProp = null,
 		series: seriesProp = null,
 		mode = 'area',
-		grandTotal = 0,   // the author's (or overview's) all-time total, for the share line
-		shareOf = '',     // phrase after "% of ", e.g. "J. K. Rowling's checkouts"
 		annotations = [],  // [{ month, end, label, short, tiny, blurb, url }] — shaded event bands
 		peak = null,      // { idx, value, month } — a static callout pointing at the peak
 		legendHoverKey = null,  // key of the legend entry being hovered -> light up its band(s)
@@ -24,6 +22,8 @@
 		onSeriesClick = null, // click an end label: (key) => … (e.g. isolate that line)
 		percent = false,  // values are percentages (the genre shares), not counts
 		monthTotals = null, // per-month totals: the tooltip shows each line's share of that month (Overview by format)
+		yearly = false,   // one point per year: `months` are "YYYY-01" and values are yearly totals
+		lastMonth = '',   // with `yearly`: the data's last month ("2026-08"), so the unfinished year is marked
 		plotInset = $bindable(0) // out: the plot's right margin, so a page can align to its edge
 	} = $props();
 	const uid = $props.id(); // unique ids for the event notes (aria-describedby)
@@ -57,7 +57,7 @@
 	const height = $derived(width < 520 ? 300 : 380);
 	// Month-tick mode (narrow year window) draws a second axis row for the
 	// year, so it needs a little more room at the bottom.
-	const monthTickMode = $derived(months.length > 0 && months.length <= 48);
+	const monthTickMode = $derived(!yearly && months.length > 0 && months.length <= 48);
 	// Margins. The y-axis labels sit INSIDE the plot (on their gridlines), so the
 	// left margin is ~0. The top grows to fit book markers or event labels; the
 	// right grows to fit end-of-line labels.
@@ -159,11 +159,14 @@
 		return annotations
 			.map((a) => {
 				const end = a.end || a.month;
-				const i0 = months.findIndex((m) => m >= a.month);
+				// Yearly points: a band covers the years its months fall in.
+				const at = (m) => (yearly ? m.slice(0, 4) : m);
+				const i0 = months.findIndex((m) => at(m) >= at(a.month));
 				let i1 = -1;
-				for (let k = months.length - 1; k >= 0; k--) if (months[k] <= end) { i1 = k; break; }
+				for (let k = months.length - 1; k >= 0; k--) if (at(months[k]) <= at(end)) { i1 = k; break; }
 				if (i0 < 0 || i1 < i0) return null;
-				const x0 = x(i0) - halfStep, x1 = x(i1) + halfStep;
+				// Kept inside the plot (yearly points have wide half-steps at the edges).
+				const x0 = Math.max(margin.left, x(i0) - halfStep), x1 = Math.min(width - margin.right, x(i1) + halfStep);
 				const lw = Math.max(...(a.short || [a.label]).map((t) => t.length)) * 6.2;
 				// A band wide enough to hold its label (Covid, Mar 2020-Apr 2021)
 				// gets it inside, at its top-left; a narrow one gets it beside it.
@@ -267,14 +270,22 @@
 		}))
 	);
 
+	// With yearly points, the current year isn't over: its segment is dashed.
+	const partialYear = $derived(
+		yearly && lastMonth && !lastMonth.endsWith('-12') && months[months.length - 1]?.slice(0, 4) === lastMonth.slice(0, 4)
+	);
 	const linePaths = $derived(
-		lineLayers.map((s, k) => ({
-			...s,
-			eachKey: lineKeys[k],
-			d: d3line()
-				.x((_, i) => x(i))
-				.y((_, i) => y(s.values[i]))(s.values)
-		}))
+		lineLayers.map((s, k) => {
+			const line = d3line().x((_, i) => x(i)).y((_, i) => y(s.values[i]));
+			const n = s.values.length;
+			const split = partialYear && n > 1;
+			return {
+				...s,
+				eachKey: lineKeys[k],
+				d: split ? line(s.values.slice(0, n - 1)) : line(s.values),
+				dPartial: split ? d3line()([[x(n - 2), y(s.values[n - 2])], [x(n - 1), y(s.values[n - 1])]]) : null
+			};
+		})
 	);
 
 	// The top edge of each stacked band, drawn as a line so every area gets a crisp
@@ -306,7 +317,8 @@
 		};
 	});
 
-	const yTicks = $derived(y.ticks(5));
+	// Counts only get whole-number gridlines (no "0.5 checkouts").
+	const yTicks = $derived(y.ticks(5).filter((t) => percent || Number.isInteger(t)));
 	// The topmost labelled gridline carries the unit ("1,200 checkouts a month").
 	const yTopTick = $derived(yTicks.length ? yTicks[yTicks.length - 1] : null);
 
@@ -330,7 +342,7 @@
 		const placed = [[], []];
 		const fits = (r, a, b) => a >= 0 && b <= width && placed[r].every(([p, q]) => b + 8 <= p || a >= q + 8);
 		return markers
-			.map((mk) => ({ ...mk, i: months.indexOf(mk.month) }))
+			.map((mk) => ({ ...mk, i: months.indexOf(yearly ? `${mk.month.slice(0, 4)}-01` : mk.month) }))
 			.filter((mk) => mk.i >= 0)
 			.sort((a, b) => a.i - b.i)
 			.map((mk) => {
@@ -558,15 +570,18 @@
 		return layers
 			.map((l) => ({
 				key: keyOf(l), label: l.label, color: l.color,
-				v: (l.raw ?? l.values)?.[hoverIndex] ?? 0,
-				pct: monthPct((l.raw ?? l.values)?.[hoverIndex] ?? 0),
-				avg: smooth && mode === 'line' ? l.values?.[hoverIndex] : null
+				v: l.values?.[hoverIndex] ?? 0,
+				pct: monthPct((l.raw ?? l.values)?.[hoverIndex] ?? 0)
 			}))
 			.sort((a, b) => b.v - a.v);
 	});
 
 	function formatMonth(ym) {
 		if (!ym) return '';
+		if (yearly) {
+			const yr = ym.slice(0, 4);
+			return partialYear && yr === lastMonth.slice(0, 4) ? `${yr} (through ${MONTH_NAMES[Number(lastMonth.slice(5, 7)) - 1]})` : yr;
+		}
 		const parts = ym.split('-');
 		if (parts.length < 2) return ym;
 		return `${MONTH_NAMES[Number(parts[1]) - 1]} ${parts[0]}`;
@@ -603,10 +618,6 @@
 			: selectedItem.label
 	);
 
-	// The hovered work's share of the author's (or overview's) all-time checkouts.
-	const workSharePct = $derived(
-		selectedItem && grandTotal && selectedItem.workTotal ? (selectedItem.workTotal / grandTotal) * 100 : null
-	);
 	function fmtPct(p) {
 		if (p >= 9.95) return Math.round(p) + "%";
 		if (p >= 0.1) return p.toFixed(1) + "%";
@@ -667,15 +678,6 @@
         return [...byFmt.values()].sort((a, b) => b.value - a.value);
     });
 
-    // The hovered thing's share of THAT MONTH's total checkouts. In the format
-    // overview each layer is a format, so this reads "38% of this month's
-    // checkouts are audiobook"; for a multi-edition work it's the whole work's
-    // share (all its formats), not a single edition.
-    const monthShareNum = $derived(groupSiblings.length > 1 ? groupTotal : (selectedItem ? selectedItem.values[hoverIndex] : 0));
-    const monthSharePct = $derived(
-        mode !== 'line' && hoverIndex !== null && selectedItem && hoveredTotal
-            ? (monthShareNum / hoveredTotal) * 100 : null
-    );
 
     // opacity for a given area layer, given the current hover state
     function pathOpacity(p) {
@@ -770,6 +772,9 @@
 					opacity={pathOpacity(p)}
 					class="line-path"
 				/>
+				{#if p.dPartial}
+					<path d={p.dPartial} fill="none" stroke={p.color} stroke-width={p.isAggregate ? 2.25 : 2} stroke-dasharray="4 4" stroke-linecap="round" opacity={pathOpacity(p)} class="line-path" />
+				{/if}
 			{/each}
 		{:else}
 			{#each areaPaths as p (p.eachKey)}
@@ -916,7 +921,7 @@
 					<li class:on={hoveredSeriesKey && r.label === hoveredSeriesKey}>
 						<span class="ts-sw" style="background:{r.color}"></span>
 						<span class="ts-name">{r.label}</span>
-						<span class="ts-val">{percent ? fmtVal(r.v) : r.v.toLocaleString()}{#if r.pct != null}<span class="ts-avg">{fmtPct(r.pct)}</span>{/if}{#if r.avg != null}<span class="ts-avg">avg {percent ? fmtVal(r.avg) : Math.round(r.avg).toLocaleString()}</span>{/if}</span>
+						<span class="ts-val">{fmtVal(r.v)}{#if r.pct != null}<span class="ts-avg">{fmtPct(r.pct)}</span>{/if}</span>
 					</li>
 				{/each}
 			</ul>
@@ -948,19 +953,8 @@
                     <span>{groupTotal.toLocaleString()}</span>
                 </div>
             {:else}
-                <div class="tt-value">{percent ? fmtVal((selectedItem.raw ?? selectedItem.values)[hoverIndex]) : (selectedItem.raw ?? selectedItem.values)[hoverIndex].toLocaleString()}<span class="tt-value-unit">{percent ? "of checkouts" : "checkouts"}</span></div>
-                {#if smooth && mode === 'line'}<div class="tt-avg">3-month avg. {fmtVal(selectedItem.values[hoverIndex])}</div>{/if}
-            {/if}
-
-            {#if selectedItem.otherTitles?.length}
-                <div class="tt-others">
-                    {#each selectedItem.otherTitles.slice(0, 8) as name}
-                        <div class="tt-other">{name}</div>
-                    {/each}
-                    {#if selectedItem.otherTitles.length > 8}
-                        <div class="tt-other-more">+{selectedItem.otherTitles.length - 8} more</div>
-                    {/if}
-                </div>
+                <!-- The value that's drawn: the 3-month average where the chart is smoothed (Genres). -->
+                <div class="tt-value">{fmtVal(selectedItem.values[hoverIndex])}<span class="tt-value-unit">{percent ? "of checkouts" : "checkouts"}{#if smooth && mode === 'line'}{" · 3-month average"}{/if}</span></div>
             {/if}
 
             {#if monthTotals && monthPct((selectedItem.raw ?? selectedItem.values)[hoverIndex]) !== null}
@@ -970,12 +964,6 @@
                     {#each layers.map((l) => ({ l, v: (l.raw ?? l.values)[hoverIndex] ?? 0 })).sort((a, b) => b.v - a.v) as { l, v } (keyOf(l))}
                         <div class="tt-shares-row" class:on={keyOf(l) === keyOf(selectedItem)}><span class="tt-sw" style="background:{l.color}"></span><span>{l.label}</span><span class="tt-shares-pct">{fmtPct(monthPct(v))}</span></div>
                     {/each}
-                </div>
-            {:else if monthSharePct !== null}
-                <div class="tooltip-total"><span class="tt-share" style="color: {selectedItem.color};">{fmtPct(monthSharePct)} of this month's checkouts</span></div>
-            {:else if workSharePct !== null && shareOf}
-                <div class="tooltip-total">
-                    <span class="tt-share">{fmtPct(workSharePct)} of {shareOf}</span>
                 </div>
             {:else if mode !== 'line'}
                 <div class="tooltip-total">
@@ -1143,7 +1131,6 @@
 	/* Hover */
 	.hover-guide { stroke: #9a9a9a; stroke-width: 0.75; }
 	.hover-dot { stroke: #fff; stroke-width: 2; }
-	.tt-avg { font-size: 12px; color: #858585; margin-top: 2px; }
 	.qmark-body {
 		margin: 0;
 		font-family: var(--font-sans, system-ui, sans-serif);
@@ -1324,26 +1311,6 @@
 		color: #1a1a1a;
 	}
 	/* The titles rolled into an "Other titles" band, listed in its tooltip. */
-	.tt-others {
-		margin: 4px 0 2px 19px;
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-	}
-	.tt-other {
-		font-size: 0.8rem;
-		color: #444;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 240px;
-	}
-	.tt-other-more {
-		font-size: 0.74rem;
-		font-weight: 600;
-		color: #888;
-		margin-top: 1px;
-	}
 	.tt-value-unit {
 		font-size: 0.68rem;
 		font-weight: 700;

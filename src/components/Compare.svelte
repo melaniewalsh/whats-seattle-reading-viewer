@@ -16,6 +16,7 @@
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import YearBrush from "$components/YearBrush.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
+	import { isQuiet, toYearly, QUIET_PEAK } from "$utils/lowCount.js";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import { getMonths, getAuthor, densify } from "$components/db.js";
 	import { normalizeWorkKey, cleanTitleForDisplay, bareTitleAliases } from "$utils/workTitle.js";
@@ -56,7 +57,6 @@
 	let months = $state([]);
 	let picks = $state.raw([]); // [{ id, kind, slug, title?, label, color, values }]
 	let loading = $state(0);
-	let smooth = $state(true);
 	let yearLo = $state(0);
 	let yearHi = $state(0);
 	let plotInset = $state(0);
@@ -172,6 +172,10 @@
 			values: isYearFiltered ? p.values.slice(yearLo, yearHi + 1) : p.values
 		}))
 	);
+	// If any line never reached QUIET_PEAK checkouts in a month, the chart (and
+	// the table and downloads) count by year, so every line shares one scale.
+	const yearly = $derived(picks.some((p) => isQuiet(p.values)));
+	const chartData = $derived(yearly ? toYearly(viewMonths, series) : { months: viewMonths, series });
 	// The slider's backdrop: everything picked, added up.
 	const brushValues = $derived.by(() => {
 		const out = new Array(months.length).fill(0);
@@ -189,20 +193,22 @@
 		if (yearLo < brushStart) yearLo = brushStart;
 	});
 
-	// Under the chart: each pick's total and its best month.
-	const rows = $derived(
-		picks.map((p) => {
+	// Under the chart: each pick's total and its best month (best year when
+	// the chart counts by year).
+	const rows = $derived.by(() => {
+		const per = yearly ? toYearly(months, picks) : { months, series: picks };
+		return per.series.map((p) => {
 			let best = 0;
 			p.values.forEach((v, i) => { if (v > p.values[best]) best = i; });
-			const m = months[best] || "";
+			const m = per.months[best] || "";
 			return {
 				...p,
 				total: p.values.reduce((s, v) => s + v, 0),
 				peak: p.values[best] || 0,
-				peakLabel: m ? `${MONTH_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}` : ""
+				peakLabel: !m ? "" : yearly ? m.slice(0, 4) : `${MONTH_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`
 			};
-		})
-	);
+		});
+	});
 
 	// Downloads: the chart as an image, or every month's checkouts as a CSV.
 	const fileStub = () =>
@@ -213,7 +219,7 @@
 		const yrs = viewMonths.length ? `, ${viewMonths[0].slice(0, 4)}–${viewMonths[viewMonths.length - 1].slice(0, 4)}` : "";
 		return renderChartPng(chartWrap?.querySelector("svg"), {
 			title,
-			subtitle: `Checkouts a month at the Seattle Public Library${yrs}${smooth ? " (3-month average)" : ""}`,
+			subtitle: `Checkouts a ${yearly ? "year" : "month"} at the Seattle Public Library${yrs}`,
 			legend: picks.map((p) => ({ label: p.kind === "work" ? `${p.label} (${p.author})` : p.label, color: p.color }))
 		});
 	}
@@ -260,7 +266,8 @@
 			return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
 		};
 		const head = ["date", ...picks.map((p) => (p.kind === "work" ? `${p.label} (${p.author})` : p.label))];
-		const rows = months.map((m, i) => [`${m}-01`, ...picks.map((p) => p.values[i] || 0)]);
+		const per = yearly ? toYearly(months, picks) : { months, series: picks };
+		const rows = per.months.map((m, i) => [yearly ? m.slice(0, 4) : `${m}-01`, ...per.series.map((p) => p.values[i] || 0)]);
 		const csv = [head, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
 		saveBlob(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }), `${fileStub()}-spl-checkouts.csv`);
 	}
@@ -294,12 +301,9 @@
 	{#if notFound}<p class="cmp-note">Couldn't find “{notFound}”.</p>{/if}
 
 	<div class="cmp-chart">
-		<div class="cmp-toolbar">
-			<label class="smooth-toggle"><input type="checkbox" bind:checked={smooth} /> 3-month average</label>
-		</div>
 		{#if picks.length && months.length}
 			<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
-			<div bind:this={chartWrap}><LineChart bind:plotInset months={viewMonths} {series} mode="line" {smooth} annotations={EVENT_ANNOTATIONS} onSeriesClick={openPick} /></div>
+			<div bind:this={chartWrap}><LineChart bind:plotInset months={chartData.months} series={chartData.series} {yearly} lastMonth={months[months.length - 1]} unit={yearly ? "checkouts a year" : undefined} mode="line" annotations={EVENT_ANNOTATIONS} onSeriesClick={openPick} /></div>
 			{#if series.length >= 2}
 				<div class="cmp-legend">
 					{#each picks as p (p.id)}<button type="button" class="cl-item" title="See this {p.kind === 'work' ? 'book' : 'author'}'s own trends page" onclick={() => openPick(p.id)}><span class="cl-sw" style="background:{p.color}"></span>{p.label}</button>{/each}
@@ -309,7 +313,7 @@
 				<YearBrush {months} start={brushStart} inset={phone.current ? 0 : plotInset} bind:lo={yearLo} bind:hi={yearHi} />
 			{/if}
 			<div class="chart-foot" style="padding-right: {phone.current ? 0 : plotInset}px">
-				<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>, every edition (print, ebook and audiobook).{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.</p>
+				<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>, every edition (print, ebook and audiobook).{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.{#if yearly}{" "}Shown by year: books with fewer than {QUIET_PEAK} checkouts in their busiest month are counted by year, not month.{/if}</p>
 				<div class="foot-actions">
 					<span class="dl-wrap">
 						<button class="tb-btn" onclick={() => (dlOpen = !dlOpen)} aria-haspopup="true" aria-expanded={dlOpen}><DownloadIcon size={13} strokeWidth={2} aria-hidden="true" /> Download <ChevronDownIcon size={12} strokeWidth={2} aria-hidden="true" /></button>
@@ -345,7 +349,7 @@
 
 	{#if rows.length}
 		<table class="cmp-table">
-			<thead><tr><th>On the chart</th><th class="num">Total checkouts</th><th class="num">Best month</th></tr></thead>
+			<thead><tr><th>On the chart</th><th class="num">Total checkouts</th><th class="num">{yearly ? "Best year" : "Best month"}</th></tr></thead>
 			<tbody>
 				{#each rows as r (r.id)}
 					<tr>
@@ -385,9 +389,6 @@
 	.cmp-note { margin: 8px 0 0; font-size: 14px; color: var(--color-fg-light); }
 
 	.cmp-chart { margin: 22px 0 0; padding-top: 16px; border-top: 3px solid var(--color-fg); }
-	.cmp-toolbar { display: flex; align-items: center; gap: 16px; margin: 0 0 6px; }
-	.smooth-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--color-fg-light); cursor: pointer; user-select: none; }
-	.smooth-toggle input { appearance: auto; -webkit-appearance: auto; width: 17px; height: 17px; margin: 0; accent-color: var(--color-fg); background: none; flex: none; cursor: pointer; }
 	.cmp-empty { margin: 40px 0; text-align: center; color: var(--color-fg-light); }
 
 	/* As on the trends page: on wide screens the line labels hang out into the

@@ -15,7 +15,6 @@
 	import ChartAreaIcon from "@lucide/svelte/icons/chart-area";
 	import ChartLineIcon from "@lucide/svelte/icons/chart-line";
 	import BookCopyIcon from "@lucide/svelte/icons/book-copy";
-	import SlidersIcon from "@lucide/svelte/icons/sliders-horizontal";
 	import ShoppingBagIcon from "@lucide/svelte/icons/shopping-bag";
 	import { base } from "$app/paths";
 	import { drawChartLogo, chartLogoWidth } from "$utils/chartLogo.js";
@@ -27,6 +26,7 @@
 	import { coverUrl } from "$utils/covers.js";
 	import { compactNumber } from "$utils/format.js";
 	import { HIDDEN_GENRES } from "$utils/rankGenres.js";
+	import { isQuiet, toYearly, QUIET_PEAK, SMALL_TOTAL } from "$utils/lowCount.js";
 	import { seattleReadsYear, SEATTLE_READS } from "$utils/seattleReads.js";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
@@ -84,7 +84,6 @@
 	}
 	let isolatedKeys = $state([]); // when non-empty, the chart shows ONLY these series (keys 'g<id>' | 's<idx>'); multiple = compare
 	let showAuthorTotal = $state(true); // show the author's aggregate total line in the line view
-	let smoothOn = $state(true);
 	let plotInset = $state(0); // the chart's right margin, to line the footer up with the plot's edge // draw 3-month averages (raw months as faint bars behind the total)
 	// Manual overrides to the auto work-clustering: edition idx -> the work key it
 	// should belong to (a merge target, or its own `excl-<idx>` key when pulled out
@@ -99,7 +98,6 @@
 	let currentSlug = $state(null); // slug of the selected author (for shareable URLs)
 	let isOverview = $state(false); // true when showing the library-wide "all checkouts" landing view (no per-title data)
 	let tableCollapsed = $state(false); // the books table is open by default; its header still collapses it
-	let customizeOpen = $state(false); // phones: the "Customize" panel (3-month average, Compare)
 	let editMode = $state(false); // "Edit groupings": reveals drag handles, exclude, save/reset/custom work
 	let booksShowAll = $state(false); // view mode lists the top BOOKS_PREVIEW books until "Show all"
 	const BOOKS_PREVIEW = 8;
@@ -790,18 +788,34 @@
 		if (!current || isOverview || !months.length || !current.titles?.length) return;
 		const author = displayName(current.name);
 		const wg = workGroups;
-		const rows = [["author", "work", "title", "format", "date", "checkouts"]];
+		// Same small-count rules as the chart: books under SMALL_TOTAL checkouts
+		// are summed into one "other books" row per year, and a book that never
+		// reached QUIET_PEAK in a month gets yearly rows ("period" says which).
+		const rows = [["author", "work", "title", "format", "period", "date", "checkouts"]];
+		const smallByYear = new Map();
 		current.titles.forEach((t, idx) => {
-			const work = wg.get(workIdentityKey(idx, t.title))?.name || cleanTitleForDisplay(t.title) || t.title;
+			const w = wg.get(workIdentityKey(idx, t.title));
+			const work = w?.name || cleanTitleForDisplay(t.title) || t.title;
 			const series = t.series || [];
+			if (w && w.total < SMALL_TOTAL) {
+				series.forEach((v, i) => { if (v) smallByYear.set(months[i].slice(0, 4), (smallByYear.get(months[i].slice(0, 4)) || 0) + v); });
+				return;
+			}
+			if (isQuiet(w ? sumSeries(w.idxs) : series)) {
+				const byYear = new Map();
+				series.forEach((v, i) => { if (v) byYear.set(months[i].slice(0, 4), (byYear.get(months[i].slice(0, 4)) || 0) + v); });
+				for (const [y, v] of byYear) rows.push([author, titleCase(work), t.title, formatLabel(t.format), "year", y, v]);
+				return;
+			}
 			for (let i = 0; i < months.length; i++) {
 				const v = series[i] || 0;
 				if (!v) continue;
 				// Append a dummy day so "2023-05" becomes a full "2023-05-01" date that
 				// spreadsheets and pandas parse as a date out of the box.
-				rows.push([author, titleCase(work), t.title, formatLabel(t.format), `${months[i]}-01`, v]);
+				rows.push([author, titleCase(work), t.title, formatLabel(t.format), "month", `${months[i]}-01`, v]);
 			}
 		});
+		for (const [y, v] of [...smallByYear].sort()) rows.push([author, `Other books (fewer than ${SMALL_TOTAL} checkouts each)`, "", "", "year", y, v]);
 		const cell = (v) => {
 			const s = String(v ?? "");
 			return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -940,6 +954,8 @@
 		// 5 most-borrowed works always show even if some aren't multi-edition.
 		const works = [...buckets.values()]
 				.map((idxs) => ({ idxs, total: idxs.reduce((s, i) => s + current.titles[i].total, 0) }))
+				// Small books aren't drawn as their own lines (see SMALL_TOTAL).
+				.filter((w) => w.total >= SMALL_TOTAL || (searchMode === "title" && !!searchedWork && w.idxs.some((i) => searchedWork.idxs.includes(i))))
 				.sort((a, b) => b.total - a.total)
 				.slice(0, MAX_AUTO_GROUPS);
 
@@ -1242,6 +1258,9 @@
 		const f = titleFilter.trim().toLowerCase();
 		const blocks = [];
 		for (const [key, w] of workGroups) {
+			// Books under SMALL_TOTAL checkouts aren't listed one by one (see
+			// smallWorks); editing groupings still shows every book.
+			if (!editMode && w.total < SMALL_TOTAL && !isSearchedWork(w)) continue;
 			const nameMatch = f ? w.name.toLowerCase().includes(f) : false;
 			const editions = w.idxs.map((idx) => {
 				const t = current.titles[idx];
@@ -1370,6 +1389,16 @@
 		const hi = isYearFiltered ? yearHi : months.length - 1;
 		const a1 = months[lo]?.slice(0, 4), b1 = months[hi]?.slice(0, 4);
 		return a1 === b1 ? a1 : `${a1}\u2013${b1}`;
+	});
+
+	// The author's books with fewer than SMALL_TOTAL checkouts, summed into one
+	// line under the table (a small book's own page still lists it).
+	const isSearchedWork = (w) => searchMode === "title" && !!searchedWork && w.idxs.some((i) => searchedWork.idxs.includes(i));
+	const smallWorks = $derived.by(() => {
+		if (editMode || !current) return null;
+		let n = 0, total = 0;
+		for (const w of workGroups.values()) if (w.total < SMALL_TOTAL && !isSearchedWork(w)) { n++; total += w.total; }
+		return n ? { n, total } : null;
 	});
 
 	// View mode shows the top few books; editing, filtering or "Show all" lists them all.
@@ -1871,6 +1900,11 @@
 			? displaySeries.map((s) => ({ ...s, values: s.values.slice(yearLo, yearHi + 1) }))
 			: displaySeries
 	);
+	// A line that never reached QUIET_PEAK checkouts in a month is shown as
+	// yearly totals (small monthly counts can point to a single reader); then
+	// the whole chart goes yearly so its lines share one scale.
+	const yearlyView = $derived(!isOverview && displaySeries.some((s) => isQuiet(s.values)));
+	const chartData = $derived(yearlyView ? toYearly(viewMonths, viewSeries) : { months: viewMonths, series: viewSeries });
 
 	// The year slider's context, over every month: the author's whole record on
 	// an author page (not just the lines currently shown, so isolating one book
@@ -1906,7 +1940,7 @@
 			.filter((o) => o.f >= 36 && o.f > firstActive + 6)
 			.map((o) => {
 				const m = months[o.f];
-				return { month: m, label: o.w.name, sub: `first checkout: ${MONTH_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}` };
+				return { month: m, label: o.w.name, sub: `first checkout: ${yearlyView ? "" : MONTH_FULL[Number(m.slice(5, 7)) - 1] + " "}${m.slice(0, 4)}` };
 			});
 	});
 
@@ -1951,20 +1985,11 @@
 		<div class="author">
 			<div class="split" class:collapsed={tableCollapsed}>
 			<div class="split-main" bind:this={titleEl}>
-			<!-- Phones: everything past Total / By book lives under "Customize",
-			     above the name. -->
-			{#if !isOverview}
+			<!-- Phones: + Compare sits above the name. -->
+			{#if !isOverview && onCompare && currentSlug}
 				<div class="customize-row on-phone">
-					<button type="button" class="customize-btn" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>
-					{#if onCompare && currentSlug}
-						<button type="button" class="customize-btn" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={16} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
-					{/if}
+					<button type="button" class="customize-btn" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={16} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
 				</div>
-				{#if customizeOpen}
-					<div class="customize-panel on-phone">
-						<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
-					</div>
-				{/if}
 			{/if}
 			<div class="hd-top">
 			<!-- A book's cover sits beside its title and byline; subjects run full
@@ -2081,7 +2106,6 @@
 					{#if isOverview}<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" />{:else}<BookCopyIcon size={17} strokeWidth={2} aria-hidden="true" />{/if}<span class="mt-txt">{isOverview ? "By format" : "By book"}</span>
 				</button>
 			</div>
-			<label class="smooth-toggle off-phone"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 			{#if chartMode === "area" && isolatedKeys.length}
 				<!-- The way back after clicking a line's name to show it alone -->
 				<span class="iso-note">Showing {viewSeries.length} of {legendItems.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={clearIsolate}>Show all</button>{#if soloBook}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall iso-book" onclick={() => openTitle(soloBook, currentSlug)} title="Its own page: just this book's trend, editions and formats">Open this book's page →</button>{/if}</span>
@@ -2096,7 +2120,7 @@
 					<!-- The chart, its slider and source line share one white panel -->
 					<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 					<div class="chart-wrap" bind:this={chartWrap}>
-				<LineChart bind:plotInset months={viewMonths} series={viewSeries} mode="line" smooth={smoothOn} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} grandTotal={current.total} shareOf={isOverview ? "all Seattle checkouts" : `${displayName(current.name)}'s checkouts`} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
+				<LineChart bind:plotInset months={chartData.months} series={chartData.series} yearly={yearlyView} lastMonth={months[months.length - 1]} unit={yearlyView ? "checkouts a year" : undefined} mode="line" markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
 			</div>
 
 			<!-- Several lines: a swatch legend under the chart, every book listed
@@ -2137,7 +2161,7 @@
 
 			<!-- Source on the left; Download and Share as small links on the right -->
 			<div class="chart-foot" style="padding-right: {phone.current ? 0 : plotInset}px">
-			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>.{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.{#if bookMarkers.length}{" "}Book labels mark the month each title first appears in this data.{/if}</p>
+			<p class="chart-source">Source: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Seattle Public Library open data</a>.{" "}<DataInfo first={months[0]} last={months[months.length - 1]} />.{#if bookMarkers.length}{" "}Book labels mark the {yearlyView ? "year" : "month"} each title first appears in this data.{/if}{#if yearlyView}{" "}Shown by year: books with fewer than {QUIET_PEAK} checkouts in their busiest month are counted by year, not month.{/if}</p>
 			<div class="chart-actions tb-actions foot-actions">
 				<div class="dl-wrap">
 					<button class="tb-btn" onclick={() => (downloadOpen = !downloadOpen)} title="Download the data or the chart image" aria-haspopup="true" aria-expanded={downloadOpen}>
@@ -2271,6 +2295,9 @@
 						{/if}
 					{/each}
 				</ul>
+				{#if smallWorks && (!booksCapped || workBlocks.length <= BOOKS_PREVIEW)}
+					<p class="titles-more">{#if smallWorks.n === 1}Plus 1 more book with fewer than {SMALL_TOTAL} checkouts, not listed.{:else}Plus {smallWorks.n.toLocaleString()} books with fewer than {SMALL_TOTAL} checkouts each ({smallWorks.total.toLocaleString()} in all), not listed one by one.{/if}</p>
+				{/if}
 				{#if booksCapped && workBlocks.length > BOOKS_PREVIEW}
 					<button type="button" class="books-more" onclick={() => (booksShowAll = true)}>Show all {workBlocks.length.toLocaleString()} books</button>
 				{:else if booksShowAll && !editMode && !titleFilter.trim() && workBlocks.length > BOOKS_PREVIEW}
@@ -3531,13 +3558,9 @@
 	.on-phone { display: none !important; }
 	.mode-toggle button { display: inline-flex; align-items: center; gap: 6px; }
 	.customize-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; font-family: var(--font-sans); font-size: 14px; font-weight: 500; color: var(--color-fg); cursor: pointer; }
-	.customize-btn.on { background: var(--color-gray-100); }
-	.customize-panel .compare-btn { width: auto; height: auto; text-align: left; }
-	.customize-panel .compare-btn :global(svg), .customize-btn :global(svg), .mode-toggle :global(svg) { width: 16px !important; height: 16px !important; flex: none; }
-	.customize-panel { flex-direction: column; align-items: flex-start; gap: 12px; margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: 8px; background: #fafafa; }
+	.customize-btn :global(svg), .mode-toggle :global(svg) { width: 16px !important; height: 16px !important; flex: none; }
 	@media (max-width: 600px) {
 		.on-phone { display: inline-flex !important; }
-		.customize-panel.on-phone { display: flex !important; }
 		.off-phone { display: none !important; }
 		/* Name, then just the byline and total ("by Robin Wall Kimmerer · 52.2k
 		   total checkouts"), with a book's cover small beside it; no
@@ -3664,17 +3687,6 @@
 	.iso-showall { background: none; border: 0; padding: 0; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 	.iso-showall.iso-book { color: #3f88cc; font-weight: 600; }
 	.leg-showall.leg-book { color: #3f88cc; border-color: #b9d3ec; }
-	.smooth-toggle {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		color: var(--color-fg-light);
-		cursor: pointer;
-		user-select: none;
-	}
-	.smooth-toggle input { margin: 0; accent-color: var(--color-fg); }
 	.chart-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin: 16px 0 0; }
 	.chart-foot .chart-source { margin: 0; flex: 1 1 260px; }
 	.chart-foot .foot-actions { display: flex; gap: 8px; align-items: center; flex: none; }
