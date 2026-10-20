@@ -215,7 +215,7 @@
 	// it as a serif title above the chart — matching the other views' plot titles.
 	// The genres currently featured on the plot: the isolated ones if any, else all shown.
 	const plotGenres = $derived(
-		isolatedKeys.length ? isolatedKeys.map((k) => k.replace(/^g:/, "")) : [...shown],
+		isolatedKeys.length ? isolatedKeys.map((k) => (k === "g:__other" ? "Other / Unclassified" : k.replace(/^g:/, ""))) : [...shown],
 	);
 	// Clicking a genre's name plots it alone (like isolating a line).
 	function pickGenre(name) {
@@ -278,7 +278,7 @@
 	);
 	// "Romance, Fantasy and Mystery"
 	function listGenres(names) {
-		const n = names.filter((x) => genreByName[x]);
+		const n = names.filter((x) => genreByName[x] || x === "Other / Unclassified");
 		return n.length < 3 ? n.join(" and ") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`;
 	}
 	const headTerms = $derived(headGenre ? [...(headGenre.terms || []), ...(headGenre.ficTerms || [])].map(termText).slice(0, 4) : []);
