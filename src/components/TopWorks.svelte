@@ -16,6 +16,7 @@
 	import { cleanWorkTitle, searchTitle } from "$utils/cleanTitle.js";
 	import { curateGenres, extraGenres, genreLabel } from "$utils/rankGenres.js";
 	import BorrowMenu from "$components/BorrowMenu.svelte";
+	import { seattleReadsYear, SEATTLE_READS, SEATTLE_READS_URL } from "$utils/seattleReads.js";
 
 	// openAuthor(slug) / openTitle(title, slug) are provided by Index.svelte: jump to the
 	// By-author / By-title views. rankKind / setRankKind drive the Type dropdown that
@@ -142,7 +143,7 @@
 			if (books.length)
 				secs.push({
 					genre: g,
-					label: g === "All genres" ? "Most borrowed overall" : `Top in ${genreLabel(g)}`,
+					label: g === "All genres" ? "Most borrowed overall" : g === SEATTLE_READS ? "Top Seattle Reads picks" : `Top in ${genreLabel(g)}`,
 					books,
 				});
 		}
@@ -596,6 +597,7 @@
 										     title and author just open their trend pages. -->
 										<button class="tw-title tw-titlelink" title="See this book's checkout trend" onclick={() => openTitle(row[0], row[2])}>{titleCase(cleanWorkTitle(row[0]))}</button>
 										<span class="tw-by">by {#if row[2]}<button class="tw-authorlink" title="See this author's checkout trend" onclick={() => openAuthor(row[2])}>{displayName(row[1])}</button>{:else}{displayName(row[1])}{/if}</span>
+										{#if seattleReadsYear(row[0], row[2])}<span class="tw-sr">Seattle Reads {seattleReadsYear(row[0], row[2])}</span>{/if}
 											{#if coverKey(row) in summaries}
 												<p class="row-sum">{#if summaries[coverKey(row)]}{blurb(summaries[coverKey(row)])} {/if}<span class="src-links"><a class="icon-link" href={wikiUrls[coverKey(row)] || lookupUrls(`${row[0]} ${displayName(row[1])}`).wikipedia} target="_blank" rel="noopener noreferrer" title="Read more on Wikipedia">Wikipedia&nbsp;<ExtArrow /></a><BorrowMenu q={`${row[0]} ${displayName(row[1])}`} compact /></span></p>
 											{/if}
@@ -618,6 +620,12 @@
 						<div class="aside-card">
 							<div class="aside-h">Subject tags · {genre}</div>
 							<p class="ta-tags">{#each genreTags as t}<code class="ta-tag">{t}</code>{/each}</p>
+						</div>
+					{/if}
+					{#if genre === SEATTLE_READS}
+						<div class="aside-card">
+							<div class="aside-h">Seattle Reads</div>
+							<p class="aside-p">Each year the library's Seattle Reads program picks one book for the whole city to read and discuss. This list ranks the picks by checkouts. In 2004 the program featured Isabel Allende's work as a whole. <a href={SEATTLE_READS_URL} target="_blank" rel="noopener noreferrer">Past picks</a></p>
 						</div>
 					{/if}
 					<div class="aside-card">
@@ -663,6 +671,7 @@
 		flex-direction: column;
 		gap: 16px;
 	}
+	.tw-sr { display: inline-block; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--color-border); border-radius: 999px; font-size: 11px; line-height: 1.5; color: var(--color-fg-light); white-space: nowrap; vertical-align: 1px; }
 	.aside-h {
 		font-size: 0.72rem;
 		font-weight: 700;

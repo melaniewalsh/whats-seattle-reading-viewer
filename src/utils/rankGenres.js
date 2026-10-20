@@ -13,6 +13,8 @@ export const RANK_GENRES = [
 	// Not a genre: every book by the 93 authors in the Norton Anthology of
 	// American Literature, Volume E (src/data/curated-lists.json).
 	"Canonical American Authors (1945—Present)",
+	// Not a genre: the library's Seattle Reads picks (src/data/seattle-reads.json).
+	"Seattle Reads",
 	"Literary & Classic Fiction",
 	"Mystery",
 	"Thriller & Suspense",

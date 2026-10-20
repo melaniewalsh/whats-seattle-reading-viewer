@@ -1338,6 +1338,24 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     except Exception as e:  # noqa: BLE001
         print(f"  WARNING: curated lists skipped ({e})", flush=True)
 
+    # Seattle Reads: the library's pick for each year, ranked like a genre (every
+    # pick, not just a top 20).
+    try:
+        picks = json.load(open(PROJECT_DIR / "src" / "data" / "seattle-reads.json"))["picks"]
+        want = {(normalize_work_key(t), s) for _, t, s in picks}
+        mem = {wk for wk, (title, author) in meta.items()
+               if (normalize_work_key(title), slug_by_author.get(author, "")) in want}
+        rank = lambda pairs: [[*meta[wk], slug_by_author.get(meta[wk][1], ""), c]
+                              for wk, c in sorted(pairs, key=lambda p: -p[1]) if c]
+        gdata = {str(y): rank([(wk, full_year.get((wk, y), 0)) for wk in mem]) for y in years}
+        gdata["all"] = rank([(wk, full_all.get(wk, 0)) for wk in mem])
+        gdata["month"] = rank([(wk, full_month.get(wk, 0)) for wk in mem])
+        data["Seattle Reads"] = gdata
+        genres_out.append("Seattle Reads")
+        print(f"  Seattle Reads: {len(mem)} works for {len(picks)} picks", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"  WARNING: Seattle Reads list skipped ({e})", flush=True)
+
     for tbl in ("cw", "cwm", "workmeta", "titlework"):
         con.execute(f"DROP TABLE IF EXISTS {tbl}")
 

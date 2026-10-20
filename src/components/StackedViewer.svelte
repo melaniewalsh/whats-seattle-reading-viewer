@@ -27,6 +27,7 @@
 	import { coverUrl } from "$utils/covers.js";
 	import { compactNumber } from "$utils/format.js";
 	import { HIDDEN_GENRES } from "$utils/rankGenres.js";
+	import { seattleReadsYear, SEATTLE_READS } from "$utils/seattleReads.js";
 	import debounce from "lodash.debounce";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
@@ -1745,7 +1746,7 @@
 		const wantAuthor = displayName(current.name).toLowerCase();
 		const out = [];
 		for (const genre of topWorksData.genres) {
-			if (genre === "All genres" || HIDDEN_GENRES.has(genre)) continue;
+			if (genre === "All genres" || genre === SEATTLE_READS || HIDDEN_GENRES.has(genre)) continue;
 			const list = topWorksData.data[genre]?.["all"];
 			if (!list) continue;
 			const n = Math.min(list.length, GENRE_RANK_MAX);
@@ -1760,6 +1761,9 @@
 		out.sort((a, b) => a.rank - b.rank);
 		return out;
 	});
+
+	// The year this book was the library's Seattle Reads pick, if it was.
+	const srYear = $derived(searchMode === "title" && headingText ? seattleReadsYear(headingText, currentSlug) : null);
 
 	// In "By title" mode, the total checkouts of the single plotted title (summed
 	// over its editions). null when zero or several titles are shown -- then the
@@ -2382,7 +2386,7 @@
 					{#if isOverview}
 						{compactNumber(current.total)} checkouts · books, ebooks &amp; audiobooks · {months[0]?.slice(0, 4)}–{months[months.length - 1]?.slice(0, 4)}
 					{:else if searchMode === "title"}
-						by {#if bookAuthors.length}{#each bookAuthors as name, k}{#if k}{k === bookAuthors.length - 1 ? (bookAuthors.length > 2 ? ", and " : " and ") : ", "}{/if}{#if name.toLowerCase().includes(displayName(current.name).split(/\s+/).pop().toLowerCase())}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{name}</button>{:else if coAuthorSlugs[name]}<button type="button" class="author-link" onclick={() => openAuthor(coAuthorSlugs[name])} title="See this author's borrowing trends">{name}</button>{:else}{name}{/if}{/each}{:else}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{/if}{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} total checkouts{/if}{#if genreRanks.length}<span class="off-phone">{" · "}<button type="button" class="author-link" onclick={() => openGenre(genreRanks[0].genre)} title="See the most-borrowed {genreRanks[0].genre} books">#{genreRanks[0].rank} all-time in {genreRanks[0].genre}</button></span>{/if}
+						by {#if bookAuthors.length}{#each bookAuthors as name, k}{#if k}{k === bookAuthors.length - 1 ? (bookAuthors.length > 2 ? ", and " : " and ") : ", "}{/if}{#if name.toLowerCase().includes(displayName(current.name).split(/\s+/).pop().toLowerCase())}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{name}</button>{:else if coAuthorSlugs[name]}<button type="button" class="author-link" onclick={() => openAuthor(coAuthorSlugs[name])} title="See this author's borrowing trends">{name}</button>{:else}{name}{/if}{/each}{:else}<button type="button" class="author-link" onclick={() => currentSlug && openAuthor(currentSlug)} title="See this author's borrowing trends">{displayName(current.name)}</button>{/if}{#if titleCheckouts != null}{" · "}{compactNumber(titleCheckouts)} total checkouts{/if}{#if genreRanks.length}<span class="off-phone">{" · "}<button type="button" class="author-link" onclick={() => openGenre(genreRanks[0].genre)} title="See the most-borrowed {genreRanks[0].genre} books">#{genreRanks[0].rank} all-time in {genreRanks[0].genre}</button></span>{/if}{#if srYear}{" · "}<button type="button" class="author-link" onclick={() => openGenre(SEATTLE_READS)} title="See all the Seattle Reads picks">Seattle Reads {srYear}</button>{/if}
 					{:else}
 						{compactNumber(current.total)} total checkouts<span class="off-phone">{" · "}{workGroups.size.toLocaleString()} {workGroups.size === 1 ? "work" : "works"}</span>
 					{/if}
