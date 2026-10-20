@@ -61,6 +61,7 @@
 	let yearHi = $state(0);
 	let plotInset = $state(0);
 	let dlOpen = $state(false);
+	let smooth = $state(true); // 3-month average lines
 	let shareOpen = $state(false);
 	let shareMsg = $state("");
 	let flashTimer;
@@ -223,7 +224,7 @@
 		const yrs = viewMonths.length ? `, ${viewMonths[0].slice(0, 4)}–${viewMonths[viewMonths.length - 1].slice(0, 4)}` : "";
 		return renderChartPng(chartWrap?.querySelector("svg"), {
 			title,
-			subtitle: `Checkouts a ${yearly ? "year" : "month"} at the Seattle Public Library${yrs}`,
+			subtitle: `Checkouts a ${yearly ? "year" : "month"} at the Seattle Public Library${yrs}${smooth && !yearly ? " (3-month average)" : ""}`,
 			legend: charted.map((p) => ({ label: p.kind === "work" ? `${p.label} (${p.author})` : p.label, color: p.color }))
 		});
 	}
@@ -305,10 +306,11 @@
 	{#if notFound}<p class="cmp-note">Couldn't find “{notFound}”.</p>{/if}
 
 	<div class="cmp-chart">
+		{#if !yearly}<div class="cmp-toolbar"><label class="smooth-toggle"><input type="checkbox" bind:checked={smooth} /> 3-month average</label></div>{/if}
 		{#if tooSmall.length}<p class="cmp-note">{tooSmall.map((p) => p.label).join(", ")} {tooSmall.length === 1 ? "has" : "have"} fewer than {SMALL_TOTAL} checkouts, so {tooSmall.length === 1 ? "it isn't" : "they aren't"} charted.</p>{/if}
 		{#if charted.length && months.length}
 			<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
-			<div bind:this={chartWrap}><LineChart bind:plotInset months={chartData.months} series={chartData.series} {yearly} lastMonth={months[months.length - 1]} unit={yearly ? "checkouts a year" : undefined} mode="line" annotations={EVENT_ANNOTATIONS} onSeriesClick={openPick} /></div>
+			<div bind:this={chartWrap}><LineChart bind:plotInset months={chartData.months} series={chartData.series} {yearly} lastMonth={months[months.length - 1]} unit={yearly ? "checkouts a year" : undefined} mode="line" smooth={smooth && !yearly} annotations={EVENT_ANNOTATIONS} onSeriesClick={openPick} /></div>
 			{#if series.length >= 2}
 				<div class="cmp-legend">
 					{#each charted as p (p.id)}<button type="button" class="cl-item" title="See this {p.kind === 'work' ? 'book' : 'author'}'s own trends page" onclick={() => openPick(p.id)}><span class="cl-sw" style="background:{p.color}"></span>{p.label}</button>{/each}
@@ -438,4 +440,7 @@
 		.cmp-table .muted { display: block; }
 		.cmp-legend { display: none; } /* the chips up top and the line-end names do it */
 	}
+	.cmp-toolbar { display: flex; align-items: center; gap: 16px; margin: 0 0 6px; }
+	.smooth-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--color-fg-light); cursor: pointer; user-select: none; }
+	.smooth-toggle input { appearance: auto; -webkit-appearance: auto; width: 17px; height: 17px; margin: 0; accent-color: var(--color-fg); background: none; flex: none; cursor: pointer; }
 </style>

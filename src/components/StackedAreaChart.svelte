@@ -576,7 +576,7 @@
 		return layers
 			.map((l) => ({
 				key: keyOf(l), label: l.label, color: l.color,
-				v: l.values?.[hoverIndex] ?? 0,
+				v: (l.raw ?? l.values)?.[hoverIndex] ?? 0,
 				pct: monthPct((l.raw ?? l.values)?.[hoverIndex] ?? 0)
 			}))
 			.sort((a, b) => b.v - a.v);
@@ -968,8 +968,8 @@
                     <span>{groupTotal.toLocaleString()}</span>
                 </div>
             {:else}
-                <!-- The value that's drawn: the 3-month average where the chart is smoothed (Genres). -->
-                <div class="tt-value">{fmtVal(selectedItem.values[hoverIndex])}<span class="tt-value-unit">{percent ? "of checkouts" : "checkouts"}{#if smooth && mode === 'line'}{" · 3-month average"}{/if}</span></div>
+                <!-- That month's actual count, even when the line shows 3-month averages. -->
+                <div class="tt-value">{fmtVal((selectedItem.raw ?? selectedItem.values)[hoverIndex])}<span class="tt-value-unit">{percent ? "of checkouts" : "checkouts"}</span></div>
             {/if}
 
             {#if monthTotals && monthPct((selectedItem.raw ?? selectedItem.values)[hoverIndex]) !== null}
@@ -1227,8 +1227,8 @@
 		-webkit-backdrop-filter: saturate(1.8) blur(6px);
 		backdrop-filter: saturate(1.8) blur(6px);
 		border: 1px solid rgba(0, 0, 0, 0.06);
-		border-radius: 12px;
-		padding: 14px 18px 15px;
+		border-radius: 10px;
+		padding: 10px 14px 11px;
 		font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
 		font-size: 13px;
 		color: #333;
@@ -1236,8 +1236,8 @@
 		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04),
 			0 6px 16px rgba(0, 0, 0, 0.08),
 			0 18px 40px rgba(0, 0, 0, 0.10);
-		min-width: 210px;
-		max-width: 330px;
+		min-width: 180px;
+		max-width: 280px;
 		z-index: 10;
 		animation: tt-fade 0.14s ease-out;
 	}
@@ -1293,7 +1293,7 @@
 		align-items: baseline;
 		gap: 8px;
 		font-family: var(--font-serif, Georgia, "Times New Roman", serif);
-		font-size: 1.05rem;
+		font-size: 0.95rem;
 		font-weight: 600;
 		line-height: 1.15;
 		color: #1a1a1a;
@@ -1309,7 +1309,7 @@
 		word-break: break-word;
 	}
 	.tt-date {
-		margin: 3px 0 10px 19px;
+		margin: 2px 0 6px 19px;
 		font-size: 11px;
 		font-weight: 700;
 		letter-spacing: 0.04em;
@@ -1320,12 +1320,11 @@
 		display: flex;
 		align-items: baseline;
 		gap: 6px;
-		margin: 0 0 2px 19px;
-		font-size: 1.3rem;
+		margin: 0 0 1px 19px;
+		font-size: 1.1rem;
 		font-weight: 700;
 		color: #1a1a1a;
 	}
-	/* The titles rolled into an "Other titles" band, listed in its tooltip. */
 	.tt-value-unit {
 		font-size: 0.68rem;
 		font-weight: 700;

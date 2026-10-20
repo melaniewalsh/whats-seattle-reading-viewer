@@ -26,6 +26,7 @@
 	import { coverUrl } from "$utils/covers.js";
 	import { compactNumber } from "$utils/format.js";
 	import { HIDDEN_GENRES } from "$utils/rankGenres.js";
+	import SlidersIcon from "@lucide/svelte/icons/sliders-horizontal";
 	import { isQuiet, toYearly, QUIET_PEAK, SMALL_TOTAL } from "$utils/lowCount.js";
 	import { seattleReadsYear, SEATTLE_READS } from "$utils/seattleReads.js";
 	import LineChart from "$components/StackedAreaChart.svelte";
@@ -90,6 +91,8 @@
 	// of a cluster). Empty = pure auto-clustering.
 	let workAssign = $state.raw({});
 	let legendHoverKey = $state(null); // legend entry being hovered -> lights up its band on the chart
+	let smoothOn = $state(true); // 3-month average lines (the tooltip still gives each month's count)
+	let customizeOpen = $state(false); // phones: the "Customize" panel (3-month average)
 	let searchedWork = $state(null); // { name, idxs } of the work searched in title mode, so "Total" can snap back to it
 	let loadError = $state(""); // message when an author fails to load
 	let loading = $state(false); // true while an author's data is being fetched
@@ -1997,11 +2000,20 @@
 		<div class="author">
 			<div class="split" class:collapsed={tableCollapsed}>
 			<div class="split-main" bind:this={titleEl}>
-			<!-- Phones: + Compare sits above the name. -->
-			{#if !isOverview && onCompare && currentSlug}
+			<!-- Phones: everything past Total / By book lives under "Customize",
+			     above the name. -->
+			{#if !isOverview && !tooSmall}
 				<div class="customize-row on-phone">
-					<button type="button" class="customize-btn" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={16} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
+					{#if !yearlyView}<button type="button" class="customize-btn" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>{/if}
+					{#if onCompare && currentSlug}
+						<button type="button" class="customize-btn" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={16} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
+					{/if}
 				</div>
+				{#if customizeOpen && !yearlyView}
+					<div class="customize-panel on-phone">
+						<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
+					</div>
+				{/if}
 			{/if}
 			<div class="hd-top">
 			<!-- A book's cover sits beside its title and byline; subjects run full
@@ -2122,6 +2134,7 @@
 					{#if isOverview}<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" />{:else}<BookCopyIcon size={17} strokeWidth={2} aria-hidden="true" />{/if}<span class="mt-txt">{isOverview ? "By format" : "By book"}</span>
 				</button>
 			</div>
+			{#if !yearlyView}<label class="smooth-toggle off-phone"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>{/if}
 			{#if chartMode === "area" && isolatedKeys.length}
 				<!-- The way back after clicking a line's name to show it alone -->
 				<span class="iso-note">Showing {viewSeries.length} of {legendItems.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={clearIsolate}>Show all</button>{#if soloBook}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall iso-book" onclick={() => openTitle(soloBook, currentSlug)} title="Its own page: just this book's trend, editions and formats">Open this book's page →</button>{/if}</span>
@@ -2136,7 +2149,7 @@
 					<!-- The chart, its slider and source line share one white panel -->
 					<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 					<div class="chart-wrap" bind:this={chartWrap}>
-				<LineChart bind:plotInset months={chartData.months} series={chartData.series} yearly={yearlyView} lastMonth={months[months.length - 1]} unit={yearlyView ? "checkouts a year" : undefined} mode="line" markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
+				<LineChart bind:plotInset months={chartData.months} series={chartData.series} yearly={yearlyView} lastMonth={months[months.length - 1]} unit={yearlyView ? "checkouts a year" : undefined} mode="line" smooth={smoothOn && !yearlyView} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
 			</div>
 
 			<!-- Several lines: a swatch legend under the chart, every book listed
@@ -3575,9 +3588,12 @@
 	.on-phone { display: none !important; }
 	.mode-toggle button { display: inline-flex; align-items: center; gap: 6px; }
 	.customize-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; font-family: var(--font-sans); font-size: 14px; font-weight: 500; color: var(--color-fg); cursor: pointer; }
+	.customize-btn.on { background: var(--color-gray-100); }
 	.customize-btn :global(svg), .mode-toggle :global(svg) { width: 16px !important; height: 16px !important; flex: none; }
+	.customize-panel { flex-direction: column; align-items: flex-start; gap: 12px; margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: 8px; background: #fafafa; }
 	@media (max-width: 600px) {
 		.on-phone { display: inline-flex !important; }
+		.customize-panel.on-phone { display: flex !important; }
 		.off-phone { display: none !important; }
 		/* Name, then just the byline and total ("by Robin Wall Kimmerer · 52.2k
 		   total checkouts"), with a book's cover small beside it; no
@@ -3704,6 +3720,17 @@
 	.iso-showall { background: none; border: 0; padding: 0; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 	.iso-showall.iso-book { color: #3f88cc; font-weight: 600; }
 	.leg-showall.leg-book { color: #3f88cc; border-color: #b9d3ec; }
+	.smooth-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		color: var(--color-fg-light);
+		cursor: pointer;
+		user-select: none;
+	}
+	.smooth-toggle input { margin: 0; accent-color: var(--color-fg); }
 	.chart-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin: 16px 0 0; }
 	.chart-foot .chart-source { margin: 0; flex: 1 1 260px; }
 	.chart-foot .foot-actions { display: flex; gap: 8px; align-items: center; flex: none; }
