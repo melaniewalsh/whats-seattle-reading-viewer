@@ -1,4 +1,5 @@
 <script>
+	import ExtArrow from "$components/ExtArrow.svelte";
 	import { getContext, onMount, tick } from "svelte";
 	import { base } from "$app/paths";
 	import Viewer from "$components/StackedViewer.svelte";
@@ -514,15 +515,15 @@
 			<div class="menu-group">
 				<h3 class="menu-h">Case Studies</h3>
 				<!-- The full essays, on the essays site (Quarto). -->
-				<a class="menu-link" href="https://essays.whats-seattle-reading.com/posts/norton-anthology-american/">Canonical American Authors ↗︎</a>
-				<a class="menu-link" href="https://essays.whats-seattle-reading.com/posts/spl-500-novels/">Top 500 “Greatest” Novels ↗︎</a>
-				<a class="menu-link" href="https://essays.whats-seattle-reading.com/">All essays ↗︎</a>
+				<a class="menu-link" href="https://essays.whats-seattle-reading.com/posts/norton-anthology-american/">Canonical American Authors&nbsp;<ExtArrow /></a>
+				<a class="menu-link" href="https://essays.whats-seattle-reading.com/posts/spl-500-novels/">Top 500 “Greatest” Novels&nbsp;<ExtArrow /></a>
+				<a class="menu-link" href="https://essays.whats-seattle-reading.com/">All essays&nbsp;<ExtArrow /></a>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">The Project</h3>
 				<button class="menu-link" onclick={() => go("publications")}>Publications</button>
-				<a class="menu-link" href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Data ↗︎</a>
-				<a class="menu-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Feedback ↗︎</a>
+				<a class="menu-link" href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Data&nbsp;<ExtArrow /></a>
+				<a class="menu-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Feedback&nbsp;<ExtArrow /></a>
 			</div>
 		</nav>
 
