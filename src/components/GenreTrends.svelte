@@ -102,7 +102,7 @@
 			const d = await res.json();
 			const by = {};
 			for (const g of d.genres) by[g.name] = g;
-			const order = [...d.genres].filter((g) => !HIDDEN_GENRES.has(g.name)).sort((a, b) => sum(b.partition) - sum(a.partition)).map((g) => g.name);
+			const order = [...d.genres].filter((g) => !HIDDEN_GENRES.has(g.name)).sort((a, b) => sum(b.partition || b.overlap) - sum(a.partition || a.overlap)).map((g) => g.name);
 			genreByName = by;
 			genreOrder = order;
 			// Plot five genres but isolate Romance: only Romance's line shows, the
