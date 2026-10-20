@@ -403,7 +403,9 @@
 	.tb-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border: 0; border-radius: 6px; background: #f1f2f3; font: inherit; font-size: 12.5px; font-weight: 500; color: #555; cursor: pointer; }
 	.tb-btn:hover { background: #e4e6e8; color: var(--color-fg); }
 	.tb-btn :global(svg) { width: 13px; height: 13px; flex: none; }
-	.foot-actions { display: flex; gap: 8px; align-items: center; flex: none; }
+	/* margin-left: auto keeps the buttons at the right even when they wrap under
+	   the source, so their right-anchored menus stay on screen. */
+	.foot-actions { display: flex; gap: 8px; align-items: center; flex: none; margin-left: auto; }
 	.dl-wrap { position: relative; }
 	.dl-backdrop { position: fixed; inset: 0; z-index: 20; background: none; border: 0; cursor: default; }
 	.dl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 21; min-width: 196px; padding: 4px; background: #fff; border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1); }
