@@ -294,6 +294,22 @@ def post(soql, tries=4):
     raise last
 
 
+def post_by_month(select, where, yr):
+    """One year's rows, GROUP BY checkoutmonth. If the whole year times out on
+    the city's portal (it did in Oct 2026), ask for it a quarter at a time."""
+    try:
+        return post(f"SELECT checkoutmonth, {select} WHERE checkoutyear = {yr} AND {where} "
+                    f"GROUP BY checkoutmonth", tries=2)
+    except Exception as e:  # noqa: BLE001
+        print(f"    {yr}: whole year timed out ({e}); fetching by quarter", flush=True)
+    rows = []
+    for q in range(4):
+        ms = ", ".join(str(m) for m in range(3 * q + 1, 3 * q + 4))
+        rows += post(f"SELECT checkoutmonth, {select} WHERE checkoutyear = {yr} "
+                     f"AND checkoutmonth IN ({ms}) AND {where} GROUP BY checkoutmonth")
+    return rows
+
+
 def _clean(title):
     t = (title or "").split(" / ")[0].strip()
     return t
@@ -315,8 +331,7 @@ def main():
 
     for yr in years:
         pcases = ", ".join(f"sum(case({c}, checkouts, true, 0)) AS p{i}" for i, (n, c) in enumerate(pclauses))
-        for row in post(f"SELECT checkoutmonth, sum(checkouts) AS total, {pcases} "
-                        f"WHERE checkoutyear = {yr} AND {BOOK} GROUP BY checkoutmonth"):
+        for row in post_by_month(f"sum(checkouts) AS total, {pcases}", BOOK, yr):
             key = f"{yr}-{int(row['checkoutmonth']):02d}"
             if key not in idx:
                 continue
@@ -325,8 +340,7 @@ def main():
             for i in range(len(TAXONOMY)):
                 part[i][j] = int(float(row.get(f"p{i}", 0) or 0))
         ocases = ", ".join(f"sum(case({c}, checkouts, true, 0)) AS o{i}" for i, (n, c) in enumerate(oclauses))
-        for row in post(f"SELECT checkoutmonth, {ocases} "
-                        f"WHERE checkoutyear = {yr} AND {BOOK} GROUP BY checkoutmonth"):
+        for row in post_by_month(ocases, BOOK, yr):
             key = f"{yr}-{int(row['checkoutmonth']):02d}"
             if key not in idx:
                 continue
