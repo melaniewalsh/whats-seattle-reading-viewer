@@ -841,7 +841,9 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		font-size: clamp(1.05rem, 2.2vw, 1.25rem);
 		line-height: 1.4;
 		color: var(--color-fg-light);
-		margin: 0;
+		/* Same width as the search field below (.home-search: 11.4em of the title size). */
+		max-width: calc(11.4 * clamp(2.3rem, 6vw, 3.6rem));
+		margin: 0 auto;
 	}
 	.featured {
 		max-width: 880px;
