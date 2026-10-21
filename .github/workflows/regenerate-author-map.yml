@@ -30,7 +30,7 @@ jobs:
         with:
           python-version: "3.11"
       # numpy is required by rapidfuzz.process.cdist in the fuzzy-matching step.
-      - run: pip install duckdb boto3 orjson pyarrow python-dotenv rapidfuzz numpy
+      - run: pip install "duckdb>=1.1,<2" boto3 orjson pyarrow python-dotenv rapidfuzz numpy
 
       - name: Regenerate author clusters
         env:
