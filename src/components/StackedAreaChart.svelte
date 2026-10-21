@@ -502,16 +502,9 @@
 		pointerY = py;
 
 		if (mode === 'line') {
-			// pick the line whose value at this month sits closest to the cursor
-			let best = null, bestDist = Infinity;
-			for (const s of layers) {
-				// near the drawn (average) line, or the raw month's bar top
-				const d = Math.min(Math.abs(y(s.values[hoverIndex]) - py), Math.abs(y((s.raw ?? s.values)[hoverIndex]) - py));
-				if (d < bestDist) { bestDist = d; best = s; }
-			}
-			// Anywhere over the plot shows the month. With several lines the box
-			// lists them all (no single line is "hovered"); with one, it's that line.
-			hoveredSeriesKey = multi ? null : best ? best.label : null;
+			// Anywhere over the plot shows the month, and the box lists every line,
+			// so no single line is "hovered".
+			hoveredSeriesKey = null;
 		} else {
 			// specific stacked layer whose band contains this Y data value
 			const activeLayer = stackedSeries.find(s => {
@@ -642,9 +635,9 @@
 		return stackedSeries[stackedSeries.length - 1].top[hoverIndex];
 	});
 
-	// Several lines: the tooltip lists every line's value for the month (like
-	// the Ngram Viewer), highest first.
-	const multi = $derived(mode === 'line' && lineLayers.length >= 2);
+	// Line charts: the tooltip lists every line's value for the month (like the
+	// Ngram Viewer), highest first; a single line gets the same box with one row.
+	const multi = $derived(mode === 'line' && lineLayers.length >= 1);
 	const multiRows = $derived(
 		multi && hoverIndex !== null
 			? lineLayers
