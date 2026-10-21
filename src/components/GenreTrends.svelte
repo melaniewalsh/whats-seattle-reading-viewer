@@ -717,6 +717,8 @@
 	.chart-source a:hover { color: var(--color-fg); text-decoration-color: currentColor; }
 	.chart-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin: 16px 0 0; }
 	.chart-foot .foot-actions { gap: 8px; flex: none; }
+	/* Under the chart, Download and Share open upward. */
+	.chart-foot .share-menu { top: auto; bottom: calc(100% + 6px); }
 	/* Download / Share: quiet gray buttons (as on Our World in Data), so they
 	   read as clickable without competing with the chart. */
 	.chart-foot .tb-btn { padding: 5px 10px; border: 0; border-radius: 6px; background: #f1f2f3; font-size: 12.5px; font-weight: 500; color: #555; gap: 5px; }
