@@ -1603,7 +1603,7 @@
 		for (const [raw] of [...m.entries()].sort((a, b) => b[1] - a[1])) {
 			const c = cleanSubject(raw);
 			if (!c || c.length > 28 || seen.has(c.toLowerCase())) continue;
-			seen.add(c.toLowerCase()); out.push(c);
+			seen.add(c.toLowerCase()); rawSubject.set(c, raw); out.push(c);
 			if (out.length >= 3) break;
 		}
 		return out;
@@ -1674,6 +1674,7 @@
 			const key = c.toLowerCase().replace(/ fiction$/, "");
 			if (seen.has(key)) continue;
 			seen.add(key);
+			rawSubject.set(c, raw);
 			out.push(c);
 			if (out.length >= 3) break;
 		}
@@ -1705,7 +1706,15 @@
 	// Subject headings that have their own page on this site (see SubjectList).
 	let subjectIndex = $state.raw({});
 	onMount(() => { if (openSubject) getSubjectIndex().then((ix) => (subjectIndex = ix || {})); });
-	const subjectPage = (term) => { const sl = subjectSlug(term); return openSubject && subjectIndex[sl] ? sl : null; };
+	// A tidied tag ("African American") keeps its full heading ("African
+	// American Fiction"), and the subject page is looked up by the full heading,
+	// so a tag never opens a different heading's page.
+	const rawSubject = new Map();
+	const subjectPage = (term) => {
+		const raw = rawSubject.get(term);
+		const sl = raw ? subjectSlug(raw) : "";
+		return openSubject && sl && subjectIndex[sl] ? sl : null;
+	};
 	const splSubjectUrl = (t) => `https://seattle.bibliocommons.com/v2/search?query=${encodeURIComponent(t.replace(/[()]/g, ""))}&searchType=subject`;
 
 	// Wikipedia's one-line description under the heading: "Irish author (born
