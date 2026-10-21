@@ -7,6 +7,7 @@
 	import Compare from "$components/Compare.svelte";
 	import TopAuthors from "$components/TopAuthors.svelte";
 	import TopWorks from "$components/TopWorks.svelte";
+	import SubjectList from "$components/SubjectList.svelte";
 	import NortonExplorer from "$components/NortonExplorer.svelte";
 	import BacklistBoomerangs from "$components/BacklistBoomerangs.svelte";
 	import TrendingUp from "@lucide/svelte/icons/trending-up";
@@ -38,6 +39,7 @@
 		let page = "";
 		if (tab === "search") page = compareMode ? searchText.split(", ").join(" vs. ") : searchText;
 		else if (tab === "rankings") page = rankKind === "authors" ? "Most Borrowed Authors" : "Most Borrowed Books";
+		else if (tab === "subject") page = subjectLabel;
 		else page = TAB_TITLES[tab] || "";
 		return page ? `${page} · ${copy.title}` : copy.title;
 	});
@@ -124,7 +126,7 @@
 
 	// The deep-link params naming what a view shows; cleared when moving to
 	// another view so a stale one doesn't hijack it.
-	const VIEW_PARAMS = ["author", "title", "genre", "year", "kind", "c"];
+	const VIEW_PARAMS = ["author", "title", "genre", "year", "kind", "c", "subject"];
 	function clearViewParams(url) {
 		VIEW_PARAMS.forEach((k) => url.searchParams.delete(k));
 	}
@@ -204,6 +206,7 @@
 			else if (t === "spl500") tab = "spl500";
 			else if (t === "backlist" || t === "boomers" || t === "boomerangs") tab = "backlist";
 			else if (t === "overview" || t === "all") tab = "overview";
+			else if (t === "subject" && params.get("subject")) { tab = "subject"; subjectSlug = params.get("subject"); }
 			else tab = "home";
 		} catch {}
 	}
@@ -481,6 +484,23 @@
 
 	// Open the Most Borrowed works ranking filtered to a genre, all-time (used by
 	// the "#N in Genre" badges on a searched work).
+	// A subject heading's page of most-borrowed books (?tab=subject&subject=<slug>).
+	let subjectSlug = $state("");
+	let subjectLabel = $state("");
+	function openSubject(slug) {
+		try {
+			const url = new URL(window.location);
+			clearViewParams(url);
+			url.searchParams.set("tab", "subject");
+			url.searchParams.set("subject", slug);
+			window.history.pushState({}, "", url);
+		} catch {}
+		subjectSlug = slug;
+		subjectLabel = "";
+		tab = "subject";
+		try { window.scrollTo({ top: 0 }); } catch {}
+	}
+
 	function openGenre(genre) {
 		try {
 			const url = new URL(window.location);
@@ -591,6 +611,8 @@
 			{:else}
 				<TopAuthors {openAuthor} {rankKind} {setRankKind} />
 			{/if}
+		{:else if tab === "subject"}
+			<SubjectList slug={subjectSlug} {openTitle} {openAuthor} onLoaded={(l) => (subjectLabel = l)} />
 		{:else if tab === "backlist"}
 			<BacklistBoomerangs {openAuthor} {openTitle} />
 		{:else if tab === "home"}
@@ -773,7 +795,7 @@
 				{/key}
 			{:else}
 				{#key `${searchKind}-${searchNonce}`}
-					<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openAuthor} {openTitle} onCompare={startCompare} {onLoaded} onCompareIds={showCompare} />
+					<Viewer searchMode={searchKind} landing="search" {setSearchKind} {openGenre} {openSubject} {openAuthor} {openTitle} onCompare={startCompare} {onLoaded} onCompareIds={showCompare} />
 				{/key}
 			{/if}
 		{/if}

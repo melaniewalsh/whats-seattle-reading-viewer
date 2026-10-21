@@ -29,6 +29,7 @@
 	import SlidersIcon from "@lucide/svelte/icons/sliders-horizontal";
 	import { isQuiet, toYearly, QUIET_PEAK, SMALL_TOTAL } from "$utils/lowCount.js";
 	import { imgTimeout } from "$utils/imgTimeout.js";
+	import { subjectSlug } from "$utils/subjects.js";
 	import { seattleReadsYear, SEATTLE_READS } from "$utils/seattleReads.js";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
@@ -37,13 +38,13 @@
 	import WikiCard from "$components/WikiCard.svelte";
 	import { wikiSummary, wikiWork } from "$utils/wiki.js";
 	import Switch from "$components/ui/Switch.svelte";
-	import { getMonths, searchAuthors, searchTitles, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks, getCoauthors, getGenreTerms } from "$components/db.js";
+	import { getMonths, searchAuthors, searchTitles, getAuthor, getAllCheckouts, randomAuthor, randomTitle, getTopAuthors, getTopWorks, getCoauthors, getGenreTerms, getSubjectIndex } from "$components/db.js";
 
 	// "author" (default): search authors. "title": reverse lookup — search a title,
 	// resolve to its author, open the author's drilldown with that work highlighted.
 	// landing: "overview" (the "All" tab -> library-wide total trend) or "search"
 	// (the "By author" tab -> open straight to the search box).
-	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openAuthor = () => {}, openTitle = () => {}, onCompare = null, onLoaded = null, onCompareIds = null } = $props();
+	let { searchMode = "author", landing = "overview", setSearchKind = () => {}, openGenre = () => {}, openSubject = null, openAuthor = () => {}, openTitle = () => {}, onCompare = null, onLoaded = null, onCompareIds = null } = $props();
 	// Phones: the year slider and the Download/Share row run the full width
 	// (the plot itself is narrower, beside the line names).
 	const phone = new MediaQuery("max-width: 600px");
@@ -1701,6 +1702,10 @@
 	}
 
 	// SPL catalog subject search for a header subject.
+	// Subject headings that have their own page on this site (see SubjectList).
+	let subjectIndex = $state.raw({});
+	onMount(() => { if (openSubject) getSubjectIndex().then((ix) => (subjectIndex = ix || {})); });
+	const subjectPage = (term) => { const sl = subjectSlug(term); return openSubject && subjectIndex[sl] ? sl : null; };
 	const splSubjectUrl = (t) => `https://seattle.bibliocommons.com/v2/search?query=${encodeURIComponent(t.replace(/[()]/g, ""))}&searchType=subject`;
 
 	// Wikipedia's one-line description under the heading: "Irish author (born
@@ -2061,7 +2066,7 @@
 			</div>
 			</div><!-- /.hd-text -->
 			{#if subjectLine.length}
-				<p class="hd-subjects">{#each subjectLine as term, k}{@const g = genreFor(term)}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if g}<button type="button" class="subj-genre" onclick={() => openGenre(g)} title="The most-borrowed {g} books">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</p>
+				<p class="hd-subjects">{#each subjectLine as term, k}{@const g = genreFor(term)}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if g}<button type="button" class="subj-genre" onclick={() => openGenre(g)} title="The most-borrowed {g} books">{term}</button>{:else if subjectPage(term)}<button type="button" class="subj-genre" onclick={() => openSubject(subjectPage(term))} title="The most-borrowed books on “{term}”">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</p>
 			{/if}
 			</div>
 			{#if lookupLinks}
@@ -2301,7 +2306,7 @@
 						{#if open}
 							{@const subj = bookSubjects(w)}
 							{#if subj.length}
-								<li class="bk-row bk-ed bk-subj"><span></span><span class="bk-subj-list">{#each subj as term, k}{@const g = genreFor(term)}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if g}<button type="button" class="subj-genre" onclick={() => openGenre(g)} title="The most-borrowed {g} books">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</span></li>
+								<li class="bk-row bk-ed bk-subj"><span></span><span class="bk-subj-list">{#each subj as term, k}{@const g = genreFor(term)}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if g}<button type="button" class="subj-genre" onclick={() => openGenre(g)} title="The most-borrowed {g} books">{term}</button>{:else if subjectPage(term)}<button type="button" class="subj-genre" onclick={() => openSubject(subjectPage(term))} title="The most-borrowed books on “{term}”">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</span></li>
 							{/if}
 							{#each w.editions as t (t.idx)}
 								<li class="bk-row bk-ed" class:editing={editMode} class:hit={t.match} class:just-moved={movedIdx === t.idx} data-ed={t.idx}>
