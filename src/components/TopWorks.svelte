@@ -311,7 +311,7 @@
 	{#if embedded}
 		<section class="gal-sec home-tw">
 			<div class="home-tw-head">
-				<h2 class="home-tw-title">{#if homeTop?.year}Most borrowed in {homeTop.year}{#if monthLabel}{" "}<span class="home-tw-month">(through {monthShort.split(" ")[0]})</span>{/if}{:else}Most borrowed last&nbsp;month{#if monthLabel}{" "}<span class="home-tw-month">({monthShort})</span>{/if}{/if}</h2>
+				<h2 class="home-tw-title">{#if homeTop?.year}Most borrowed in {homeTop.year}{:else}Most borrowed last&nbsp;month{#if monthLabel}{" "}<span class="home-tw-month">({monthShort})</span>{/if}{/if}</h2>
 				<button class="home-tw-more" onclick={onSeeAll}>See all Most&nbsp;Borrowed →</button>
 			</div>
 			{@render galRow(overallBooks)}
