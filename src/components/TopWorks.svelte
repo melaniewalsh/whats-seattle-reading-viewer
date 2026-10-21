@@ -17,6 +17,7 @@
 	import { cleanWorkTitle, searchTitle } from "$utils/cleanTitle.js";
 	import { curateGenres, extraGenres, genreLabel } from "$utils/rankGenres.js";
 	import BorrowMenu from "$components/BorrowMenu.svelte";
+	import { imgTimeout } from "$utils/imgTimeout.js";
 	import { seattleReadsYear, SEATTLE_READS, SEATTLE_READS_URL } from "$utils/seattleReads.js";
 
 	// openAuthor(slug) / openTitle(title, slug) are provided by Index.svelte: jump to the
@@ -281,7 +282,7 @@
 					<span class="gal-rank">{i + 1}</span>
 					<button class="gal-cover" class:has-img={!!covers[k]} onclick={() => openTitle(r[0], r[2])} title="See borrowing trend">
 						{#if covers[k]}
-							<img src={covers[k]} alt="" width="200" height="300" loading={embedded ? "eager" : "lazy"} fetchpriority={embedded && i === 0 ? "high" : undefined} onerror={() => fillFromWiki(r)} />
+							<img src={covers[k]} alt="" width="200" height="300" loading={embedded ? "eager" : "lazy"} fetchpriority={embedded && i === 0 ? "high" : undefined} onerror={() => fillFromWiki(r)} {@attach imgTimeout(() => fillFromWiki(r))} />
 						{:else}
 							<span class="gal-cover-ph" aria-hidden="true">📖</span>
 						{/if}
@@ -430,7 +431,7 @@
 								<div class="tw-cell">
 									<button class="tw-cover" class:has-img={!!covers[coverKey(row)]} onclick={() => openTitle(row[0], row[2])} title="See borrowing trend">
 										{#if covers[coverKey(row)]}
-											<img src={covers[coverKey(row)]} alt="" width="70" height="105" loading="lazy" onerror={() => fillFromWiki(row)} />
+											<img src={covers[coverKey(row)]} alt="" width="70" height="105" loading="lazy" onerror={() => fillFromWiki(row)} {@attach imgTimeout(() => fillFromWiki(row))} />
 										{:else}
 											<span class="tw-cover-ph" aria-hidden="true">📖</span>
 										{/if}

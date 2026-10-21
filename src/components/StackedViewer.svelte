@@ -28,6 +28,7 @@
 	import { HIDDEN_GENRES } from "$utils/rankGenres.js";
 	import SlidersIcon from "@lucide/svelte/icons/sliders-horizontal";
 	import { isQuiet, toYearly, QUIET_PEAK, SMALL_TOTAL } from "$utils/lowCount.js";
+	import { imgTimeout } from "$utils/imgTimeout.js";
 	import { seattleReadsYear, SEATTLE_READS } from "$utils/seattleReads.js";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
@@ -2020,7 +2021,7 @@
 			     width underneath. Authors get no photo here (the hover card has it). -->
 			<div class="hd-main" class:has-cover={showCover}>
 			{#if showCover}
-				<img class="hd-cover" src={workCover} alt="" width="54" height="81" fetchpriority="high" onerror={() => (workCover = null)} />
+				<img class="hd-cover" src={workCover} alt="" width="54" height="81" fetchpriority="high" onerror={() => (workCover = null)} {@attach imgTimeout(() => (workCover = null))} />
 			{/if}
 			<div class="hd-text">
 			{#if headingText}

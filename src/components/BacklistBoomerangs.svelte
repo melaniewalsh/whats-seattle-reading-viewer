@@ -12,6 +12,7 @@
 	import { titleCase } from "$utils/titleCase.js";
 	import { compactNumber } from "$utils/format.js";
 	import { coverUrl, coverOverride } from "$utils/covers.js";
+	import { imgTimeout } from "$utils/imgTimeout.js";
 
 	let { openAuthor = () => {}, openTitle = () => {} } = $props();
 
@@ -151,7 +152,7 @@
 				<span class="bb-rank">{i + 1}</span>
 				<button class="bb-cover" class:has-img={!!covers[coverKey(r)]} onclick={() => open(r)} aria-label="See the trend for {titleCase(r.t)}">
 					{#if covers[coverKey(r)]}
-						<img src={covers[coverKey(r)]} alt="" loading="lazy" decoding="async" width="54" height="81" />
+						<img src={covers[coverKey(r)]} alt="" loading="lazy" decoding="async" width="54" height="81" onerror={() => (covers[coverKey(r)] = null)} {@attach imgTimeout(() => (covers[coverKey(r)] = null))} />
 					{/if}
 				</button>
 				<div class="bb-main">

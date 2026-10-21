@@ -21,6 +21,7 @@
 	import { compactNumber } from "$utils/format.js";
 	import { publications } from "$data/publications.js";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
+	import { imgTimeout } from "$utils/imgTimeout.js";
 
 	const copy = getContext("copy");
 	// Four top-level views. "search" and "rankings" carry a sub-kind toggle.
@@ -658,7 +659,7 @@
 					<div class="featured-head">
 						{#if featured.cover}
 							<button class="featured-cover" onclick={() => openTitle(featured.title, featured.authorSlug)} title="See the full trend">
-								<img src={featured.cover} alt="The Odyssey" width="64" height="96" loading="lazy" />
+								<img src={featured.cover} alt="The Odyssey" width="64" height="96" loading="lazy" onerror={() => (featured = { ...featured, cover: null })} {@attach imgTimeout(() => (featured = { ...featured, cover: null }))} />
 							</button>
 						{/if}
 						<div class="featured-headtext">
