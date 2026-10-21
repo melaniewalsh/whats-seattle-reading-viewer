@@ -419,7 +419,8 @@
 	.foot-actions { display: flex; gap: 8px; align-items: center; flex: none; margin-left: auto; }
 	.dl-wrap { position: relative; }
 	.dl-backdrop { position: fixed; inset: 0; z-index: 20; background: none; border: 0; cursor: default; }
-	.dl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 21; min-width: 196px; padding: 4px; background: #fff; border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1); }
+	/* Download and Share sit under the chart, so their menus open upward. */
+	.dl-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 21; min-width: 196px; padding: 4px; background: #fff; border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1); }
 	.dl-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: var(--text-sm); font-weight: 500; color: var(--color-fg); text-align: left; cursor: pointer; }
 	.dl-menu button:hover { background: var(--color-gray-100); }
 	.dl-menu :global(svg) { flex: none; width: 15px; height: 15px; color: var(--color-fg-light); }

@@ -3740,7 +3740,8 @@
 	.chart-foot .tb-btn:hover { background: #e4e6e8; color: var(--color-fg); }
 	.chart-foot .tb-btn :global(svg) { width: 13px; height: 13px; color: currentColor; }
 	.chart-foot .tb-btn :global(svg.lucide-chevron-down) { width: 12px; height: 12px; }
-	.chart-foot .share-menu { left: auto; right: 0; }
+	/* Under the chart, Download and Share open upward, beside the chart they belong to. */
+	.chart-foot .share-menu { left: auto; right: 0; top: auto; bottom: calc(100% + 6px); }
 	/* On a phone the links wrap under the source, at the left: open menus rightward. */
 	.chart-source a { color: inherit; text-decoration: underline; text-decoration-color: #c9c9c9; text-underline-offset: 2px; }
 	.chart-source a:hover { color: var(--color-fg); text-decoration-color: currentColor; }

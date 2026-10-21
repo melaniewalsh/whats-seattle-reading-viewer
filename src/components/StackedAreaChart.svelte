@@ -509,9 +509,9 @@
 				const d = Math.min(Math.abs(y(s.values[hoverIndex]) - py), Math.abs(y((s.raw ?? s.values)[hoverIndex]) - py));
 				if (d < bestDist) { bestDist = d; best = s; }
 			}
-			// A mouse far from every line shows nothing; a tap is deliberate.
-			if (!pinned && event.pointerType !== 'touch' && bestDist > 32) { hoverIndex = null; hoveredSeriesKey = null; return; }
-			hoveredSeriesKey = best ? best.label : null;
+			// Anywhere over the plot shows the month. With several lines the box
+			// lists them all (no single line is "hovered"); with one, it's that line.
+			hoveredSeriesKey = multi ? null : best ? best.label : null;
 		} else {
 			// specific stacked layer whose band contains this Y data value
 			const activeLayer = stackedSeries.find(s => {
@@ -641,6 +641,17 @@
 		}
 		return stackedSeries[stackedSeries.length - 1].top[hoverIndex];
 	});
+
+	// Several lines: the tooltip lists every line's value for the month (like
+	// the Ngram Viewer), highest first.
+	const multi = $derived(mode === 'line' && lineLayers.length >= 2);
+	const multiRows = $derived(
+		multi && hoverIndex !== null
+			? lineLayers
+				.map((l) => ({ key: keyOf(l), label: l.label, color: l.color, v: (l.raw ?? l.values)[hoverIndex] ?? 0 }))
+				.sort((a, b) => b.v - a.v)
+			: []
+	);
 
 	// Extract the single selected book series object matching user hover
 	const selectedItem = $derived(
@@ -881,8 +892,8 @@
 		<!-- Hover marker: a thin vertical rule plus a dot on the hovered line(s) -->
 		{#if hoverIndex !== null}
 			<line class="hover-guide" x1={x(hoverIndex)} x2={x(hoverIndex)} y1={margin.top - 12} y2={height - margin.bottom} />
-			{#if sheetMode}
-				<!-- Phones: a dot on every line, read off in the sheet below -->
+			{#if sheetMode || multi}
+				<!-- A dot on every line, read off in the list (or the phone sheet) -->
 				{#each layers as l}
 					{#if (l.top?.[hoverIndex] ?? 0) > 0}<circle class="hover-dot" cx={x(hoverIndex)} cy={y(l.top[hoverIndex])} r="4.5" fill={l.color} />{/if}
 				{/each}
@@ -942,7 +953,15 @@
 			</ul>
 		</div>
 	{/if}
-	{#if hoverIndex !== null && selectedItem && !sheetMode}
+	{#if hoverIndex !== null && multi && !sheetMode && multiRows.length}
+		<div class="tooltip tt-multi {pinned ? '' : 'side-' + tooltipSide}" class:below={pinned && tooltipBelow} class:pinned style="left: {tooltipLeft}px; top: {tooltipTop}px;" onclick={() => pinned && dismiss()}>
+			<div class="tm-date">{formatMonth(months[hoverIndex])}</div>
+			{#each multiRows as r (r.key)}
+				<div class="tm-row"><span class="tt-sw" style="background:{r.color}"></span><span class="tm-name">{r.label}</span><span class="tm-val">{fmtVal(r.v)}{#if monthPct(r.v) !== null}<span class="tm-pct">{fmtPct(monthPct(r.v))}</span>{/if}</span></div>
+			{/each}
+		</div>
+	{/if}
+	{#if hoverIndex !== null && selectedItem && !sheetMode && !multi}
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
         <div class="tooltip {pinned ? '' : 'side-' + tooltipSide}" class:below={pinned && tooltipBelow} class:pinned class:compact={width < 560} style="left: {tooltipLeft}px; top: {tooltipTop}px;" onclick={() => pinned && dismiss()}>
             {#if pinned}<button type="button" class="tt-close" aria-label="Close" onclick={(e) => { e.stopPropagation(); dismiss(); }}>×</button>{/if}
@@ -1197,17 +1216,8 @@
 		stroke-linejoin: round;
 	}
 
-	/* Glide the hover dot and guide between points, in step with the tooltip. */
-	.hover-dot {
-		transition: cx 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-			cy 0.18s cubic-bezier(0.22, 1, 0.36, 1);
-	}
-	.hover-guide {
-		opacity: 0.9;
-		transition: x1 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-			x2 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-			y1 0.18s cubic-bezier(0.22, 1, 0.36, 1);
-	}
+	/* The guide, dots and tooltip jump straight to the cursor's month (no glide). */
+	.hover-guide { opacity: 0.9; }
 
 	text.x-year { font-size: 11px; font-weight: 600; fill: #555; }
 	.tick text {
@@ -1217,12 +1227,8 @@
 
 	.tooltip {
 		position: absolute;
-		/* float just above the dot on the line; glide between points with a gentle
-		   ease so it tracks the cursor smoothly instead of snapping */
+		/* float just above the cursor's point on the guide */
 		transform: translate(-50%, calc(-100% - 18px));
-		/* glide horizontally between month positions; vertical tracks the cursor
-		   directly (no transition) so it never lags or bounces */
-		transition: left 0.12s cubic-bezier(0.22, 1, 0.36, 1);
 		background: rgba(255, 255, 255, 0.98);
 		-webkit-backdrop-filter: saturate(1.8) blur(6px);
 		backdrop-filter: saturate(1.8) blur(6px);
@@ -1239,12 +1245,14 @@
 		min-width: 180px;
 		max-width: 280px;
 		z-index: 10;
-		animation: tt-fade 0.14s ease-out;
 	}
-	@keyframes tt-fade {
-		from { opacity: 0; }
-		to { opacity: 1; }
-	}
+	/* Several lines: month on top, then one row per line, highest first. */
+	.tt-multi { min-width: 200px; max-width: 320px; padding: 9px 12px 10px; }
+	.tm-date { margin: 0 0 6px; font-weight: 700; font-size: 13px; color: #1a1a1a; }
+	.tm-row { display: flex; align-items: center; gap: 8px; padding: 2px 0; font-size: 13px; line-height: 1.3; }
+	.tm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; }
+	.tm-val { margin-left: 12px; font-variant-numeric: tabular-nums; font-weight: 600; color: #1a1a1a; white-space: nowrap; }
+	.tm-pct { margin-left: 6px; font-weight: 400; color: #777; }
 	/* Phones: the bottom sheet (tap anywhere to close). */
 	.tt-sheet {
 		position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
