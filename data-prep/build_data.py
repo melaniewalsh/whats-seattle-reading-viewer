@@ -1073,6 +1073,86 @@ def clean_title_for_display(title):
     return t
 
 
+# Subject pages: for each subject heading with at least SUBJECT_MIN_WORKS books,
+# its SUBJECT_TOP most-borrowed books (all time). A book belongs to a subject
+# the way it belongs to a genre: at least GENRE_SHARE of its checkouts come from
+# records carrying that heading. Books under SUBJECT_MIN_CHECKOUTS checkouts are
+# left out, as everywhere on the site (src/utils/lowCount.js).
+SUBJECT_TOP = 50
+SUBJECT_MIN_WORKS = 10
+SUBJECT_MIN_CHECKOUTS = 25
+SUBJECT_STOP = ("'fiction','nonfiction','non-fiction','literature','general',"
+                "'fiction general','general fiction','adult','adult fiction'")
+
+
+def subject_slug(term):
+    """URL slug for a subject heading; must match subjectSlug() in src/utils/subjects.js."""
+    t = _ud.normalize("NFKD", (term or "").lower())
+    t = "".join(c for c in t if not _ud.combining(c))
+    return re.sub(r"[^a-z0-9]+", "-", t).strip("-")[:80]
+
+
+def build_subject_lists(con, meta, slug_by_author):
+    """{subject slug: (label, n_works, [[title, author, author slug, checkouts], ...])}"""
+    rows = con.execute(
+        f"""
+        WITH ex AS (
+            SELECT wk, lower(trim(u.term)) AS t, trim(u.term) AS term, c
+            FROM cw, UNNEST(string_split(coalesce(subjects, ''), ',')) AS u(term)
+            WHERE length(trim(u.term)) > 1 AND lower(trim(u.term)) NOT IN ({SUBJECT_STOP})
+        ),
+        tagged AS (SELECT wk, t, arg_max(term, c) AS term, sum(c) AS n FROM ex GROUP BY wk, t),
+        tot AS (SELECT wk, sum(c) AS tot FROM cw GROUP BY wk),
+        mem AS (
+            SELECT tagged.t, tagged.term, tagged.wk, tot.tot
+            FROM tagged JOIN tot USING (wk)
+            WHERE tot.tot >= {SUBJECT_MIN_CHECKOUTS} AND tagged.n >= {float(GENRE_SHARE)} * tot.tot
+        )
+        SELECT t, arg_max(term, tot) AS label, count(*) AS nworks,
+               list_slice(list({{'wk': wk, 'n': tot}} ORDER BY tot DESC), 1, {SUBJECT_TOP}) AS top
+        FROM mem
+        GROUP BY t
+        HAVING count(*) >= {SUBJECT_MIN_WORKS}
+        """
+    ).fetchall()
+    out = {}
+    for _t, label, nworks, top in sorted(rows, key=lambda r: -r[2]):
+        slug = subject_slug(label)
+        if not slug or slug in out:  # two spellings of one heading: keep the bigger
+            continue
+        lst = []
+        for e in top:
+            title, author = meta.get(e["wk"], ("", ""))
+            if title:
+                lst.append([title, author, slug_by_author.get(author, ""), int(e["n"])])
+        out[slug] = (label, int(nworks), lst)
+    return out
+
+
+def write_subject_pages(out_dir, subject_lists):
+    """subjects/<slug>.json per subject, plus subjects.json ({slug: [label, n_works]})
+    so the site knows which headings have a page. Covers come from the cover
+    cache only (no new Open Library lookups); the site fills in the rest."""
+    import json as _j
+    cache = {}
+    if COVER_CACHE.exists():
+        try:
+            cache = _j.loads(COVER_CACHE.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            cache = {}
+    sdir = out_dir / "subjects"
+    if sdir.exists():
+        shutil.rmtree(sdir)
+    sdir.mkdir(parents=True)
+    index = {}
+    for slug, (label, nworks, lst) in subject_lists.items():
+        rows = [r + [cache.get(_cover_cache_key(r[0], r[1]))] for r in lst]
+        (sdir / f"{slug}.json").write_bytes(_dumps({"subject": label, "works": nworks, "rows": rows}))
+        index[slug] = [label, nworks]
+    (out_dir / "subjects.json").write_bytes(_dumps(index))
+    print(f"  wrote {len(index):,} subject pages", flush=True)
+
+
 def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     """Top-N clustered WORKS per genre per year. Parallels build_top_authors but
     ranks works (editions clustered by normalize_work_key) instead of authors.
@@ -1358,6 +1438,15 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
     except Exception as e:  # noqa: BLE001
         print(f"  WARNING: Seattle Reads list skipped ({e})", flush=True)
 
+    # Subject pages (see build_subject_lists); computed while `cw` still exists.
+    try:
+        t0 = perf_counter()
+        subject_lists = build_subject_lists(con, meta, slug_by_author)
+        print(f"  subject lists: {len(subject_lists):,} subjects ({perf_counter() - t0:.2f}s)", flush=True)
+    except Exception as e:  # noqa: BLE001
+        subject_lists = {}
+        print(f"  WARNING: subject lists skipped ({e})", flush=True)
+
     for tbl in ("cw", "cwm", "workmeta", "titlework"):
         con.execute(f"DROP TABLE IF EXISTS {tbl}")
 
@@ -1377,6 +1466,10 @@ def build_top_works(con, out_dir, slug_by_author, months, lo, top_n=20):
         _dumps({"years": years, "genres": genres_out, "latestMonth": months[-1], "data": data})
     )
     print(f"  wrote top-works.json ({len(genres_out)} genres x {len(years)} years; latest month {months[-1]})", flush=True)
+    try:
+        write_subject_pages(out_dir, subject_lists)
+    except Exception as e:  # noqa: BLE001
+        print(f"  WARNING: subject pages not written ({e})", flush=True)
 
 
 _TITLE_STOP = {"a", "an", "the", "and", "or", "of", "to", "in", "for", "is"}
