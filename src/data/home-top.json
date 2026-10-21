@@ -1,40 +1,41 @@
 {
+ "year": "2026",
  "latestMonth": "2026-08",
  "rows": [
+  [
+   "The Correspondent",
+   "virginia evans, 1986",
+   "virginia-evans-1986",
+   13356,
+   "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/covers/15232808-M.jpg"
+  ],
   [
    "Yesteryear",
    "caro claire burke",
    "caro-claire-burke",
-   3245,
+   12653,
    "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/covers/15234864-M.jpg"
+  ],
+  [
+   "Heated Rivalry",
+   "rachel reid",
+   "rachel-reid",
+   11207,
+   "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/covers/15152812-M.jpg"
+  ],
+  [
+   "Wuthering Heights",
+   "emily bronte, 1818",
+   "emily-bronte-1818",
+   9974,
+   "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/covers/12818862-M.jpg"
   ],
   [
    "The Calamity Club",
    "kathryn stockett",
    "kathryn-stockett",
-   3203,
+   9136,
    "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/covers/15236189-M.jpg"
-  ],
-  [
-   "True Biz",
-   "sara novic, 1987",
-   "sara-novic-1987",
-   2135,
-   "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/covers/13112879-M.jpg"
-  ],
-  [
-   "The Correspondent",
-   "virginia evans, 1986",
-   "virginia-evans-1986",
-   1655,
-   "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/covers/15232808-M.jpg"
-  ],
-  [
-   "Whistler",
-   "ann patchett",
-   "ann-patchett",
-   1498,
-   "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/covers/15234903-M.jpg"
   ]
  ]
 }

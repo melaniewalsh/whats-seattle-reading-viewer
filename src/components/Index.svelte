@@ -619,7 +619,7 @@
 					<button class="ht-link ht-surprise" onclick={homeSurprise}>Surprise me</button>
 				</p>
 			</div>
-			<section class="home-topworks" aria-label="Most borrowed last month">
+			<section class="home-topworks" aria-label="Most borrowed this year">
 				<TopWorks {openAuthor} {openTitle} embedded onSeeAll={() => go("rankings")} />
 			</section>
 			<nav class="hub" aria-label="Explore">

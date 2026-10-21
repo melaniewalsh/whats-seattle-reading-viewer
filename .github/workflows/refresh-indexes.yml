@@ -25,7 +25,9 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     # The first run with cover baking looks up ~600 covers on Open Library.
-    timeout-minutes: 60
+    # The first run that copies the Most Borrowed covers downloads ~5,000
+    # images from Open Library; later runs only fetch new ones.
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
 
@@ -49,8 +51,13 @@ jobs:
         run: |
           TITLE_MIN_CHECKOUTS=500 python3 data-prep/build_title_index.py
           python3 data-prep/build_backlist.py
+          # The live Most Borrowed rankings (newer than the snapshot's copy), so
+          # host_covers.py can point their covers at R2 too.
+          curl -sf -o static/data/top-works.json "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/top-works.json"
           # Copy cover thumbnails to R2 (Open Library's image server is slow).
           python3 data-prep/host_covers.py
+          # The home page strip, with its covers now on R2.
+          python3 data-prep/build_home_top.py
 
       - name: Upload to the public R2 bucket
         env:
@@ -79,17 +86,20 @@ jobs:
           aws s3 cp static/data/backlist.json "s3://${R2_DB_BUCKET}/backlist.json" \
             --endpoint-url "$R2_ENDPOINT_URL" --content-type application/json \
             --only-show-errors
-          echo "uploaded title-index.json and backlist.json"
+          aws s3 cp static/data/top-works.json "s3://${R2_DB_BUCKET}/top-works.json" \
+            --endpoint-url "$R2_ENDPOINT_URL" --content-type application/json \
+            --only-show-errors
+          echo "uploaded title-index.json, backlist.json and top-works.json"
 
-      - name: Commit refreshed bundled backlist.json
+      - name: Commit refreshed bundled backlist.json and home-top.json
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add static/backlist.json
+          git add static/backlist.json src/data/home-top.json
           if git diff --cached --quiet; then
-            echo "backlist.json unchanged -- nothing to commit"
+            echo "backlist.json / home-top.json unchanged -- nothing to commit"
           else
-            git commit -m "CI: refresh backlist.json"
+            git commit -m "CI: refresh backlist.json and home-top.json"
             for i in 1 2 3; do
               if git pull --rebase -X theirs origin ${{ github.ref_name }} \
                  && git push origin HEAD:${{ github.ref_name }}; then

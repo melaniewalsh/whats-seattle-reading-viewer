@@ -23,7 +23,7 @@
 	// openAuthor(slug) / openTitle(title, slug) are provided by Index.svelte: jump to the
 	// By-author / By-title views. rankKind / setRankKind drive the Type dropdown that
 	// swaps between the Works and Authors rankings.
-	// embedded: render ONLY the "Most borrowed overall (last month)" gallery strip
+	// embedded: render ONLY the "Most borrowed in <this year>" gallery strip
 	// (no masthead / controls / table) for the home page. onSeeAll links to the full
 	// Most Borrowed view.
 	let { openAuthor, openTitle, rankKind = "works", setRankKind = () => {}, embedded = false, onSeeAll = () => {} } = $props();
@@ -31,8 +31,9 @@
 	// The home strip uses the five books baked in at build time
 	// (data-prep/build_home_top.py), set up front so they're in the pre-built
 	// HTML: no 2.6 MB rankings download, no wait.
+	// The strip shows the current year so far (homeTop.year, e.g. "2026").
 	const baked = embedded && homeTop?.rows?.length
-		? { period: homeTop.latestMonth ? "month" : "all", rows: homeTop.rows, latestMonth: homeTop.latestMonth }
+		? { period: homeTop.year || (homeTop.latestMonth ? "month" : "all"), rows: homeTop.rows, latestMonth: homeTop.latestMonth }
 		: null;
 	let data = $state.raw(baked ? { latestMonth: baked.latestMonth, years: [], genres: ["All genres"], data: { "All genres": { [baked.period]: baked.rows } } } : null);
 	let genre = $state("All genres");
@@ -310,7 +311,7 @@
 	{#if embedded}
 		<section class="gal-sec home-tw">
 			<div class="home-tw-head">
-				<h2 class="home-tw-title">Most borrowed last&nbsp;month{#if monthLabel}{" "}<span class="home-tw-month">({monthShort})</span>{/if}</h2>
+				<h2 class="home-tw-title">{#if homeTop?.year}Most borrowed in {homeTop.year}{#if monthLabel}{" "}<span class="home-tw-month">(through {monthShort.split(" ")[0]})</span>{/if}{:else}Most borrowed last&nbsp;month{#if monthLabel}{" "}<span class="home-tw-month">({monthShort})</span>{/if}{/if}</h2>
 				<button class="home-tw-more" onclick={onSeeAll}>See all Most&nbsp;Borrowed →</button>
 			</div>
 			{@render galRow(overallBooks)}

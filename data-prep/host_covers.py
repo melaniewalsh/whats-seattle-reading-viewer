@@ -1,25 +1,32 @@
 #!/usr/bin/env python3
 """
-Host the Backlist Boomerangs cover thumbnails on R2 instead of hot-linking
-Open Library.
+Host the site's cover thumbnails on R2 instead of hot-linking Open Library:
+Backlist Boomerangs (backlist.json) and the Most Borrowed lists
+(top-works.json, the 5th column of each row).
 
 build_backlist.py bakes an Open Library cover URL into every listed work, but
 covers.openlibrary.org is slow to serve (a median ~4.6 s per image in a
 2026-09 test, each a 320x500 "-L" image shown 54 px wide), so the page filled
 in its covers over many seconds. This step:
 
-  1. collects the Open Library cover ids in static/data/backlist.json,
+  1. collects the Open Library cover ids in static/data/backlist.json and
+     static/data/top-works.json,
   2. checks which ones are already on R2 (HEAD on the public URL; a cover id's
      image never changes, so once uploaded it's reused every month),
   3. downloads the missing ones at "-M" size (~180 px wide, ~10-20 KB) into
      static/cover-thumbs/ for the workflow to upload to R2 under covers/,
-  4. rewrites each work's "c" to the R2 URL (leaving the Open Library URL for
-     any thumbnail that couldn't be fetched), in both copies of backlist.json.
+  4. rewrites each cover to the R2 URL (leaving the Open Library URL for any
+     thumbnail that couldn't be fetched): each work's "c" in both copies of
+     backlist.json, and each row's cover in top-works.json.
+
+Besides speed, this keeps covers up when Open Library's cover server is down
+(it hung for hours in October 2026).
 
 The monthly data build's `rclone sync` must exclude covers/** so it doesn't
 delete these.
 
-Run AFTER build_backlist.py; the workflow then uploads static/cover-thumbs/.
+Run AFTER build_data.py and build_backlist.py; the workflow then uploads
+static/cover-thumbs/ (and top-works.json with the rest of static/data).
 """
 import json
 import re
@@ -64,18 +71,12 @@ def fetch_thumb(cid):
         return False
 
 
-def main():
-    src = FILES[0] if FILES[0].exists() else FILES[1]
-    data = json.loads(src.read_text())
-    rows = [r for lst in data["data"].values() for r in lst]
-    ids = sorted({m.group(1) for r in rows if r.get("c") for m in [OL_ID.search(r["c"])] if m})
-    print(f"{len(ids)} Open Library cover ids in {src.name}", flush=True)
-
+def host(ids):
+    """The cover ids now on R2: already there, or downloaded for upload."""
     with ThreadPoolExecutor(max_workers=16) as ex:
         hosted = {cid for cid, ok in zip(ids, ex.map(on_r2, ids)) if ok}
     missing = [cid for cid in ids if cid not in hosted]
-    print(f"already on R2: {len(hosted)}; to download: {len(missing)}", flush=True)
-
+    print(f"  already on R2: {len(hosted)}; to download: {len(missing)}", flush=True)
     THUMB_DIR.mkdir(parents=True, exist_ok=True)
     fetched = set()
     if missing:
@@ -83,10 +84,18 @@ def main():
             for i, (cid, ok) in enumerate(zip(missing, ex.map(fetch_thumb, missing)), 1):
                 if ok:
                     fetched.add(cid)
-                if i % 100 == 0 or i == len(missing):
+                if i % 200 == 0 or i == len(missing):
                     print(f"  [{i}/{len(missing)}] downloaded {len(fetched)}", flush=True)
-    good = hosted | fetched
+    return hosted | fetched
 
+
+def backlist():
+    src = FILES[0] if FILES[0].exists() else FILES[1]
+    data = json.loads(src.read_text())
+    rows = [r for lst in data["data"].values() for r in lst]
+    ids = sorted({m.group(1) for r in rows if r.get("c") for m in [OL_ID.search(r["c"])] if m})
+    print(f"{len(ids)} Open Library cover ids in {src.name}", flush=True)
+    good = host(ids)
     changed = 0
     for r in rows:
         m = OL_ID.search(r.get("c") or "")
@@ -97,8 +106,34 @@ def main():
     for f in FILES:
         if f.parent.is_dir():
             f.write_text(text)
-    print(f"{changed}/{len(rows)} works now point at R2 thumbnails "
-          f"({len(fetched)} new files in {THUMB_DIR.relative_to(PROJECT)})", flush=True)
+    print(f"{changed}/{len(rows)} Backlist works now point at R2 thumbnails", flush=True)
+
+
+def top_works():
+    src = DATA_DIR / "top-works.json"
+    if not src.exists():
+        print("no top-works.json here; skipping the Most Borrowed covers", flush=True)
+        return
+    data = json.loads(src.read_text())
+    rows = [r for g in data["data"].values() for lst in g.values() for r in lst if len(r) > 4 and r[4]]
+    ids = sorted({m.group(1) for r in rows for m in [OL_ID.search(r[4])] if m})
+    print(f"{len(ids)} Open Library cover ids in {src.name}", flush=True)
+    good = host(ids)
+    changed = 0
+    for r in rows:
+        m = OL_ID.search(r[4])
+        if m and m.group(1) in good:
+            r[4] = r2_url(m.group(1))
+            changed += 1
+    src.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False))
+    print(f"{changed}/{len(rows)} Most Borrowed rows now point at R2 thumbnails", flush=True)
+
+
+def main():
+    backlist()
+    top_works()
+    n = len(list(THUMB_DIR.glob("*.jpg"))) if THUMB_DIR.exists() else 0
+    print(f"{n} new files in {THUMB_DIR.relative_to(PROJECT)}", flush=True)
 
 
 if __name__ == "__main__":

@@ -40,7 +40,9 @@ def main():
 
     d = json.loads(Path(args.src).read_text())
     overall = d["data"]["All genres"]
-    period = "month" if d.get("latestMonth") and overall.get("month") else "all"
+    # The current year so far (e.g. "2026"), else all time.
+    year = str(max(d.get("years") or [0]))
+    period = year if overall.get(year) else "all"
     rows = [list(r) for r in overall.get(period, [])[:N]]
 
     THUMB_DIR.mkdir(parents=True, exist_ok=True)
@@ -54,9 +56,9 @@ def main():
         else:
             r[4] = f"https://covers.openlibrary.org/b/id/{cid}-M.jpg"
 
-    out = {"latestMonth": d.get("latestMonth") if period == "month" else None, "rows": rows}
+    out = {"year": period if period != "all" else None, "latestMonth": d.get("latestMonth"), "rows": rows}
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n")
-    print(f"Wrote {OUT.relative_to(PROJECT)}: {period} {out['latestMonth']}, "
+    print(f"Wrote {OUT.relative_to(PROJECT)}: {period} through {out['latestMonth']}, "
           f"{len(rows)} books, {sum('r2.dev' in (r[4] or '') for r in rows)} covers on R2")
 
 
