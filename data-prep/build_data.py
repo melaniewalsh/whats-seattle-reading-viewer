@@ -1094,6 +1094,7 @@ def subject_slug(term):
 
 def build_subject_lists(con, meta, slug_by_author):
     """{subject slug: (label, n_works, [[title, author, author slug, checkouts], ...])}"""
+    from build_partition import GENRE_SHARE
     rows = con.execute(
         f"""
         WITH ex AS (
