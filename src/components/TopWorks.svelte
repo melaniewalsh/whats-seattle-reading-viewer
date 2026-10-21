@@ -69,9 +69,8 @@
 		}
 		data = d;
 		if (!data.genres.includes(genre)) genre = "All genres";
-		// Default to last month's ranking (the freshest, most timely view) when the
-		// data has it, unless the URL asked for a specific period.
-		if (!yearFromUrl && data.latestMonth) year = "month";
+		// Default to the current year so far, unless the URL asked for a period.
+		if (!yearFromUrl && data.years?.length) year = String(Math.max(...data.years));
 		if (year === "month") { if (!data.latestMonth) year = "all"; }
 		else if (year !== "all" && !data.years.includes(Number(year))) year = "all";
 	});

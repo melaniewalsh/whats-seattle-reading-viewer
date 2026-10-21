@@ -36,10 +36,11 @@
 	let termsMap = $state.raw({});
 	onMount(async () => {
 		// Read shareable filters from the URL first.
+		let yearFromUrl = false;
 		try {
 			const p = new URLSearchParams(window.location.search);
 			if (p.get("genre")) genre = p.get("genre");
-			if (p.get("year")) year = p.get("year");
+			if (p.get("year")) { year = p.get("year"); yearFromUrl = true; }
 		} catch {}
 		getGenreTerms().then((m) => (termsMap = m));
 		const d = await getTopAuthors();
@@ -51,6 +52,8 @@
 		}
 		data = d;
 		if (!data.genres.includes(genre)) genre = "All genres";
+		// Default to the current year so far, unless the URL asked for a period.
+		if (!yearFromUrl && data.years?.length) year = String(Math.max(...data.years));
 		if (year !== "all" && !data.years.includes(Number(year))) year = "all";
 	});
 	// Curated genres (gallery + top of the dropdown) and the rest (filterable
