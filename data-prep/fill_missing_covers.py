@@ -41,6 +41,9 @@ def clean_title(t):
     """'Babymouse. [7], Skater girl' -> 'Babymouse 7 Skater girl';
     'Naruto. Vol. 11, Impassioned efforts' -> 'Naruto 11 Impassioned efforts'."""
     t = (t or "").split(" / ")[0]
+    # Older records put the credits in the title: "A fly went by, by Mike
+    # McClintock. Illustrated by ...", "Snow [by] Roy McKie and ...".
+    t = re.split(r",\s+by\s|\.\s+Illustrated by|\s\[by\]\s", t, flags=re.I)[0]
     t = re.split(r"\s=\s", t)[0]
     t = re.sub(r"\[(?:\s*(?:vol(?:ume)?\.?|book|no\.?)\s*)?([0-9]+)[^\]]*\]", r" \1 ", t, flags=re.I)  # [7], [Volume 1, ...]
     t = re.sub(r"\[[^\]]*\]", " ", t)
