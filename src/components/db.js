@@ -106,6 +106,21 @@ export function getTopWorks() {
 	return topWorksPromise;
 }
 
+// Subject pages (data-prep/build_data.py write_subject_pages): subjects.json maps
+// each subject slug with a page to [label, number of books]; subjects/<slug>.json
+// holds its most-borrowed books. A missing index just means no subject links.
+let subjectIndexPromise = null;
+export function getSubjectIndex() {
+	if (!subjectIndexPromise) {
+		subjectIndexPromise = fetchJson(`${DATA_BASE}/subjects.json`)
+			.catch(() => { subjectIndexPromise = null; return {}; });
+	}
+	return subjectIndexPromise;
+}
+export function getSubject(slug) {
+	return fetchJson(`${DATA_BASE}/subjects/${slug}.json`);
+}
+
 // Subject terms per genre (from genres.json, served at the Pages base — NOT R2).
 // Powers the "Subject tags" line under a selected genre in the ranking tables.
 let genreTermsPromise = null;

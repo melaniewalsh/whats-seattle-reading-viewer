@@ -113,7 +113,7 @@ def top_works():
     src = DATA_DIR / "top-works.json"
     if not src.exists():
         print("no top-works.json here; skipping the Most Borrowed covers", flush=True)
-        return
+        return set()
     data = json.loads(src.read_text())
     rows = [r for g in data["data"].values() for lst in g.values() for r in lst if len(r) > 4 and r[4]]
     ids = sorted({m.group(1) for r in rows for m in [OL_ID.search(r[4])] if m})
@@ -127,11 +127,33 @@ def top_works():
             changed += 1
     src.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False))
     print(f"{changed}/{len(rows)} Most Borrowed rows now point at R2 thumbnails", flush=True)
+    return good
+
+
+def subject_pages(good):
+    """Subject pages (static/data/subjects/) reuse the thumbnails already on R2;
+    no extra downloads for them."""
+    sdir = DATA_DIR / "subjects"
+    if not good or not sdir.is_dir():
+        return
+    changed = 0
+    for f in sdir.glob("*.json"):
+        data = json.loads(f.read_text())
+        hit = False
+        for r in data.get("rows", []):
+            m = OL_ID.search((r[4] if len(r) > 4 else None) or "")
+            if m and m.group(1) in good:
+                r[4] = r2_url(m.group(1))
+                changed += 1
+                hit = True
+        if hit:
+            f.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False))
+    print(f"{changed} subject-page covers now point at R2 thumbnails", flush=True)
 
 
 def main():
     backlist()
-    top_works()
+    subject_pages(top_works())
     n = len(list(THUMB_DIR.glob("*.jpg"))) if THUMB_DIR.exists() else 0
     print(f"{n} new files in {THUMB_DIR.relative_to(PROJECT)}", flush=True)
 
