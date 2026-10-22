@@ -133,6 +133,10 @@ jobs:
           # first circulated (data-prep/build_backlist.py). ~10 s. Writes
           # static/data/backlist.json (-> R2) and static/backlist.json (bundled).
           python3 data-prep/build_backlist.py
+          # Retry books with no cover (tidied titles, Open Library, then Apple
+          # Books; capped since Apple allows ~20 lookups a minute), then fill
+          # the found ones into the rankings.
+          python3 data-prep/fill_missing_covers.py --find --limit 150 --apply
           # Copy its cover thumbnails to R2 (see data-prep/host_covers.py).
           python3 data-prep/host_covers.py
           # The home page's "Most borrowed last month" strip, baked into the
