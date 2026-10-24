@@ -137,6 +137,8 @@ jobs:
           # Books; capped since Apple allows ~20 lookups a minute), then fill
           # the found ones into the rankings.
           python3 data-prep/fill_missing_covers.py --find --limit 150 --apply
+          # Original publication years from Wikipedia (new books only; cached).
+          python3 data-prep/fill_pub_years.py --find --apply
           # Copy its cover thumbnails to R2 (see data-prep/host_covers.py).
           python3 data-prep/host_covers.py
           # The home page's "Most borrowed last month" strip, baked into the
@@ -171,7 +173,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data-prep/cover_cache.json
+          git add data-prep/cover_cache.json data-prep/pubyear_cache.json
           if git diff --cached --quiet; then
             echo "cover_cache.json unchanged -- nothing to commit"
           else

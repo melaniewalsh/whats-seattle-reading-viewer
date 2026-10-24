@@ -56,6 +56,7 @@ jobs:
           curl -sf -o static/data/top-works.json "https://pub-7559692ae8974bd6a6e7cc54db47a348.r2.dev/top-works.json"
           # Covers found since the last build (data-prep/cover_cache.json).
           python3 data-prep/fill_missing_covers.py --apply
+          python3 data-prep/fill_pub_years.py --apply
           # Copy cover thumbnails to R2 (Open Library's image server is slow).
           python3 data-prep/host_covers.py
           # The home page strip, with its covers now on R2.
