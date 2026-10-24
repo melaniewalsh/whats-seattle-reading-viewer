@@ -41,6 +41,7 @@ def key(title, author):
 def tokens(s):
     s = unicodedata.normalize("NFKD", (s or "").lower())
     s = "".join(c for c in s if not unicodedata.combining(c))
+    s = re.sub(r"['\u2019]", "", s)  # "L'Engle" -> "lengle", as the catalog writes it
     return [w for w in re.sub(r"[^a-z0-9 ]+", " ", s).split() if w not in STOP]
 
 
@@ -96,16 +97,29 @@ def author_labels(qids):
     return [((e.get("labels") or {}).get("en") or {}).get("value", "") for e in d.get("entities", {}).values()]
 
 
+ERR = "error"  # a lookup that failed (network); not cached, so it's retried
+
+
 def find_one(k):
     title, author = k.split("\t")
     want, sn = main_title(title), surname(author)
     if not want:
         return k, None
+    # First the page names a book's article usually has ("1984 (novel)" redirects
+    # to "Nineteen Eighty-Four"), then a search.
+    direct = get_json(WIKI, {"action": "query", "format": "json", "redirects": "1", "titles": f"{want} (novel)|{want} (book)|{want}",
+                             "prop": "pageprops|description", "ppprop": "wikibase_item"})
     d = get_json(WIKI, {"action": "query", "format": "json", "generator": "search", "gsrsearch": f"{want} {sn}".strip(),
-                        "gsrlimit": "5", "prop": "pageprops|description", "ppprop": "wikibase_item"}) or {}
-    pages = sorted((d.get("query") or {}).get("pages", {}).values(), key=lambda p: p.get("index", 99))
-    for p in pages:
-        if not title_matches(want, p.get("title", "")):
+                        "gsrlimit": "5", "prop": "pageprops|description", "ppprop": "wikibase_item"})
+    if direct is None or d is None:
+        return k, ERR
+    named = [p for p in (direct.get("query") or {}).get("pages", {}).values() if "missing" not in p]
+    rank = {f"{want} (novel)".lower(): 0, f"{want} (book)".lower(): 1, want.lower(): 2}
+    redirect_from = {r["to"]: r["from"] for r in (direct.get("query") or {}).get("redirects", [])}
+    named.sort(key=lambda p: rank.get((redirect_from.get(p.get("title"), p.get("title")) or "").lower(), 3))
+    searched = sorted((d.get("query") or {}).get("pages", {}).values(), key=lambda p: p.get("index", 99))
+    for p in [dict(x, _named=True) for x in named] + searched:
+        if not p.get("_named") and not title_matches(want, p.get("title", "")):
             continue
         desc = p.get("description", "") or ""
         paren = " ".join(re.findall(r"\(([^)]*)\)", p.get("title", "")))
@@ -117,7 +131,7 @@ def find_one(k):
         if not ok and sn and authors:
             ok = any(sn in tokens(lbl) for lbl in author_labels(authors))
         if not ok:
-            continue
+            continue  # wrong author (a named page may be someone else's book)
         if year is None:
             m = re.match(r"^(\d{4})\b", desc)
             year = int(m.group(1)) if m else None
@@ -138,12 +152,15 @@ def works():
 
 def find(limit=None):
     cache = json.loads(CACHE.read_text()) if CACHE.exists() else {}
-    todo = sorted(key(*w) for w in works() if key(*w) not in cache)
+    retry = __import__("os").environ.get("PUBYEAR_RETRY_MISSES") == "1"
+    todo = sorted(key(*w) for w in works() if key(*w) not in cache or (retry and cache[key(*w)] is None))
     todo = todo[:limit] if limit else todo
     print(f"{len(todo)} works to look up", flush=True)
     found = 0
     with ThreadPoolExecutor(max_workers=6) as ex:
         for i, (k, y) in enumerate(ex.map(find_one, todo), 1):
+            if y == ERR:
+                continue
             cache[k] = y
             found += bool(y)
             if i % 250 == 0 or i == len(todo):

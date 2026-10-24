@@ -656,8 +656,10 @@ def annotate_editions(con, out_dir, slug_by_author, base_select):
     t0 = perf_counter()
     sel = base_select.replace(
         "Subjects AS subjects",
-        "Subjects AS subjects, CAST(CheckoutType AS VARCHAR) AS src, CAST(Publisher AS VARCHAR) AS pub, "
-        "CAST(PublicationYear AS VARCHAR) AS py, CAST(ISBN AS VARCHAR) AS isbn",
+        # ed_* names: an alias that matches a raw column ("isbn" vs ISBN) trips
+        # DuckDB's lateral-alias rules.
+        "Subjects AS subjects, CAST(CheckoutType AS VARCHAR) AS ed_src, CAST(Publisher AS VARCHAR) AS ed_pub, "
+        "CAST(PublicationYear AS VARCHAR) AS ed_py, CAST(ISBN AS VARCHAR) AS ed_isbn",
     )
     if sel == base_select:
         raise RuntimeError("could not extend the base select")
@@ -674,8 +676,8 @@ def annotate_editions(con, out_dir, slug_by_author, base_select):
         CREATE TABLE edrows AS
         WITH base AS ({sel})
         SELECT COALESCE(e.rep, {canon}) AS author, b.title, b.fmt,
-               nullif(trim(b.src), '') AS src, nullif(trim(b.pub), '') AS pub,
-               nullif(trim(b.py), '') AS py, nullif(trim(b.isbn), '') AS isbn,
+               nullif(trim(b.ed_src), '') AS src, nullif(trim(b.ed_pub), '') AS pub,
+               nullif(trim(b.ed_py), '') AS py, nullif(trim(b.ed_isbn), '') AS isbn,
                CAST(sum(b.checkouts) AS BIGINT) AS n
         FROM base b {amap_join}
         LEFT JOIN edmerge e ON {canon} = e.variant
