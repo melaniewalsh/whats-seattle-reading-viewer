@@ -4,6 +4,5 @@
 	"url": "https://www.whats-seattle-reading.com",
 	"keywords": "seattle public library, books, checkouts, data, authors, titles, genres",
 	"dek": "Explore reading and borrowing trends for more than 600,000 books—from 2006 until today",
-	"note": "Based on a sample of SPL open checkout data, 2018–2022.",
-	"dekMore": "The Seattle Public Library publishes how many times each book is checked out every month, in print, as an ebook, and as an audiobook. This site turns those 120 million checkouts into charts and lists: look up any author or book, see what Seattle borrows most, and follow how genres and tastes change over time."
+	"note": "Based on a sample of SPL open checkout data, 2018–2022."
 }

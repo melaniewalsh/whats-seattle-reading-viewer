@@ -566,16 +566,15 @@
 		{:else if tab === "backlist"}
 			<BacklistBoomerangs {openAuthor} {openTitle} />
 		{:else if tab === "home"}
+			<!-- How fresh the data is, and the days to the next monthly update (top right). -->
+			<div class="hero-status"><DataStatus /></div>
 			<header class="hero">
 				<div class="hero-title">
 					<img class="hero-logo" src="{base}/favicon.png" alt="" width="56" height="56" />
 					<h1>{copy.title}</h1>
 				</div>
 				<p class="dek">{copy.dek}</p>
-				<p class="dek-more">{copy.dekMore}</p>
 			</header>
-			<!-- How fresh the data is, and when the next monthly update comes. -->
-			<DataStatus />
 			<!-- New visitors: a short guided story of what the data is and how to read it. -->
 			<div class="tour-banner">
 				<p><strong>New here?</strong> A short guided tour of the data: what it is, how to read the charts, and what to keep in mind.</p>
@@ -798,6 +797,8 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		padding: 0 24px;
 	}
 	/* Landing hub — title / subtitle / byline, then a grid of section cards. */
+	.hero-status { position: absolute; top: 76px; right: max(24px, calc(50% - 480px)); z-index: 1; }
+	@media (max-width: 900px) { .hero-status { position: static; display: flex; justify-content: center; margin: 0 0 18px; } }
 	.hero {
 		max-width: 720px;
 		margin: 46px auto 10px;
@@ -824,14 +825,6 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		letter-spacing: -0.005em;
 		margin: 0;
 		color: var(--color-fg);
-	}
-	.dek-more {
-		max-width: calc(11.4 * clamp(2.3rem, 6vw, 3.6rem));
-		margin: 14px auto 0;
-		font-family: var(--font-sans);
-		font-size: var(--text-base);
-		line-height: 1.55;
-		color: var(--color-fg-light);
 	}
 	.dek {
 		font-family: var(--font-sans);
