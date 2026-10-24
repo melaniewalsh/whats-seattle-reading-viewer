@@ -18,7 +18,7 @@
 	import { cleanTitleForDisplay } from "$utils/workTitle.js";
 	import { displayName } from "$utils/displayName.js";
 	import { MediaQuery } from "svelte/reactivity";
-	import { getMonths, getAuthor, searchTitles, searchAll, densify, randomAuthor } from "$components/db.js";
+	import { getMonths, getAuthor, searchTitles, searchAll, densify } from "$components/db.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { compactNumber } from "$utils/format.js";
@@ -332,63 +332,6 @@
 	// --- Search (the field on the Checkout Trends page) ------------------------
 	let pageSearch = $state(null);
 	const phone = new MediaQuery("max-width: 600px"); // shorter placeholder on phones
-	let homeSearch = $state(null);
-	// Starting points under the home page's search field.
-	const HOME_TRY = [
-		{ label: "Sally Rooney", slug: "sally-rooney" },
-		{ label: "Wuthering Heights", slug: "emily-bronte-1818", title: "Wuthering Heights" },
-		{ label: "Colleen Hoover", slug: "colleen-hoover" },
-		{ label: "Becoming", slug: "michelle-obama-1964", title: "Becoming" },
-	];
-	// The home search box's starting comparison (Enter to run it), a nod to
-	// the Ngram Viewer's default. A different pair on each visit.
-	const HOME_PAIRS = [
-		[["Ulysses", "w~james-joyce-1882~Ulysses"], ["Mrs. Dalloway", "w~virginia-woolf-1882~Mrs. Dalloway"]],
-		[["Parable of the Sower", "w~octavia-e-butler~Parable of the Sower"], ["Neuromancer", "w~william-gibson-1948~Neuromancer"]],
-		[["Wuthering Heights", "w~emily-bronte-1818~Wuthering Heights"], ["Pride and Prejudice", "w~jane-austen-1775~Pride and Prejudice"]],
-		[["Sally Rooney", "a~sally-rooney"], ["Ben Lerner", "a~ben-lerner-1979"]],
-		[["Beverly Cleary", "a~beverly-cleary"], ["Judy Blume", "a~judy-blume"]],
-		[["1984", "w~george-orwell-1903~1984"], ["Brave New World", "w~aldous-huxley-1894~Brave New World"]],
-		[["Kindred", "w~octavia-e-butler~Kindred"], ["The Fifth Season", "w~n-k-jemisin~The Fifth Season"]],
-		[["The Fire Next Time", "w~james-baldwin-1924~The Fire Next Time"], ["Between the World and Me", "w~ta-nehisi-coates~Between the World and Me"]],
-		[["So You Want to Talk About Race", "w~ijeoma-oluo~So You Want to Talk about Race"], ["White Fragility", "w~robin-j-diangelo~White Fragility"]],
-	];
-	let homePair = $state(HOME_PAIRS[0]);
-	const HOME_COMPARE = $derived(homePair.map(([label]) => label).join(", "));
-	onMount(() => {
-		homePair = HOME_PAIRS[Math.floor(Math.random() * HOME_PAIRS.length)];
-	});
-	// The single picks after it: three, none already in the pair.
-	const homeTryShown = $derived(HOME_TRY.filter((t) => !homePair.some(([label]) => label === t.label)).slice(0, 3));
-	// The "Try" row stays on one line, as wide as the search box: it shows as
-	// many of the single picks as fit at this width (re-fit on resize).
-	let tryRow = $state(null);
-	let tryWidth = $state(0);
-	let tryFit = $state(3);
-	const tryWraps = () => {
-		if (!tryRow) return false;
-		if (tryRow.scrollWidth > tryRow.clientWidth + 1) return true; // one line, too long
-		const kids = [...tryRow.children].filter((el) => el.offsetParent);
-		return kids.length > 1 && kids[kids.length - 1].offsetTop > kids[0].offsetTop + 4;
-	};
-	$effect(() => {
-		tryWidth; homePair; // re-fit when these change
-		if (!tryRow) return;
-		let cancelled = false; // a newer re-fit (or unmount) stops this one
-		(async () => {
-			tryFit = homeTryShown.length;
-			await tick();
-			while (!cancelled && tryFit > 0 && tryWraps()) {
-				tryFit--;
-				await tick();
-			}
-		})();
-		return () => (cancelled = true);
-	});
-	async function homeSurprise() {
-		const a = await randomAuthor();
-		if (a) openAuthor(a.slug);
-	}
 	let cmp = $state(null); // the compare view, when it's showing
 	let compareMode = $state(false);
 
@@ -401,8 +344,6 @@
 	function remember(label, id) {
 		if (label && id) knownIds.set(label.trim().toLowerCase(), id);
 	}
-	// The home box's starter pairs resolve to these exact books.
-	HOME_PAIRS.flat().forEach(([label, id]) => remember(label, id));
 	const labelOfRes = (r) => (r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name));
 	// Split on commas, but not inside a name we already know has one.
 	function splitNames(text) {
@@ -477,10 +418,6 @@
 	// jump to its field.
 	function navSearch() {
 		menuOpen = false;
-		if (tab === "home" && homeSearch) {
-			window.scrollTo({ top: 0 });
-			return homeSearch.focus(true);
-		}
 		if (tab === "search") focusSearch();
 		else go("search");
 	}
@@ -647,28 +584,8 @@
 					<h1>{copy.title}</h1>
 				</div>
 				<p class="dek">{copy.dek}</p>
+				<p class="dek-more">{copy.dekMore}</p>
 			</header>
-			<!-- The most eye-catching thing up top: what Seattle borrowed most last
-			     month, with a link into the full Most Borrowed view. -->
-			<!-- Looking something up is what most people come to do, so the search
-			     field leads the home page (the Explore cards follow). -->
-			<div class="home-search">
-				<!-- Starts with a comparison, a nod to the Google Books Ngram Viewer's
-				     default: press Enter to see it, or type over it. -->
-				<SiteSearch bind:this={homeSearch} multi example={HOME_COMPARE} onPick={pickSearch} onSubmit={submitSearch} placeholder={phone.current ? "Search any author or book" : "Search any author or book (add commas to compare)"} />
-				<p class="home-try" bind:this={tryRow} bind:clientWidth={tryWidth}>
-					<span class="ht-lead">Try</span>
-					<!-- First: the comparison already in the box, one click away (in
-					     case it isn't obvious that Enter runs it). -->
-					<button class="ht-link" onclick={() => showCompare(homePair.map(([, id]) => id))}>{homePair.map(([label]) => label).join(" vs. ")}</button>
-					{#each homeTryShown.slice(0, tryFit) as t}<span class="ht-sep ht-extra" aria-hidden="true">·</span><button class="ht-link ht-extra" class:is-title={!!t.title} onclick={() => (t.title ? openTitle(t.title, t.slug) : openAuthor(t.slug))}>{t.label}</button>{/each}
-					<span class="ht-sep" aria-hidden="true">·</span>
-					<button class="ht-link ht-surprise" onclick={homeSurprise}>Surprise me</button>
-				</p>
-			</div>
-			<section class="home-topworks" aria-label="Most borrowed this year">
-				<TopWorks {openAuthor} {openTitle} embedded onSeeAll={() => go("rankings")} />
-			</section>
 			<!-- New visitors: a short guided story of what the data is and how to read it. -->
 			<div class="tour-banner">
 				<p><strong>New here?</strong> A short guided tour of the data: what it is, how to read the charts, and what to keep in mind.</p>
@@ -890,22 +807,6 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		padding: 0 24px 80px;
 	}
 	/* Home search: centered under the title, the page's first thing to do. */
-	/* As wide as the title: the box gets the h1's font size (the clamp below
-	   matches .hero h1) and a width in em, so the two scale together. The
-	   search and "Try" text set their own sizes, so this only sets the width. */
-	.home-search { font-size: clamp(2.3rem, 6vw, 3.6rem); width: 11.4em; max-width: 100%; margin: 22px auto 34px; }
-	.home-search :global(.ss) { max-width: none; height: 52px; }
-	.home-try { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 7px; margin: 12px 0 0; font-family: var(--font-sans); font-size: 14.5px; color: var(--color-fg-light); }
-	.ht-lead::after { content: ":"; }
-	.ht-sep { color: var(--color-gray-300, #c8c8c8); }
-	.ht-link { padding: 0; border: 0; background: none; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
-	.ht-link:hover { text-decoration-color: currentColor; }
-	.ht-link.is-title { font-style: italic; }
-	.ht-link.ht-surprise { color: var(--color-fg-light); }
-	/* Phones: one suggestion and "Surprise me". */
-	@media (max-width: 600px) { .ht-extra { display: none; } }
-	/* Wider screens: the one line runs the full width of the search box. */
-	@media (min-width: 601px) { .home-try { flex-wrap: nowrap; justify-content: space-between; white-space: nowrap; } }
 	/* Landing hub — title / subtitle / byline, then a grid of section cards. */
 	.hero {
 		max-width: 720px;
@@ -934,12 +835,20 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		margin: 0;
 		color: var(--color-fg);
 	}
+	.dek-more {
+		max-width: calc(11.4 * clamp(2.3rem, 6vw, 3.6rem));
+		margin: 14px auto 0;
+		font-family: var(--font-sans);
+		font-size: var(--text-base);
+		line-height: 1.55;
+		color: var(--color-fg-light);
+	}
 	.dek {
 		font-family: var(--font-sans);
 		font-size: clamp(1.05rem, 2.2vw, 1.25rem);
 		line-height: 1.4;
 		color: var(--color-fg-light);
-		/* Same width as the search field below (.home-search: 11.4em of the title size). */
+		/* About as wide as the title (11.4em of the title size). */
 		max-width: calc(11.4 * clamp(2.3rem, 6vw, 3.6rem));
 		margin: 0 auto;
 	}
@@ -1058,16 +967,7 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		color: #3f88cc;
 		text-decoration: underline;
 	}
-	/* Home "most borrowed last month" strip, above the hub cards — boxed like the
-	   featured-trend card. */
-	.home-topworks {
-		max-width: 880px;
-		margin: 40px auto 10px;
-		padding: 22px 24px 24px;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md, 12px);
-		background: var(--color-white);
-	}
+
 	/* "New here?" banner above the cards. */
 	.tour-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; max-width: 880px; margin: 34px auto 0; padding: 16px 22px; border-radius: 10px; background: #eef1f4; font-family: var(--font-sans); }
 	.tour-banner p { margin: 0; font-size: 1rem; line-height: 1.45; color: var(--color-fg); }
