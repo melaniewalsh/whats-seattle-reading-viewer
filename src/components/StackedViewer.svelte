@@ -1443,6 +1443,11 @@
 	const hiddenWorkCount = $derived(Math.max(0, workBlocks.length - visibleWorkBlocks.length));
 
 	let expandedWorks = $state([]); // work keys currently expanded in the table
+	// Author pages: scroll to the Books table and put the cursor in its filter.
+	function showBooks() {
+		sideEl?.scrollIntoView({ behavior: "smooth", block: "start" });
+		setTimeout(() => sideEl?.querySelector(".bk-filter")?.focus({ preventScroll: true }), 400);
+	}
 	// "Looking for a specific edition?": open this book's editions in the table
 	// and scroll to them.
 	async function showEditions() {
@@ -2356,6 +2361,9 @@
 			{#if searchMode === "title" && searchedWork && !isOverview}
 				<!-- Book pages: a nudge down to this book's editions in the table. -->
 				<button type="button" class="ed-callout" onclick={showEditions}>Looking for a specific edition? <ArrowDownIcon size={15} strokeWidth={2.4} aria-hidden="true" /></button>
+			{:else if searchMode !== "title" && !isOverview && current}
+				<!-- Author pages: down to the Books table, ready to filter. -->
+				<button type="button" class="ed-callout" onclick={showBooks}>Looking for a specific book or edition? <ArrowDownIcon size={15} strokeWidth={2.4} aria-hidden="true" /></button>
 			{/if}
 			{/if}
 			</div><!-- /.split-main -->
