@@ -288,7 +288,7 @@
 						{/if}
 					</button>
 				</div>
-				<button class="gal-booktitle" onclick={() => openTitle(r[0], r[2])}>{titleCase(cleanWorkTitle(r[0]))}</button>
+				<button class="gal-booktitle" onclick={() => openTitle(r[0], r[2])}>{titleCase(cleanWorkTitle(r[0]))}{#if r[5]}{" "}<span class="pub-year">({r[5]})</span>{/if}</button>
 				<div class="gal-by">by {displayName(r[1])}</div>
 				<div class="gal-count">{compactNumber(r[3])} checkouts</div>
 				{#if !embedded}
@@ -439,7 +439,7 @@
 									<span class="tw-text">
 										<!-- The row already shows the summary, More and Borrow, so the
 										     title and author just open their trend pages. -->
-										<button class="tw-title tw-titlelink" title="See this book's checkout trend" onclick={() => openTitle(row[0], row[2])}>{titleCase(cleanWorkTitle(row[0]))}</button>
+										<button class="tw-title tw-titlelink" title="See this book's checkout trend" onclick={() => openTitle(row[0], row[2])}>{titleCase(cleanWorkTitle(row[0]))}{#if row[5]}{" "}<span class="pub-year">({row[5]})</span>{/if}</button>
 										<span class="tw-by">by {#if row[2]}<button class="tw-authorlink" title="See this author's checkout trend" onclick={() => openAuthor(row[2])}>{displayName(row[1])}</button>{:else}{displayName(row[1])}{/if}</span>
 										{#if seattleReadsYear(row[0], row[2])}<span class="tw-sr">Seattle Reads {seattleReadsYear(row[0], row[2])}</span>{/if}
 											{#if coverKey(row) in summaries}
@@ -515,6 +515,8 @@
 		flex-direction: column;
 		gap: 16px;
 	}
+	/* Original publication year after a title, from Wikipedia (data-prep/fill_pub_years.py). */
+	.pub-year { font-weight: 400; color: var(--color-fg-light); }
 	.tw-sr { display: inline-block; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--color-border); border-radius: 999px; font-size: 11px; line-height: 1.5; color: var(--color-fg-light); white-space: nowrap; vertical-align: 1px; }
 	.aside-h {
 		font-size: 0.72rem;

@@ -9,6 +9,7 @@
 	import TopWorks from "$components/TopWorks.svelte";
 	import SubjectList from "$components/SubjectList.svelte";
 	import Guide from "$components/Guide.svelte";
+	import DataStatus from "$components/DataStatus.svelte";
 	import NortonExplorer from "$components/NortonExplorer.svelte";
 	import BacklistBoomerangs from "$components/BacklistBoomerangs.svelte";
 	import TrendingUp from "@lucide/svelte/icons/trending-up";
@@ -48,19 +49,6 @@
 	});
 
 	// "Featured trend of the month" on the home hub: this month, The Odyssey.
-	// "Last updated" = the most recent month present in the data.
-	const MONTHS_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-	let lastUpdated = $state("");
-	onMount(async () => {
-		try {
-			const months = await getMonths();
-			const last = months[months.length - 1];
-			if (last) {
-				const [y, mo] = last.split("-");
-				lastUpdated = `${MONTHS_FULL[Number(mo) - 1]} ${y}`;
-			}
-		} catch {}
-	});
 
 	let featured = $state.raw(null);
 	// Loaded once, the first time the home page shows (called wherever tab
@@ -586,6 +574,8 @@
 				<p class="dek">{copy.dek}</p>
 				<p class="dek-more">{copy.dekMore}</p>
 			</header>
+			<!-- How fresh the data is, and when the next monthly update comes. -->
+			<DataStatus />
 			<!-- New visitors: a short guided story of what the data is and how to read it. -->
 			<div class="tour-banner">
 				<p><strong>New here?</strong> A short guided tour of the data: what it is, how to read the charts, and what to keep in mind.</p>
@@ -772,7 +762,7 @@ You can manually adjust the clustering in the works table at the bottom of the p
 				<div class="sf-brand">
 					<button type="button" class="sf-logo" onclick={() => go("home")}><img src="{base}/favicon.png" alt="" width="44" height="44" /><span>What’s Seattle Reading?</span></button>
 					<p>Two decades of borrowing at the Seattle Public Library. A project at the University of Washington Information School.</p>
-					<p class="sf-small">Data: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener">Seattle Public Library, Checkouts by Title</a>{#if lastUpdated}<br />Last updated: {lastUpdated}{/if}<br /><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a></p>
+					<p class="sf-small">Data: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener">Seattle Public Library, Checkouts by Title</a><br /><DataStatus compact /><br /><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a></p>
 				</div>
 				<nav class="sf-col" aria-label="Explore">
 					<h3>Explore</h3>

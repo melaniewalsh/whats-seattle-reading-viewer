@@ -1454,8 +1454,10 @@
 		document.querySelector(`[data-work="${CSS.escape(key)}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 	}
 	// What tells one edition from another (data-prep/build_data.py
-	// annotate_editions): publisher and year, ISBN, other formats, where its
-	// checkouts came from, and the years it was checked out.
+	// annotate_editions): publisher and year, ISBN, other formats, and where
+	// its checkouts came from.
+	// An ISBN opens that exact edition in the SPL catalog (digital editions included).
+	const isbnUrl = (isbn) => `https://seattle.bibliocommons.com/v2/search?query=${isbn}&searchType=keyword`;
 	const SOURCE = { Horizon: "a library copy", OverDrive: "OverDrive", Hoopla: "Hoopla", Freegal: "Freegal", Zinio: "Zinio" };
 	function editionMeta(t) {
 		const parts = [];
@@ -1465,22 +1467,16 @@
 			const [pub, py, isbn] = v[0];
 			const yr = (py || "").match(/\d{4}/)?.[0];
 			const p = [pub, yr].filter(Boolean).join(", ");
-			if (p) parts.push(p);
-			if (isbn) parts.push(`ISBN ${isbn}`);
+			if (p) parts.push({ t: p });
+			const num = (isbn || "").match(/\d{13}|\d{9}[\dXx]/)?.[0];
+			if (num) parts.push({ isbn: num });
 		}
-		if ((ed.f || []).length > 1) parts.push(ed.f.map(([f]) => formatLabel(f)).join(" + "));
-		// "checked out via OverDrive, 2012–2026": where its checkouts came from,
-		// and the first and last year it was checked out.
-		const ser = t.series || [];
-		const a = ser.findIndex((x) => x > 0);
-		let b = -1;
-		for (let k = ser.length - 1; k >= 0; k--) if (ser[k] > 0) { b = k; break; }
-		const y0 = a >= 0 ? months[a]?.slice(0, 4) : "", y1 = b >= 0 ? months[b]?.slice(0, 4) : "";
-		const years = !y0 ? "" : y0 === y1 ? `in ${y0}` : `${y0}–${y1}`;
+		if ((ed.f || []).length > 1) parts.push({ t: ed.f.map(([f]) => formatLabel(f)).join(" + ") });
+		// Where its checkouts came from ("checked out via OverDrive").
 		const via = (ed.s || []).map(([src]) => SOURCE[src] || src).join(", ");
-		if (via || years) parts.push(`checked out${via ? ` via ${via}` : ""}${via && years ? "," : ""}${years ? ` ${years}` : ""}`);
+		if (via) parts.push({ t: `checked out via ${via}` });
 		const more = v.slice(1).map(([pub, py, isbn, f]) => [formatLabel(f), pub, (py || "").match(/\d{4}/)?.[0], isbn && `ISBN ${isbn}`].filter(Boolean).join(", "));
-		return { line: parts.join(" · "), more };
+		return { parts, more };
 	}
 	const isExpanded = (key) => expandedWorks.includes(key);
 	// While a filter is active, auto-expand any work with a matching edition so the
@@ -1607,6 +1603,17 @@
 
 	// The year this book was the library's Seattle Reads pick, if it was.
 	const srYear = $derived(searchMode === "title" && headingText ? seattleReadsYear(headingText, currentSlug) : null);
+
+	// A book's original publication year (from Wikipedia, baked into the
+	// rankings by data-prep/fill_pub_years.py), shown after its title.
+	const pubYear = $derived.by(() => {
+		if (searchMode !== "title" || !topWorksData || !headingText || !current) return null;
+		const want = normalizeWorkKey(headingText), au = displayName(current.name).toLowerCase();
+		for (const g of Object.values(topWorksData.data || {}))
+			for (const lst of Object.values(g))
+				for (const r of lst) if (r[5] && normalizeWorkKey(r[0]) === want && displayName(r[1]).toLowerCase() === au) return r[5];
+		return null;
+	});
 
 	// In "By title" mode, the total checkouts of the single plotted title (summed
 	// over its editions). null when zero or several titles are shown -- then the
@@ -2084,7 +2091,7 @@
 					<h2>{headingText}</h2>
 				{:else}
 					<div class="hd-name"><div class="h2-wrap" role="presentation" onmouseenter={wikiEnter} onmouseleave={wikiLeave}>
-						<h2 class="h2-hoverable" onclick={wikiActivate}>{headingText}</h2>
+						<h2 class="h2-hoverable" onclick={wikiActivate}>{headingText}{#if pubYear}{" "}<span class="hd-year">({pubYear})</span>{/if}</h2>
 						{#if wikiHover}
 							<span class="wiki-pop">
 								<WikiCard
@@ -2368,7 +2375,7 @@
 										checked={isSingleSelected(t.idx)}
 										onchange={() => keepTableStill(() => toggleTitle(t.idx))}
 										aria-label="Plot this edition on its own: {t.title}" />
-									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.line}<span class="bk-ed-meta" title={em.more.length ? `Also: ${em.more.join("; ")}` : undefined}>{em.line}{#if em.more.length}{" · "}+{em.more.length} more{/if}</span>{/if}{/if}</span>
+									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.parts.length}<span class="bk-ed-meta" title={em.more.length ? `Also: ${em.more.join("; ")}` : undefined}>{#each em.parts as p, k}{#if k}{" · "}{/if}{#if p.isbn}ISBN <a href={isbnUrl(p.isbn)} target="_blank" rel="noopener noreferrer" title="Find this edition in the Seattle Public Library catalog">{p.isbn}</a>{:else}{p.t}{/if}{/each}{#if em.more.length}{" · "}+{em.more.length} more{/if}</span>{/if}{/if}</span>
 									{#if editMode}
 										<span class="bk-ed-tools">
 											<select class="bk-move" aria-label="Move this edition to another book" onchange={(e) => { moveEdition(t.idx, e.currentTarget.value); e.currentTarget.value = ""; }}>
@@ -4774,9 +4781,12 @@
 			max-height: 300px;
 		}
 	}
+	.hd-year { font-weight: 400; color: var(--color-fg-light); }
 	/* Edition details and the "Looking for a specific edition?" button (all widths). */
 	/* Edition titles wrap instead of being cut off: the ending is often what tells two editions apart. */
 	.bk-ed-title { white-space: normal; overflow-wrap: anywhere; }
+	.bk-ed-meta a { color: inherit; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 2px; }
+	.bk-ed-meta a:hover { text-decoration-color: currentColor; }
 	.bk-ed-meta { display: block; margin-top: 2px; font-family: var(--font-sans); font-size: 12px; line-height: 1.4; color: var(--color-fg-light); white-space: normal; }
 	.ed-callout { display: flex; align-items: center; gap: 6px; margin: 18px auto 0; padding: 8px 16px; border: 1px solid var(--color-border); border-radius: 999px; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); cursor: pointer; }
 	.ed-callout:hover { border-color: var(--color-fg-light); }
