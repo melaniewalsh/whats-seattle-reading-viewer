@@ -11,6 +11,7 @@
 	import TableIcon from "@lucide/svelte/icons/table";
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
 	import ArrowDownIcon from "@lucide/svelte/icons/arrow-down";
+	import LayersIcon from "@lucide/svelte/icons/layers";
 	import GlobeIcon from "@lucide/svelte/icons/globe";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import ChartAreaIcon from "@lucide/svelte/icons/chart-area";
@@ -75,7 +76,7 @@
 	let groupIdCounter = 0; // increasing id source for groups
 	let singleIdxs = $state([]); // editions plotted on their own
 	let titleFilter = $state(""); // text filter for the title list
-	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = one line per book; 'format' = print / ebook / audiobook
+	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = one line per book; 'format' = print / ebook / audiobook; 'edition' = one line per edition
 	let titleSort = $state("work"); // 'work' = editions grouped by work; 'borrowed' = most checkouts; 'alpha' = A–Z
 	let workOrder = $state("checkouts"); // in 'work' mode, order the works by 'checkouts' (total, default) or 'name' (A–Z)
 	let workOrderFlip = $state(false); // reversed: fewest checkouts first / Z–A
@@ -1869,6 +1870,32 @@
 			.map((f) => ({ key: `f:${f.key}`, legendKey: `f:${f.key}`, label: f.label, color: f.color, values: sums[f.key].map(Math.round) }))
 			.filter((s) => s.values.some((v) => v > 0));
 	});
+	// "By edition": the most-borrowed editions as separate lines (a book page:
+	// that book's; an author page: across all their books). Editions under
+	// SMALL_TOTAL checkouts get no line of their own.
+	const EDITION_LINES = 8;
+	const editionSeries = $derived.by(() => {
+		if (!current || isOverview) return [];
+		const idxs = searchMode === "title" && searchedWork ? searchedWork.idxs : current.titles.map((_, i) => i);
+		return idxs
+			.filter((i) => (current.titles[i]?.total || 0) >= SMALL_TOTAL)
+			.sort((a, b) => current.titles[b].total - current.titles[a].total)
+			.slice(0, EDITION_LINES)
+			.map((i, k) => {
+				const t = current.titles[i];
+				const yr = (t.ed?.v?.[0]?.[1] || "").match(/\d{4}/)?.[0];
+				// The catalog title (minus "/ by ..."), so "(Unabridged)" and subtitles stay.
+				const name = t.title.split(" / ")[0].trim() || t.title;
+				const fmt = formatLabel(t.format);
+				return { key: `e${i}`, legendKey: `e${i}`, label: `${fmt.charAt(0).toUpperCase() + fmt.slice(1)} · ${titleCase(name)}${yr ? `, ${yr}` : ""}`, color: TITLE_COLORS[k % TITLE_COLORS.length], values: t.series };
+			})
+			// Two editions with the same label: add when each was first checked out.
+			.map((s, _, all) => {
+				if (all.filter((o) => o.label === s.label).length < 2) return s;
+				const f = s.values.findIndex((v) => v > 0);
+				return f < 0 ? s : { ...s, label: `${s.label} (from ${months[f].slice(0, 4)})` };
+			});
+	});
 	const overviewAreaSeries = $derived.by(() => {
 		if (!current || !current.formats) return [];
 		return OVERVIEW_FORMATS.map((f, i) => ({
@@ -1911,9 +1938,10 @@
 			const only = overviewAreaSeries.filter((s) => isolatedKeys.includes(s.key));
 			return only.length ? only : overviewAreaSeries;
 		}
-		if (chartMode === "format") {
-			const only = formatSeries.filter((s) => isolatedKeys.includes(s.key));
-			return only.length ? only : formatSeries;
+		if (chartMode === "format" || chartMode === "edition") {
+			const all = chartMode === "format" ? formatSeries : editionSeries;
+			const only = all.filter((s) => isolatedKeys.includes(s.key));
+			return only.length ? only : all;
 		}
 		if (chartMode === "line") {
 			// "Total" = a filled total area, plus any editions you clicked (overlaid
@@ -1957,7 +1985,7 @@
 		if (isOverview) {
 			return chartMode === "area" ? [...OVERVIEW_FORMATS].reverse().map((f) => ({ label: f.label, color: f.color, key: f.key })) : [];
 		}
-		if (chartMode === "format") return formatSeries.map((s) => ({ label: s.label, color: s.color, key: s.key }));
+		if (chartMode === "format" || chartMode === "edition") return (chartMode === "format" ? formatSeries : editionSeries).map((s) => ({ label: s.label, color: s.color, key: s.key }));
 		// Build from the full PLOTTED set (not the isolation-filtered displaySeries)
 		// so the legend stays put while isolating -- the isolated entry just lights
 		// up and the rest dim, and you can click again to bring them back.
@@ -2226,6 +2254,10 @@
 					<button type="button" class:active={chartMode === "format"} onclick={() => { chartMode = "format"; isolatedKeys = []; }} title="By format" aria-label="By format">
 						<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">By format</span>
 					</button>
+					<!-- The most-borrowed editions, one line each. -->
+					<button type="button" class:active={chartMode === "edition"} onclick={() => { chartMode = "edition"; isolatedKeys = []; }} title="By edition" aria-label="By edition">
+						<LayersIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">By edition</span>
+					</button>
 				{/if}
 			</div>
 			{#if !yearlyView}<label class="smooth-toggle off-phone"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>{/if}
@@ -2243,7 +2275,7 @@
 					<!-- The chart, its slider and source line share one white panel -->
 					<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 					<div class="chart-wrap" bind:this={chartWrap}>
-				<LineChart bind:plotInset months={chartData.months} series={chartData.series} yearly={yearlyView} lastMonth={months[months.length - 1]} unit={yearlyView ? "checkouts a year" : undefined} mode="line" smooth={smoothOn && !yearlyView} markers={bookMarkers} onSeriesClick={chartMode !== "line" ? (k) => toggleIsolate(k) : null} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
+				<LineChart bind:plotInset months={chartData.months} series={chartData.series} yearly={yearlyView} lastMonth={months[months.length - 1]} unit={yearlyView ? "checkouts a year" : undefined} mode="line" smooth={smoothOn && !yearlyView} markers={bookMarkers} endLabels={chartMode !== "edition"} onSeriesClick={chartMode !== "line" ? (k) => toggleIsolate(k) : null} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
 			</div>
 
 			<!-- Several lines: a swatch legend under the chart, every book listed
@@ -4813,6 +4845,8 @@
 		}
 	}
 	.hd-year { font-weight: 400; color: var(--color-fg-light); }
+	/* Phones: four chart buttons fit on one row without their icons. */
+	@media (max-width: 600px) { .mode-toggle :global(svg) { display: none !important; } }
 	/* Edition details and the "Looking for a specific edition?" button (all widths). */
 	/* Edition titles wrap instead of being cut off: the ending is often what tells two editions apart. */
 	.bk-ed-title { white-space: normal; overflow-wrap: anywhere; }
