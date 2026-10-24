@@ -1,5 +1,5 @@
 <script>
-	// When the data was last updated, and a live countdown to the next monthly
+	// When the data was last updated, and the days until the next monthly
 	// update. The monthly pull (.github/workflows/update.yml) and rebuild
 	// (build-data-to-r2.yml) run on the 7th at 06:00 and 12:00 UTC; new data is
 	// usually live by about 14:00 UTC that day.
@@ -21,7 +21,7 @@
 			if (last) through = `${MONTHS[Number(last.slice(5, 7)) - 1]} ${last.slice(0, 4)}`;
 		}).catch(() => {});
 		getDataRefreshed().then((d) => (refreshed = d));
-		const id = setInterval(() => (now = Date.now()), 1000);
+		const id = setInterval(() => (now = Date.now()), 60000);
 		return () => clearInterval(id);
 	});
 
@@ -32,22 +32,16 @@
 		if (t <= now) t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, UPDATE_DAY, UPDATE_HOUR_UTC);
 		return t;
 	});
-	const left = $derived.by(() => {
-		let s = Math.max(0, Math.floor((next - now) / 1000));
-		const days = Math.floor(s / 86400); s -= days * 86400;
-		const hrs = Math.floor(s / 3600); s -= hrs * 3600;
-		const min = Math.floor(s / 60);
-		return { days, hrs, min, sec: s - min * 60 };
-	});
+	// Whole days to go (rounded up, so the day before shows "1 day").
+	const daysLeft = $derived(Math.max(0, Math.ceil((next - now) / 86400000)));
 	const fmtDate = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 	const nextLabel = $derived(new Date(next).toLocaleDateString(undefined, { month: "long", day: "numeric" }));
-	const pad = (n) => String(n).padStart(2, "0");
 </script>
 
 {#if compact}
 	<span class="ds-compact">
 		{#if through}Data through {through}{/if}{#if refreshed}{" · "}refreshed {fmtDate(refreshed)}{/if}<br />
-		Updated monthly · next update {nextLabel}
+		Updated monthly · next scheduled update {nextLabel}
 	</span>
 {:else}
 	<section class="ds" aria-label="Data updates">
@@ -57,13 +51,8 @@
 			{#if refreshed}<span class="ds-sub">Refreshed {fmtDate(refreshed)}</span>{/if}
 		</div>
 		<div class="ds-next">
-			<span class="ds-k">Next update in</span>
-			<span class="ds-clock" role="timer" aria-live="off">
-				<span><b>{left.days}</b> days</span>
-				<span><b>{pad(left.hrs)}</b> hrs</span>
-				<span><b>{pad(left.min)}</b> min</span>
-				<span><b>{pad(left.sec)}</b> sec</span>
-			</span>
+			<span class="ds-k">Next scheduled update</span>
+			<span class="ds-clock">{#if daysLeft >= 1}<span><b>{daysLeft}</b> {daysLeft === 1 ? "day" : "days"}</span>{:else}<span><b>Today</b></span>{/if}</span>
 			<span class="ds-sub">{nextLabel}. The site updates monthly, after the library publishes the previous month's checkouts (sometimes later than planned).</span>
 		</div>
 	</section>

@@ -75,7 +75,7 @@
 	let groupIdCounter = 0; // increasing id source for groups
 	let singleIdxs = $state([]); // editions plotted on their own
 	let titleFilter = $state(""); // text filter for the title list
-	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = stacked by title
+	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = one line per book; 'format' = print / ebook / audiobook
 	let titleSort = $state("work"); // 'work' = editions grouped by work; 'borrowed' = most checkouts; 'alpha' = A–Z
 	let workOrder = $state("checkouts"); // in 'work' mode, order the works by 'checkouts' (total, default) or 'name' (A–Z)
 	let workOrderFlip = $state(false); // reversed: fewest checkouts first / Z–A
@@ -1849,6 +1849,26 @@
 		{ key: "ebook", label: "Ebook", format: "ebook", color: "#e58a00" },
 		{ key: "audiobook", label: "Audiobook", format: "audiobook", color: "#1f7a4d" }
 	];
+	// "By format" on an author or book page: print, ebook and audiobook lines.
+	// An edition's months are counted under its format; an edition record that
+	// mixes formats is split by its share of checkouts in each (ed.f).
+	const FMT_BUCKET = { print: "print", largeprint: "print", ebook: "ebook", audiobook: "audiobook" };
+	const formatSeries = $derived.by(() => {
+		if (!current || isOverview || !months.length) return [];
+		const idxs = searchMode === "title" && searchedWork ? searchedWork.idxs : current.titles.map((_, i) => i);
+		const sums = { print: new Array(months.length).fill(0), ebook: new Array(months.length).fill(0), audiobook: new Array(months.length).fill(0) };
+		for (const i of idxs) {
+			const t = current.titles[i];
+			if (!t?.series) continue;
+			const f = (t.ed?.f || []).filter(([k]) => FMT_BUCKET[k]);
+			const tot = f.reduce((a, [, n]) => a + n, 0);
+			const shares = tot ? f.map(([k, n]) => [FMT_BUCKET[k], n / tot]) : FMT_BUCKET[t.format] ? [[FMT_BUCKET[t.format], 1]] : [];
+			for (const [b, sh] of shares) t.series.forEach((v, m) => { if (v) sums[b][m] += v * sh; });
+		}
+		return OVERVIEW_FORMATS
+			.map((f) => ({ key: `f:${f.key}`, legendKey: `f:${f.key}`, label: f.label, color: f.color, values: sums[f.key].map(Math.round) }))
+			.filter((s) => s.values.some((v) => v > 0));
+	});
 	const overviewAreaSeries = $derived.by(() => {
 		if (!current || !current.formats) return [];
 		return OVERVIEW_FORMATS.map((f, i) => ({
@@ -1890,6 +1910,10 @@
 			// "By format": click a format (legend or line label) to show it alone.
 			const only = overviewAreaSeries.filter((s) => isolatedKeys.includes(s.key));
 			return only.length ? only : overviewAreaSeries;
+		}
+		if (chartMode === "format") {
+			const only = formatSeries.filter((s) => isolatedKeys.includes(s.key));
+			return only.length ? only : formatSeries;
 		}
 		if (chartMode === "line") {
 			// "Total" = a filled total area, plus any editions you clicked (overlaid
@@ -1933,6 +1957,7 @@
 		if (isOverview) {
 			return chartMode === "area" ? [...OVERVIEW_FORMATS].reverse().map((f) => ({ label: f.label, color: f.color, key: f.key })) : [];
 		}
+		if (chartMode === "format") return formatSeries.map((s) => ({ label: s.label, color: s.color, key: s.key }));
 		// Build from the full PLOTTED set (not the isolation-filtered displaySeries)
 		// so the legend stays put while isolating -- the isolated entry just lights
 		// up and the rest dim, and you can click again to bring them back.
@@ -2196,6 +2221,12 @@
 				>
 					{#if isOverview}<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" />{:else}<BookCopyIcon size={17} strokeWidth={2} aria-hidden="true" />{/if}<span class="mt-txt">{isOverview ? "By format" : "By book"}</span>
 				</button>
+				{#if !isOverview}
+					<!-- Print, ebook and audiobook as separate lines. -->
+					<button type="button" class:active={chartMode === "format"} onclick={() => { chartMode = "format"; isolatedKeys = []; }} title="By format" aria-label="By format">
+						<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">By format</span>
+					</button>
+				{/if}
 			</div>
 			{#if !yearlyView}<label class="smooth-toggle off-phone"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>{/if}
 			{#if chartMode === "area" && isolatedKeys.length}
@@ -2212,7 +2243,7 @@
 					<!-- The chart, its slider and source line share one white panel -->
 					<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 					<div class="chart-wrap" bind:this={chartWrap}>
-				<LineChart bind:plotInset months={chartData.months} series={chartData.series} yearly={yearlyView} lastMonth={months[months.length - 1]} unit={yearlyView ? "checkouts a year" : undefined} mode="line" smooth={smoothOn && !yearlyView} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
+				<LineChart bind:plotInset months={chartData.months} series={chartData.series} yearly={yearlyView} lastMonth={months[months.length - 1]} unit={yearlyView ? "checkouts a year" : undefined} mode="line" smooth={smoothOn && !yearlyView} markers={bookMarkers} onSeriesClick={chartMode !== "line" ? (k) => toggleIsolate(k) : null} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
 			</div>
 
 			<!-- Several lines: a swatch legend under the chart, every book listed
