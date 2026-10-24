@@ -801,12 +801,12 @@ You can manually adjust the clustering in the works table at the bottom of the p
 	.view-error button { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 	/* One shared content width for every tab, so Search / Genres / Most Borrowed
 	   all line up at the same width and left edge. */
+	/* No bottom padding: the full-width footer ends the page. */
 	article {
 		max-width: 1008px;
 		margin: 0 auto;
-		padding: 0 24px 80px;
+		padding: 0 24px;
 	}
-	/* Home search: centered under the title, the page's first thing to do. */
 	/* Landing hub — title / subtitle / byline, then a grid of section cards. */
 	.hero {
 		max-width: 720px;

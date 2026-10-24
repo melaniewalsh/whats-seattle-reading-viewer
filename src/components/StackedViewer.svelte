@@ -10,6 +10,7 @@
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import TableIcon from "@lucide/svelte/icons/table";
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
+	import ArrowDownIcon from "@lucide/svelte/icons/arrow-down";
 	import GlobeIcon from "@lucide/svelte/icons/globe";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import ChartAreaIcon from "@lucide/svelte/icons/chart-area";
@@ -1441,6 +1442,45 @@
 	const hiddenWorkCount = $derived(Math.max(0, workBlocks.length - visibleWorkBlocks.length));
 
 	let expandedWorks = $state([]); // work keys currently expanded in the table
+	// "Looking for a specific edition?": open this book's editions in the table
+	// and scroll to them.
+	async function showEditions() {
+		const i = workBlocks.findIndex((w) => w.editions.some((e) => searchedWork?.idxs.includes(e.idx)));
+		if (i < 0) return;
+		const key = workBlocks[i].key;
+		if (!expandedWorks.includes(key)) expandedWorks = [...expandedWorks, key];
+		if (i >= BOOKS_PREVIEW) booksShowAll = true;
+		await tick();
+		document.querySelector(`[data-work="${CSS.escape(key)}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+	}
+	// What tells one edition from another (data-prep/build_data.py
+	// annotate_editions): publisher and year, ISBN, other formats, where its
+	// checkouts came from, and the years it was checked out.
+	const SOURCE = { Horizon: "a library copy", OverDrive: "OverDrive", Hoopla: "Hoopla", Freegal: "Freegal", Zinio: "Zinio" };
+	function editionMeta(t) {
+		const parts = [];
+		const ed = t.ed || {};
+		const v = ed.v || [];
+		if (v.length) {
+			const [pub, py, isbn] = v[0];
+			const yr = (py || "").match(/\d{4}/)?.[0];
+			const p = [pub, yr].filter(Boolean).join(", ");
+			if (p) parts.push(p);
+			if (isbn) parts.push(`ISBN ${isbn}`);
+		}
+		if ((ed.f || []).length > 1) parts.push(ed.f.map(([f]) => formatLabel(f)).join(" + "));
+		if ((ed.s || []).length) parts.push(`checked out via ${ed.s.map(([src]) => SOURCE[src] || src).join(", ")}`);
+		const ser = t.series || [];
+		const a = ser.findIndex((x) => x > 0);
+		let b = -1;
+		for (let k = ser.length - 1; k >= 0; k--) if (ser[k] > 0) { b = k; break; }
+		if (a >= 0) {
+			const y0 = months[a]?.slice(0, 4), y1 = months[b]?.slice(0, 4);
+			parts.push(y0 === y1 ? `in ${y0}` : `${y0}–${y1}`);
+		}
+		const more = v.slice(1).map(([pub, py, isbn, f]) => [formatLabel(f), pub, (py || "").match(/\d{4}/)?.[0], isbn && `ISBN ${isbn}`].filter(Boolean).join(", "));
+		return { line: parts.join(" · "), more };
+	}
 	const isExpanded = (key) => expandedWorks.includes(key);
 	// While a filter is active, auto-expand any work with a matching edition so the
 	// highlighted rows are visible without a manual click.
@@ -2242,6 +2282,10 @@
 			</div>
 			</div>
 			</div><!-- /.chart-panel -->
+			{#if searchMode === "title" && searchedWork && !isOverview}
+				<!-- Book pages: a nudge down to this book's editions in the table. -->
+				<button type="button" class="ed-callout" onclick={showEditions}>Looking for a specific edition? <ArrowDownIcon size={15} strokeWidth={2.4} aria-hidden="true" /></button>
+			{/if}
 			{/if}
 			</div><!-- /.split-main -->
 
@@ -2295,7 +2339,7 @@
 						{@const wColor = workPlotColor(w)}
 						{@const open = workOpen(w)}
 						{#if !w.filteredOut}
-						<li class="bk-row bk-book" class:plotted={!!wColor}>
+						<li class="bk-row bk-book" class:plotted={!!wColor} data-work={w.key}>
 							<input type="checkbox" class="bk-check" checked={isWorkPlotted(w.key)}
 								indeterminate={!isWorkPlotted(w.key) && w.editions.some((e) => groupForTitle(e.idx) || isSingleSelected(e.idx))}
 								onchange={() => keepTableStill(() => toggleWork(w.key))}
@@ -2323,7 +2367,7 @@
 										checked={isSingleSelected(t.idx)}
 										onchange={() => keepTableStill(() => toggleTitle(t.idx))}
 										aria-label="Plot this edition on its own: {t.title}" />
-									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}</span>
+									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.line}<span class="bk-ed-meta" title={em.more.length ? `Also: ${em.more.join("; ")}` : undefined}>{em.line}{#if em.more.length}{" · "}+{em.more.length} more{/if}</span>{/if}{/if}</span>
 									{#if editMode}
 										<span class="bk-ed-tools">
 											<select class="bk-move" aria-label="Move this edition to another book" onchange={(e) => { moveEdition(t.idx, e.currentTarget.value); e.currentTarget.value = ""; }}>
@@ -4033,6 +4077,12 @@
 	.bk-ed.editing { grid-template-columns: 22px minmax(0, 1fr) auto 76px; }
 	.bk-ed .bk-num { color: var(--color-fg-light); }
 	.bk-ed-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.bk-ed-meta { display: block; margin-top: 2px; font-family: var(--font-sans); font-size: 12px; line-height: 1.4; color: var(--color-fg-light); white-space: normal; }
+	.ed-callout { display: flex; align-items: center; gap: 6px; margin: 18px auto 0; padding: 8px 16px; border: 1px solid var(--color-border); border-radius: 999px; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); cursor: pointer; }
+	.ed-callout:hover { border-color: var(--color-fg-light); }
+	.ed-callout :global(svg) { animation: ed-bob 1.6s ease-in-out infinite; }
+	@keyframes ed-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+	@media (prefers-reduced-motion: reduce) { .ed-callout :global(svg) { animation: none; } }
 	.bk-rename { font-family: var(--font-serif); font-size: 1rem; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-white); color: var(--color-fg); min-width: 0; width: 16em; max-width: 100%; }
 	.bk-new { background: #fbfaf6; }
 	.bk-new-note { font-size: 12px; color: var(--color-fg-light); }
