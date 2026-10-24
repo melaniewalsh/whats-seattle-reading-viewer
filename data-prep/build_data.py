@@ -642,6 +642,110 @@ def annotate_subjects(con, out_dir, slug_by_author):
     print(f"  [subjects] patched {n_patched[0]:,} author files ({perf_counter() - t0:.2f}s)", flush=True)
 
 
+def annotate_editions(con, out_dir, slug_by_author, base_select):
+    """Add what tells one edition from another to each title in the author files:
+    its formats, where its checkouts came from (CheckoutType: OverDrive, Hoopla,
+    Horizon = a physical copy) and its top publisher / publication year / ISBN
+    combinations, from the raw rows (the cleaned table doesn't carry them).
+
+      title -> "ed": {"f": [[fmt, n], ...], "s": [[source, n], ...],
+                      "v": [[publisher, year, isbn, fmt, n], ...]  (top 4)}
+
+    Isolated post-pass: if the raw files lack these columns, the build carries on."""
+    authors_dir = out_dir / "authors"
+    t0 = perf_counter()
+    sel = base_select.replace(
+        "Subjects AS subjects",
+        "Subjects AS subjects, CAST(CheckoutType AS VARCHAR) AS src, CAST(Publisher AS VARCHAR) AS pub, "
+        "CAST(PublicationYear AS VARCHAR) AS py, CAST(ISBN AS VARCHAR) AS isbn",
+    )
+    if sel == base_select:
+        raise RuntimeError("could not extend the base select")
+    con.execute("DROP TABLE IF EXISTS edmerge")
+    con.execute("CREATE TABLE edmerge(variant VARCHAR, rep VARCHAR)")
+    if _NAME_REMAP:
+        con.executemany("INSERT INTO edmerge VALUES (?, ?)", list(_NAME_REMAP.items()))
+    has_amap = bool(con.execute("SELECT count(*) FROM information_schema.tables WHERE table_name = 'amap'").fetchone()[0])
+    amap_join = "LEFT JOIN amap m ON b.author = m.raw" if has_amap else ""
+    canon = "COALESCE(m.canonical, b.author)" if has_amap else "b.author"
+    con.execute("DROP TABLE IF EXISTS edrows")
+    con.execute(
+        f"""
+        CREATE TABLE edrows AS
+        WITH base AS ({sel})
+        SELECT COALESCE(e.rep, {canon}) AS author, b.title, b.fmt,
+               nullif(trim(b.src), '') AS src, nullif(trim(b.pub), '') AS pub,
+               nullif(trim(b.py), '') AS py, nullif(trim(b.isbn), '') AS isbn,
+               CAST(sum(b.checkouts) AS BIGINT) AS n
+        FROM base b {amap_join}
+        LEFT JOIN edmerge e ON {canon} = e.variant
+        GROUP BY ALL
+        """
+    )
+    print(f"  [editions] edition rows built ({perf_counter() - t0:.2f}s)", flush=True)
+    cur = con.execute(
+        """
+        WITH f AS (SELECT author, title, fmt, sum(n) AS n FROM edrows GROUP BY ALL),
+        s AS (SELECT author, title, src, sum(n) AS n FROM edrows WHERE src IS NOT NULL GROUP BY ALL),
+        v AS (SELECT author, title, pub, py, isbn, fmt, sum(n) AS n FROM edrows
+              WHERE pub IS NOT NULL OR py IS NOT NULL OR isbn IS NOT NULL GROUP BY ALL),
+        fa AS (SELECT author, title, list([fmt, CAST(n AS VARCHAR)] ORDER BY n DESC) AS f FROM f GROUP BY ALL),
+        sa AS (SELECT author, title, list([src, CAST(n AS VARCHAR)] ORDER BY n DESC) AS s FROM s GROUP BY ALL),
+        va AS (SELECT author, title,
+                      list_slice(list([coalesce(pub, ''), coalesce(py, ''), coalesce(isbn, ''), fmt, CAST(n AS VARCHAR)] ORDER BY n DESC), 1, 4) AS v
+               FROM v GROUP BY ALL)
+        SELECT fa.author, fa.title, fa.f, sa.s, va.v
+        FROM fa LEFT JOIN sa USING (author, title) LEFT JOIN va USING (author, title)
+        ORDER BY fa.author
+        """
+    )
+    reader = cur.fetch_record_batch(rows_per_batch=TITLE_FETCH_CHUNK)
+    num = lambda pairs: [[p[0], int(p[1])] for p in (pairs or [])]
+    sentinel = object()
+    state = {"author": sentinel, "titles": {}}
+    n_patched = [0]
+
+    def flush():
+        author, titles = state["author"], state["titles"]
+        state["titles"] = {}
+        if author is sentinel:
+            return
+        slug = slug_by_author.get(author)
+        if not slug:
+            return
+        path = authors_dir / (slug[:2] or "__") / f"{slug}.json"
+        if not path.exists():
+            return
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            return
+        hit = False
+        for t in data.get("titles", []):
+            ed = titles.get(t["title"])
+            if ed:
+                t["ed"] = ed
+                hit = True
+        if hit:
+            path.write_bytes(_dumps(data))
+            n_patched[0] += 1
+
+    for batch in reader:
+        for row in batch.to_pylist():
+            if row["author"] != state["author"]:
+                flush()
+                state["author"] = row["author"]
+            state["titles"][row["title"]] = {
+                "f": num(row["f"]),
+                "s": num(row["s"]),
+                "v": [[x[0], x[1], x[2], x[3], int(x[4])] for x in (row["v"] or [])],
+            }
+    flush()
+    con.execute("DROP TABLE IF EXISTS edrows")
+    con.execute("DROP TABLE IF EXISTS edmerge")
+    print(f"  [editions] patched {n_patched[0]:,} author files ({perf_counter() - t0:.2f}s)", flush=True)
+
+
 def build_sqlite(db_path, months, record_stream, counters):
     """
     Create library.sqlite3 and stream every author's series + titles into it.
@@ -874,6 +978,9 @@ def sync_new_files_from_r2():
     return downloaded
 
 
+_NAME_REMAP = {}  # name-variant -> representative, from merge_name_variants
+
+
 def merge_name_variants(con):
     """Apply the second-pass author reconciliation at build time.
 
@@ -890,6 +997,8 @@ def merge_name_variants(con):
         "SELECT author, CAST(sum(checkouts) AS BIGINT) AS c FROM clean GROUP BY author"
     ).fetchall()
     remap = name_variant_remap(rows)
+    _NAME_REMAP.clear()
+    _NAME_REMAP.update(remap or {})  # kept for annotate_editions
     if not remap:
         print("  no author name-variant merges")
         return
@@ -2032,6 +2141,15 @@ def main():
         print(f"  subjects done ({perf_counter() - t0:.2f}s)", flush=True)
     except Exception as e:  # noqa: BLE001
         print(f"  WARNING: subject annotation failed ({e}); files written without subjects", flush=True)
+
+    # Edition details (publisher, year, ISBN, source) per title; isolated too.
+    print("Annotating editions ...", flush=True)
+    t0 = perf_counter()
+    try:
+        annotate_editions(con, OUT_DIR, slug_by_author, BASE_SELECT)
+        print(f"  editions done ({perf_counter() - t0:.2f}s)", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"  WARNING: edition annotation failed ({e}); files written without edition details", flush=True)
 
     # Top authors per genre per year (isolated post-pass, same as subjects).
     print("Building top-authors.json ...", flush=True)
