@@ -8,9 +8,11 @@
 	import TopAuthors from "$components/TopAuthors.svelte";
 	import TopWorks from "$components/TopWorks.svelte";
 	import SubjectList from "$components/SubjectList.svelte";
+	import Guide from "$components/Guide.svelte";
 	import NortonExplorer from "$components/NortonExplorer.svelte";
 	import BacklistBoomerangs from "$components/BacklistBoomerangs.svelte";
 	import TrendingUp from "@lucide/svelte/icons/trending-up";
+	import Compass from "@lucide/svelte/icons/compass";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import SiteSearch from "$components/SiteSearch.svelte";
 	import { cleanTitleForDisplay } from "$utils/workTitle.js";
@@ -34,7 +36,8 @@
 	// The browser-tab title names what's on screen ("Octavia E. Butler · What’s
 	// Seattle Reading?"); the home page uses the site name alone.
 	const TAB_TITLES = { overview: "Overview", genres: "Genre Trends", backlist: "Backlist Boomerangs",
-		about: "About the Project", publications: "Publications", norton: "Canonical American Authors" };
+		about: "About the Project", publications: "Publications", norton: "Canonical American Authors",
+		guide: "How to Read the Data" };
 	const docTitle = $derived.by(() => {
 		let page = "";
 		if (tab === "search") page = compareMode ? searchText.split(", ").join(" vs. ") : searchText;
@@ -206,6 +209,7 @@
 			else if (t === "spl500") tab = "spl500";
 			else if (t === "backlist" || t === "boomers" || t === "boomerangs") tab = "backlist";
 			else if (t === "overview" || t === "all") tab = "overview";
+			else if (t === "guide") tab = "guide";
 			else if (t === "subject" && params.get("subject")) { tab = "subject"; subjectSlug = params.get("subject"); }
 			else tab = "home";
 		} catch {}
@@ -484,6 +488,24 @@
 
 	// Open the Most Borrowed works ranking filtered to a genre, all-time (used by
 	// the "#N in Genre" badges on a searched work).
+	// Home page cards: each section with a screenshot (static/home/) and a line on what it's for.
+	const HOME_CARDS = [
+		{ title: "Checkout Trends", img: "home/trends.jpg", text: "Look up any author or book and see its checkouts month by month since 2006, or compare several.", go: "Start exploring", open: () => go("search") },
+		{ title: "Most Borrowed", img: "home/borrowed.jpg", text: "The books and authors checked out most, by year and by genre.", go: "Start exploring", open: () => go("rankings") },
+		{ title: "Genres", img: "home/genres.jpg", text: "How the popularity of romance, fantasy, mystery and other genres has changed.", go: "Start exploring", open: () => go("genres") },
+		{ title: "Backlist Boomerangs", img: "home/backlist.jpg", text: "Books that suddenly became popular again, years after they first circulated.", go: "Start exploring", open: () => go("backlist") },
+		{ title: "Overview", img: "home/overview.jpg", text: "Every checkout at the library, and the shift from print to ebooks and audiobooks.", go: "Start exploring", open: () => goOverview() },
+		{ title: "Case Studies", img: "home/essays.jpg", text: "Essays and research that use this data, from the literary canon to the most-borrowed novels.", go: "Read the essays", href: "https://essays.whats-seattle-reading.com/" }
+	];
+
+	// Guide links ({ tab } / { author } / { compare }) open that part of the site.
+	function guideNavigate(link) {
+		if (link.author) return openAuthor(link.author);
+		if (link.compare) return showCompare(link.compare);
+		if (link.tab === "works") { rankKind = "works"; return go("rankings"); }
+		go(link.tab);
+	}
+
 	// A subject heading's page of most-borrowed books (?tab=subject&subject=<slug>).
 	let subjectSlug = $state("");
 	let subjectLabel = $state("");
@@ -518,7 +540,7 @@
 
 <svelte:head><title>{docTitle}</title></svelte:head>
 
-<svelte:boundary onerror={(e) => console.error(e)}>
+<svelte:boundary onerror={(e) => console.error(String(e?.stack || e))}>
 	{#snippet failed()}
 		<div class="view-error" role="alert">
 			<p>Something went wrong. <button type="button" onclick={() => location.reload()}>Reload the page</button></p>
@@ -566,6 +588,7 @@
 				<button class="menu-link menu-ic" onclick={() => go("backlist")}><span class="menu-lucide" aria-hidden="true"><TrendingUp size={20} strokeWidth={2.4} /></span>Backlist Boomerangs</button>
 				<button class="menu-link menu-ic" onclick={() => go("search")}><img src="{base}/hub-search.png" alt="" width="22" height="22" />Search</button>
 				<button class="menu-link menu-ic" onclick={() => go("genres")}><img src="{base}/hub-genres.png" alt="" width="22" height="22" />Genres</button>
+				<button class="menu-link menu-ic" onclick={() => go("guide")}><span class="menu-lucide" aria-hidden="true"><Compass size={20} strokeWidth={2.4} /></span>How to Read the Data</button>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">Case Studies</h3>
@@ -585,7 +608,7 @@
 		<!-- One view failing shows a message instead of blanking the page; the
 		     masthead and menu stay, and switching views starts fresh. -->
 		{#key tab}
-		<svelte:boundary onerror={(e) => console.error(e)}>
+		<svelte:boundary onerror={(e) => console.error(String(e?.stack || e))}>
 		{#snippet failed(error, reset)}
 			<div class="view-error" role="alert">
 				<p>Something went wrong loading this page.</p>
@@ -611,6 +634,8 @@
 			{:else}
 				<TopAuthors {openAuthor} {rankKind} {setRankKind} />
 			{/if}
+		{:else if tab === "guide"}
+			<Guide onNavigate={guideNavigate} />
 		{:else if tab === "subject"}
 			<SubjectList slug={subjectSlug} {openTitle} {openAuthor} onLoaded={(l) => (subjectLabel = l)} />
 		{:else if tab === "backlist"}
@@ -644,35 +669,28 @@
 			<section class="home-topworks" aria-label="Most borrowed this year">
 				<TopWorks {openAuthor} {openTitle} embedded onSeeAll={() => go("rankings")} />
 			</section>
-			<nav class="hub" aria-label="Explore">
-				<button class="hub-card" onclick={goOverview}>
-					<img class="hub-emoji hub-img" src="{base}/hub-overview.png" alt="" width="34" height="34" />
-					<span class="hub-h">Overview</span>
-					<span class="hub-d">Total checkouts across the entire library, broken down by format.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
-				<button class="hub-card" onclick={() => go("rankings")}>
-					<img class="hub-emoji hub-img" src="{base}/hub-borrowed.png" alt="" width="34" height="34" />
-					<span class="hub-h">Most Borrowed</span>
-					<span class="hub-d">The books and authors most checked out, broken down by year and genre.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
-				<button class="hub-card" onclick={() => go("backlist")}>
-					<span class="hub-emoji hub-lucide" aria-hidden="true"><TrendingUp size={32} strokeWidth={2.2} /></span>
-					<span class="hub-h">Backlist Boomerangs</span>
-					<span class="hub-d">Books that became popular again, years after they were first checked out.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
-				<button class="hub-card" onclick={() => go("genres")}>
-					<span class="hub-emoji hub-icons" aria-hidden="true">
-						<img class="hub-img" src="{base}/hub-genres.png" alt="" width="34" height="34" />
-						<img class="hub-img hub-img-sm" src="{base}/hub-heart.png" alt="" width="34" height="34" />
-						<img class="hub-img hub-img-ghost" src="{base}/hub-ghost.png" alt="" width="34" height="34" />
-					</span>
-					<span class="hub-h">Genres</span>
-					<span class="hub-d">Popularity of certain genres over time—historical fiction, romance, horror, etc.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
+			<!-- New visitors: a short guided story of what the data is and how to read it. -->
+			<div class="tour-banner">
+				<p><strong>New here?</strong> A short guided tour of the data: what it is, how to read the charts, and what to keep in mind.</p>
+				<button type="button" class="tour-btn" onclick={() => go("guide")}>Take the tour →</button>
+			</div>
+			<!-- The site's sections, each with a picture of what you'll find. -->
+			<nav class="cards" aria-label="Explore">
+				{#each HOME_CARDS as c (c.title)}
+					{#if c.href}
+						<a class="card" href={c.href}>
+							<h2 class="card-h">{c.title}</h2>
+							<img class="card-img" src="{base}/{c.img}" alt="" width="800" height="500" loading="lazy" />
+							<span class="card-foot"><span class="card-d">{c.text}</span><span class="card-go">{c.go}&nbsp;<ExtArrow /></span></span>
+						</a>
+					{:else}
+						<button class="card" onclick={c.open}>
+							<h2 class="card-h">{c.title}</h2>
+							<img class="card-img" src="{base}/{c.img}" alt="" width="800" height="500" loading="lazy" />
+							<span class="card-foot"><span class="card-d">{c.text}</span><span class="card-go">{c.go} →</span></span>
+						</button>
+					{/if}
+				{/each}
 			</nav>
 
 			{#if featured}
@@ -828,26 +846,34 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		</details>
 		{/if}
 
-			<!-- Pages with a chart already credit (and link) the data under it. -->
-			{#if !["search", "overview", "genres"].includes(tab)}
-			<p class="cf-source">
-				Data source:
-				<a
-					href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6"
-					target="_blank"
-					rel="noopener"
-				>Seattle Public Library — Checkouts by Title</a>
-				(2006–2026)
-			</p>
-			{/if}
-			<p class="cf-attr">
-				What’s Seattle Reading?
-				<span class="cf-sep">·</span>
-				<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a>
-				{#if lastUpdated}<span class="cf-sep">·</span> Last updated: {lastUpdated}{/if}
-				<span class="cf-sep">·</span>
-				<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Share feedback</a>
-			</p>
+
+
+		</footer>
+		<!-- Site footer: a full-width band with the project, its sections and links. -->
+		<footer class="site-footer">
+			<div class="sf-inner">
+				<div class="sf-brand">
+					<button type="button" class="sf-logo" onclick={() => go("home")}><img src="{base}/favicon.png" alt="" width="44" height="44" /><span>What’s Seattle Reading?</span></button>
+					<p>Two decades of borrowing at the Seattle Public Library. A project at the University of Washington Information School.</p>
+					<p class="sf-small">Data: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener">Seattle Public Library, Checkouts by Title</a>{#if lastUpdated}<br />Last updated: {lastUpdated}{/if}<br /><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a></p>
+				</div>
+				<nav class="sf-col" aria-label="Explore">
+					<h3>Explore</h3>
+					<button type="button" onclick={goOverview}>Overview</button>
+					<button type="button" onclick={() => go("search")}>Checkout Trends</button>
+					<button type="button" onclick={() => go("rankings")}>Most Borrowed</button>
+					<button type="button" onclick={() => go("genres")}>Genres</button>
+					<button type="button" onclick={() => go("backlist")}>Backlist Boomerangs</button>
+					<button type="button" onclick={() => go("guide")}>How to Read the Data</button>
+				</nav>
+				<nav class="sf-col" aria-label="Project">
+					<h3>Project</h3>
+					<button type="button" onclick={() => go("about")}>About the Project</button>
+					<button type="button" onclick={() => go("publications")}>Publications</button>
+					<a href="https://essays.whats-seattle-reading.com/">Case Studies&nbsp;<ExtArrow /></a>
+					<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Share feedback&nbsp;<ExtArrow /></a>
+				</nav>
+			</div>
 		</footer>
 	</article>
 </svelte:boundary>
@@ -1042,51 +1068,24 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		border-radius: var(--radius-md, 12px);
 		background: var(--color-white);
 	}
-	.hub {
-		max-width: 880px;
-		margin: 28px auto 10px;
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 16px;
+	/* "New here?" banner above the cards. */
+	.tour-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; max-width: 880px; margin: 34px auto 0; padding: 16px 22px; border-radius: 10px; background: #eef1f4; font-family: var(--font-sans); }
+	.tour-banner p { margin: 0; font-size: 1rem; line-height: 1.45; color: var(--color-fg); }
+	.tour-btn { flex: none; padding: 9px 16px; border: 1.5px solid var(--color-fg); border-radius: 8px; background: #fff; font: inherit; font-size: var(--text-sm); font-weight: 700; color: var(--color-fg); cursor: pointer; }
+	.tour-btn:hover { background: var(--color-fg); color: #fff; }
+	/* Section cards (like the Atlas of Economic Complexity's home page). */
+	.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; max-width: 880px; margin: 24px auto 10px; }
+	.card { display: flex; flex-direction: column; gap: 14px; padding: 22px 22px 20px; border: 1px solid var(--color-border); border-radius: 10px; background: #fafaf9; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06); text-align: left; text-decoration: none; color: inherit; font: inherit; cursor: pointer; transition: box-shadow 0.15s, transform 0.15s; }
+	.card:hover { box-shadow: 0 8px 26px rgba(0, 0, 0, 0.12); transform: translateY(-2px); }
+	.card-h { margin: 0; font-family: var(--font-sans); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-fg); }
+	.card-img { width: 100%; height: auto; aspect-ratio: 8 / 5; object-fit: cover; object-position: top; border: 1px solid var(--color-border); border-radius: 6px; background: #fff; }
+	.card-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+	.card-d { font-family: var(--font-sans); font-size: 1rem; line-height: 1.45; color: var(--color-fg-light); }
+	.card-go { flex: none; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 700; color: #3f88cc; white-space: nowrap; }
+	@media (max-width: 700px) {
+		.cards { grid-template-columns: 1fr; gap: 18px; }
+		.card-foot { flex-direction: column; align-items: flex-start; gap: 8px; }
 	}
-	/* With an odd number of cards, let the last one span the row. */
-	.hub-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
-	@media (max-width: 620px) {
-		.hub { grid-template-columns: 1fr; }
-	}
-	.hub-card {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 6px;
-		text-align: left;
-		padding: 22px;
-		border: 1px solid var(--color-border);
-		border-radius: 14px;
-		background: var(--color-white);
-		cursor: pointer;
-		font-family: var(--font-sans);
-		transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
-	}
-	.hub-card:hover {
-		border-color: var(--color-fg-light);
-		box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
-		transform: translateY(-2px);
-	}
-	.hub-emoji { font-size: 1.7rem; line-height: 1; }
-	.hub-lucide { display: inline-flex; color: #e3120b; }
-	.hub-img { width: 2rem; height: 2rem; object-fit: contain; }
-	.hub-icons { display: inline-flex; align-items: center; gap: 0.35rem; }
-	.hub-img-sm { width: 1.4rem; height: 1.4rem; }
-	.hub-img-ghost { width: 1.7rem; height: 1.7rem; }
-	.hub-h {
-		font-family: var(--font-display, var(--font-serif));
-		font-size: 1.4rem;
-		font-weight: 700;
-		color: var(--color-fg);
-	}
-	.hub-d { font-size: var(--text-base); line-height: 1.45; color: var(--color-fg-light); }
-	.hub-go { margin-top: 4px; font-size: var(--text-sm); font-weight: 700; color: #3f88cc; }
 	/* About page — project details, moved off the landing. */
 	.about-page {
 		max-width: 680px;
@@ -1671,5 +1670,20 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		background: #fff3bf;
 		box-shadow: 0 0 0 4px #fff3bf;
 		border-radius: 2px;
+	}
+	/* Full-width footer band. */
+	.site-footer { width: 100vw; margin: 56px 0 0 calc(50% - 50vw); background: #ececea; font-family: var(--font-sans); }
+	.sf-inner { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 32px; max-width: 1040px; margin: 0 auto; padding: 44px 24px 52px; }
+	.sf-logo { display: inline-flex; align-items: center; gap: 12px; padding: 0; border: 0; background: none; font-family: var(--font-display, var(--font-serif)); font-size: 1.5rem; font-weight: 700; color: var(--color-fg); cursor: pointer; }
+	.sf-brand p { margin: 14px 0 0; max-width: 34em; font-size: var(--text-sm); line-height: 1.55; color: var(--color-fg); }
+	.sf-brand .sf-small { color: var(--color-fg-light); }
+	.sf-brand a { color: inherit; }
+	.sf-col { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; }
+	.sf-col h3 { margin: 4px 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-fg-light); }
+	.sf-col button, .sf-col a { padding: 0; border: 0; background: none; font: inherit; font-size: var(--text-sm); letter-spacing: 0.02em; color: var(--color-fg); text-decoration: none; cursor: pointer; text-align: left; }
+	.sf-col button:hover, .sf-col a:hover { text-decoration: underline; text-underline-offset: 3px; }
+	@media (max-width: 700px) {
+		.sf-inner { grid-template-columns: 1fr 1fr; padding: 34px 16px 40px; }
+		.sf-brand { grid-column: 1 / -1; }
 	}
 </style>
