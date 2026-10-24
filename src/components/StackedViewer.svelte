@@ -1469,15 +1469,16 @@
 			if (isbn) parts.push(`ISBN ${isbn}`);
 		}
 		if ((ed.f || []).length > 1) parts.push(ed.f.map(([f]) => formatLabel(f)).join(" + "));
-		if ((ed.s || []).length) parts.push(`checked out via ${ed.s.map(([src]) => SOURCE[src] || src).join(", ")}`);
+		// "checked out via OverDrive, 2012–2026": where its checkouts came from,
+		// and the first and last year it was checked out.
 		const ser = t.series || [];
 		const a = ser.findIndex((x) => x > 0);
 		let b = -1;
 		for (let k = ser.length - 1; k >= 0; k--) if (ser[k] > 0) { b = k; break; }
-		if (a >= 0) {
-			const y0 = months[a]?.slice(0, 4), y1 = months[b]?.slice(0, 4);
-			parts.push(y0 === y1 ? `in ${y0}` : `${y0}–${y1}`);
-		}
+		const y0 = a >= 0 ? months[a]?.slice(0, 4) : "", y1 = b >= 0 ? months[b]?.slice(0, 4) : "";
+		const years = !y0 ? "" : y0 === y1 ? `in ${y0}` : `${y0}–${y1}`;
+		const via = (ed.s || []).map(([src]) => SOURCE[src] || src).join(", ");
+		if (via || years) parts.push(`checked out${via ? ` via ${via}` : ""}${via && years ? "," : ""}${years ? ` ${years}` : ""}`);
 		const more = v.slice(1).map(([pub, py, isbn, f]) => [formatLabel(f), pub, (py || "").match(/\d{4}/)?.[0], isbn && `ISBN ${isbn}`].filter(Boolean).join(", "));
 		return { line: parts.join(" · "), more };
 	}
@@ -4077,12 +4078,7 @@
 	.bk-ed.editing { grid-template-columns: 22px minmax(0, 1fr) auto 76px; }
 	.bk-ed .bk-num { color: var(--color-fg-light); }
 	.bk-ed-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-	.bk-ed-meta { display: block; margin-top: 2px; font-family: var(--font-sans); font-size: 12px; line-height: 1.4; color: var(--color-fg-light); white-space: normal; }
-	.ed-callout { display: flex; align-items: center; gap: 6px; margin: 18px auto 0; padding: 8px 16px; border: 1px solid var(--color-border); border-radius: 999px; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); cursor: pointer; }
-	.ed-callout:hover { border-color: var(--color-fg-light); }
-	.ed-callout :global(svg) { animation: ed-bob 1.6s ease-in-out infinite; }
-	@keyframes ed-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
-	@media (prefers-reduced-motion: reduce) { .ed-callout :global(svg) { animation: none; } }
+
 	.bk-rename { font-family: var(--font-serif); font-size: 1rem; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-white); color: var(--color-fg); min-width: 0; width: 16em; max-width: 100%; }
 	.bk-new { background: #fbfaf6; }
 	.bk-new-note { font-size: 12px; color: var(--color-fg-light); }
@@ -4778,4 +4774,13 @@
 			max-height: 300px;
 		}
 	}
+	/* Edition details and the "Looking for a specific edition?" button (all widths). */
+	/* Edition titles wrap instead of being cut off: the ending is often what tells two editions apart. */
+	.bk-ed-title { white-space: normal; overflow-wrap: anywhere; }
+	.bk-ed-meta { display: block; margin-top: 2px; font-family: var(--font-sans); font-size: 12px; line-height: 1.4; color: var(--color-fg-light); white-space: normal; }
+	.ed-callout { display: flex; align-items: center; gap: 6px; margin: 18px auto 0; padding: 8px 16px; border: 1px solid var(--color-border); border-radius: 999px; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); cursor: pointer; }
+	.ed-callout:hover { border-color: var(--color-fg-light); }
+	.ed-callout :global(svg) { display: inline-block; width: 15px; height: 15px; flex: none; animation: ed-bob 1.6s ease-in-out infinite; }
+	@keyframes ed-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+	@media (prefers-reduced-motion: reduce) { .ed-callout :global(svg) { display: inline-block; width: 15px; height: 15px; flex: none; animation: none; } }
 </style>
