@@ -95,6 +95,7 @@
 	// of a cluster). Empty = pure auto-clustering.
 	let workAssign = $state.raw({});
 	let legendHoverKey = $state(null); // legend entry being hovered -> lights up its band on the chart
+	let labelsOn = $state(true); // "first checkout" labels on an author's chart
 	let smoothOn = $state(true); // 3-month average lines (the tooltip still gives each month's count)
 	let customizeOpen = $state(false); // phones: the "Customize" panel (3-month average)
 	let searchedWork = $state(null); // { name, idxs } of the work searched in title mode, so "Total" can snap back to it
@@ -2056,20 +2057,20 @@
 	const brushStart = $derived(Math.min(firstActiveMonth(brushValues), yearLo));
 
 	// Book markers on an author's "Total" chart: the month each of their top
-	// three books was FIRST CHECKED OUT at SPL (not its publication or arrival
+	// five books was FIRST CHECKED OUT at SPL (not its publication or arrival
 	// date — the data can't tell us those). Skipped for books already circulating
 	// when the data begins, and for the author's very first book, whose marker
 	// would just sit at the left edge.
 	const MONTH_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-	const bookMarkers = $derived.by(() => {
+	const bookMarkersAll = $derived.by(() => {
 		if (!current || isOverview || searchMode === "title" || chartMode !== "line" || !months.length) return [];
 		const firstActive = current.series.findIndex((v) => v > 0);
 		return [...workGroups.values()]
 			.sort((a, b) => b.total - a.total)
-			.slice(0, 3)
-			// Only label books big enough to matter on the chart (>= 10% of the
+			.slice(0, 5)
+			// Only label books big enough to matter on the chart (>= 5% of the
 			// author's checkouts), not a small anthology that happens to be new.
-			.filter((w) => w.total >= current.total * 0.1)
+			.filter((w) => w.total >= current.total * 0.05)
 			.map((w) => ({ w, f: sumSeries(w.idxs).findIndex((v) => v > 0) }))
 			// Skip the first three years of data: older books' catalog records
 			// trickle in then, so a "first checkout" there isn't a real debut.
@@ -2079,6 +2080,7 @@
 				return { month: m, label: o.w.name, sub: `first checkout: ${yearlyView ? "" : MONTH_FULL[Number(m.slice(5, 7)) - 1] + " "}${m.slice(0, 4)}` };
 			});
 	});
+	const bookMarkers = $derived(labelsOn ? bookMarkersAll : []);
 
 	// Drop any pending timers when the view goes away (e.g. switching tabs).
 	onDestroy(() => {
@@ -2125,14 +2127,15 @@
 			     above the name. -->
 			{#if !isOverview && !tooSmall}
 				<div class="customize-row on-phone">
-					{#if !yearlyView}<button type="button" class="customize-btn" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>{/if}
+					{#if !yearlyView || bookMarkersAll.length}<button type="button" class="customize-btn" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>{/if}
 					{#if onCompare && currentSlug}
 						<button type="button" class="customize-btn" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={16} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
 					{/if}
 				</div>
-				{#if customizeOpen && !yearlyView}
+				{#if customizeOpen && (!yearlyView || bookMarkersAll.length)}
 					<div class="customize-panel on-phone">
-						<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
+						{#if !yearlyView}<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>{/if}
+						{#if bookMarkersAll.length}<label class="smooth-toggle"><input type="checkbox" bind:checked={labelsOn} /> Book labels</label>{/if}
 					</div>
 				{/if}
 			{/if}
@@ -2266,6 +2269,7 @@
 				{/if}
 			</div>
 			{#if !yearlyView}<label class="smooth-toggle off-phone"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>{/if}
+			{#if bookMarkersAll.length}<label class="smooth-toggle off-phone"><input type="checkbox" bind:checked={labelsOn} /> Book labels</label>{/if}
 			{#if chartMode === "area" && isolatedKeys.length}
 				<!-- The way back after clicking a line's name to show it alone -->
 				<span class="iso-note">Showing {viewSeries.length} of {legendItems.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={clearIsolate}>Show all</button>{#if soloBook}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall iso-book" onclick={() => openTitle(soloBook, currentSlug)} title="Its own page: just this book's trend, editions and formats">Open this book's page →</button>{/if}</span>
