@@ -649,7 +649,7 @@ def annotate_editions(con, out_dir, slug_by_author, base_select, parquet_list=No
     combinations, from the raw rows (the cleaned table doesn't carry them).
 
       title -> "ed": {"f": [[fmt, n], ...], "s": [[source, n], ...],
-                      "v": [[publisher, year, isbn, fmt, n], ...]  (top 4)}
+                      "v": [[publisher, year, isbn, fmt, n], ...]  (top 8 editions)}
 
     Isolated post-pass: if the raw files lack these columns, the build carries on."""
     authors_dir = out_dir / "authors"
@@ -702,15 +702,21 @@ def annotate_editions(con, out_dir, slug_by_author, base_select, parquet_list=No
         """
         WITH f AS (SELECT author, title, fmt, sum(n) AS n FROM edrows GROUP BY ALL),
         s AS (SELECT author, title, src, sum(n) AS n FROM edrows WHERE src IS NOT NULL GROUP BY ALL),
-        -- One row per publisher/year/format, with its most-borrowed ISBN (only
-        -- checkouts since mid-2022 carry one).
-        v AS (SELECT author, title, pub, py, fmt, arg_max(isbn, n) FILTER (WHERE isbn IS NOT NULL) AS isbn, sum(n) AS n
-              FROM edrows WHERE pub IS NOT NULL OR py IS NOT NULL OR isbn IS NOT NULL
-              GROUP BY author, title, pub, py, fmt),
+        -- One row per edition: publisher, year, format and ISBN. Checkouts from
+        -- before mid-2022 have no ISBN; they join their publisher/year/format's
+        -- most-borrowed ISBN. Editions with different ISBNs stay separate.
+        v0 AS (SELECT author, title, pub, py, fmt, isbn, sum(n) AS n FROM edrows
+               WHERE pub IS NOT NULL OR py IS NOT NULL OR isbn IS NOT NULL GROUP BY ALL),
+        dom AS (SELECT author, title, pub, py, fmt, arg_max(isbn, n) AS isbn FROM v0
+                WHERE isbn IS NOT NULL GROUP BY author, title, pub, py, fmt),
+        v AS (SELECT v0.author, v0.title, v0.pub, v0.py, v0.fmt, coalesce(v0.isbn, dom.isbn) AS isbn, sum(v0.n) AS n
+              FROM v0 LEFT JOIN dom ON v0.isbn IS NULL AND v0.author = dom.author AND v0.title = dom.title
+                   AND v0.pub IS NOT DISTINCT FROM dom.pub AND v0.py IS NOT DISTINCT FROM dom.py AND v0.fmt = dom.fmt
+              GROUP BY ALL),
         fa AS (SELECT author, title, list([fmt, CAST(n AS VARCHAR)] ORDER BY n DESC) AS f FROM f GROUP BY ALL),
         sa AS (SELECT author, title, list([src, CAST(n AS VARCHAR)] ORDER BY n DESC) AS s FROM s GROUP BY ALL),
         va AS (SELECT author, title,
-                      list_slice(list([coalesce(pub, ''), coalesce(py, ''), coalesce(isbn, ''), fmt, CAST(n AS VARCHAR)] ORDER BY n DESC), 1, 4) AS v
+                      list_slice(list([coalesce(pub, ''), coalesce(py, ''), coalesce(isbn, ''), fmt, CAST(n AS VARCHAR)] ORDER BY n DESC), 1, 8) AS v
                FROM v GROUP BY ALL)
         SELECT fa.author, fa.title, fa.f, sa.s, va.v
         FROM fa LEFT JOIN sa USING (author, title) LEFT JOIN va USING (author, title)

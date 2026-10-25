@@ -1492,9 +1492,16 @@
 	// An ISBN opens that exact edition in the SPL catalog (digital editions included).
 	const isbnUrl = (isbn) => `https://seattle.bibliocommons.com/v2/search?query=${isbn}&searchType=keyword`;
 	const SOURCE = { Horizon: "a library copy", OverDrive: "OverDrive", Hoopla: "Hoopla", Freegal: "Freegal", Zinio: "Zinio" };
-	// One ISBN from a catalog field ("0735219095, 9780735219090"): the
-	// 13-digit one if there is one.
-	const pickIsbn = (s) => (s || "").match(/\d{13}/)?.[0] || (s || "").match(/\d{9}[\dXx]/)?.[0];
+	// The ISBNs in a catalog field, as 13-digit numbers. A field can hold the
+	// same book's 10- and 13-digit forms ("0735219095, 9780735219090"), which
+	// count once, or two editions' (hardcover and paperback), which both show.
+	function isbn13(ten) {
+		const core = "978" + ten.slice(0, 9);
+		const sum = [...core].reduce((a, d, i) => a + Number(d) * (i % 2 ? 3 : 1), 0);
+		return core + ((10 - (sum % 10)) % 10);
+	}
+	const isbnList = (s) => [...new Set(((s || "").match(/\b(?:97[89]\d{10}|\d{9}[\dXx])\b/g) || []).map((x) => (x.length === 10 ? isbn13(x) : x)))];
+	const pickIsbn = (s) => isbnList(s)[0];
 	// The library only records ISBNs from mid-2022, so an older listing of an
 	// edition (same book, publisher, year and format) borrows its ISBN.
 	const isbnByWork = $derived.by(() => {
@@ -1524,11 +1531,16 @@
 		for (const [rawPub, py, isbn, f, n] of ed.v || []) {
 			const pub = (rawPub || "").replace(/[\s,;:/]+$/, ""); // catalog punctuation: "Beacon Press,"
 			const yr = (py || "").match(/\d{4}/)?.[0];
-			const num = pickIsbn(isbn) || isbnByWork.get(`${t.workKey}|${pub}|${yr}|${t.fmt}`);
-			const label = [pub, yr].filter(Boolean).join(", ");
-			const same = eds.find((e) => (num && e.isbn === num) || (!num && e.label === label));
-			if (same) same.n += n;
-			else eds.push({ label, isbn: num, n });
+			const own = isbnList(isbn);
+			const isbns = own.length ? own : [isbnByWork.get(`${t.workKey}|${pub}|${yr}|${t.fmt}`)].filter(Boolean);
+			// Same ISBN under two publisher names (Penguin Group (USA) / Penguin
+			// Publishing Group) is one edition.
+			const same = eds.find((e) => (isbns.length && isbns.some((x) => e.isbns.includes(x))) || (!isbns.length && !e.isbns.length && e.pubs.join() === pub && e.yrs.join() === (yr || "")));
+			if (same) {
+				same.n += n;
+				if (pub && !same.pubs.includes(pub)) same.pubs.push(pub);
+				if (yr && !same.yrs.includes(yr)) same.yrs.push(yr);
+			} else eds.push({ pubs: [pub].filter(Boolean), yrs: [yr].filter(Boolean), isbns, n });
 		}
 		// A title string shared by more than one format (an audiobook also listed
 		// as plain "Wuthering Heights") is one row here: say what else it holds.
@@ -1539,9 +1551,11 @@
 		if (via) parts.push({ t: `checked out via ${via}` });
 		// One edition: it leads the line. Several: a short list under it, plus
 		// the rest (the build keeps the top four).
+		// "Penguin Group (USA), Inc. / Penguin Publishing Group, 2011"
+		for (const e of eds) e.labels = [[e.pubs.join(" / "), e.yrs.join(" / ")].filter(Boolean).join(", ")].filter(Boolean);
 		if (eds.length === 1) {
 			const [e] = eds;
-			parts.unshift(...[e.label && { t: e.label }, e.isbn && { isbn: e.isbn }].filter(Boolean));
+			parts.unshift(...[e.labels.length && { t: e.labels.join(" / ") }, e.isbns.length && { isbns: e.isbns }].filter(Boolean));
 			return { parts, eds: [], rest: 0 };
 		}
 		const rest = eds.length > 1 ? Math.max(0, (t.total || 0) - eds.reduce((a, e) => a + e.n, 0)) : 0;
@@ -2152,6 +2166,7 @@
 </script>
 
 <div class="viewer">
+	{#snippet isbnLinks(list)}ISBN{list.length > 1 ? "s" : ""}{" "}{#each list as x, k}{#if k}, {/if}<a href={isbnUrl(x)} target="_blank" rel="noopener noreferrer" title="Find this edition in the Seattle Public Library catalog">{x}</a>{/each}{/snippet}
 	{#snippet authorPicker()}
 		<!-- Under the page's search field: a few starting points, half authors and
 		     half books, from a varied mix (recent, classic, romance, nonfiction). -->
@@ -2517,7 +2532,7 @@
 										checked={isSingleSelected(t.idx)}
 										onchange={() => keepTableStill(() => toggleTitle(t.idx))}
 										aria-label="Plot this edition on its own: {t.title}" />
-									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.parts.length}<span class="bk-ed-meta">{#if em.eds.length}{em.eds.length} editions under this title{" · "}{/if}{#each em.parts as p, k}{#if k}{" · "}{/if}{#if p.isbn}ISBN <a href={isbnUrl(p.isbn)} target="_blank" rel="noopener noreferrer" title="Find this edition in the Seattle Public Library catalog">{p.isbn}</a>{:else}{p.t}{/if}{/each}</span>{/if}{#if em.eds.length}<span class="bk-ed-list">{#each em.eds as e}<span class="bk-ed-item">{e.label || "Unknown publisher"}{#if e.isbn}{" · "}ISBN <a href={isbnUrl(e.isbn)} target="_blank" rel="noopener noreferrer" title="Find this edition in the Seattle Public Library catalog">{e.isbn}</a>{/if}{" · "}{e.n.toLocaleString()}</span>{/each}{#if em.rest >= SMALL_TOTAL}<span class="bk-ed-item">Other editions · {em.rest.toLocaleString()}</span>{/if}</span>{/if}{/if}</span>
+									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.parts.length}<span class="bk-ed-meta">{#if em.eds.length}{em.eds.length} editions under this title{" · "}{/if}{#each em.parts as p, k}{#if k}{" · "}{/if}{#if p.isbns}{@render isbnLinks(p.isbns)}{:else}{p.t}{/if}{/each}</span>{/if}{#if em.eds.length}<span class="bk-ed-list">{#each em.eds as e}<span class="bk-ed-item">{e.labels.join(" / ") || "Unknown publisher"}{#if e.isbns.length}{" · "}{@render isbnLinks(e.isbns)}{/if}{" · "}{e.n.toLocaleString()}</span>{/each}{#if em.rest >= SMALL_TOTAL}<span class="bk-ed-item">Other editions · {em.rest.toLocaleString()}</span>{/if}</span>{/if}{/if}</span>
 									{#if editMode}
 										<span class="bk-ed-tools">
 											<select class="bk-move" aria-label="Move this edition to another book" onchange={(e) => { moveEdition(t.idx, e.currentTarget.value); e.currentTarget.value = ""; }}>
