@@ -50,6 +50,15 @@
 
 	// "Featured trend of the month" on the home hub: this month, The Odyssey.
 
+	// The last month in the data ("August 2026"), for the dek.
+	let dataThrough = $state("");
+	onMount(() => {
+		getMonths().then((m) => {
+			const last = m?.[m.length - 1];
+			if (last) dataThrough = new Date(Date.UTC(+last.slice(0, 4), +last.slice(5, 7) - 1, 15)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+		}).catch(() => {});
+	});
+
 	let featured = $state.raw(null);
 	// Loaded once, the first time the home page shows (called wherever tab
 	// becomes "home": first load, Back/Forward, the logo).
@@ -566,14 +575,13 @@
 		{:else if tab === "backlist"}
 			<BacklistBoomerangs {openAuthor} {openTitle} />
 		{:else if tab === "home"}
-			<!-- How fresh the data is, and the days to the next monthly update (top right). -->
-			<div class="hero-status"><DataStatus /></div>
 			<header class="hero">
 				<div class="hero-title">
 					<img class="hero-logo" src="{base}/favicon.png" alt="" width="56" height="56" />
 					<h1>{copy.title}</h1>
 				</div>
-				<p class="dek">{copy.dek}</p>
+				<!-- "...until August 2026", with the days to the next monthly update beside it. -->
+				<p class="dek">{dataThrough ? copy.dek.replace(/today$/, dataThrough) : copy.dek} <DataStatus inline /></p>
 			</header>
 			<!-- New visitors: a short guided story of what the data is and how to read it. -->
 			<div class="tour-banner">
@@ -797,8 +805,6 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		padding: 0 24px;
 	}
 	/* Landing hub — title / subtitle / byline, then a grid of section cards. */
-	.hero-status { position: absolute; top: 76px; right: max(24px, calc(50% - 480px)); z-index: 1; }
-	@media (max-width: 900px) { .hero-status { position: static; display: flex; justify-content: center; margin: 0 0 18px; } }
 	.hero {
 		max-width: 720px;
 		margin: 46px auto 10px;

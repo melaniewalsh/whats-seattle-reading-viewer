@@ -6,7 +6,7 @@
 	import { onMount } from "svelte";
 	import { getMonths, getDataRefreshed } from "$components/db.js";
 
-	let { compact = false } = $props();
+	let { compact = false, inline = false } = $props();
 
 	const UPDATE_DAY = 7, UPDATE_HOUR_UTC = 14;
 	const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -49,6 +49,15 @@
 		{#if through}Data through {through}{/if}{#if refreshed}{" · "}refreshed {fmtDate(refreshed)}{/if}<br />
 		Updated monthly · next scheduled update {nextLabel}
 	</span>
+{:else if inline}
+	<!-- A small chip for the home page's dek: a tiny dial and the days to go. -->
+	<span class="ds-inline" title="Next scheduled update: {nextLabel}. New data is added monthly, after the library publishes the previous month's checkouts (sometimes later than planned).">
+		<svg class="ds-mini" viewBox="0 0 44 44" width="14" height="14" aria-hidden="true">
+			<circle cx="22" cy="22" r="17" class="ds-track" />
+			<circle cx="22" cy="22" r="17" class="ds-fill" stroke-dasharray="{(progress * 106.8).toFixed(1)} 106.8" transform="rotate(-90 22 22)" />
+		</svg>
+		Next update in {daysLeft} {daysLeft === 1 ? "day" : "days"}
+	</span>
 {:else}
 	<!-- A small dial: the ring fills as the month runs out; days left in the middle. -->
 	<div class="ds" title="New data is added monthly, after the library publishes the previous month's checkouts (sometimes later than planned).">
@@ -77,5 +86,8 @@
 	.ds-k { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-fg-light); }
 	.ds-v { font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); }
 	.ds-sub { font-size: 12px; color: var(--color-fg-light); }
+	.ds-inline { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; padding: 2px 9px 2px 6px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-white, #fff); font-family: var(--font-sans); font-size: 12px; font-weight: 600; line-height: 1.5; color: var(--color-fg-light); white-space: nowrap; vertical-align: 0.15em; cursor: help; }
+	.ds-mini { flex: none; display: block; width: 14px; height: 14px; }
+	.ds-mini .ds-track, .ds-mini .ds-fill { stroke-width: 8; }
 	.ds-compact { font-size: var(--text-sm); line-height: 1.55; }
 </style>
