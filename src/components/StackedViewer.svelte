@@ -2406,6 +2406,10 @@
 						<button type="button" class="bk-btn" class:on={editMode} aria-pressed={editMode} onclick={() => setEditMode(!editMode)}>{editMode ? "Done editing" : "Edit groupings"}</button>
 					</div>
 				</div>
+				{#if !editMode}
+					<!-- What a row is: one book, gathered from the library's separate records. -->
+					<p class="bk-note">Each book gathers the library's separate catalog records for it: print, ebook and audiobook editions, reissues and translations, and sometimes the same edition listed under slightly different titles (“Unabridged,” “A Novel”). Open a book's editions to see them all, or tick books to chart them. The grouping is automatic, so use Edit groupings to fix one that's wrong. <a class="works-why" href="#method-clustering">Why is this hard?</a></p>
+				{/if}
 				{#if editMode}
 					<div class="bk-editbar">
 						<p class="bk-editnote">Move editions between books, or split out ones that don't belong. <a class="works-why" href="{base}/trends#method-clustering" target="_blank" rel="noopener">Why is this hard?</a></p>
@@ -4052,6 +4056,7 @@
 		flex-wrap: wrap;
 		margin: 0 0 10px;
 	}
+	.bk-note { margin: 4px 0 12px; max-width: 760px; font-family: var(--font-sans); font-size: var(--text-sm); line-height: 1.5; color: var(--color-fg-light); }
 	.bk-title { font-family: var(--font-sans); font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--color-fg); }
 	.bk-count { font-weight: 400; color: var(--color-fg-light); }
 	.bk-tools { display: flex; gap: 8px; align-items: center; }
