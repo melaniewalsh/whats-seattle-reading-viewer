@@ -1298,7 +1298,8 @@
 					idx,
 					workKey: key,
 					workName: cleanTitleForDisplay(t.title) || t.title,
-					match: f ? (nameMatch || t.title.toLowerCase().includes(f)) : false
+					// Title, or any of its editions' publishers or ISBNs.
+					match: f ? (nameMatch || t.title.toLowerCase().includes(f) || (t.ed?.v || []).some(([pub, , isbn]) => `${pub || ""} ${isbn || ""}`.toLowerCase().includes(f))) : false
 				};
 			});
 			const matchCount = f ? editions.filter((e) => e.match).length : 0;
@@ -1515,25 +1516,36 @@
 	function editionMeta(t) {
 		const parts = [];
 		const ed = t.ed || {};
-		const v = ed.v || [];
-		if (v.length) {
-			const [rawPub, py, isbn] = v[0];
+		// One catalog title can cover several editions (OverDrive's "Wuthering
+		// Heights" is a Duke Classics, a Penguin and an Oxford ebook). List each:
+		// publisher and year, ISBN, checkouts. Two publisher names on one ISBN
+		// (Penguin Group (USA) / Penguin Publishing Group) are one edition.
+		const eds = [];
+		for (const [rawPub, py, isbn, f, n] of ed.v || []) {
 			const pub = (rawPub || "").replace(/[\s,;:/]+$/, ""); // catalog punctuation: "Beacon Press,"
 			const yr = (py || "").match(/\d{4}/)?.[0];
-			const p = [pub, yr].filter(Boolean).join(", ");
-			if (p) parts.push({ t: p });
 			const num = pickIsbn(isbn) || isbnByWork.get(`${t.workKey}|${pub}|${yr}|${t.fmt}`);
-			if (num) parts.push({ isbn: num });
+			const label = [pub, yr].filter(Boolean).join(", ");
+			const same = eds.find((e) => (num && e.isbn === num) || (!num && e.label === label));
+			if (same) same.n += n;
+			else eds.push({ label, isbn: num, n });
 		}
-		if ((ed.f || []).length > 1) parts.push({ t: ed.f.map(([f]) => formatLabel(f)).join(" + ") });
+		// A title string shared by more than one format (an audiobook also listed
+		// as plain "Wuthering Heights") is one row here: say what else it holds.
+		const FMT_NOUN = { ebook: "ebook", audiobook: "audiobook", print: "print", largeprint: "large print" };
+		for (const [f, n] of (ed.f || []).slice(1)) parts.push({ t: `includes ${n.toLocaleString()} ${FMT_NOUN[f] || f} checkout${n === 1 ? "" : "s"}` });
 		// Where its checkouts came from ("checked out via OverDrive").
 		const via = (ed.s || []).map(([src]) => SOURCE[src] || src).join(", ");
 		if (via) parts.push({ t: `checked out via ${via}` });
-		// The same catalog title under other publisher names or years ("Penguin
-		// Publishing Group" for "Penguin Group (USA), Inc.").
-		const more = v.slice(1).map(([pub, py]) => [(pub || "").replace(/[\s,;:/]+$/, ""), (py || "").match(/\d{4}/)?.[0]].filter(Boolean).join(", "));
-		const first = parts[0]?.t;
-		return { parts, more: [...new Set(more)].filter((x) => x && x !== first) };
+		// One edition: it leads the line. Several: a short list under it, plus
+		// the rest (the build keeps the top four).
+		if (eds.length === 1) {
+			const [e] = eds;
+			parts.unshift(...[e.label && { t: e.label }, e.isbn && { isbn: e.isbn }].filter(Boolean));
+			return { parts, eds: [], rest: 0 };
+		}
+		const rest = eds.length > 1 ? Math.max(0, (t.total || 0) - eds.reduce((a, e) => a + e.n, 0)) : 0;
+		return { parts, eds, rest };
 	}
 	const isExpanded = (key) => expandedWorks.includes(key);
 	// While a filter is active, auto-expand any work with a matching edition so the
@@ -2495,13 +2507,17 @@
 							{#if subj.length}
 								<li class="bk-row bk-ed bk-subj"><span></span><span class="bk-subj-list">{#each subj as term, k}{@const g = genreFor(term)}{#if k}<span class="hd-sep" aria-hidden="true">{" · "}</span>{/if}{#if g}<button type="button" class="subj-genre" onclick={() => openGenre(g)} title="The most-borrowed {g} books">{term}</button>{:else if subjectPage(term)}<button type="button" class="subj-genre" onclick={() => openSubject(subjectPage(term))} title="The most-borrowed books on “{term}”">{term}</button>{:else}<a href={splSubjectUrl(term)} target="_blank" rel="noopener noreferrer" title="Find books on “{term}” at the Seattle Public Library">{term}</a>{/if}{/each}</span></li>
 							{/if}
-							{#each w.editions as t (t.idx)}
+							<!-- While filtering, only the matching editions (unless the book's own
+							     name matches, or groupings are being edited). -->
+							{@const onlyHits = filtering && !editMode && w.matchCount > 0 && w.matchCount < w.editions.length}
+							{#if onlyHits}<li class="bk-row bk-ed bk-ed-note"><span></span><span>Showing {w.matchCount} of {w.editions.length} editions matching “{titleFilter.trim()}”</span></li>{/if}
+							{#each onlyHits ? w.editions.filter((e) => e.match) : w.editions as t (t.idx)}
 								<li class="bk-row bk-ed" class:editing={editMode} class:hit={t.match} class:just-moved={movedIdx === t.idx} data-ed={t.idx}>
 									<input type="checkbox" class="bk-check"
 										checked={isSingleSelected(t.idx)}
 										onchange={() => keepTableStill(() => toggleTitle(t.idx))}
 										aria-label="Plot this edition on its own: {t.title}" />
-									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.parts.length}<span class="bk-ed-meta" title={em.more.length > 1 ? `Also listed as: ${em.more.join("; ")}` : undefined}>{#each em.parts as p, k}{#if k}{" · "}{/if}{#if p.isbn}ISBN <a href={isbnUrl(p.isbn)} target="_blank" rel="noopener noreferrer" title="Find this edition in the Seattle Public Library catalog">{p.isbn}</a>{:else}{p.t}{/if}{/each}{#if em.more.length}{" · "}also listed as {em.more[0]}{#if em.more.length > 1}{" "}and {em.more.length - 1} more{/if}{/if}</span>{/if}{/if}</span>
+									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.parts.length}<span class="bk-ed-meta">{#if em.eds.length}{em.eds.length} editions under this title{" · "}{/if}{#each em.parts as p, k}{#if k}{" · "}{/if}{#if p.isbn}ISBN <a href={isbnUrl(p.isbn)} target="_blank" rel="noopener noreferrer" title="Find this edition in the Seattle Public Library catalog">{p.isbn}</a>{:else}{p.t}{/if}{/each}</span>{/if}{#if em.eds.length}<span class="bk-ed-list">{#each em.eds as e}<span class="bk-ed-item">{e.label || "Unknown publisher"}{#if e.isbn}{" · "}ISBN <a href={isbnUrl(e.isbn)} target="_blank" rel="noopener noreferrer" title="Find this edition in the Seattle Public Library catalog">{e.isbn}</a>{/if}{" · "}{e.n.toLocaleString()}</span>{/each}{#if em.rest >= SMALL_TOTAL}<span class="bk-ed-item">Other editions · {em.rest.toLocaleString()}</span>{/if}</span>{/if}{/if}</span>
 									{#if editMode}
 										<span class="bk-ed-tools">
 											<select class="bk-move" aria-label="Move this edition to another book" onchange={(e) => { moveEdition(t.idx, e.currentTarget.value); e.currentTarget.value = ""; }}>
@@ -4916,6 +4932,10 @@
 	.bk-ed-title { white-space: normal; overflow-wrap: anywhere; }
 	.bk-ed-meta a { color: inherit; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 2px; }
 	.bk-ed-meta a:hover { text-decoration-color: currentColor; }
+	.bk-ed-note { font-family: var(--font-sans); font-size: 12px; color: var(--color-fg-light); font-style: italic; }
+	.bk-ed-list { display: block; margin: 3px 0 0; padding-left: 10px; border-left: 2px solid var(--color-border); font-family: var(--font-sans); font-size: 12px; line-height: 1.5; color: var(--color-fg-light); white-space: normal; }
+	.bk-ed-item { display: block; }
+	.bk-ed-list a { color: inherit; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 2px; }
 	.bk-ed-meta { display: block; margin-top: 2px; font-family: var(--font-sans); font-size: 12px; line-height: 1.4; color: var(--color-fg-light); white-space: normal; }
 	.ed-callout { display: flex; align-items: center; gap: 6px; margin: 18px auto 0; padding: 8px 16px; border: 1px solid var(--color-border); border-radius: 999px; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); cursor: pointer; }
 	.ed-callout:hover { border-color: var(--color-fg-light); }
