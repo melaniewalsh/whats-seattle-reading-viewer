@@ -654,12 +654,16 @@ def annotate_editions(con, out_dir, slug_by_author, base_select):
     Isolated post-pass: if the raw files lack these columns, the build carries on."""
     authors_dir = out_dir / "authors"
     t0 = perf_counter()
+    # Not every raw file has every column (the build's files have no ISBN), so
+    # a missing one is just NULL. ed_* names: an alias that matches a raw
+    # column ("isbn" vs ISBN) trips DuckDB's lateral-alias rules.
+    have = {r[0].lower() for r in con.execute("DESCRIBE raw").fetchall()}
+    col = lambda c: f"CAST({c} AS VARCHAR)" if c.lower() in have else "CAST(NULL AS VARCHAR)"
+    print(f"  edition columns: {', '.join(c for c in ('CheckoutType', 'Publisher', 'PublicationYear', 'ISBN') if c.lower() in have)}", flush=True)
     sel = base_select.replace(
         "Subjects AS subjects",
-        # ed_* names: an alias that matches a raw column ("isbn" vs ISBN) trips
-        # DuckDB's lateral-alias rules.
-        "Subjects AS subjects, CAST(CheckoutType AS VARCHAR) AS ed_src, CAST(Publisher AS VARCHAR) AS ed_pub, "
-        "CAST(PublicationYear AS VARCHAR) AS ed_py, CAST(ISBN AS VARCHAR) AS ed_isbn",
+        f"Subjects AS subjects, {col('CheckoutType')} AS ed_src, {col('Publisher')} AS ed_pub, "
+        f"{col('PublicationYear')} AS ed_py, {col('ISBN')} AS ed_isbn",
     )
     if sel == base_select:
         raise RuntimeError("could not extend the base select")
