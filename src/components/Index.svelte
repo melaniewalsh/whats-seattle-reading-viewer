@@ -577,7 +577,7 @@
 			</header>
 			<!-- New visitors: a short guided story of what the data is and how to read it. -->
 			<div class="tour-banner">
-				<p><strong>New here?</strong> A short guided tour of the data: what it is, how to read the charts, and what to keep in mind.</p>
+				<p>Take a short guided tour of this website and how to use it.</p>
 				<button type="button" class="tour-btn" onclick={() => go("guide")}>Take the tour →</button>
 			</div>
 			<!-- The site's sections, each with a picture of what you'll find. -->
