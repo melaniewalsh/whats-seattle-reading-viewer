@@ -78,7 +78,7 @@
 									{/if}
 								</button>
 								<span class="tw-text">
-									<button class="tw-title" title="See this book's checkout trend" onclick={() => openTitle(r[0], r[2])}>{titleCase(cleanWorkTitle(r[0]))}</button>
+									<button class="tw-title" title="See this book's checkout trend" onclick={() => openTitle(r[0], r[2])}>{titleCase(cleanWorkTitle(r[0]))}{#if r[5]}{" "}<span class="pub-year">({r[5]})</span>{/if}</button>
 									<span class="tw-by">by {#if r[2]}<button class="tw-authorlink" title="See this author's checkout trend" onclick={() => openAuthor(r[2])}>{displayName(r[1])}</button>{:else}{displayName(r[1])}{/if}</span>
 								</span>
 							</div>
@@ -119,6 +119,7 @@
 	}
 	.tw-text { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; }
 	.tw-title { display: block; font: inherit; font-weight: 700; color: var(--color-fg); background: none; border: none; padding: 0; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+	.pub-year { font-weight: 400; color: var(--color-fg-light); }
 	.tw-title:hover { text-decoration-color: var(--color-fg-light); }
 	.tw-by { display: inline-block; margin-top: 1px; font-size: 0.82rem; font-weight: 500; color: var(--color-fg-light); }
 	.tw-authorlink { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }

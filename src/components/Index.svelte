@@ -8,15 +8,18 @@
 	import TopAuthors from "$components/TopAuthors.svelte";
 	import TopWorks from "$components/TopWorks.svelte";
 	import SubjectList from "$components/SubjectList.svelte";
+	import Guide from "$components/Guide.svelte";
+	import DataStatus from "$components/DataStatus.svelte";
 	import NortonExplorer from "$components/NortonExplorer.svelte";
 	import BacklistBoomerangs from "$components/BacklistBoomerangs.svelte";
 	import TrendingUp from "@lucide/svelte/icons/trending-up";
+	import Compass from "@lucide/svelte/icons/compass";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import SiteSearch from "$components/SiteSearch.svelte";
 	import { cleanTitleForDisplay } from "$utils/workTitle.js";
 	import { displayName } from "$utils/displayName.js";
 	import { MediaQuery } from "svelte/reactivity";
-	import { getMonths, getAuthor, searchTitles, searchAll, densify, randomAuthor } from "$components/db.js";
+	import { getMonths, getAuthor, searchTitles, searchAll, densify } from "$components/db.js";
 	import { coverUrl } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
 	import { compactNumber } from "$utils/format.js";
@@ -34,7 +37,8 @@
 	// The browser-tab title names what's on screen ("Octavia E. Butler · What’s
 	// Seattle Reading?"); the home page uses the site name alone.
 	const TAB_TITLES = { overview: "Overview", genres: "Genre Trends", backlist: "Backlist Boomerangs",
-		about: "About the Project", publications: "Publications", norton: "Canonical American Authors" };
+		about: "About the Project", publications: "Publications", norton: "Canonical American Authors",
+		guide: "How to Read the Data" };
 	const docTitle = $derived.by(() => {
 		let page = "";
 		if (tab === "search") page = compareMode ? searchText.split(", ").join(" vs. ") : searchText;
@@ -45,18 +49,14 @@
 	});
 
 	// "Featured trend of the month" on the home hub: this month, The Odyssey.
-	// "Last updated" = the most recent month present in the data.
-	const MONTHS_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-	let lastUpdated = $state("");
-	onMount(async () => {
-		try {
-			const months = await getMonths();
-			const last = months[months.length - 1];
-			if (last) {
-				const [y, mo] = last.split("-");
-				lastUpdated = `${MONTHS_FULL[Number(mo) - 1]} ${y}`;
-			}
-		} catch {}
+
+	// The last month in the data ("August 2026"), for the dek.
+	let dataThrough = $state("");
+	onMount(() => {
+		getMonths().then((m) => {
+			const last = m?.[m.length - 1];
+			if (last) dataThrough = new Date(Date.UTC(+last.slice(0, 4), +last.slice(5, 7) - 1, 15)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+		}).catch(() => {});
 	});
 
 	let featured = $state.raw(null);
@@ -206,6 +206,7 @@
 			else if (t === "spl500") tab = "spl500";
 			else if (t === "backlist" || t === "boomers" || t === "boomerangs") tab = "backlist";
 			else if (t === "overview" || t === "all") tab = "overview";
+			else if (t === "guide") tab = "guide";
 			else if (t === "subject" && params.get("subject")) { tab = "subject"; subjectSlug = params.get("subject"); }
 			else tab = "home";
 		} catch {}
@@ -328,63 +329,6 @@
 	// --- Search (the field on the Checkout Trends page) ------------------------
 	let pageSearch = $state(null);
 	const phone = new MediaQuery("max-width: 600px"); // shorter placeholder on phones
-	let homeSearch = $state(null);
-	// Starting points under the home page's search field.
-	const HOME_TRY = [
-		{ label: "Sally Rooney", slug: "sally-rooney" },
-		{ label: "Wuthering Heights", slug: "emily-bronte-1818", title: "Wuthering Heights" },
-		{ label: "Colleen Hoover", slug: "colleen-hoover" },
-		{ label: "Becoming", slug: "michelle-obama-1964", title: "Becoming" },
-	];
-	// The home search box's starting comparison (Enter to run it), a nod to
-	// the Ngram Viewer's default. A different pair on each visit.
-	const HOME_PAIRS = [
-		[["Ulysses", "w~james-joyce-1882~Ulysses"], ["Mrs. Dalloway", "w~virginia-woolf-1882~Mrs. Dalloway"]],
-		[["Parable of the Sower", "w~octavia-e-butler~Parable of the Sower"], ["Neuromancer", "w~william-gibson-1948~Neuromancer"]],
-		[["Wuthering Heights", "w~emily-bronte-1818~Wuthering Heights"], ["Pride and Prejudice", "w~jane-austen-1775~Pride and Prejudice"]],
-		[["Sally Rooney", "a~sally-rooney"], ["Ben Lerner", "a~ben-lerner-1979"]],
-		[["Beverly Cleary", "a~beverly-cleary"], ["Judy Blume", "a~judy-blume"]],
-		[["1984", "w~george-orwell-1903~1984"], ["Brave New World", "w~aldous-huxley-1894~Brave New World"]],
-		[["Kindred", "w~octavia-e-butler~Kindred"], ["The Fifth Season", "w~n-k-jemisin~The Fifth Season"]],
-		[["The Fire Next Time", "w~james-baldwin-1924~The Fire Next Time"], ["Between the World and Me", "w~ta-nehisi-coates~Between the World and Me"]],
-		[["So You Want to Talk About Race", "w~ijeoma-oluo~So You Want to Talk about Race"], ["White Fragility", "w~robin-j-diangelo~White Fragility"]],
-	];
-	let homePair = $state(HOME_PAIRS[0]);
-	const HOME_COMPARE = $derived(homePair.map(([label]) => label).join(", "));
-	onMount(() => {
-		homePair = HOME_PAIRS[Math.floor(Math.random() * HOME_PAIRS.length)];
-	});
-	// The single picks after it: three, none already in the pair.
-	const homeTryShown = $derived(HOME_TRY.filter((t) => !homePair.some(([label]) => label === t.label)).slice(0, 3));
-	// The "Try" row stays on one line, as wide as the search box: it shows as
-	// many of the single picks as fit at this width (re-fit on resize).
-	let tryRow = $state(null);
-	let tryWidth = $state(0);
-	let tryFit = $state(3);
-	const tryWraps = () => {
-		if (!tryRow) return false;
-		if (tryRow.scrollWidth > tryRow.clientWidth + 1) return true; // one line, too long
-		const kids = [...tryRow.children].filter((el) => el.offsetParent);
-		return kids.length > 1 && kids[kids.length - 1].offsetTop > kids[0].offsetTop + 4;
-	};
-	$effect(() => {
-		tryWidth; homePair; // re-fit when these change
-		if (!tryRow) return;
-		let cancelled = false; // a newer re-fit (or unmount) stops this one
-		(async () => {
-			tryFit = homeTryShown.length;
-			await tick();
-			while (!cancelled && tryFit > 0 && tryWraps()) {
-				tryFit--;
-				await tick();
-			}
-		})();
-		return () => (cancelled = true);
-	});
-	async function homeSurprise() {
-		const a = await randomAuthor();
-		if (a) openAuthor(a.slug);
-	}
 	let cmp = $state(null); // the compare view, when it's showing
 	let compareMode = $state(false);
 
@@ -397,8 +341,6 @@
 	function remember(label, id) {
 		if (label && id) knownIds.set(label.trim().toLowerCase(), id);
 	}
-	// The home box's starter pairs resolve to these exact books.
-	HOME_PAIRS.flat().forEach(([label, id]) => remember(label, id));
 	const labelOfRes = (r) => (r.kind === "work" ? cleanTitleForDisplay(r.title) || r.title : displayName(r.name));
 	// Split on commas, but not inside a name we already know has one.
 	function splitNames(text) {
@@ -473,10 +415,6 @@
 	// jump to its field.
 	function navSearch() {
 		menuOpen = false;
-		if (tab === "home" && homeSearch) {
-			window.scrollTo({ top: 0 });
-			return homeSearch.focus(true);
-		}
 		if (tab === "search") focusSearch();
 		else go("search");
 	}
@@ -484,6 +422,24 @@
 
 	// Open the Most Borrowed works ranking filtered to a genre, all-time (used by
 	// the "#N in Genre" badges on a searched work).
+	// Home page cards: each section with a screenshot (static/home/) and a line on what it's for.
+	const HOME_CARDS = [
+		{ title: "Checkout Trends", img: "home/trends.jpg", text: "Look up any author or book and see its checkouts month by month since 2006, or compare several.", go: "Start exploring", open: () => go("search") },
+		{ title: "Most Borrowed", img: "home/borrowed.jpg", text: "The books and authors checked out most, by year and by genre.", go: "Start exploring", open: () => go("rankings") },
+		{ title: "Genres", img: "home/genres.jpg", text: "How the popularity of romance, fantasy, mystery and other genres has changed.", go: "Start exploring", open: () => go("genres") },
+		{ title: "Backlist Boomerangs", img: "home/backlist.jpg", text: "Books that suddenly became popular again, years after they first circulated.", go: "Start exploring", open: () => go("backlist") },
+		{ title: "Overview", img: "home/overview.jpg", text: "Every checkout at the library, and the shift from print to ebooks and audiobooks.", go: "Start exploring", open: () => goOverview() },
+		{ title: "Case Studies", img: "home/essays.jpg", text: "Essays and research that use this data, from the literary canon to the most-borrowed novels.", go: "Read the essays", href: "https://essays.whats-seattle-reading.com/" }
+	];
+
+	// Guide links ({ tab } / { author } / { compare }) open that part of the site.
+	function guideNavigate(link) {
+		if (link.author) return openAuthor(link.author);
+		if (link.compare) return showCompare(link.compare);
+		if (link.tab === "works") { rankKind = "works"; return go("rankings"); }
+		go(link.tab);
+	}
+
 	// A subject heading's page of most-borrowed books (?tab=subject&subject=<slug>).
 	let subjectSlug = $state("");
 	let subjectLabel = $state("");
@@ -518,7 +474,7 @@
 
 <svelte:head><title>{docTitle}</title></svelte:head>
 
-<svelte:boundary onerror={(e) => console.error(e)}>
+<svelte:boundary onerror={(e) => console.error(String(e?.stack || e))}>
 	{#snippet failed()}
 		<div class="view-error" role="alert">
 			<p>Something went wrong. <button type="button" onclick={() => location.reload()}>Reload the page</button></p>
@@ -566,6 +522,7 @@
 				<button class="menu-link menu-ic" onclick={() => go("backlist")}><span class="menu-lucide" aria-hidden="true"><TrendingUp size={20} strokeWidth={2.4} /></span>Backlist Boomerangs</button>
 				<button class="menu-link menu-ic" onclick={() => go("search")}><img src="{base}/hub-search.png" alt="" width="22" height="22" />Search</button>
 				<button class="menu-link menu-ic" onclick={() => go("genres")}><img src="{base}/hub-genres.png" alt="" width="22" height="22" />Genres</button>
+				<button class="menu-link menu-ic" onclick={() => go("guide")}><span class="menu-lucide" aria-hidden="true"><Compass size={20} strokeWidth={2.4} /></span>How to Read the Data</button>
 			</div>
 			<div class="menu-group">
 				<h3 class="menu-h">Case Studies</h3>
@@ -585,7 +542,7 @@
 		<!-- One view failing shows a message instead of blanking the page; the
 		     masthead and menu stay, and switching views starts fresh. -->
 		{#key tab}
-		<svelte:boundary onerror={(e) => console.error(e)}>
+		<svelte:boundary onerror={(e) => console.error(String(e?.stack || e))}>
 		{#snippet failed(error, reset)}
 			<div class="view-error" role="alert">
 				<p>Something went wrong loading this page.</p>
@@ -611,6 +568,8 @@
 			{:else}
 				<TopAuthors {openAuthor} {rankKind} {setRankKind} />
 			{/if}
+		{:else if tab === "guide"}
+			<Guide onNavigate={guideNavigate} />
 		{:else if tab === "subject"}
 			<SubjectList slug={subjectSlug} {openTitle} {openAuthor} onLoaded={(l) => (subjectLabel = l)} />
 		{:else if tab === "backlist"}
@@ -621,58 +580,31 @@
 					<img class="hero-logo" src="{base}/favicon.png" alt="" width="56" height="56" />
 					<h1>{copy.title}</h1>
 				</div>
-				<p class="dek">{copy.dek}</p>
+				<!-- "...until August 2026", with the days to the next monthly update beside it. -->
+				<p class="dek">{dataThrough ? copy.dek.replace(/today$/, dataThrough) : copy.dek} <DataStatus inline /></p>
 			</header>
-			<!-- The most eye-catching thing up top: what Seattle borrowed most last
-			     month, with a link into the full Most Borrowed view. -->
-			<!-- Looking something up is what most people come to do, so the search
-			     field leads the home page (the Explore cards follow). -->
-			<div class="home-search">
-				<!-- Starts with a comparison, a nod to the Google Books Ngram Viewer's
-				     default: press Enter to see it, or type over it. -->
-				<SiteSearch bind:this={homeSearch} multi example={HOME_COMPARE} onPick={pickSearch} onSubmit={submitSearch} placeholder={phone.current ? "Search any author or book" : "Search any author or book (add commas to compare)"} />
-				<p class="home-try" bind:this={tryRow} bind:clientWidth={tryWidth}>
-					<span class="ht-lead">Try</span>
-					<!-- First: the comparison already in the box, one click away (in
-					     case it isn't obvious that Enter runs it). -->
-					<button class="ht-link" onclick={() => showCompare(homePair.map(([, id]) => id))}>{homePair.map(([label]) => label).join(" vs. ")}</button>
-					{#each homeTryShown.slice(0, tryFit) as t}<span class="ht-sep ht-extra" aria-hidden="true">·</span><button class="ht-link ht-extra" class:is-title={!!t.title} onclick={() => (t.title ? openTitle(t.title, t.slug) : openAuthor(t.slug))}>{t.label}</button>{/each}
-					<span class="ht-sep" aria-hidden="true">·</span>
-					<button class="ht-link ht-surprise" onclick={homeSurprise}>Surprise me</button>
-				</p>
+			<!-- New visitors: a short guided story of what the data is and how to read it. -->
+			<div class="tour-banner">
+				<p>Take a short guided tour of this website and how to use it.</p>
+				<button type="button" class="tour-btn" onclick={() => go("guide")}>Take the tour →</button>
 			</div>
-			<section class="home-topworks" aria-label="Most borrowed this year">
-				<TopWorks {openAuthor} {openTitle} embedded onSeeAll={() => go("rankings")} />
-			</section>
-			<nav class="hub" aria-label="Explore">
-				<button class="hub-card" onclick={goOverview}>
-					<img class="hub-emoji hub-img" src="{base}/hub-overview.png" alt="" width="34" height="34" />
-					<span class="hub-h">Overview</span>
-					<span class="hub-d">Total checkouts across the entire library, broken down by format.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
-				<button class="hub-card" onclick={() => go("rankings")}>
-					<img class="hub-emoji hub-img" src="{base}/hub-borrowed.png" alt="" width="34" height="34" />
-					<span class="hub-h">Most Borrowed</span>
-					<span class="hub-d">The books and authors most checked out, broken down by year and genre.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
-				<button class="hub-card" onclick={() => go("backlist")}>
-					<span class="hub-emoji hub-lucide" aria-hidden="true"><TrendingUp size={32} strokeWidth={2.2} /></span>
-					<span class="hub-h">Backlist Boomerangs</span>
-					<span class="hub-d">Books that became popular again, years after they were first checked out.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
-				<button class="hub-card" onclick={() => go("genres")}>
-					<span class="hub-emoji hub-icons" aria-hidden="true">
-						<img class="hub-img" src="{base}/hub-genres.png" alt="" width="34" height="34" />
-						<img class="hub-img hub-img-sm" src="{base}/hub-heart.png" alt="" width="34" height="34" />
-						<img class="hub-img hub-img-ghost" src="{base}/hub-ghost.png" alt="" width="34" height="34" />
-					</span>
-					<span class="hub-h">Genres</span>
-					<span class="hub-d">Popularity of certain genres over time—historical fiction, romance, horror, etc.</span>
-					<span class="hub-go">Explore →</span>
-				</button>
+			<!-- The site's sections, each with a picture of what you'll find. -->
+			<nav class="cards" aria-label="Explore">
+				{#each HOME_CARDS as c (c.title)}
+					{#if c.href}
+						<a class="card" href={c.href}>
+							<h2 class="card-h">{c.title}</h2>
+							<img class="card-img" src="{base}/{c.img}" alt="" width="800" height="500" loading="lazy" />
+							<span class="card-foot"><span class="card-d">{c.text}</span><span class="card-go">{c.go}&nbsp;<ExtArrow /></span></span>
+						</a>
+					{:else}
+						<button class="card" onclick={c.open}>
+							<h2 class="card-h">{c.title}</h2>
+							<img class="card-img" src="{base}/{c.img}" alt="" width="800" height="500" loading="lazy" />
+							<span class="card-foot"><span class="card-d">{c.text}</span><span class="card-go">{c.go} →</span></span>
+						</button>
+					{/if}
+				{/each}
 			</nav>
 
 			{#if featured}
@@ -828,26 +760,34 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		</details>
 		{/if}
 
-			<!-- Pages with a chart already credit (and link) the data under it. -->
-			{#if !["search", "overview", "genres"].includes(tab)}
-			<p class="cf-source">
-				Data source:
-				<a
-					href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6"
-					target="_blank"
-					rel="noopener"
-				>Seattle Public Library — Checkouts by Title</a>
-				(2006–2026)
-			</p>
-			{/if}
-			<p class="cf-attr">
-				What’s Seattle Reading?
-				<span class="cf-sep">·</span>
-				<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a>
-				{#if lastUpdated}<span class="cf-sep">·</span> Last updated: {lastUpdated}{/if}
-				<span class="cf-sep">·</span>
-				<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Share feedback</a>
-			</p>
+
+
+		</footer>
+		<!-- Site footer: a full-width band with the project, its sections and links. -->
+		<footer class="site-footer">
+			<div class="sf-inner">
+				<div class="sf-brand">
+					<button type="button" class="sf-logo" onclick={() => go("home")}><img src="{base}/favicon.png" alt="" width="44" height="44" /><span>What’s Seattle Reading?</span></button>
+					<p>Two decades of borrowing at the Seattle Public Library. A project at the University of Washington Information School.</p>
+					<p class="sf-small">Data: <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener">Seattle Public Library, Checkouts by Title</a><br /><DataStatus compact /><br /><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a></p>
+				</div>
+				<nav class="sf-col" aria-label="Explore">
+					<h3>Explore</h3>
+					<button type="button" onclick={goOverview}>Overview</button>
+					<button type="button" onclick={() => go("search")}>Checkout Trends</button>
+					<button type="button" onclick={() => go("rankings")}>Most Borrowed</button>
+					<button type="button" onclick={() => go("genres")}>Genres</button>
+					<button type="button" onclick={() => go("backlist")}>Backlist Boomerangs</button>
+					<button type="button" onclick={() => go("guide")}>How to Read the Data</button>
+				</nav>
+				<nav class="sf-col" aria-label="Project">
+					<h3>Project</h3>
+					<button type="button" onclick={() => go("about")}>About the Project</button>
+					<button type="button" onclick={() => go("publications")}>Publications</button>
+					<a href="https://essays.whats-seattle-reading.com/">Case Studies&nbsp;<ExtArrow /></a>
+					<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Share feedback&nbsp;<ExtArrow /></a>
+				</nav>
+			</div>
 		</footer>
 	</article>
 </svelte:boundary>
@@ -858,28 +798,12 @@ You can manually adjust the clustering in the works table at the bottom of the p
 	.view-error button { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 	/* One shared content width for every tab, so Search / Genres / Most Borrowed
 	   all line up at the same width and left edge. */
+	/* No bottom padding: the full-width footer ends the page. */
 	article {
 		max-width: 1008px;
 		margin: 0 auto;
-		padding: 0 24px 80px;
+		padding: 0 24px;
 	}
-	/* Home search: centered under the title, the page's first thing to do. */
-	/* As wide as the title: the box gets the h1's font size (the clamp below
-	   matches .hero h1) and a width in em, so the two scale together. The
-	   search and "Try" text set their own sizes, so this only sets the width. */
-	.home-search { font-size: clamp(2.3rem, 6vw, 3.6rem); width: 11.4em; max-width: 100%; margin: 22px auto 34px; }
-	.home-search :global(.ss) { max-width: none; height: 52px; }
-	.home-try { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 7px; margin: 12px 0 0; font-family: var(--font-sans); font-size: 14.5px; color: var(--color-fg-light); }
-	.ht-lead::after { content: ":"; }
-	.ht-sep { color: var(--color-gray-300, #c8c8c8); }
-	.ht-link { padding: 0; border: 0; background: none; font: inherit; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
-	.ht-link:hover { text-decoration-color: currentColor; }
-	.ht-link.is-title { font-style: italic; }
-	.ht-link.ht-surprise { color: var(--color-fg-light); }
-	/* Phones: one suggestion and "Surprise me". */
-	@media (max-width: 600px) { .ht-extra { display: none; } }
-	/* Wider screens: the one line runs the full width of the search box. */
-	@media (min-width: 601px) { .home-try { flex-wrap: nowrap; justify-content: space-between; white-space: nowrap; } }
 	/* Landing hub — title / subtitle / byline, then a grid of section cards. */
 	.hero {
 		max-width: 720px;
@@ -913,7 +837,7 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		font-size: clamp(1.05rem, 2.2vw, 1.25rem);
 		line-height: 1.4;
 		color: var(--color-fg-light);
-		/* Same width as the search field below (.home-search: 11.4em of the title size). */
+		/* About as wide as the title (11.4em of the title size). */
 		max-width: calc(11.4 * clamp(2.3rem, 6vw, 3.6rem));
 		margin: 0 auto;
 	}
@@ -1032,61 +956,25 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		color: #3f88cc;
 		text-decoration: underline;
 	}
-	/* Home "most borrowed last month" strip, above the hub cards — boxed like the
-	   featured-trend card. */
-	.home-topworks {
-		max-width: 880px;
-		margin: 40px auto 10px;
-		padding: 22px 24px 24px;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md, 12px);
-		background: var(--color-white);
+
+	/* "New here?" banner above the cards. */
+	.tour-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; max-width: 880px; margin: 34px auto 0; padding: 16px 22px; border-radius: 10px; background: #eef1f4; font-family: var(--font-sans); }
+	.tour-banner p { margin: 0; font-size: 1rem; line-height: 1.45; color: var(--color-fg); }
+	.tour-btn { flex: none; padding: 9px 16px; border: 1.5px solid var(--color-fg); border-radius: 8px; background: #fff; font: inherit; font-size: var(--text-sm); font-weight: 700; color: var(--color-fg); cursor: pointer; }
+	.tour-btn:hover { background: var(--color-fg); color: #fff; }
+	/* Section cards (like the Atlas of Economic Complexity's home page). */
+	.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; max-width: 880px; margin: 24px auto 10px; }
+	.card { display: flex; flex-direction: column; gap: 14px; padding: 22px 22px 20px; border: 1px solid var(--color-border); border-radius: 10px; background: #fafaf9; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06); text-align: left; text-decoration: none; color: inherit; font: inherit; cursor: pointer; transition: box-shadow 0.15s, transform 0.15s; }
+	.card:hover { box-shadow: 0 8px 26px rgba(0, 0, 0, 0.12); transform: translateY(-2px); }
+	.card-h { margin: 0; font-family: var(--font-sans); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-fg); }
+	.card-img { width: 100%; height: auto; aspect-ratio: 8 / 5; object-fit: cover; object-position: top; border: 1px solid var(--color-border); border-radius: 6px; background: #fff; }
+	.card-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+	.card-d { font-family: var(--font-sans); font-size: 1rem; line-height: 1.45; color: var(--color-fg-light); }
+	.card-go { flex: none; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 700; color: #3f88cc; white-space: nowrap; }
+	@media (max-width: 700px) {
+		.cards { grid-template-columns: 1fr; gap: 18px; }
+		.card-foot { flex-direction: column; align-items: flex-start; gap: 8px; }
 	}
-	.hub {
-		max-width: 880px;
-		margin: 28px auto 10px;
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 16px;
-	}
-	/* With an odd number of cards, let the last one span the row. */
-	.hub-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
-	@media (max-width: 620px) {
-		.hub { grid-template-columns: 1fr; }
-	}
-	.hub-card {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 6px;
-		text-align: left;
-		padding: 22px;
-		border: 1px solid var(--color-border);
-		border-radius: 14px;
-		background: var(--color-white);
-		cursor: pointer;
-		font-family: var(--font-sans);
-		transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
-	}
-	.hub-card:hover {
-		border-color: var(--color-fg-light);
-		box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
-		transform: translateY(-2px);
-	}
-	.hub-emoji { font-size: 1.7rem; line-height: 1; }
-	.hub-lucide { display: inline-flex; color: #e3120b; }
-	.hub-img { width: 2rem; height: 2rem; object-fit: contain; }
-	.hub-icons { display: inline-flex; align-items: center; gap: 0.35rem; }
-	.hub-img-sm { width: 1.4rem; height: 1.4rem; }
-	.hub-img-ghost { width: 1.7rem; height: 1.7rem; }
-	.hub-h {
-		font-family: var(--font-display, var(--font-serif));
-		font-size: 1.4rem;
-		font-weight: 700;
-		color: var(--color-fg);
-	}
-	.hub-d { font-size: var(--text-base); line-height: 1.45; color: var(--color-fg-light); }
-	.hub-go { margin-top: 4px; font-size: var(--text-sm); font-weight: 700; color: #3f88cc; }
 	/* About page — project details, moved off the landing. */
 	.about-page {
 		max-width: 680px;
@@ -1671,5 +1559,20 @@ You can manually adjust the clustering in the works table at the bottom of the p
 		background: #fff3bf;
 		box-shadow: 0 0 0 4px #fff3bf;
 		border-radius: 2px;
+	}
+	/* Full-width footer band. */
+	.site-footer { width: 100vw; margin: 56px 0 0 calc(50% - 50vw); background: #ececea; font-family: var(--font-sans); }
+	.sf-inner { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 32px; max-width: 1040px; margin: 0 auto; padding: 44px 24px 52px; }
+	.sf-logo { display: inline-flex; align-items: center; gap: 12px; padding: 0; border: 0; background: none; font-family: var(--font-display, var(--font-serif)); font-size: 1.5rem; font-weight: 700; color: var(--color-fg); cursor: pointer; }
+	.sf-brand p { margin: 14px 0 0; max-width: 34em; font-size: var(--text-sm); line-height: 1.55; color: var(--color-fg); }
+	.sf-brand .sf-small { color: var(--color-fg-light); }
+	.sf-brand a { color: inherit; }
+	.sf-col { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; }
+	.sf-col h3 { margin: 4px 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-fg-light); }
+	.sf-col button, .sf-col a { padding: 0; border: 0; background: none; font: inherit; font-size: var(--text-sm); letter-spacing: 0.02em; color: var(--color-fg); text-decoration: none; cursor: pointer; text-align: left; }
+	.sf-col button:hover, .sf-col a:hover { text-decoration: underline; text-underline-offset: 3px; }
+	@media (max-width: 700px) {
+		.sf-inner { grid-template-columns: 1fr 1fr; padding: 34px 16px 40px; }
+		.sf-brand { grid-column: 1 / -1; }
 	}
 </style>

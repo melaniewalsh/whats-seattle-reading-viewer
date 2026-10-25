@@ -10,6 +10,8 @@
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import TableIcon from "@lucide/svelte/icons/table";
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
+	import ArrowDownIcon from "@lucide/svelte/icons/arrow-down";
+	import LayersIcon from "@lucide/svelte/icons/layers";
 	import GlobeIcon from "@lucide/svelte/icons/globe";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import ChartAreaIcon from "@lucide/svelte/icons/chart-area";
@@ -74,7 +76,7 @@
 	let groupIdCounter = 0; // increasing id source for groups
 	let singleIdxs = $state([]); // editions plotted on their own
 	let titleFilter = $state(""); // text filter for the title list
-	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = stacked by title
+	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = one line per book; 'format' = print / ebook / audiobook; 'edition' = one line per edition
 	let titleSort = $state("work"); // 'work' = editions grouped by work; 'borrowed' = most checkouts; 'alpha' = A–Z
 	let workOrder = $state("checkouts"); // in 'work' mode, order the works by 'checkouts' (total, default) or 'name' (A–Z)
 	let workOrderFlip = $state(false); // reversed: fewest checkouts first / Z–A
@@ -93,6 +95,7 @@
 	// of a cluster). Empty = pure auto-clustering.
 	let workAssign = $state.raw({});
 	let legendHoverKey = $state(null); // legend entry being hovered -> lights up its band on the chart
+	let labelsOn = $state(true); // "first checkout" labels on an author's chart
 	let smoothOn = $state(true); // 3-month average lines (the tooltip still gives each month's count)
 	let customizeOpen = $state(false); // phones: the "Customize" panel (3-month average)
 	let searchedWork = $state(null); // { name, idxs } of the work searched in title mode, so "Total" can snap back to it
@@ -1441,6 +1444,48 @@
 	const hiddenWorkCount = $derived(Math.max(0, workBlocks.length - visibleWorkBlocks.length));
 
 	let expandedWorks = $state([]); // work keys currently expanded in the table
+	// Author pages: scroll to the Books table and put the cursor in its filter.
+	function showBooks() {
+		sideEl?.scrollIntoView({ behavior: "smooth", block: "start" });
+		setTimeout(() => sideEl?.querySelector(".bk-filter")?.focus({ preventScroll: true }), 400);
+	}
+	// "Looking for a specific edition?": open this book's editions in the table
+	// and scroll to them.
+	async function showEditions() {
+		const i = workBlocks.findIndex((w) => w.editions.some((e) => searchedWork?.idxs.includes(e.idx)));
+		if (i < 0) return;
+		const key = workBlocks[i].key;
+		if (!expandedWorks.includes(key)) expandedWorks = [...expandedWorks, key];
+		if (i >= BOOKS_PREVIEW) booksShowAll = true;
+		await tick();
+		document.querySelector(`[data-work="${CSS.escape(key)}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+	}
+	// What tells one edition from another (data-prep/build_data.py
+	// annotate_editions): publisher and year, ISBN, other formats, and where
+	// its checkouts came from.
+	// An ISBN opens that exact edition in the SPL catalog (digital editions included).
+	const isbnUrl = (isbn) => `https://seattle.bibliocommons.com/v2/search?query=${isbn}&searchType=keyword`;
+	const SOURCE = { Horizon: "a library copy", OverDrive: "OverDrive", Hoopla: "Hoopla", Freegal: "Freegal", Zinio: "Zinio" };
+	function editionMeta(t) {
+		const parts = [];
+		const ed = t.ed || {};
+		const v = ed.v || [];
+		if (v.length) {
+			const [rawPub, py, isbn] = v[0];
+			const pub = (rawPub || "").replace(/[\s,;:/]+$/, ""); // catalog punctuation: "Beacon Press,"
+			const yr = (py || "").match(/\d{4}/)?.[0];
+			const p = [pub, yr].filter(Boolean).join(", ");
+			if (p) parts.push({ t: p });
+			const num = (isbn || "").match(/\d{13}|\d{9}[\dXx]/)?.[0];
+			if (num) parts.push({ isbn: num });
+		}
+		if ((ed.f || []).length > 1) parts.push({ t: ed.f.map(([f]) => formatLabel(f)).join(" + ") });
+		// Where its checkouts came from ("checked out via OverDrive").
+		const via = (ed.s || []).map(([src]) => SOURCE[src] || src).join(", ");
+		if (via) parts.push({ t: `checked out via ${via}` });
+		const more = v.slice(1).map(([pub, py, isbn, f]) => [formatLabel(f), pub, (py || "").match(/\d{4}/)?.[0], isbn && `ISBN ${isbn}`].filter(Boolean).join(", "));
+		return { parts, more };
+	}
 	const isExpanded = (key) => expandedWorks.includes(key);
 	// While a filter is active, auto-expand any work with a matching edition so the
 	// highlighted rows are visible without a manual click.
@@ -1566,6 +1611,17 @@
 
 	// The year this book was the library's Seattle Reads pick, if it was.
 	const srYear = $derived(searchMode === "title" && headingText ? seattleReadsYear(headingText, currentSlug) : null);
+
+	// A book's original publication year (from Wikipedia, baked into the
+	// rankings by data-prep/fill_pub_years.py), shown after its title.
+	const pubYear = $derived.by(() => {
+		if (searchMode !== "title" || !topWorksData || !headingText || !current) return null;
+		const want = normalizeWorkKey(headingText), au = displayName(current.name).toLowerCase();
+		for (const g of Object.values(topWorksData.data || {}))
+			for (const lst of Object.values(g))
+				for (const r of lst) if (r[5] && normalizeWorkKey(r[0]) === want && displayName(r[1]).toLowerCase() === au) return r[5];
+		return null;
+	});
 
 	// In "By title" mode, the total checkouts of the single plotted title (summed
 	// over its editions). null when zero or several titles are shown -- then the
@@ -1801,6 +1857,52 @@
 		{ key: "ebook", label: "Ebook", format: "ebook", color: "#e58a00" },
 		{ key: "audiobook", label: "Audiobook", format: "audiobook", color: "#1f7a4d" }
 	];
+	// "By format" on an author or book page: print, ebook and audiobook lines.
+	// An edition's months are counted under its format; an edition record that
+	// mixes formats is split by its share of checkouts in each (ed.f).
+	const FMT_BUCKET = { print: "print", largeprint: "print", ebook: "ebook", audiobook: "audiobook" };
+	const formatSeries = $derived.by(() => {
+		if (!current || isOverview || !months.length) return [];
+		const idxs = searchMode === "title" && searchedWork ? searchedWork.idxs : current.titles.map((_, i) => i);
+		const sums = { print: new Array(months.length).fill(0), ebook: new Array(months.length).fill(0), audiobook: new Array(months.length).fill(0) };
+		for (const i of idxs) {
+			const t = current.titles[i];
+			if (!t?.series) continue;
+			const f = (t.ed?.f || []).filter(([k]) => FMT_BUCKET[k]);
+			const tot = f.reduce((a, [, n]) => a + n, 0);
+			const shares = tot ? f.map(([k, n]) => [FMT_BUCKET[k], n / tot]) : FMT_BUCKET[t.format] ? [[FMT_BUCKET[t.format], 1]] : [];
+			for (const [b, sh] of shares) t.series.forEach((v, m) => { if (v) sums[b][m] += v * sh; });
+		}
+		return OVERVIEW_FORMATS
+			.map((f) => ({ key: `f:${f.key}`, legendKey: `f:${f.key}`, label: f.label, color: f.color, values: sums[f.key].map(Math.round) }))
+			.filter((s) => s.values.some((v) => v > 0));
+	});
+	// "By edition": the most-borrowed editions as separate lines (a book page:
+	// that book's; an author page: across all their books). Editions under
+	// SMALL_TOTAL checkouts get no line of their own.
+	const EDITION_LINES = 8;
+	const editionSeries = $derived.by(() => {
+		if (!current || isOverview) return [];
+		const idxs = searchMode === "title" && searchedWork ? searchedWork.idxs : current.titles.map((_, i) => i);
+		return idxs
+			.filter((i) => (current.titles[i]?.total || 0) >= SMALL_TOTAL)
+			.sort((a, b) => current.titles[b].total - current.titles[a].total)
+			.slice(0, EDITION_LINES)
+			.map((i, k) => {
+				const t = current.titles[i];
+				const yr = (t.ed?.v?.[0]?.[1] || "").match(/\d{4}/)?.[0];
+				// The catalog title (minus "/ by ..."), so "(Unabridged)" and subtitles stay.
+				const name = t.title.split(" / ")[0].trim() || t.title;
+				const fmt = formatLabel(t.format);
+				return { key: `e${i}`, legendKey: `e${i}`, label: `${fmt.charAt(0).toUpperCase() + fmt.slice(1)} · ${titleCase(name)}${yr ? `, ${yr}` : ""}`, color: TITLE_COLORS[k % TITLE_COLORS.length], values: t.series };
+			})
+			// Two editions with the same label: add when each was first checked out.
+			.map((s, _, all) => {
+				if (all.filter((o) => o.label === s.label).length < 2) return s;
+				const f = s.values.findIndex((v) => v > 0);
+				return f < 0 ? s : { ...s, label: `${s.label} (from ${months[f].slice(0, 4)})` };
+			});
+	});
 	const overviewAreaSeries = $derived.by(() => {
 		if (!current || !current.formats) return [];
 		return OVERVIEW_FORMATS.map((f, i) => ({
@@ -1842,6 +1944,11 @@
 			// "By format": click a format (legend or line label) to show it alone.
 			const only = overviewAreaSeries.filter((s) => isolatedKeys.includes(s.key));
 			return only.length ? only : overviewAreaSeries;
+		}
+		if (chartMode === "format" || chartMode === "edition") {
+			const all = chartMode === "format" ? formatSeries : editionSeries;
+			const only = all.filter((s) => isolatedKeys.includes(s.key));
+			return only.length ? only : all;
 		}
 		if (chartMode === "line") {
 			// "Total" = a filled total area, plus any editions you clicked (overlaid
@@ -1885,6 +1992,7 @@
 		if (isOverview) {
 			return chartMode === "area" ? [...OVERVIEW_FORMATS].reverse().map((f) => ({ label: f.label, color: f.color, key: f.key })) : [];
 		}
+		if (chartMode === "format" || chartMode === "edition") return (chartMode === "format" ? formatSeries : editionSeries).map((s) => ({ label: s.label, color: s.color, key: s.key }));
 		// Build from the full PLOTTED set (not the isolation-filtered displaySeries)
 		// so the legend stays put while isolating -- the isolated entry just lights
 		// up and the rest dim, and you can click again to bring them back.
@@ -1950,20 +2058,20 @@
 	const brushStart = $derived(Math.min(firstActiveMonth(brushValues), yearLo));
 
 	// Book markers on an author's "Total" chart: the month each of their top
-	// three books was FIRST CHECKED OUT at SPL (not its publication or arrival
+	// five books was FIRST CHECKED OUT at SPL (not its publication or arrival
 	// date — the data can't tell us those). Skipped for books already circulating
 	// when the data begins, and for the author's very first book, whose marker
 	// would just sit at the left edge.
 	const MONTH_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-	const bookMarkers = $derived.by(() => {
+	const bookMarkersAll = $derived.by(() => {
 		if (!current || isOverview || searchMode === "title" || chartMode !== "line" || !months.length) return [];
 		const firstActive = current.series.findIndex((v) => v > 0);
 		return [...workGroups.values()]
 			.sort((a, b) => b.total - a.total)
-			.slice(0, 3)
-			// Only label books big enough to matter on the chart (>= 10% of the
+			.slice(0, 5)
+			// Only label books big enough to matter on the chart (>= 5% of the
 			// author's checkouts), not a small anthology that happens to be new.
-			.filter((w) => w.total >= current.total * 0.1)
+			.filter((w) => w.total >= current.total * 0.05)
 			.map((w) => ({ w, f: sumSeries(w.idxs).findIndex((v) => v > 0) }))
 			// Skip the first three years of data: older books' catalog records
 			// trickle in then, so a "first checkout" there isn't a real debut.
@@ -1973,6 +2081,7 @@
 				return { month: m, label: o.w.name, sub: `first checkout: ${yearlyView ? "" : MONTH_FULL[Number(m.slice(5, 7)) - 1] + " "}${m.slice(0, 4)}` };
 			});
 	});
+	const bookMarkers = $derived(labelsOn ? bookMarkersAll : []);
 
 	// Drop any pending timers when the view goes away (e.g. switching tabs).
 	onDestroy(() => {
@@ -2019,14 +2128,15 @@
 			     above the name. -->
 			{#if !isOverview && !tooSmall}
 				<div class="customize-row on-phone">
-					{#if !yearlyView}<button type="button" class="customize-btn" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>{/if}
+					{#if !yearlyView || bookMarkersAll.length}<button type="button" class="customize-btn" class:on={customizeOpen} aria-expanded={customizeOpen} onclick={() => (customizeOpen = !customizeOpen)}><SlidersIcon size={16} strokeWidth={2} aria-hidden="true" /> Customize</button>{/if}
 					{#if onCompare && currentSlug}
 						<button type="button" class="customize-btn" onclick={startCompare} title="Put another author or book on this chart"><PlusIcon size={16} strokeWidth={2.2} aria-hidden="true" /> Compare</button>
 					{/if}
 				</div>
-				{#if customizeOpen && !yearlyView}
+				{#if customizeOpen && (!yearlyView || bookMarkersAll.length)}
 					<div class="customize-panel on-phone">
-						<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
+						{#if !yearlyView}<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>{/if}
+						{#if bookMarkersAll.length}<label class="smooth-toggle"><input type="checkbox" bind:checked={labelsOn} /> Book labels</label>{/if}
 					</div>
 				{/if}
 			{/if}
@@ -2043,7 +2153,7 @@
 					<h2>{headingText}</h2>
 				{:else}
 					<div class="hd-name"><div class="h2-wrap" role="presentation" onmouseenter={wikiEnter} onmouseleave={wikiLeave}>
-						<h2 class="h2-hoverable" onclick={wikiActivate}>{headingText}</h2>
+						<h2 class="h2-hoverable" onclick={wikiActivate}>{headingText}{#if pubYear}{" "}<span class="hd-year">({pubYear})</span>{/if}</h2>
 						{#if wikiHover}
 							<span class="wiki-pop">
 								<WikiCard
@@ -2148,8 +2258,19 @@
 				>
 					{#if isOverview}<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" />{:else}<BookCopyIcon size={17} strokeWidth={2} aria-hidden="true" />{/if}<span class="mt-txt">{isOverview ? "By format" : "By book"}</span>
 				</button>
+				{#if !isOverview}
+					<!-- Print, ebook and audiobook as separate lines. -->
+					<button type="button" class:active={chartMode === "format"} onclick={() => { chartMode = "format"; isolatedKeys = []; }} title="By format" aria-label="By format">
+						<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">By format</span>
+					</button>
+					<!-- The most-borrowed editions, one line each. -->
+					<button type="button" class:active={chartMode === "edition"} onclick={() => { chartMode = "edition"; isolatedKeys = []; }} title="By edition" aria-label="By edition">
+						<LayersIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">By edition</span>
+					</button>
+				{/if}
 			</div>
 			{#if !yearlyView}<label class="smooth-toggle off-phone"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>{/if}
+			{#if bookMarkersAll.length}<label class="smooth-toggle off-phone"><input type="checkbox" bind:checked={labelsOn} /> Book labels</label>{/if}
 			{#if chartMode === "area" && isolatedKeys.length}
 				<!-- The way back after clicking a line's name to show it alone -->
 				<span class="iso-note">Showing {viewSeries.length} of {legendItems.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={clearIsolate}>Show all</button>{#if soloBook}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall iso-book" onclick={() => openTitle(soloBook, currentSlug)} title="Its own page: just this book's trend, editions and formats">Open this book's page →</button>{/if}</span>
@@ -2164,7 +2285,7 @@
 					<!-- The chart, its slider and source line share one white panel -->
 					<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 					<div class="chart-wrap" bind:this={chartWrap}>
-				<LineChart bind:plotInset months={chartData.months} series={chartData.series} yearly={yearlyView} lastMonth={months[months.length - 1]} unit={yearlyView ? "checkouts a year" : undefined} mode="line" smooth={smoothOn && !yearlyView} markers={bookMarkers} onSeriesClick={chartMode === "area" ? (k) => toggleIsolate(k) : null} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
+				<LineChart bind:plotInset months={chartData.months} series={chartData.series} yearly={yearlyView} lastMonth={months[months.length - 1]} unit={yearlyView ? "checkouts a year" : undefined} mode="line" smooth={smoothOn && !yearlyView} markers={bookMarkers} endLabels={chartMode !== "edition"} onSeriesClick={chartMode !== "line" ? (k) => toggleIsolate(k) : null} annotations={EVENT_ANNOTATIONS} legendHoverKey={legendHoverKey} monthTotals={overviewMonthTotals}/>
 			</div>
 
 			<!-- Several lines: a swatch legend under the chart, every book listed
@@ -2242,6 +2363,13 @@
 			</div>
 			</div>
 			</div><!-- /.chart-panel -->
+			{#if searchMode === "title" && searchedWork && !isOverview}
+				<!-- Book pages: a nudge down to this book's editions in the table. -->
+				<button type="button" class="ed-callout" onclick={showEditions}>Looking for a specific edition? <ArrowDownIcon size={15} strokeWidth={2.4} aria-hidden="true" /></button>
+			{:else if searchMode !== "title" && !isOverview && current}
+				<!-- Author pages: down to the Books table, ready to filter. -->
+				<button type="button" class="ed-callout" onclick={showBooks}>Looking for a specific book or edition? <ArrowDownIcon size={15} strokeWidth={2.4} aria-hidden="true" /></button>
+			{/if}
 			{/if}
 			</div><!-- /.split-main -->
 
@@ -2295,7 +2423,7 @@
 						{@const wColor = workPlotColor(w)}
 						{@const open = workOpen(w)}
 						{#if !w.filteredOut}
-						<li class="bk-row bk-book" class:plotted={!!wColor}>
+						<li class="bk-row bk-book" class:plotted={!!wColor} data-work={w.key}>
 							<input type="checkbox" class="bk-check" checked={isWorkPlotted(w.key)}
 								indeterminate={!isWorkPlotted(w.key) && w.editions.some((e) => groupForTitle(e.idx) || isSingleSelected(e.idx))}
 								onchange={() => keepTableStill(() => toggleWork(w.key))}
@@ -2323,7 +2451,7 @@
 										checked={isSingleSelected(t.idx)}
 										onchange={() => keepTableStill(() => toggleTitle(t.idx))}
 										aria-label="Plot this edition on its own: {t.title}" />
-									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}</span>
+									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.parts.length}<span class="bk-ed-meta" title={em.more.length ? `Also: ${em.more.join("; ")}` : undefined}>{#each em.parts as p, k}{#if k}{" · "}{/if}{#if p.isbn}ISBN <a href={isbnUrl(p.isbn)} target="_blank" rel="noopener noreferrer" title="Find this edition in the Seattle Public Library catalog">{p.isbn}</a>{:else}{p.t}{/if}{/each}{#if em.more.length}{" · "}+{em.more.length} more{/if}</span>{/if}{/if}</span>
 									{#if editMode}
 										<span class="bk-ed-tools">
 											<select class="bk-move" aria-label="Move this edition to another book" onchange={(e) => { moveEdition(t.idx, e.currentTarget.value); e.currentTarget.value = ""; }}>
@@ -4033,6 +4161,7 @@
 	.bk-ed.editing { grid-template-columns: 22px minmax(0, 1fr) auto 76px; }
 	.bk-ed .bk-num { color: var(--color-fg-light); }
 	.bk-ed-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 	.bk-rename { font-family: var(--font-serif); font-size: 1rem; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-white); color: var(--color-fg); min-width: 0; width: 16em; max-width: 100%; }
 	.bk-new { background: #fbfaf6; }
 	.bk-new-note { font-size: 12px; color: var(--color-fg-light); }
@@ -4728,4 +4857,18 @@
 			max-height: 300px;
 		}
 	}
+	.hd-year { font-weight: 400; color: var(--color-fg-light); }
+	/* Phones: four chart buttons fit on one row without their icons. */
+	@media (max-width: 600px) { .mode-toggle :global(svg) { display: none !important; } }
+	/* Edition details and the "Looking for a specific edition?" button (all widths). */
+	/* Edition titles wrap instead of being cut off: the ending is often what tells two editions apart. */
+	.bk-ed-title { white-space: normal; overflow-wrap: anywhere; }
+	.bk-ed-meta a { color: inherit; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 2px; }
+	.bk-ed-meta a:hover { text-decoration-color: currentColor; }
+	.bk-ed-meta { display: block; margin-top: 2px; font-family: var(--font-sans); font-size: 12px; line-height: 1.4; color: var(--color-fg-light); white-space: normal; }
+	.ed-callout { display: flex; align-items: center; gap: 6px; margin: 18px auto 0; padding: 8px 16px; border: 1px solid var(--color-border); border-radius: 999px; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); cursor: pointer; }
+	.ed-callout:hover { border-color: var(--color-fg-light); }
+	.ed-callout :global(svg) { display: inline-block; width: 15px; height: 15px; flex: none; animation: ed-bob 1.6s ease-in-out infinite; }
+	@keyframes ed-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+	@media (prefers-reduced-motion: reduce) { .ed-callout :global(svg) { display: inline-block; width: 15px; height: 15px; flex: none; animation: none; } }
 </style>
