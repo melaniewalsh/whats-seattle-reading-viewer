@@ -17,6 +17,7 @@ export const PATHS = {
 	guide: "guide",
 	about: "about",
 	cite: "cite",
+	made: "how-we-made-this",
 	publications: "publications",
 	norton: "norton-anthology",
 	spl500: "top-500-novels"
@@ -38,6 +39,6 @@ export function viewOfPath(pathname) {
 // Point a URL object at a page, keeping its query settings.
 export function setPage(url, view) {
 	url.pathname = pathFor(view);
-	url.searchParams.delete("tab"); // the old ?tab= addresses
+	url.searchParams.delete("tab");
 	return url;
 }

@@ -11,6 +11,7 @@
 	import Guide from "$components/Guide.svelte";
 	import DataStatus from "$components/DataStatus.svelte";
 	import Cite from "$components/Cite.svelte";
+	import HowWeMadeThis from "$components/HowWeMadeThis.svelte";
 	import { setPage, viewOfPath, pathFor } from "$utils/routes.js";
 	import NortonExplorer from "$components/NortonExplorer.svelte";
 	import BacklistBoomerangs from "$components/BacklistBoomerangs.svelte";
@@ -39,7 +40,7 @@
 	// The browser-tab title names what's on screen ("Octavia E. Butler · What’s
 	// Seattle Reading?"); the home page uses the site name alone.
 	const TAB_TITLES = { overview: "Overview", genres: "Genre Trends", backlist: "Backlist Boomerangs",
-		about: "About the Project", publications: "Publications", cite: "Cite the Project", norton: "Canonical American Authors",
+		about: "About the Project", publications: "Publications", cite: "Cite the Project", made: "How We Made This", norton: "Canonical American Authors",
 		guide: "How to Read the Data" };
 	const docTitle = $derived.by(() => {
 		let page = "";
@@ -165,6 +166,12 @@
 		methodOpen = false;
 		if (url && /^#(data-methodology|method-)/.test(url.hash)) url.hash = "";
 	}
+	// Open the Data & Methodology section (bottom of Checkout Trends) and go to it.
+	function openMethod() {
+		go("search");
+		methodOpen = true;
+		setTimeout(() => document.getElementById("data-methodology")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+	}
 	function scrollToMethod() {
 		const h = (window.location.hash || "").slice(1);
 		if (h === "data-methodology" || h.startsWith("method-")) {
@@ -197,41 +204,9 @@
 				if (view === "subject") subjectSlug = params.get("subject") || "";
 				return;
 			}
-			// The old addresses (/?tab=genres, /?author=…) still work, and are
-			// rewritten to the new ones.
-			legacyUrlState(params);
-			const url = new URL(window.location);
-			setPage(url, compareMode ? "compare" : tab);
-			if (url.searchParams.get("view") === "genre") url.searchParams.delete("view");
-			if (tab === "rankings") { url.searchParams.delete("kind"); if (rankKind === "authors") url.searchParams.set("kind", "authors"); }
-			if (url.href !== window.location.href) window.history.replaceState({}, "", url);
+			tab = "home";
+			compareMode = false;
 		} catch {}
-	}
-	function legacyUrlState(params) {
-		// ?c=… (or ?tab=compare): the trends page's compare view.
-		compareMode = params.getAll("c").length > 0 || params.get("tab") === "compare";
-		if (compareMode) { tab = "search"; return; }
-		const t = params.get("tab");
-		const kind = params.get("kind");
-		if (t === "genres") tab = "genres";
-		else if (t === "rankings" || t === "top" || t === "works") {
-			tab = "rankings";
-			rankKind = t === "top" || kind === "authors" ? "authors" : "works";
-		} else if (t === "search" || t === "authors" || t === "titles") {
-			tab = "search";
-			searchKind = t === "titles" || kind === "title" ? "title" : "author";
-		} else if (params.get("title")) { tab = "search"; searchKind = "title"; }
-		else if (params.get("author")) { tab = "search"; searchKind = "author"; }
-		else if (t === "about") tab = "about";
-		else if (t === "publications") tab = "publications";
-		else if (t === "norton") tab = "norton";
-		else if (t === "spl500") tab = "spl500";
-		else if (t === "backlist" || t === "boomers" || t === "boomerangs") tab = "backlist";
-		else if (t === "overview" || t === "all") tab = "overview";
-		else if (t === "guide") tab = "guide";
-		else if (params.get("view") === "genre") tab = "genres";
-		else if (t === "subject" && params.get("subject")) { tab = "subject"; subjectSlug = params.get("subject"); }
-		else tab = "home";
 	}
 
 	// Back/Forward between two trend pages (a book, then its author) stays on the
@@ -556,6 +531,7 @@
 			<div class="menu-group">
 				<h3 class="menu-h">The Project</h3>
 				<button class="menu-link" onclick={() => go("publications")}>Publications</button>
+				<button class="menu-link" onclick={() => go("made")}>How We Made This</button>
 				<button class="menu-link" onclick={() => go("cite")}>Cite the Project</button>
 				<a class="menu-link" href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Data&nbsp;<ExtArrow /></a>
 				<a class="menu-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Feedback&nbsp;<ExtArrow /></a>
@@ -679,8 +655,10 @@
 				<p>We are thankful to David Christensen, who spearheads the SPL's open data effort and has been a very helpful collaborator and guide. We are also thankful to the <a href="https://humanitiesdatalab.ds.lib.uw.edu/hdssi/" target="_blank" rel="noopener noreferrer">Humanities Data Science Summer Institute</a> and the <a href="https://calma.ischool.uw.edu/" target="_blank" rel="noopener noreferrer">Center for Advances in Libraries, Museums, and Archives (CALMA)</a>, which have provided support for this project.</p>
 
 				<h3 class="about-h">Feedback</h3>
-				<p>This is a work-in-progress — we'd love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>. For how the data is sourced and how works are clustered, see <a href="{pathFor("search")}#data-methodology" onclick={(e) => { e.preventDefault(); go("search"); methodOpen = true; setTimeout(() => document.getElementById("data-methodology")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}>Data &amp; Methodology</a> on the Checkout Trends page.</p>
+				<p>This is a work-in-progress — we'd love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>. For how the data is sourced and how works are clustered, see <a href="{pathFor("search")}#data-methodology" onclick={(e) => { e.preventDefault(); openMethod(); }}>Data &amp; Methodology</a> on the Checkout Trends page.</p>
 			</section>
+		{:else if tab === "made"}
+			<HowWeMadeThis onMethod={openMethod} />
 		{:else if tab === "cite"}
 			<Cite />
 		{:else if tab === "publications"}
@@ -766,10 +744,10 @@
 			<div class="about-body">
 				<h3 id="method-checkouts">What counts as a checkout</h3>
 				<p>
-					This tool charts anonymized and aggregated checkouts logged by the Seattle Public Library, including physical books, ebooks, and audiobooks. This website does not include information about songs, DVDs, and other items, even though the open data includes that information. The library publishes aggregate data about how many times each item in their collection was checked out each month. This data does not include information about holds or renewals, so it undercounts checkouts in some ways, and checkouts for different books can have different ceilings that are not always clear. For example, some audiobooks can only be listened to by a certain number of readers at a time, while others allow unlimited use.
+					This website charts aggregated and fully de-identified checkouts logged by the Seattle Public Library (shared via the <a href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">City of Seattle's Open Data Portal</a>), including physical books, ebooks, and audiobooks. We do not include information about songs, DVDs, and other items, even though the open data includes that information. The library publishes aggregate data about how many times each item in their collection was checked out each month. This data does not include information about holds or renewals, so it undercounts checkouts in some ways, and checkouts for different books can have different ceilings that are not always clear. For example, some audiobooks can only be listened to by a certain number of readers at a time, while others allow unlimited use.
 				</p>
 
-				<h3 id="method-clustering">Why is clustering by work so hard?</h3>
+				<h3 id="method-clustering">How are books and authors clustered? Why is this hard?</h3>
 				<p>
 					A single <em>work</em>, like <em>The Odyssey</em> or <em>Harry Potter and the Sorcerer's Stone</em>, appears in the catalog as many separate
 					records: print, ebook, and audiobook editions; reprints and reissues; large-print and
@@ -809,6 +787,7 @@ You can manually adjust the clustering in the works table at the bottom of the p
 					<h3>Project</h3>
 					<button type="button" onclick={() => go("about")}>About the Project</button>
 					<button type="button" onclick={() => go("publications")}>Publications</button>
+					<button type="button" onclick={() => go("made")}>How We Made This</button>
 					<button type="button" onclick={() => go("cite")}>Cite the Project</button>
 					<a href="https://essays.whats-seattle-reading.com/">Case Studies&nbsp;<ExtArrow /></a>
 					<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Share feedback&nbsp;<ExtArrow /></a>
