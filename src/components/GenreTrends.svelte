@@ -52,7 +52,13 @@
 	];
 	const DEFAULT_SHOWN = 6; // how many genres to plot on first load
 
-	let data = $state.raw(null);
+	let raw = $state.raw(null);
+	// Format buttons: every share is of that format's checkouts (romance is a
+	// bigger share of ebooks than of print). genres.json splits each count by format.
+	const FORMATS = [["all", "All formats", "book"], ["print", "Print", "print book"], ["ebook", "Ebook", "ebook"], ["audiobook", "Audiobook", "audiobook"]];
+	let fmt = $state("all");
+	const data = $derived(raw && fmt !== "all" && raw.byFormat?.[fmt] ? { ...raw, total: raw.byFormat[fmt].total, other: raw.byFormat[fmt].other } : raw);
+	const fmtNoun = $derived(FORMATS.find((f) => f[0] === fmt)?.[2] || "book");
 	let loadError = $state("");
 	let shown = $state(new Set());  // genre names currently plotted
 	let showOther = $state(false);  // the "Other / Unclassified" partition line
@@ -107,20 +113,53 @@
 			// other four stay in the legend, greyed out (click to bring them back).
 			const romance = by["Romance"] ? "Romance" : order[0];
 			shown = new Set([romance, ...order.filter((n) => n !== romance)].slice(0, 5));
-			openGroupsFor(shown);
 			isolatedKeys = [`g:${romance}`];
+			// A shared link names its format and genres (?format=ebook&genres=Romance,Fantasy).
+			try {
+				const sp = new URLSearchParams(window.location.search);
+				const f = sp.get("format");
+				if (FORMATS.some(([k]) => k === f) && d.byFormat?.[f]) fmt = f;
+				const want = (sp.get("genres") || "").split(",").map((x) => x.trim()).filter((x) => by[x] || x === "Other");
+				if (want.length) {
+					shown = new Set(want.filter((x) => x !== "Other"));
+					showOther = want.includes("Other");
+					isolatedKeys = [];
+				}
+			} catch {}
+			openGroupsFor(shown);
 			lo = 0;
 			hi = d.months.length - 1;
-			data = d;
+			raw = d;
 		} catch (e) {
 			loadError = "Couldn't load genre data.";
 		}
 	});
 
+	// Keep the format and the plotted genres in the link.
+	// (What's on the chart: the isolated genres when some are, else all the ticked
+	// ones.) The default view leaves the link bare.
+	let defaultSig = null;
+	$effect(() => {
+		if (!raw) return;
+		const iso = isolatedKeys.map((k) => k.replace(/^g:/, "")).map((n) => (n === "__other" ? "Other" : n));
+		const names = iso.length ? iso : [...shown, ...(showOther ? ["Other"] : [])];
+		const sig = `${fmt}|${names.join(",")}`;
+		if (defaultSig === null) defaultSig = sig;
+		if (sig === defaultSig && !window.location.search.includes("genres=")) return;
+		try {
+			const url = new URL(window.location.href);
+			if (fmt !== "all") url.searchParams.set("format", fmt);
+			else url.searchParams.delete("format");
+			if (names.length) url.searchParams.set("genres", names.join(","));
+			else url.searchParams.delete("genres");
+			if (url.href !== window.location.href) window.history.replaceState({}, "", url);
+		} catch {}
+	});
+
 	function sum(a) { let s = 0; for (const v of a || []) s += v; return s; }
 	const share = (arr) => arr.map((v, i) => (data.total[i] ? (100 * v) / data.total[i] : 0));
 	const overall = (arr) => (data ? (100 * sum(arr)) / Math.max(1, sum(data.total)) : 0);
-	const seriesArr = (g) => g.overlap;
+	const seriesArr = (g) => (fmt !== "all" && g.fmt?.[fmt]) || g.overlap;
 	const colorIdx = (name) => genreOrder.indexOf(name);
 	const colorOf = (name) => PALETTE[colorIdx(name) % PALETTE.length];
 
@@ -283,7 +322,7 @@
 	function downloadCSV() {
 		dlOpen = false;
 		const cols = chartSeries;
-		const rows = [["month", ...cols.map((c) => `${c.name} (% of book checkouts)`)]];
+		const rows = [["month", ...cols.map((c) => `${c.name} (% of ${fmtNoun} checkouts)`)]];
 		viewMonths.forEach((m, i) => rows.push([`${m}-01`, ...cols.map((c) => (c.values[i] ?? 0).toFixed(3))]));
 		const cell = (v) => { const t = String(v ?? ""); return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
 		const blob = new Blob(["\ufeff" + rows.map((r) => r.map(cell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
@@ -291,7 +330,7 @@
 	}
 
 	// --- Share / download (mirrors the "By author" tab exactly) --------------
-	const plotTitle = "Share of book checkouts · a book can count toward several genres";
+	const plotTitle = $derived(`Share of ${fmtNoun} checkouts · a book can count toward several genres`);
 	const legendItems = $derived(series.map((s) => ({ label: s.name, color: s.color, key: s.key })));
 
 	// A shareable link (reopens the genre tab) plus a caption.
@@ -299,7 +338,6 @@
 		let link = window.location.href;
 		try {
 			const url = new URL(window.location.href);
-			url.searchParams.set("view", "genre");
 			link = url.toString();
 		} catch {}
 		const text = "What’s Seattle Reading? — What genres is Seattle checking out?";
@@ -498,13 +536,13 @@
 		<div class="g-head">
 			{#if headGenre}
 				<h3 class="g-name">{headTitle}</h3>
-				<p class="g-meta">{fmtShare(windowShare(seriesArr(headGenre)))} of book checkouts, {yearRange} · {compactNumber(sum(seriesArr(headGenre).slice(lo, hi + 1)))} checkouts</p>
+				<p class="g-meta">{fmtShare(windowShare(seriesArr(headGenre)))} of {fmtNoun} checkouts, {yearRange} · {compactNumber(sum(seriesArr(headGenre).slice(lo, hi + 1)))} checkouts</p>
 				{#if headTerms.length}
 					<p class="g-terms"><span class="g-lead">Subject headings with</span> {#each headTerms as t, k}{#if k}<span class="g-sep" aria-hidden="true">{" · "}</span>{/if}<a href={splSubjectUrl(t)} target="_blank" rel="noopener noreferrer" title="Find books on “{t}” at the Seattle Public Library">{t}</a>{/each}</p>
 				{/if}
 			{:else if plotGenres.length}
 				<!-- Several genres: a plain line, not a second big title under the page's -->
-				<p class="g-meta g-compare">{plotGenres.length <= 3 ? listGenres(plotGenres) : `${plotGenres.length} genres`}: share of book checkouts, {yearRange}. Click a genre's name to show it alone.</p>
+				<p class="g-meta g-compare">{plotGenres.length <= 3 ? listGenres(plotGenres) : `${plotGenres.length} genres`}: share of {fmtNoun} checkouts, {yearRange}. Click a genre's name to show it alone.</p>
 			{:else}
 				<p class="g-meta">Tick genres in the table below to plot them.</p>
 			{/if}
@@ -512,6 +550,11 @@
 
 		<div class="plot-toolbar">
 			<div class="tb-left">
+				{#if raw.byFormat}
+					<div class="fmt-seg" role="group" aria-label="Format">
+						{#each FORMATS as [k, label]}<button type="button" class:on={fmt === k} aria-pressed={fmt === k} onclick={() => (fmt = k)}>{label}</button>{/each}
+					</div>
+				{/if}
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 				{#if isolatedKeys.length && series.length >= 2}
 					<span class="iso-note">Showing {chartSeries.length} of {series.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={() => (isolatedKeys = [])}>Show all</button></span>
@@ -522,7 +565,7 @@
 		<!-- The chart, its slider and source line share one white panel -->
 		<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 		<div class="chartwrap" bind:this={chartWrap}>
-			<LineChart bind:plotInset months={viewMonths} series={chartSeries} mode="line" percent unit="of book checkouts"
+			<LineChart bind:plotInset months={viewMonths} series={chartSeries} mode="line" percent unit="of {fmtNoun} checkouts"
 				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={(k) => toggleIsolate(k)} />
 		</div>
 
@@ -809,4 +852,10 @@
 	}
 	.smooth-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-fg-light); cursor: pointer; user-select: none; }
 	.smooth-toggle input { margin: 0; width: 16px; height: 16px; accent-color: var(--color-fg); appearance: auto; -webkit-appearance: auto; }
+	.fmt-seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; background: #fff; }
+	.fmt-seg button { padding: 6px 12px; border: 0; border-left: 1px solid var(--color-border); border-radius: 0; background: #fff; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-fg-light); cursor: pointer; }
+	.fmt-seg button:first-child { border-left: 0; }
+	.fmt-seg button.on { background: var(--color-fg); color: #fff; }
+	.fmt-seg button:hover:not(.on) { color: var(--color-fg); }
+	@media (max-width: 600px) { .fmt-seg button { padding: 6px 9px; font-size: 13px; } }
 </style>

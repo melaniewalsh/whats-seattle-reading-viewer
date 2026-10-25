@@ -9,8 +9,11 @@
 
 Output static/genres.json:
   { "months":[...], "total":[...],
-    "genres":[ {"name","terms":[...],"overlap":[...],"examples":[...]} ],
-    "other":[...] }
+    "genres":[ {"name","terms":[...],"overlap":[...],"examples":[...],
+                "fmt":{"print":[...],"ebook":[...],"audiobook":[...]}} ],
+    "other":[...],
+    "byFormat":{"print":{"total":[...],"other":[...]}, "ebook":..., "audiobook":...} }
+(each count split by format too, for the Genres tab's format buttons)
 
 The queries are tens of KB -> GET 414s, so we POST
 to the SODA v3 endpoint. Whole-history subject scans time out, so we go a year at
@@ -293,19 +296,31 @@ def post(soql, tries=4):
 
 
 def post_by_month(select, where, yr):
-    """One year's rows, GROUP BY checkoutmonth. If the whole year times out on
-    the city's portal (it did in Oct 2026), ask for it a quarter at a time."""
+    """One year's rows, GROUP BY checkoutmonth and materialtype (print, ebook,
+    audiobook). If the whole year times out on the city's portal (it did in Oct
+    2026), ask for it a quarter at a time."""
     try:
-        return post(f"SELECT checkoutmonth, {select} WHERE checkoutyear = {yr} AND {where} "
-                    f"GROUP BY checkoutmonth", tries=2)
+        return post(f"SELECT checkoutmonth, materialtype, {select} WHERE checkoutyear = {yr} AND {where} "
+                    f"GROUP BY checkoutmonth, materialtype", tries=2)
     except Exception as e:  # noqa: BLE001
         print(f"    {yr}: whole year timed out ({e}); fetching by quarter", flush=True)
     rows = []
     for q in range(4):
         ms = ", ".join(str(m) for m in range(3 * q + 1, 3 * q + 4))
-        rows += post(f"SELECT checkoutmonth, {select} WHERE checkoutyear = {yr} "
-                     f"AND checkoutmonth IN ({ms}) AND {where} GROUP BY checkoutmonth")
+        rows += post(f"SELECT checkoutmonth, materialtype, {select} WHERE checkoutyear = {yr} "
+                     f"AND checkoutmonth IN ({ms}) AND {where} GROUP BY checkoutmonth, materialtype")
     return rows
+
+
+# BOOK (see build_genres) keeps three material types; each is one format.
+FORMATS = {"BOOK": "print", "EBOOK": "ebook", "AUDIOBOOK": "audiobook"}
+
+
+def _row_slot(row, idx, yr):
+    """(month index, format) for a by-month-and-format row, or None."""
+    key = f"{yr}-{int(row['checkoutmonth']):02d}"
+    f = FORMATS.get((row.get("materialtype") or "").strip().upper())
+    return (idx[key], f) if key in idx and f else None
 
 
 def _clean(title):
@@ -322,28 +337,31 @@ def main():
     print(f"{len(TAXONOMY)} genres, {N} months, years {years[0]}..{years[-1]}"
           + (" (TEST)" if test_years else ""), flush=True)
 
-    total = [0] * N
-    over = [[0] * N for _ in TAXONOMY]
-    classified = [0] * N
+    FMTS = list(FORMATS.values())
+    total_f = {f: [0] * N for f in FMTS}
+    classified_f = {f: [0] * N for f in FMTS}
+    over_f = {f: [[0] * N for _ in TAXONOMY] for f in FMTS}
     oclauses, pclauses = overlap_clauses(), partition_clauses()
     any_genre = " OR ".join(f"({c})" for _, c in oclauses)
 
     for yr in years:
         for row in post_by_month(f"sum(checkouts) AS total, sum(case({any_genre}, checkouts, true, 0)) AS classified", BOOK, yr):
-            key = f"{yr}-{int(row['checkoutmonth']):02d}"
-            if key not in idx:
+            slot = _row_slot(row, idx, yr)
+            if not slot:
                 continue
-            j = idx[key]
-            total[j] = int(float(row.get("total", 0) or 0))
-            classified[j] = int(float(row.get("classified", 0) or 0))
+            j, f = slot
+            total_f[f][j] += int(float(row.get("total", 0) or 0))
+            classified_f[f][j] += int(float(row.get("classified", 0) or 0))
         ocases = ", ".join(f"sum(case({c}, checkouts, true, 0)) AS o{i}" for i, (n, c) in enumerate(oclauses))
         for row in post_by_month(ocases, BOOK, yr):
-            key = f"{yr}-{int(row['checkoutmonth']):02d}"
-            if key not in idx:
+            slot = _row_slot(row, idx, yr)
+            if not slot:
                 continue
-            j = idx[key]
+            j, f = slot
             for i in range(len(TAXONOMY)):
-                over[i][j] = int(float(row.get(f"o{i}", 0) or 0))
+                over_f[f][i][j] += int(float(row.get(f"o{i}", 0) or 0))
+        total = [sum(total_f[f][j] for f in FMTS) for j in range(N)]
+        classified = [sum(classified_f[f][j] for f in FMTS) for j in range(N)]
         asg = sum(classified[idx[f"{yr}-{m:02d}"]] for m in range(1, 13) if f"{yr}-{m:02d}" in idx)
         tot = sum(total[idx[f"{yr}-{m:02d}"]] for m in range(1, 13) if f"{yr}-{m:02d}" in idx)
         print(f"  {yr}: {tot:>9,} checkouts, {100 * asg / max(1, tot):4.1f}% classified", flush=True)
@@ -351,6 +369,8 @@ def main():
     # Books matching no genre. (Summing the first-match partition instead double
     # counts fiction-gated matches and went negative from 2020 on.)
     other = [total[j] - classified[j] for j in range(N)]
+    over = [[sum(over_f[f][i][j] for f in FMTS) for j in range(N)] for i in range(len(TAXONOMY))]
+    by_format = {f: {"total": total_f[f], "other": [total_f[f][j] - classified_f[f][j] for j in range(N)]} for f in FMTS}
 
     # Examples: top first-match titles over the last few years. Scoping to recent
     # years keeps the subject scan from timing out AND surfaces current favorites.
@@ -366,7 +386,7 @@ def main():
             if t and t.lower() != "<unknown title>":
                 titles.append(t)
         genres_out.append({"name": name, "terms": inc, "ficTerms": fic, "overlap": over[i],
-                           "examples": titles[:10]})
+                           "fmt": {f: over_f[f][i] for f in FMTS}, "examples": titles[:10]})
         oshare = 100 * sum(over[i]) / max(1, sum(total))
         print(f"  [{i + 1:>2}/{len(TAXONOMY)}] {name:26s} {oshare:4.1f}%", flush=True)
 
@@ -394,7 +414,7 @@ def main():
 
     OUT.write_text(json.dumps({"months": months, "total": total, "genres": genres_out,
                                "other": other, "otherExamples": other_examples[:10],
-                               "otherTags": other_tags},
+                               "otherTags": other_tags, "byFormat": by_format},
                               separators=(",", ":")))
     print(f"Wrote {OUT}", flush=True)
 

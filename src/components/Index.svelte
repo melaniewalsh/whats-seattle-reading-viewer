@@ -10,6 +10,8 @@
 	import SubjectList from "$components/SubjectList.svelte";
 	import Guide from "$components/Guide.svelte";
 	import DataStatus from "$components/DataStatus.svelte";
+	import Cite from "$components/Cite.svelte";
+	import { setPage, viewOfPath, pathFor } from "$utils/routes.js";
 	import NortonExplorer from "$components/NortonExplorer.svelte";
 	import BacklistBoomerangs from "$components/BacklistBoomerangs.svelte";
 	import TrendingUp from "@lucide/svelte/icons/trending-up";
@@ -37,11 +39,11 @@
 	// The browser-tab title names what's on screen ("Octavia E. Butler · What’s
 	// Seattle Reading?"); the home page uses the site name alone.
 	const TAB_TITLES = { overview: "Overview", genres: "Genre Trends", backlist: "Backlist Boomerangs",
-		about: "About the Project", publications: "Publications", norton: "Canonical American Authors",
+		about: "About the Project", publications: "Publications", cite: "Cite the Project", norton: "Canonical American Authors",
 		guide: "How to Read the Data" };
 	const docTitle = $derived.by(() => {
 		let page = "";
-		if (tab === "search") page = compareMode ? searchText.split(", ").join(" vs. ") : searchText;
+		if (tab === "search") page = compareMode ? searchText.split(", ").join(" vs. ") : searchText || "Checkout Trends";
 		else if (tab === "rankings") page = rankKind === "authors" ? "Most Borrowed Authors" : "Most Borrowed Books";
 		else if (tab === "subject") page = subjectLabel;
 		else page = TAB_TITLES[tab] || "";
@@ -113,8 +115,8 @@
 			const url = new URL(window.location);
 			clearViewParams(url);
 			leaveMethod(url);
-			if (t === "home") url.searchParams.delete("tab");
-			else url.searchParams.set("tab", t === "rankings" ? (rankKind === "authors" ? "top" : "works") : t);
+			setPage(url, t);
+			if (t === "rankings" && rankKind === "authors") url.searchParams.set("kind", "authors");
 			window.history.pushState({}, "", url);
 		} catch {}
 		// Heading to Search puts the cursor in the page's search field.
@@ -126,7 +128,7 @@
 
 	// The deep-link params naming what a view shows; cleared when moving to
 	// another view so a stale one doesn't hijack it.
-	const VIEW_PARAMS = ["author", "title", "genre", "year", "kind", "c", "subject"];
+	const VIEW_PARAMS = ["author", "title", "genre", "year", "kind", "c", "subject", "view", "format", "genres"];
 	function clearViewParams(url) {
 		VIEW_PARAMS.forEach((k) => url.searchParams.delete(k));
 	}
@@ -172,7 +174,7 @@
 				try {
 					const url = new URL(window.location);
 					clearViewParams(url);
-					url.searchParams.set("tab", "search");
+					setPage(url, "search");
 					window.history.replaceState({}, "", url);
 				} catch {}
 			}
@@ -186,30 +188,50 @@
 	function applyUrlState() {
 		try {
 			const params = new URLSearchParams(window.location.search);
-			// ?c=… (or ?tab=compare): the trends page's compare view.
-			compareMode = params.getAll("c").length > 0 || params.get("tab") === "compare";
-			if (compareMode) { tab = "search"; return; }
-			const t = params.get("tab");
-			const kind = params.get("kind");
-			if (t === "genres") tab = "genres";
-			else if (t === "rankings" || t === "top" || t === "works") {
-				tab = "rankings";
-				rankKind = t === "top" || kind === "authors" ? "authors" : "works";
-			} else if (t === "search" || t === "authors" || t === "titles") {
-				tab = "search";
-				searchKind = t === "titles" || kind === "title" ? "title" : "author";
-			} else if (params.get("title")) { tab = "search"; searchKind = "title"; }
-			else if (params.get("author")) { tab = "search"; searchKind = "author"; }
-			else if (t === "about") tab = "about";
-			else if (t === "publications") tab = "publications";
-			else if (t === "norton") tab = "norton";
-			else if (t === "spl500") tab = "spl500";
-			else if (t === "backlist" || t === "boomers" || t === "boomerangs") tab = "backlist";
-			else if (t === "overview" || t === "all") tab = "overview";
-			else if (t === "guide") tab = "guide";
-			else if (t === "subject" && params.get("subject")) { tab = "subject"; subjectSlug = params.get("subject"); }
-			else tab = "home";
+			const view = viewOfPath(window.location.pathname);
+			if (view && view !== "home") {
+				compareMode = view === "compare";
+				tab = view === "compare" ? "search" : view;
+				if (view === "search") searchKind = params.get("title") ? "title" : "author";
+				if (view === "rankings") rankKind = params.get("kind") === "authors" ? "authors" : "works";
+				if (view === "subject") subjectSlug = params.get("subject") || "";
+				return;
+			}
+			// The old addresses (/?tab=genres, /?author=…) still work, and are
+			// rewritten to the new ones.
+			legacyUrlState(params);
+			const url = new URL(window.location);
+			setPage(url, compareMode ? "compare" : tab);
+			if (url.searchParams.get("view") === "genre") url.searchParams.delete("view");
+			if (tab === "rankings") { url.searchParams.delete("kind"); if (rankKind === "authors") url.searchParams.set("kind", "authors"); }
+			if (url.href !== window.location.href) window.history.replaceState({}, "", url);
 		} catch {}
+	}
+	function legacyUrlState(params) {
+		// ?c=… (or ?tab=compare): the trends page's compare view.
+		compareMode = params.getAll("c").length > 0 || params.get("tab") === "compare";
+		if (compareMode) { tab = "search"; return; }
+		const t = params.get("tab");
+		const kind = params.get("kind");
+		if (t === "genres") tab = "genres";
+		else if (t === "rankings" || t === "top" || t === "works") {
+			tab = "rankings";
+			rankKind = t === "top" || kind === "authors" ? "authors" : "works";
+		} else if (t === "search" || t === "authors" || t === "titles") {
+			tab = "search";
+			searchKind = t === "titles" || kind === "title" ? "title" : "author";
+		} else if (params.get("title")) { tab = "search"; searchKind = "title"; }
+		else if (params.get("author")) { tab = "search"; searchKind = "author"; }
+		else if (t === "about") tab = "about";
+		else if (t === "publications") tab = "publications";
+		else if (t === "norton") tab = "norton";
+		else if (t === "spl500") tab = "spl500";
+		else if (t === "backlist" || t === "boomers" || t === "boomerangs") tab = "backlist";
+		else if (t === "overview" || t === "all") tab = "overview";
+		else if (t === "guide") tab = "guide";
+		else if (params.get("view") === "genre") tab = "genres";
+		else if (t === "subject" && params.get("subject")) { tab = "subject"; subjectSlug = params.get("subject"); }
+		else tab = "home";
 	}
 
 	// Back/Forward between two trend pages (a book, then its author) stays on the
@@ -240,12 +262,12 @@
 
 	// Clear any deep-link params so a freshly-mounted view isn't hijacked by a
 	// stale ?author/?title/?genre.
-	function clearParams() {
+	function clearParams(view = "home") {
 		try {
 			const url = new URL(window.location);
 			clearViewParams(url);
-			url.searchParams.delete("tab");
-			window.history.replaceState({}, "", url);
+			setPage(url, view);
+			window.history.pushState({}, "", url);
 		} catch {}
 	}
 	// The logo goes to the landing hub.
@@ -257,7 +279,7 @@
 	}
 	// The "Overview" card / menu item goes to the library-wide checkouts plot.
 	function goOverview() {
-		clearParams();
+		clearParams("overview");
 		tab = "overview";
 		menuOpen = false;
 	}
@@ -295,7 +317,7 @@
 			leaveMethod(url);
 			window.scrollTo({ top: 0 });
 			clearViewParams(url);
-			url.searchParams.delete("tab");
+			setPage(url, "search");
 			url.searchParams.set("author", slug);
 			window.history.pushState({}, "", url);
 		} catch {}
@@ -315,7 +337,7 @@
 			leaveMethod(url);
 			window.scrollTo({ top: 0 });
 			clearViewParams(url);
-			url.searchParams.delete("tab");
+			setPage(url, "search");
 			url.searchParams.set("title", title);
 			if (authorSlug) url.searchParams.set("author", authorSlug);
 			window.history.pushState({}, "", url);
@@ -382,7 +404,7 @@
 		try {
 			const url = new URL(window.location);
 			clearViewParams(url);
-			url.searchParams.delete("tab");
+			setPage(url, "compare");
 			ids.forEach((id) => url.searchParams.append("c", id));
 			window.history.pushState({}, "", url);
 		} catch {}
@@ -447,7 +469,7 @@
 		try {
 			const url = new URL(window.location);
 			clearViewParams(url);
-			url.searchParams.set("tab", "subject");
+			setPage(url, "subject");
 			url.searchParams.set("subject", slug);
 			window.history.pushState({}, "", url);
 		} catch {}
@@ -460,7 +482,7 @@
 	function openGenre(genre) {
 		try {
 			const url = new URL(window.location);
-			url.searchParams.set("tab", "works");
+			setPage(url, "rankings");
 			url.searchParams.set("genre", genre);
 			url.searchParams.set("year", "all");
 			["kind", "author", "title"].forEach((k) => url.searchParams.delete(k));
@@ -534,6 +556,7 @@
 			<div class="menu-group">
 				<h3 class="menu-h">The Project</h3>
 				<button class="menu-link" onclick={() => go("publications")}>Publications</button>
+				<button class="menu-link" onclick={() => go("cite")}>Cite the Project</button>
 				<a class="menu-link" href="https://data.seattle.gov/Community-and-Culture/Checkouts-by-Title/tmmm-ytt6" target="_blank" rel="noopener noreferrer">Data&nbsp;<ExtArrow /></a>
 				<a class="menu-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Feedback&nbsp;<ExtArrow /></a>
 			</div>
@@ -656,8 +679,10 @@
 				<p>We are thankful to David Christensen, who spearheads the SPL's open data effort and has been a very helpful collaborator and guide. We are also thankful to the <a href="https://humanitiesdatalab.ds.lib.uw.edu/hdssi/" target="_blank" rel="noopener noreferrer">Humanities Data Science Summer Institute</a> and the <a href="https://calma.ischool.uw.edu/" target="_blank" rel="noopener noreferrer">Center for Advances in Libraries, Museums, and Archives (CALMA)</a>, which have provided support for this project.</p>
 
 				<h3 class="about-h">Feedback</h3>
-				<p>This is a work-in-progress — we'd love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>. For how the data is sourced and how works are clustered, see <a href="?tab=search#data-methodology" onclick={(e) => { e.preventDefault(); go("search"); methodOpen = true; setTimeout(() => document.getElementById("data-methodology")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}>Data &amp; Methodology</a> on the Checkout Trends page.</p>
+				<p>This is a work-in-progress — we'd love your <a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">feedback</a>. For how the data is sourced and how works are clustered, see <a href="{pathFor("search")}#data-methodology" onclick={(e) => { e.preventDefault(); go("search"); methodOpen = true; setTimeout(() => document.getElementById("data-methodology")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}>Data &amp; Methodology</a> on the Checkout Trends page.</p>
 			</section>
+		{:else if tab === "cite"}
+			<Cite />
 		{:else if tab === "publications"}
 			<section class="pubs-page">
 				<h2 class="about-title">Publications</h2>
@@ -751,7 +776,7 @@
 					translated editions; and re-cataloged copies with slightly different title strings.
 					There is no shared identifier that ties every related edition to the same work. We attempt to cluster by
 				 normalizing and matching the title text in various ways.
-				 You can read more about our approach in our <a href="?tab=publications" onclick={(e) => { e.preventDefault(); go("publications"); }}>JCDL paper</a> (DOI: 10.1145/3805696.3848491). What's important to remember is that clustering is automatic and purposely approximate.
+				 You can read more about our approach in our <a href={pathFor("publications")} onclick={(e) => { e.preventDefault(); go("publications"); }}>JCDL paper</a> (DOI: 10.1145/3805696.3848491). What's important to remember is that clustering is automatic and purposely approximate.
 You can manually adjust the clustering in the works table at the bottom of the page
 				</p>
 
@@ -784,6 +809,7 @@ You can manually adjust the clustering in the works table at the bottom of the p
 					<h3>Project</h3>
 					<button type="button" onclick={() => go("about")}>About the Project</button>
 					<button type="button" onclick={() => go("publications")}>Publications</button>
+					<button type="button" onclick={() => go("cite")}>Cite the Project</button>
 					<a href="https://essays.whats-seattle-reading.com/">Case Studies&nbsp;<ExtArrow /></a>
 					<a href="https://docs.google.com/forms/d/e/1FAIpQLSfHWbWEj1H4NltjSp3ixjelJKSu2VMQgEkTF3CpjWtWhwARfA/viewform?usp=dialog" target="_blank" rel="noopener noreferrer">Share feedback&nbsp;<ExtArrow /></a>
 				</nav>

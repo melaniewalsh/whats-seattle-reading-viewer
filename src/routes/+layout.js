@@ -1,2 +1,3 @@
 export const prerender = true;
-export const trailingSlash = "always";
+// "never": /genres is written as genres.html, which GitHub Pages serves at /genres.
+export const trailingSlash = "never";

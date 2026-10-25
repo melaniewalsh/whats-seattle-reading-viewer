@@ -76,6 +76,15 @@
 	let groupIdCounter = 0; // increasing id source for groups
 	let singleIdxs = $state([]); // editions plotted on their own
 	let titleFilter = $state(""); // text filter for the title list
+	// The chart view lives in the link (?view=book|format|edition), so a shared
+	// page opens the same way. Read once; applied when the author or book loads.
+	const VIEW_NAMES = { area: "book", format: "format", edition: "edition" };
+	let pendingView = (() => {
+		try {
+			const v = new URLSearchParams(window.location.search).get("view");
+			return Object.keys(VIEW_NAMES).find((k) => VIEW_NAMES[k] === v) || null;
+		} catch { return null; }
+	})();
 	let chartMode = $state("line"); // 'line' = author's total as one line (default); 'area' = one line per book; 'format' = print / ebook / audiobook; 'edition' = one line per edition
 	let titleSort = $state("work"); // 'work' = editions grouped by work; 'borrowed' = most checkouts; 'alpha' = A–Z
 	let workOrder = $state("checkouts"); // in 'work' mode, order the works by 'checkouts' (total, default) or 'name' (A–Z)
@@ -585,6 +594,18 @@
 			titleEl?.scrollIntoView?.({ block: "start", behavior: "smooth" });
 		}
 	}
+
+	$effect(() => {
+		if (!current || isOverview) return;
+		if (pendingView) { chartMode = pendingView; pendingView = null; return; }
+		const v = VIEW_NAMES[chartMode];
+		try {
+			const url = new URL(window.location.href);
+			if (v) url.searchParams.set("view", v);
+			else url.searchParams.delete("view");
+			if (url.href !== window.location.href) window.history.replaceState({}, "", url);
+		} catch {}
+	});
 
 	// A shareable link (reopens the current author) plus a caption.
 	function shareTarget() {
@@ -2072,9 +2093,6 @@
 		return [...workGroups.values()]
 			.sort((a, b) => b.total - a.total)
 			.slice(0, 5)
-			// Only label books big enough to matter on the chart (>= 5% of the
-			// author's checkouts), not a small anthology that happens to be new.
-			.filter((w) => w.total >= current.total * 0.05)
 			.map((w) => ({ w, f: sumSeries(w.idxs).findIndex((v) => v > 0) }))
 			// Skip the first three years of data: older books' catalog records
 			// trickle in then, so a "first checkout" there isn't a real debut.
@@ -2390,7 +2408,7 @@
 				</div>
 				{#if editMode}
 					<div class="bk-editbar">
-						<p class="bk-editnote">Move editions between books, or split out ones that don't belong. <a class="works-why" href="?tab=search#method-clustering" target="_blank" rel="noopener">Why is this hard?</a></p>
+						<p class="bk-editnote">Move editions between books, or split out ones that don't belong. <a class="works-why" href="{base}/trends#method-clustering" target="_blank" rel="noopener">Why is this hard?</a></p>
 						<div class="bk-editactions">
 							<button type="button" class="bk-btn" onclick={newBook}>New book</button>
 							<button type="button" class="bk-btn" onclick={clearGroupings}>Reset to automatic</button>

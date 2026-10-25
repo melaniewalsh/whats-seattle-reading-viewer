@@ -4,6 +4,7 @@
 	// The page's search field sets its picks (Index.svelte calls setPicksFromIds).
 	// Picks live in the URL (?c=a~<author-slug>&c=w~<author-slug>~<title>) so a
 	// comparison can be shared.
+	import { setPage } from "$utils/routes.js";
 	import { onMount, onDestroy } from "svelte";
 	import { MediaQuery } from "svelte/reactivity";
 	import LinkIcon from "@lucide/svelte/icons/link";
@@ -145,7 +146,8 @@
 	function syncUrl() {
 		try {
 			const url = new URL(window.location);
-			["c", "tab", "author", "title"].forEach((k) => url.searchParams.delete(k));
+			setPage(url, "compare");
+			["c", "author", "title"].forEach((k) => url.searchParams.delete(k));
 			for (const p of picks) url.searchParams.append("c", p.id);
 			window.history.replaceState({}, "", url);
 		} catch {}

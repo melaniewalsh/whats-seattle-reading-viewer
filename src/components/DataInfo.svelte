@@ -165,7 +165,7 @@
 				<button type="button" class="di-copy" onclick={() => copy("paper", paperCite)} aria-label="Copy the data paper citation">{#if copied === "paper"}<CheckIcon size={16} strokeWidth={2} />{:else}<CopyIcon size={16} strokeWidth={2} />{/if}</button>
 			</div>
 		{/if}
-		<p class="di-more">Our research with this data is listed under <a href="{base}/?tab=publications">Publications</a>.</p>
+		<p class="di-more">Our research with this data is listed under <a href="{base}/publications">Publications</a>.</p>
 	</div>
 </dialog>
 

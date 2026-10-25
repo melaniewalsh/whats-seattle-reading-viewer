@@ -1,4 +1,5 @@
 <script>
+	import { setPage } from "$utils/routes.js";
 	import ExtArrow from "$components/ExtArrow.svelte";
 	import { onMount, onDestroy, untrack } from "svelte";
 	import ImageIcon from "@lucide/svelte/icons/image";
@@ -133,7 +134,8 @@
 		if (!data) return;
 		try {
 			const url = new URL(window.location);
-			url.searchParams.set("tab", "top");
+			setPage(url, "rankings");
+			url.searchParams.set("kind", "authors");
 			url.searchParams.set("genre", genre);
 			url.searchParams.set("year", year);
 			url.searchParams.delete("author");
