@@ -57,7 +57,10 @@ TAXONOMY = [
     # literary fiction, films and thrillers (Hollinghurst, Tash Aw, Olivia Laing;
     # checked Oct 2026), and queer romances nearly all carry "romance" anyway.
     # Likewise NOT "man woman relationships" -- 5.3M checkouts, only ~8% romance.
-    ("Romance", [], ["romance languages"],
+    # "Love stories" is the Library of Congress heading for romance, so print
+    # records (which rarely say "romance") need it; ebooks and audiobooks carry
+    # the publishers' "FICTION / Romance / ..." terms instead.
+    ("Romance", ["love stories"], ["romance languages"],
         ["romance", "romantic", "erotic"]),
     # "fantasy" always; the evocative words only when a Fiction tag is present
     # (so "magic" doesn't grab "The Magic of Tidying Up", "elf" ≠ "self-help").
