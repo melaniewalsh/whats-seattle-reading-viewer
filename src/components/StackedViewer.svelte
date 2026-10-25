@@ -1466,7 +1466,11 @@
 
 	let expandedWorks = $state([]); // work keys currently expanded in the table
 	// Author pages: scroll to the Books table and put the cursor in its filter.
+	// "Looking for a specific book or edition?" (author pages): open the top
+	// book's editions so they're in view, and go to the table.
 	function showBooks() {
+		const first = visibleWorkBlocks[0]?.key;
+		if (first && !expandedWorks.includes(first)) expandedWorks = [...expandedWorks, first];
 		sideEl?.scrollIntoView({ behavior: "smooth", block: "start" });
 		setTimeout(() => sideEl?.querySelector(".bk-filter")?.focus({ preventScroll: true }), 400);
 	}
