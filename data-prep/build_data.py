@@ -642,7 +642,7 @@ def annotate_subjects(con, out_dir, slug_by_author):
     print(f"  [subjects] patched {n_patched[0]:,} author files ({perf_counter() - t0:.2f}s)", flush=True)
 
 
-def annotate_editions(con, out_dir, slug_by_author, base_select):
+def annotate_editions(con, out_dir, slug_by_author, base_select, parquet_list=None):
     """Add what tells one edition from another to each title in the author files:
     its formats, where its checkouts came from (CheckoutType: OverDrive, Hoopla,
     Horizon = a physical copy) and its top publisher / publication year / ISBN
@@ -658,6 +658,15 @@ def annotate_editions(con, out_dir, slug_by_author, base_select):
     # a missing one is just NULL. ed_* names: an alias that matches a raw
     # column ("isbn" vs ISBN) trips DuckDB's lateral-alias rules.
     have = {r[0].lower() for r in con.execute("DESCRIBE raw").fetchall()}
+    # The city only fills ISBN from mid-2022, so the older monthly files have no
+    # ISBN column and `raw` (whose columns come from the first file) drops it.
+    # Matching columns by name across all the files brings it back.
+    if "isbn" not in have and parquet_list:
+        con.execute(f"CREATE OR REPLACE VIEW raw_ed AS SELECT * FROM read_parquet({parquet_list}, union_by_name = true)")
+        have_u = {r[0].lower() for r in con.execute("DESCRIBE raw_ed").fetchall()}
+        if "isbn" in have_u:
+            have = have_u
+            base_select = base_select.replace("FROM raw\n", "FROM raw_ed\n", 1)
     col = lambda c: f"CAST({c} AS VARCHAR)" if c.lower() in have else "CAST(NULL AS VARCHAR)"
     print(f"  edition columns: {', '.join(c for c in ('CheckoutType', 'Publisher', 'PublicationYear', 'ISBN') if c.lower() in have)}", flush=True)
     sel = base_select.replace(
@@ -693,8 +702,11 @@ def annotate_editions(con, out_dir, slug_by_author, base_select):
         """
         WITH f AS (SELECT author, title, fmt, sum(n) AS n FROM edrows GROUP BY ALL),
         s AS (SELECT author, title, src, sum(n) AS n FROM edrows WHERE src IS NOT NULL GROUP BY ALL),
-        v AS (SELECT author, title, pub, py, isbn, fmt, sum(n) AS n FROM edrows
-              WHERE pub IS NOT NULL OR py IS NOT NULL OR isbn IS NOT NULL GROUP BY ALL),
+        -- One row per publisher/year/format, with its most-borrowed ISBN (only
+        -- checkouts since mid-2022 carry one).
+        v AS (SELECT author, title, pub, py, fmt, arg_max(isbn, n) FILTER (WHERE isbn IS NOT NULL) AS isbn, sum(n) AS n
+              FROM edrows WHERE pub IS NOT NULL OR py IS NOT NULL OR isbn IS NOT NULL
+              GROUP BY author, title, pub, py, fmt),
         fa AS (SELECT author, title, list([fmt, CAST(n AS VARCHAR)] ORDER BY n DESC) AS f FROM f GROUP BY ALL),
         sa AS (SELECT author, title, list([src, CAST(n AS VARCHAR)] ORDER BY n DESC) AS s FROM s GROUP BY ALL),
         va AS (SELECT author, title,
@@ -2152,7 +2164,7 @@ def main():
     print("Annotating editions ...", flush=True)
     t0 = perf_counter()
     try:
-        annotate_editions(con, OUT_DIR, slug_by_author, BASE_SELECT)
+        annotate_editions(con, OUT_DIR, slug_by_author, BASE_SELECT, parquet_list_literal)
         print(f"  editions done ({perf_counter() - t0:.2f}s)", flush=True)
     except Exception as e:  # noqa: BLE001
         print(f"  WARNING: edition annotation failed ({e}); files written without edition details", flush=True)

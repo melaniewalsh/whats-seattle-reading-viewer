@@ -1483,8 +1483,11 @@
 		// Where its checkouts came from ("checked out via OverDrive").
 		const via = (ed.s || []).map(([src]) => SOURCE[src] || src).join(", ");
 		if (via) parts.push({ t: `checked out via ${via}` });
-		const more = v.slice(1).map(([pub, py, isbn, f]) => [formatLabel(f), pub, (py || "").match(/\d{4}/)?.[0], isbn && `ISBN ${isbn}`].filter(Boolean).join(", "));
-		return { parts, more };
+		// The same catalog title under other publisher names or years ("Penguin
+		// Publishing Group" for "Penguin Group (USA), Inc.").
+		const more = v.slice(1).map(([pub, py]) => [(pub || "").replace(/[\s,;:/]+$/, ""), (py || "").match(/\d{4}/)?.[0]].filter(Boolean).join(", "));
+		const first = parts[0]?.t;
+		return { parts, more: [...new Set(more)].filter((x) => x && x !== first) };
 	}
 	const isExpanded = (key) => expandedWorks.includes(key);
 	// While a filter is active, auto-expand any work with a matching edition so the
@@ -2451,7 +2454,7 @@
 										checked={isSingleSelected(t.idx)}
 										onchange={() => keepTableStill(() => toggleTitle(t.idx))}
 										aria-label="Plot this edition on its own: {t.title}" />
-									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.parts.length}<span class="bk-ed-meta" title={em.more.length ? `Also: ${em.more.join("; ")}` : undefined}>{#each em.parts as p, k}{#if k}{" · "}{/if}{#if p.isbn}ISBN <a href={isbnUrl(p.isbn)} target="_blank" rel="noopener noreferrer" title="Find this edition in the Seattle Public Library catalog">{p.isbn}</a>{:else}{p.t}{/if}{/each}{#if em.more.length}{" · "}+{em.more.length} more{/if}</span>{/if}{/if}</span>
+									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.parts.length}<span class="bk-ed-meta" title={em.more.length > 1 ? `Also listed as: ${em.more.join("; ")}` : undefined}>{#each em.parts as p, k}{#if k}{" · "}{/if}{#if p.isbn}ISBN <a href={isbnUrl(p.isbn)} target="_blank" rel="noopener noreferrer" title="Find this edition in the Seattle Public Library catalog">{p.isbn}</a>{:else}{p.t}{/if}{/each}{#if em.more.length}{" · "}also listed as {em.more[0]}{#if em.more.length > 1}{" "}and {em.more.length - 1} more{/if}{/if}</span>{/if}{/if}</span>
 									{#if editMode}
 										<span class="bk-ed-tools">
 											<select class="bk-move" aria-label="Move this edition to another book" onchange={(e) => { moveEdition(t.idx, e.currentTarget.value); e.currentTarget.value = ""; }}>
