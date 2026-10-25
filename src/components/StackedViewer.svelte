@@ -1471,7 +1471,8 @@
 		const ed = t.ed || {};
 		const v = ed.v || [];
 		if (v.length) {
-			const [pub, py, isbn] = v[0];
+			const [rawPub, py, isbn] = v[0];
+			const pub = (rawPub || "").replace(/[\s,;:/]+$/, ""); // catalog punctuation: "Beacon Press,"
 			const yr = (py || "").match(/\d{4}/)?.[0];
 			const p = [pub, yr].filter(Boolean).join(", ");
 			if (p) parts.push({ t: p });
