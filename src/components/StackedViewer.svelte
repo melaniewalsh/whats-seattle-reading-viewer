@@ -2408,7 +2408,7 @@
 				</div>
 				{#if !editMode}
 					<!-- What a row is: one book, gathered from the library's separate records. -->
-					<p class="bk-note">Each book gathers the library's separate catalog records for it: print, ebook and audiobook editions, reissues and translations, and sometimes the same edition listed under slightly different titles (“Unabridged,” “A Novel”). Open a book's editions to see them all, or tick books to chart them. The grouping is automatic, so use Edit groupings to fix one that's wrong. <a class="works-why" href="#method-clustering">Why is this hard?</a></p>
+					<p class="bk-note">This table shows every catalog variation for this author or book—including print, ebook and audiobook editions, reissues and translations, and more. Sometimes the same edition is listed under slightly different titles due to changes in the ILS or platform (e.g. OverDrive). You can click a book's editions to see them all, and tick editions or books to chart them separately. You can also “Edit groupings” to alter any grouping or create your own grouping. <a class="works-why" href="#method-clustering">Why is clustering by book or “work” difficult?</a></p>
 				{/if}
 				{#if editMode}
 					<div class="bk-editbar">
