@@ -24,6 +24,12 @@ export const GUIDE_STEPS = [
 		link: { label: "See Octavia E. Butler's page", author: "octavia-e-butler" }
 	},
 	{
+		chart: "editions",
+		title: "One book, many editions",
+		text: "The library's data lists every edition separately. Parable of the Sower appears under more than a dozen catalog records: ebooks and audiobooks from different publishers, print copies (one with a foreword by N. K. Jemisin), a graphic novel adaptation, and Spanish and Chinese translations. The site groups these into one work so a book's whole readership counts together. On a book's page, the By edition button splits the line back apart, and the edition list gives each one's publisher, year and format. The grouping is automatic, so check that list when a number looks off.",
+		link: { label: "See Parable of the Sower's editions", title: "Parable of the Sower", titleAuthor: "octavia-e-butler" }
+	},
+	{
 		chart: "compare",
 		title: "Compare authors and books",
 		text: "Type a comma between names to put several authors or books on one chart. Here Octavia E. Butler and Ursula K. Le Guin, two science fiction writers, over twenty years.",
@@ -38,7 +44,7 @@ export const GUIDE_STEPS = [
 	{
 		image: "home/borrowed.jpg",
 		title: "The most-borrowed books",
-		text: "Most Borrowed ranks books and authors by checkouts for any year, for last month, or for all time, overall and by genre. Different editions of a book (print, ebook, audiobook, reissues) are grouped into one work, so a book's whole readership counts together.",
+		text: "Most Borrowed ranks books and authors by checkouts for any year, for last month, or for all time, overall and by genre. Editions are grouped into works here too.",
 		link: { label: "See Most Borrowed", tab: "works" }
 	},
 	{

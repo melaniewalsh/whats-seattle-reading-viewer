@@ -33,6 +33,16 @@
 			try {
 				const [butler, leguin] = await Promise.all([getAuthor("octavia-e-butler"), getAuthor("ursula-k-le-guin-1929")]);
 				if (butler) out.author = { series: [{ key: "butler", label: "Octavia E. Butler", color: "#3f88cc", values: densify(butler.series, m.length), isAggregate: true }] };
+				// One book's editions: Parable of the Sower's biggest catalog records.
+				if (butler) {
+					const FMT = { ebook: "Ebook", audiobook: "Audiobook", print: "Print" };
+					const eds = butler.titles.filter((t) => /^parable of the sower\b/i.test(t.title)).sort((x, y) => y.total - x.total).slice(0, 4);
+					const colors = ["#3f88cc", "#e58a00", "#1f7a4d", "#8e44ad"];
+					out.editions = { series: eds.map((t, i) => {
+						const yr = (t.ed?.v?.[0]?.[1] || "").match(/\d{4}/)?.[0];
+						return { key: `ed${i}`, label: `${FMT[t.fmt] || t.fmt}${yr ? `, ${yr}` : ""}`, color: colors[i], values: densify(t.series, m.length) };
+					}) };
+				}
 				if (butler && leguin) out.compare = { series: [
 					{ key: "butler", label: "Octavia E. Butler", color: "#3f88cc", values: densify(butler.series, m.length) },
 					{ key: "leguin", label: "Ursula K. Le Guin", color: "#e58a00", values: densify(leguin.series, m.length) }

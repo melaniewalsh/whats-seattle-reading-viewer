@@ -431,6 +431,7 @@
 
 	// Guide links ({ tab } / { author } / { compare }) open that part of the site.
 	function guideNavigate(link) {
+		if (link.title) return openTitle(link.title, link.titleAuthor);
 		if (link.author) return openAuthor(link.author);
 		if (link.compare) return showCompare(link.compare);
 		if (link.tab === "works") { rankKind = "works"; return go("rankings"); }

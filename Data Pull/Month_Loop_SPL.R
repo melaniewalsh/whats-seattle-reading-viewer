@@ -17,7 +17,7 @@ cat("Bucket connection OK.\n")
  
 # ---- Config -------------------------------------------------------------
 socrata_url <- "https://data.seattle.gov/resource/tmmm-ytt6.json"
-start_year  <- 2006
+start_year  <- 2005  # the library's data begins April 2005
  
 end_date  <- Sys.Date()
 end_year  <- as.integer(format(end_date, "%Y"))
