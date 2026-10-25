@@ -1491,6 +1491,27 @@
 	// An ISBN opens that exact edition in the SPL catalog (digital editions included).
 	const isbnUrl = (isbn) => `https://seattle.bibliocommons.com/v2/search?query=${isbn}&searchType=keyword`;
 	const SOURCE = { Horizon: "a library copy", OverDrive: "OverDrive", Hoopla: "Hoopla", Freegal: "Freegal", Zinio: "Zinio" };
+	// One ISBN from a catalog field ("0735219095, 9780735219090"): the
+	// 13-digit one if there is one.
+	const pickIsbn = (s) => (s || "").match(/\d{13}/)?.[0] || (s || "").match(/\d{9}[\dXx]/)?.[0];
+	// The library only records ISBNs from mid-2022, so an older listing of an
+	// edition (same book, publisher, year and format) borrows its ISBN.
+	const isbnByWork = $derived.by(() => {
+		const m = new Map();
+		if (!current) return m;
+		for (const [key, w] of workGroups) {
+			for (const idx of w.idxs) {
+				const t = current.titles[idx];
+				for (const [rawPub, py, isbn] of t?.ed?.v || []) {
+					const num = pickIsbn(isbn);
+					if (!num) continue;
+					const k = `${key}|${(rawPub || "").replace(/[\s,;:/]+$/, "")}|${(py || "").match(/\d{4}/)?.[0]}|${t.fmt}`;
+					if (!m.has(k)) m.set(k, num);
+				}
+			}
+		}
+		return m;
+	});
 	function editionMeta(t) {
 		const parts = [];
 		const ed = t.ed || {};
@@ -1501,7 +1522,7 @@
 			const yr = (py || "").match(/\d{4}/)?.[0];
 			const p = [pub, yr].filter(Boolean).join(", ");
 			if (p) parts.push({ t: p });
-			const num = (isbn || "").match(/\d{13}|\d{9}[\dXx]/)?.[0];
+			const num = pickIsbn(isbn) || isbnByWork.get(`${t.workKey}|${pub}|${yr}|${t.fmt}`);
 			if (num) parts.push({ isbn: num });
 		}
 		if ((ed.f || []).length > 1) parts.push({ t: ed.f.map(([f]) => formatLabel(f)).join(" + ") });
@@ -2498,7 +2519,7 @@
 					{/each}
 				</ul>
 				{#if smallWorks && (!booksCapped || workBlocks.length <= BOOKS_PREVIEW)}
-					<p class="titles-more">{workBlocks.length ? "Plus " : ""}{#if smallWorks.n === 1}{workBlocks.length ? "1 more book" : "1 book"} with fewer than {SMALL_TOTAL} checkouts, not listed.{:else}{smallWorks.n.toLocaleString()} books with fewer than {SMALL_TOTAL} checkouts each{#if !tooSmall} ({smallWorks.total.toLocaleString()} in all){/if}, not listed one by one.{/if}</p>
+					<p class="titles-more">{workBlocks.length ? "Plus " : ""}{#if smallWorks.n === 1}{workBlocks.length ? "1 more book" : "1 book"} with fewer than {SMALL_TOTAL} checkouts, not listed.{:else}{smallWorks.n.toLocaleString()} books with fewer than {SMALL_TOTAL} checkouts each{#if !tooSmall}{" "}({smallWorks.total.toLocaleString()} in all){/if}, not listed one by one.{/if}</p>
 				{/if}
 				{#if booksCapped && workBlocks.length > BOOKS_PREVIEW}
 					<button type="button" class="books-more" onclick={() => (booksShowAll = true)}>Show all {workBlocks.length.toLocaleString()} books</button>
