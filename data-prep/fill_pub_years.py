@@ -8,11 +8,13 @@ its title matches the book and its short description or Wikidata author
 names the right author, and takes the earliest publication date (Wikidata
 P577), else a year at the start of the description ("1993 novel by ...").
 Results are cached in data-prep/pubyear_cache.json, so each build only looks
-up new books.
+up new books. The matched article's title goes in wikititle_cache.json, so the
+site can show that exact article's summary (its own search misses some books).
 
   python3 data-prep/fill_pub_years.py --find    # look up new works (network)
-  python3 data-prep/fill_pub_years.py --apply   # add the year as a 6th column to
-                                                # top-works.json and subject pages
+  python3 data-prep/fill_pub_years.py --apply   # add the year (6th column) and the
+                                                # article title (7th) to top-works.json
+                                                # and subject pages
 """
 import argparse
 import json
@@ -27,6 +29,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 PROJECT = HERE.parent
 CACHE = HERE / "pubyear_cache.json"
+TITLE_CACHE = HERE / "wikititle_cache.json"
 DATA = PROJECT / "static" / "data"
 UA = {"User-Agent": "whats-seattle-reading build (melwalsh@uw.edu)"}
 WIKI = "https://en.wikipedia.org/w/api.php"
@@ -104,7 +107,7 @@ def find_one(k):
     title, author = k.split("\t")
     want, sn = main_title(title), surname(author)
     if not want:
-        return k, None
+        return k, (None, None)
     # First the page names a book's article usually has ("1984 (novel)" redirects
     # to "Nineteen Eighty-Four"), then a search.
     direct = get_json(WIKI, {"action": "query", "format": "json", "redirects": "1", "titles": f"{want} (novel)|{want} (book)|{want}",
@@ -112,7 +115,7 @@ def find_one(k):
     d = get_json(WIKI, {"action": "query", "format": "json", "generator": "search", "gsrsearch": f"{want} {sn}".strip(),
                         "gsrlimit": "5", "prop": "pageprops|description", "ppprop": "wikibase_item"})
     if direct is None or d is None:
-        return k, ERR
+        return k, (ERR, None)
     named = [p for p in (direct.get("query") or {}).get("pages", {}).values() if "missing" not in p]
     rank = {f"{want} (novel)".lower(): 0, f"{want} (book)".lower(): 1, want.lower(): 2}
     redirect_from = {r["to"]: r["from"] for r in (direct.get("query") or {}).get("redirects", [])}
@@ -137,8 +140,8 @@ def find_one(k):
             year = int(m.group(1)) if m else None
         # The best matching page decides: no year there means no year (not a
         # later page's, e.g. a translation's).
-        return k, (year if year and 1000 < year <= 2100 else None)
-    return k, None
+        return k, ((year if year and 1000 < year <= 2100 else None), p.get("title"))
+    return k, (None, None)
 
 
 def works():
@@ -152,38 +155,45 @@ def works():
 
 def find(limit=None):
     cache = json.loads(CACHE.read_text()) if CACHE.exists() else {}
+    titles = json.loads(TITLE_CACHE.read_text()) if TITLE_CACHE.exists() else {}
     retry = __import__("os").environ.get("PUBYEAR_RETRY_MISSES") == "1"
-    todo = sorted(key(*w) for w in works() if key(*w) not in cache or (retry and cache[key(*w)] is None))
+    todo = sorted(key(*w) for w in works()
+                  if key(*w) not in cache or key(*w) not in titles or (retry and cache[key(*w)] is None))
     todo = todo[:limit] if limit else todo
     print(f"{len(todo)} works to look up", flush=True)
     found = 0
     with ThreadPoolExecutor(max_workers=6) as ex:
-        for i, (k, y) in enumerate(ex.map(find_one, todo), 1):
+        for i, (k, (y, page)) in enumerate(ex.map(find_one, todo), 1):
             if y == ERR:
                 continue
-            cache[k] = y
+            cache[k] = y or cache.get(k)  # a miss never erases a year found before
+            titles[k] = page or titles.get(k)
             found += bool(y)
             if i % 250 == 0 or i == len(todo):
                 print(f"  [{i}/{len(todo)}] found {found}", flush=True)
-                CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=0, sort_keys=True) + "\n")
-    CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=0, sort_keys=True) + "\n")
+                save(cache, titles)
+    save(cache, titles)
     print(f"found years for {found} of {len(todo)}", flush=True)
+
+
+def save(cache, titles):
+    CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=0, sort_keys=True) + "\n")
+    TITLE_CACHE.write_text(json.dumps(titles, ensure_ascii=False, indent=0, sort_keys=True) + "\n")
 
 
 def apply():
     cache = json.loads(CACHE.read_text()) if CACHE.exists() else {}
+    titles = json.loads(TITLE_CACHE.read_text()) if TITLE_CACHE.exists() else {}
 
     def patch(rows):
         n = 0
         for r in rows:
-            y = cache.get(key(r[0], r[1]))
-            while len(r) < 5:
+            k = key(r[0], r[1])
+            while len(r) < 7:
                 r.append(None)
-            if len(r) == 5:
-                r.append(y)
-            else:
-                r[5] = y
-            n += bool(y)
+            r[5] = cache.get(k)
+            r[6] = titles.get(k)
+            n += bool(r[5])
         return n
 
     tw = DATA / "top-works.json"
