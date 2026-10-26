@@ -927,7 +927,7 @@
 		</div>
 	{/each}
 	{#each showEventQs ? annotationMarks : [] as a, k}
-		<button type="button" class="ev-q" class:open={evOpen === k} style="left: {evQLeft[k]}px; top: {margin.top - 12 - 21}px;" aria-label="{a.label}: about this dip" aria-expanded={evOpen === k} onpointerdown={(e) => e.stopPropagation()} onclick={() => (evOpen = evOpen === k ? null : k)}>{a.tiny || a.lines[0]} <span class="ev-q-mark" aria-hidden="true">?</span></button>
+		<button type="button" class="ev-q" class:open={evOpen === k} style="left: {evQLeft[k]}px; top: {margin.top - 12 - 21}px;" aria-label="{a.label}: about this dip" aria-expanded={evOpen === k} onpointerdown={(e) => e.stopPropagation()} onclick={() => (evOpen = evOpen === k ? null : k)}>{a.tiny || a.lines[0]}</button>
 	{/each}
 	{#if showEventQs && evOpen !== null && annotationMarks[evOpen]}
 		{@const a = annotationMarks[evOpen]}
@@ -1063,26 +1063,25 @@
 
 	/* Phones: a small "?" over each event band, and the note it opens (spans
 	   the chart, so it never runs off a narrow screen). */
+	/* Plain gray text over the band, as on desktop; tapping it opens the note. */
 	.ev-q {
 		position: absolute;
 		z-index: 7;
 		transform: translateX(-50%);
 		height: 20px;
-		padding: 0 7px;
-		border: 1px solid #c4c4c4;
-		border-radius: 10px;
-		background: #fff;
-		color: #666;
-		font: 600 11px/18px var(--font-sans, system-ui, sans-serif);
+		padding: 0;
+		border: 0;
+		background: none;
+		color: #858585;
+		font: 400 11px/18px var(--font-sans, system-ui, sans-serif);
 		white-space: nowrap;
 		text-align: center;
+		text-shadow: 0 0 3px #fff, 0 0 3px #fff;
 		cursor: pointer;
 	}
-	.ev-q-mark { color: #999; margin-left: 1px; }
-	.ev-q.open .ev-q-mark { color: #fff; }
-	/* A bigger tap target than the circle itself. */
+	/* A bigger tap target than the text itself. */
 	.ev-q::after { content: ""; position: absolute; inset: -10px; }
-	.ev-q.open { background: #555; border-color: #555; color: #fff; }
+	.ev-q.open { color: var(--color-fg, #222); }
 	.ev-sheet {
 		position: absolute;
 		left: 6px;

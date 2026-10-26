@@ -16,6 +16,9 @@
 	import DownloadIcon from "@lucide/svelte/icons/download";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import TableIcon from "@lucide/svelte/icons/table";
+	import ChartAreaIcon from "@lucide/svelte/icons/chart-area";
+	import ChartLineIcon from "@lucide/svelte/icons/chart-line";
+	import MergeIcon from "@lucide/svelte/icons/merge";
 	import LineChart from "$components/StackedAreaChart.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
@@ -585,17 +588,26 @@
 
 		<div class="plot-toolbar">
 			<div class="tb-left">
-				{#if raw.byFormat}
-					<button type="button" class="fmt-btn" class:on={showByFmt} aria-pressed={showByFmt} disabled={!canByFmt}
-						title={canByFmt ? "Split this genre into print, ebook and audiobook" : "Show one genre to split it by format"}
-						onclick={() => { byFmt = !showByFmt; if (byFmt) combine = false; }}>By format</button>
-				{/if}
+				<!-- The chart's views, the same buttons as on an author's page. -->
+				<div class="mode-toggle" role="group" aria-label="Chart type">
+					<button type="button" class:active={!showByFmt && !showCombine} onclick={() => { byFmt = false; combine = false; }} title="Total" aria-label="Total">
+						<ChartAreaIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">Total</span>
+					</button>
+					{#if raw.byFormat}
+						<button type="button" class:active={showByFmt} disabled={!canByFmt}
+							title={canByFmt ? "Split this genre into print, ebook and audiobook" : "Show one genre to split it by format"} aria-label="By format"
+							onclick={() => { byFmt = true; combine = false; }}>
+							<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">By format</span>
+						</button>
+					{/if}
+					{#if pair}
+						<button type="button" class:active={showCombine} title="Show {pair.a} and {pair.b} as one line, counting each book once" aria-label="Combine"
+							onclick={() => { combine = true; byFmt = false; }}>
+							<MergeIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">Combine</span>
+						</button>
+					{/if}
+				</div>
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
-				{#if pair}
-					<button type="button" class="fmt-btn" class:on={showCombine} aria-pressed={showCombine}
-						title="Show {pair.a} and {pair.b} as one line, counting each book once"
-						onclick={() => { combine = !showCombine; if (combine) byFmt = false; }}>Combine</button>
-				{/if}
 				{#if showCombine}<span class="iso-note">Books in either genre, counted once, and the books in both.</span>{/if}
 				{#if showByFmt}<span class="iso-note">Each line is a share of all book checkouts; together they make {headName}'s total.</span>{/if}
 				{#if !showByFmt && isolatedKeys.length && series.length >= 2}
@@ -895,7 +907,12 @@
 	}
 	.smooth-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-fg-light); cursor: pointer; user-select: none; }
 	.smooth-toggle input { margin: 0; width: 16px; height: 16px; accent-color: var(--color-fg); appearance: auto; -webkit-appearance: auto; }
-	.fmt-btn { padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-fg); cursor: pointer; }
-	.fmt-btn.on { background: var(--color-fg); border-color: var(--color-fg); color: #fff; }
-	.fmt-btn:disabled { color: var(--color-fg-light); cursor: default; opacity: 0.6; }
+	/* Chart views: as on an author's page (StackedViewer .plot-toolbar .mode-toggle). */
+	.mode-toggle { display: inline-flex; gap: 6px; font-family: var(--font-sans); }
+	.mode-toggle button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white, #fff); font-size: var(--text-sm); font-weight: 500; line-height: 1; color: var(--color-fg); cursor: pointer; }
+	.mode-toggle button:hover:not(.active):not(:disabled) { border-color: var(--color-fg-light); }
+	.mode-toggle button.active { background: var(--color-fg); border-color: var(--color-fg); color: var(--color-white, #fff); }
+	.mode-toggle button:disabled { color: var(--color-fg-light); cursor: default; opacity: 0.55; }
+	.mode-toggle :global(svg) { width: 16px !important; height: 16px !important; flex: none; }
+	@media (max-width: 600px) { .mode-toggle :global(svg) { display: none !important; } }
 </style>
