@@ -589,10 +589,11 @@
 
 		<!-- A swatch legend under the chart (phones have no end-of-line names).
 		     Click one to show it alone; the others gray out, click to add them. -->
-		{#if !showByFmt && series.length >= 2}
-			<div class="phone-legend" class:off-phone={!isolatedKeys.length}>
+		<!-- By format, the legend picks which genre is split. -->
+		{#if series.length >= 2}
+			<div class="phone-legend" class:off-phone={!isolatedKeys.length && !showByFmt}>
 				{#each series as s (s.key)}
-					<button type="button" class="pl-item" class:dim={isolatedKeys.length && !isIsolated(s.key)} onclick={() => toggleIsolate(s.key)}><span class="pl-sw" style="background:{s.color}"></span>{s.name}</button>
+					<button type="button" class="pl-item" class:dim={showByFmt ? s.name !== headName : isolatedKeys.length && !isIsolated(s.key)} onclick={() => (showByFmt ? (isolatedKeys = [s.key]) : toggleIsolate(s.key))}><span class="pl-sw" style="background:{s.color}"></span>{s.name}</button>
 				{/each}
 			</div>
 		{/if}
