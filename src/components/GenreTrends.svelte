@@ -161,7 +161,14 @@
 	const overall = (arr) => (data ? (100 * sum(arr)) / Math.max(1, sum(data.total)) : 0);
 	const seriesArr = (g) => (fmt !== "all" && g.fmt?.[fmt]) || g.overlap;
 	const colorIdx = (name) => genreOrder.indexOf(name);
-	const colorOf = (name) => PALETTE[colorIdx(name) % PALETTE.length];
+	// Romance, the genre the page opens on, gets the palette's red (as in the
+	// tour) rather than a blue like an author's line; whichever genre had the
+	// red takes Romance's color instead.
+	const colorOf = (name) => {
+		const r = colorIdx("Romance");
+		const i = name === "Romance" ? 0 : r >= 0 && colorIdx(name) === 0 ? r : colorIdx(name);
+		return PALETTE[i % PALETTE.length];
+	};
 
 	function cleanTitle(t) {
 		return (t || "").split(" / ")[0]
