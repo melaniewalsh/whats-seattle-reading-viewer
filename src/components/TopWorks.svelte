@@ -10,7 +10,10 @@
 	import { displayName } from "$utils/displayName.js";
 	import { coverUrl, coverOverride } from "$utils/covers.js";
 	import { lookupUrls } from "$utils/lookup.js";
-	import { wikiWork } from "$utils/wiki.js";
+	import { wikiWork, wikiPage } from "$utils/wiki.js";
+	// A ranked book's Wikipedia article: the one the build matched (r[6]) when
+	// there is one, else a search from the browser.
+	const bookWiki = (r) => (r[6] ? wikiPage(r[6]) : wikiWork(searchTitle(r[0]), displayName(r[1])));
 	import { compactNumber, blurb } from "$utils/format.js";
 	import { renderTableBlob, shareTableImage, copyTableImage, copyPageLink } from "$utils/tableExport.js";
 	import { eachKey } from "$utils/eachKey.js";
@@ -111,7 +114,7 @@
 			return;
 		}
 		wikiTried.add(k);
-		wikiWork(searchTitle(r[0]), displayName(r[1])).then((w) => {
+		bookWiki(r).then((w) => {
 			covers = { ...covers, [k]: w?.thumbnail || null };
 		});
 	}
@@ -193,7 +196,7 @@
 		}
 		if (!(k in summaries) && !summaryInflight.has(k)) {
 			summaryInflight.add(k);
-			wikiWork(searchTitle(r[0]), displayName(r[1])).then((w) => {
+			bookWiki(r).then((w) => {
 				summaries = { ...summaries, [k]: w?.extract || null };
 				wikiUrls = { ...wikiUrls, [k]: w?.url || null };
 				if (!covers[k] && w?.thumbnail) covers = { ...covers, [k]: w.thumbnail };
