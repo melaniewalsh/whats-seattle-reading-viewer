@@ -540,6 +540,79 @@
 		}
 	}
 
+	// One catalog title can hold several editions: OverDrive's "Wuthering
+	// Heights" is a Duke Classics, a Penguin and an Oxford ebook. Where the build
+	// saved each edition's monthly checkouts (data-prep/build_data.py
+	// annotate_editions), each becomes its own row, with its own line. One ISBN
+	// under two publisher names or years stays one edition; checkouts with no
+	// publisher or ISBN make an "other editions" row.
+	function splitEditions(titles) {
+		const out = [];
+		for (const t of titles) {
+			const v = t.ed?.v || [];
+			const groups = [];
+			if (v.length > 1 && v.every((e) => Array.isArray(e[5]))) {
+				for (const e of v) {
+					const isbns = isbnList(e[2]);
+					const g = groups.find((x) => isbns.some((i) => x.isbns.includes(i)));
+					if (g) { g.v.push(e); isbns.forEach((i) => g.isbns.includes(i) || g.isbns.push(i)); }
+					else groups.push({ isbns, v: [e] });
+				}
+			}
+			if (groups.length < 2) { out.push(t); continue; }
+			const rest = t.series.slice();
+			for (const g of groups) {
+				const series = new Array(t.series.length).fill(0);
+				for (const e of g.v) for (const [m, c] of e[5]) { series[m] += c; rest[m] -= c; }
+				const fmt = g.v[0][3] || t.fmt;
+				const total = g.v.reduce((a, e) => a + e[4], 0);
+				out.push({ ...t, series, total, fmt, format: fmt, ed: { f: [[fmt, total]], s: t.ed.s, v: g.v } });
+			}
+			const left = rest.map((c) => Math.max(0, c));
+			const leftTotal = left.reduce((a, c) => a + c, 0);
+			if (leftTotal > 0) out.push({ ...t, series: left, total: leftTotal, ed: { f: [], s: t.ed.s, v: [] }, otherEditions: true });
+		}
+		// The same ISBN under two catalog titles ("Wuthering Heights: (Unabridged)"
+		// and "Wuthering Heights (Unabridged)", or Crawdads' "Reese's Book Club"
+		// retitlings) is one edition: one row, under its most-borrowed title.
+		// (A listing with no ISBN of its own, from before mid-2022, takes the one
+		// its book has under the same publisher, year and format.)
+		const clean = (p) => (p || "").replace(/[\s,;:/]+$/, "");
+		const known = new Map();
+		for (const t of out) for (const e of t.ed?.v || []) {
+			const i = isbnList(e[2])[0];
+			const k = `${normalizeWorkKey(t.title)}|${clean(e[0])}|${(e[1] || "").match(/\d{4}/)?.[0]}|${t.fmt}`;
+			if (i && !known.has(k)) known.set(k, i);
+		}
+		const rowIsbns = (t) => {
+			const v = t.ed?.v || [];
+			const sets = v.map((e) => {
+				const own = isbnList(e[2]);
+				return own.length ? own : [known.get(`${normalizeWorkKey(t.title)}|${clean(e[0])}|${(e[1] || "").match(/\d{4}/)?.[0]}|${t.fmt}`)].filter(Boolean);
+			});
+			return sets.length && sets.every((x) => x.length && x.some((i) => sets[0].includes(i))) ? sets[0] : [];
+		};
+		const byIsbn = new Map();
+		const merged = [];
+		for (const t of [...out].sort((a, b) => b.total - a.total)) {
+			const isbns = rowIsbns(t);
+			const into = isbns.map((i) => byIsbn.get(`${t.fmt}|${i}`)).find(Boolean);
+			if (!into) {
+				const row = { ...t, alsoTitles: [] };
+				merged.push(row);
+				isbns.forEach((i) => byIsbn.set(`${t.fmt}|${i}`, row));
+				continue;
+			}
+			into.series = into.series.map((c, m) => c + (t.series[m] || 0));
+			into.total += t.total;
+			into.ed = { ...into.ed, f: [[into.fmt, into.total]], v: [...into.ed.v, ...t.ed.v] };
+			// (Spelling-only differences, "(Unabridged)" vs "(unabridged)", aren't worth naming.)
+			const flat = (x) => x.toLowerCase().replace(/[^a-z0-9]+/g, "");
+			if (flat(t.title) !== flat(into.title) && !into.alsoTitles.some((x) => flat(x) === flat(t.title))) into.alsoTitles.push(t.title);
+		}
+		return merged; // (the table sorts rows itself)
+	}
+
 	async function selectAuthor(a, { scroll = true } = {}) {
 		// One author's drilldown (their series + every qualifying title) comes
 		// from their static JSON file (see db.js).
@@ -558,6 +631,7 @@
 			t.series = densify(t.series);
 			t.format = t.fmt; // the ETL stores the short field name "fmt"
 		});
+		data.titles = splitEditions(data.titles);
 		current = data;
 		currentSlug = a.slug;
 		isOverview = false;
@@ -1542,6 +1616,8 @@
 				if (yr && !same.yrs.includes(yr)) same.yrs.push(yr);
 			} else eds.push({ pubs: [pub].filter(Boolean), yrs: [yr].filter(Boolean), isbns, n });
 		}
+		if (t.otherEditions) parts.push({ t: "other editions under this title" });
+		if (t.alsoTitles?.length) parts.push({ t: `also catalogued as ${t.alsoTitles.map((x) => `“${x}”`).join(", ")}` });
 		// A title string shared by more than one format (an audiobook also listed
 		// as plain "Wuthering Heights") is one row here: say what else it holds.
 		const FMT_NOUN = { ebook: "ebook", audiobook: "audiobook", print: "print", largeprint: "large print" };
