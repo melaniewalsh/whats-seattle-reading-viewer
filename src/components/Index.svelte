@@ -421,7 +421,7 @@
 	// the "#N in Genre" badges on a searched work).
 	// Home page cards: each section with a screenshot (static/home/) and a line on what it's for.
 	const HOME_CARDS = [
-		{ title: "Checkout Trends", img: "home/trends.jpg", text: "Look up any author or book and see its checkouts month by month since 2006, or compare several.", go: "Start exploring", open: () => go("search") },
+		{ title: "Checkout Trends", img: "home/trends.jpg", text: "Look up any author or book and see its checkouts month by month since 2005, or compare several.", go: "Start exploring", open: () => go("search") },
 		{ title: "Most Borrowed", img: "home/borrowed.jpg", text: "The books and authors checked out most, by year and by genre.", go: "Start exploring", open: () => go("rankings") },
 		{ title: "Genres", img: "home/genres.jpg", text: "How the popularity of romance, fantasy, mystery and other genres has changed.", go: "Start exploring", open: () => go("genres") },
 		{ title: "Backlist Boomerangs", img: "home/backlist.jpg", text: "Books that suddenly became popular again, years after they first circulated.", go: "Start exploring", open: () => go("backlist") },
@@ -621,7 +621,7 @@
 								<button class="flink" onclick={() => openTitle(featured.title, featured.authorSlug)}>The Odyssey</button>
 								<span class="featured-by">by <button class="flink" onclick={() => openAuthor(featured.authorSlug)}>Homer</button></span>
 							</h2>
-							<p class="featured-sub">{compactNumber(featured.checkouts)} checkouts at the Seattle Public Library, 2006–2026</p>
+							<p class="featured-sub">{compactNumber(featured.checkouts)} checkouts at the Seattle Public Library, 2005–2026</p>
 						</div>
 					</div>
 					<div class="featured-chart">
