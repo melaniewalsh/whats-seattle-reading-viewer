@@ -59,6 +59,10 @@
 	// share of ALL book checkouts, so the three add up to the genre's line.
 	// (genres.json splits each genre's count by format.)
 	let byFmt = $state(false);
+	// "Combine": two genres as one line ("Science Fiction or Fantasy"), plus the
+	// books in both. Only for the pairs the build counts (build_partition.py
+	// PAIRS): a book can be in both, so the two lines can't just be added.
+	let combine = $state(false);
 	const FMT_LINES = [["print", "Print", "#3f88cc"], ["ebook", "Ebook", "#e58a00"], ["audiobook", "Audiobook", "#1f7a4d"]];
 	let loadError = $state("");
 	let shown = $state(new Set());  // genre names currently plotted
@@ -119,6 +123,7 @@
 			try {
 				const sp = new URLSearchParams(window.location.search);
 				if (sp.get("view") === "format") byFmt = true;
+				if (sp.get("view") === "combine") combine = true;
 				const want = (sp.get("genres") || "").split(",").map((x) => x.trim()).filter((x) => by[x] || x === "Other");
 				if (want.length) {
 					shown = new Set(want.filter((x) => x !== "Other"));
@@ -143,12 +148,13 @@
 		if (!raw) return;
 		const iso = isolatedKeys.map((k) => k.replace(/^g:/, "")).map((n) => (n === "__other" ? "Other" : n));
 		const names = iso.length ? iso : [...shown, ...(showOther ? ["Other"] : [])];
-		const sig = `${byFmt}|${names.join(",")}`;
+		const sig = `${byFmt}|${combine}|${names.join(",")}`;
 		if (defaultSig === null) defaultSig = sig;
 		if (sig === defaultSig && !window.location.search.includes("genres=")) return;
 		try {
 			const url = new URL(window.location.href);
-			if (byFmt) url.searchParams.set("view", "format");
+			if (showByFmt) url.searchParams.set("view", "format");
+			else if (showCombine) url.searchParams.set("view", "combine");
 			else url.searchParams.delete("view");
 			if (names.length) url.searchParams.set("genres", names.join(","));
 			else url.searchParams.delete("genres");
@@ -308,8 +314,20 @@
 	// by format, the one genre's print / ebook / audiobook lines.
 	const canByFmt = $derived(!!(headGenre?.fmt && raw?.byFormat));
 	const showByFmt = $derived(byFmt && canByFmt);
+	const pair = $derived.by(() => {
+		if (!raw?.pairs || plotGenres.length !== 2) return null;
+		const [x, y] = plotGenres;
+		return raw.pairs.find((p) => (p.a === x && p.b === y) || (p.a === y && p.b === x)) || null;
+	});
+	const showCombine = $derived(combine && !!pair && !showByFmt);
 	const chartSeries = $derived(
-		showByFmt
+		showCombine
+			? [
+				{ key: "c:either", name: `${pair.a} or ${pair.b}`, label: `${pair.a} or ${pair.b}`, color: "#6a4c93", values: share(pair.either).slice(lo, hi + 1) },
+				{ key: "c:both", name: "Both", label: "Both", color: "#c1666b",
+					values: share(pair.either.map((e, i) => (genreByName[pair.a].overlap[i] || 0) + (genreByName[pair.b].overlap[i] || 0) - e)).slice(lo, hi + 1) }
+			]
+		: showByFmt
 			? FMT_LINES.map(([f, label, color]) => ({ key: `f:${f}`, name: label, label, color, values: share(headGenre.fmt[f]).slice(lo, hi + 1) }))
 			: (isolatedKeys.length ? series.filter((s) => isolatedKeys.includes(s.key)) : series).map((s) => ({ ...s, label: s.name })),
 	);
@@ -570,9 +588,15 @@
 				{#if raw.byFormat}
 					<button type="button" class="fmt-btn" class:on={showByFmt} aria-pressed={showByFmt} disabled={!canByFmt}
 						title={canByFmt ? "Split this genre into print, ebook and audiobook" : "Show one genre to split it by format"}
-						onclick={() => (byFmt = !showByFmt)}>By format</button>
+						onclick={() => { byFmt = !showByFmt; if (byFmt) combine = false; }}>By format</button>
 				{/if}
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
+				{#if pair}
+					<button type="button" class="fmt-btn" class:on={showCombine} aria-pressed={showCombine}
+						title="Show {pair.a} and {pair.b} as one line, counting each book once"
+						onclick={() => { combine = !showCombine; if (combine) byFmt = false; }}>Combine</button>
+				{/if}
+				{#if showCombine}<span class="iso-note">Books in either genre, counted once, and the books in both.</span>{/if}
 				{#if showByFmt}<span class="iso-note">Each line is a share of all book checkouts; together they make {headName}'s total.</span>{/if}
 				{#if !showByFmt && isolatedKeys.length && series.length >= 2}
 					<span class="iso-note">Showing {chartSeries.length} of {series.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={() => (isolatedKeys = [])}>Show all</button></span>
@@ -584,7 +608,7 @@
 		<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 		<div class="chartwrap" bind:this={chartWrap}>
 			<LineChart bind:plotInset months={viewMonths} series={chartSeries} mode="line" percent unit="of {fmtNoun} checkouts"
-				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={showByFmt ? null : (k) => toggleIsolate(k)} />
+				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={showByFmt || showCombine ? null : (k) => toggleIsolate(k)} />
 		</div>
 
 		<!-- A swatch legend under the chart (phones have no end-of-line names).
