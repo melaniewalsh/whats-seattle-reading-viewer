@@ -35,6 +35,7 @@
 	// Numbers on the axis, end labels and tooltip: counts ("1,200") or, with
 	// `percent`, shares with just enough decimals ("12%", "2.5%", "0.15%").
 	function fmtVal(v) {
+		if (v == null) return "–"; // a gap (e.g. a share in a month with almost no checkouts)
 		if (!percent) return Math.round(v).toLocaleString();
 		const a = Math.abs(v);
 		return `${parseFloat(v.toFixed(a < 1 ? 2 : a < 10 ? 1 : 0))}%`;
@@ -282,7 +283,8 @@
 	);
 	const linePaths = $derived(
 		lineLayers.map((s, k) => {
-			const line = d3line().x((_, i) => x(i)).y((_, i) => y(s.values[i]));
+			// A null value is a gap in the line.
+			const line = d3line().defined((_, i) => s.values[i] != null).x((_, i) => x(i)).y((_, i) => y(s.values[i]));
 			const n = s.values.length;
 			const split = partialYear && n > 1;
 			return {

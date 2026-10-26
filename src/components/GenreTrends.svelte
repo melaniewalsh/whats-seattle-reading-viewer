@@ -157,7 +157,11 @@
 	});
 
 	function sum(a) { let s = 0; for (const v of a || []) s += v; return s; }
-	const share = (arr) => arr.map((v, i) => (data.total[i] ? (100 * v) / data.total[i] : 0));
+	// A share of almost nothing is noise: in spring 2020 the closed branches
+	// lent about 70 print books a month, so a few picture books were "70%" of
+	// print. Months with fewer than MIN_BASE checkouts in the format are gaps.
+	const MIN_BASE = 1000;
+	const share = (arr) => arr.map((v, i) => (data.total[i] >= MIN_BASE ? (100 * v) / data.total[i] : null));
 	const overall = (arr) => (data ? (100 * sum(arr)) / Math.max(1, sum(data.total)) : 0);
 	const seriesArr = (g) => (fmt !== "all" && g.fmt?.[fmt]) || g.overlap;
 	const colorIdx = (name) => genreOrder.indexOf(name);
@@ -296,7 +300,8 @@
 		const avg = avg3(seg);
 		// One scale for every genre row (small genres draw flatter lines).
 		const mx = Math.max(1e-9, sparkMax);
-		return avg.map((v, i) => `${i ? "L" : "M"}${(1 + (i * (w - 2)) / (avg.length - 1)).toFixed(1)},${(h - 1 - (v / mx) * (h - 3)).toFixed(1)}`).join("");
+		// A gap (null) lifts the pen; the next point starts a new stroke.
+		return avg.map((v, i) => (v == null ? "" : `${i && avg[i - 1] != null ? "L" : "M"}${(1 + (i * (w - 2)) / (avg.length - 1)).toFixed(1)},${(h - 1 - (v / mx) * (h - 3)).toFixed(1)}`)).join("");
 	}
 
 	// What the chart draws: the plotted genres, or only the isolated ones.
@@ -330,7 +335,7 @@
 		dlOpen = false;
 		const cols = chartSeries;
 		const rows = [["month", ...cols.map((c) => `${c.name} (% of ${fmtNoun} checkouts)`)]];
-		viewMonths.forEach((m, i) => rows.push([`${m}-01`, ...cols.map((c) => (c.values[i] ?? 0).toFixed(3))]));
+		viewMonths.forEach((m, i) => rows.push([`${m}-01`, ...cols.map((c) => (c.values[i] == null ? "" : c.values[i].toFixed(3)))]));
 		const cell = (v) => { const t = String(v ?? ""); return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
 		const blob = new Blob(["\ufeff" + rows.map((r) => r.map(cell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
 		saveBlob(blob, "seattle-reading-genres.csv");
