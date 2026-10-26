@@ -315,6 +315,22 @@ def post_by_month(select, where, yr):
     return rows
 
 
+# Genre pairs the Genres tab can combine. Books carry several genres, so a
+# pair's "either" line can't be summed from the two genres' lines; it's counted
+# here. ("Both" = A + B - either.)
+PAIRS = [
+    ("Science Fiction", "Fantasy"),
+    ("Mystery", "Thriller & Suspense"),
+    ("Romance", "Fantasy"),
+    ("Romance", "Historical Fiction"),
+    ("Romance", "Young Adult"),
+    ("Horror", "Thriller & Suspense"),
+    ("Young Adult", "Fantasy"),
+    ("Young Adult", "Juvenile Fiction"),
+    ("Memoir & Biography", "History"),
+    ("Mystery", "True Crime"),
+]
+
 # BOOK (see build_genres) keeps three material types; each is one format.
 FORMATS = {"BOOK": "print", "EBOOK": "ebook", "AUDIOBOOK": "audiobook"}
 
@@ -344,6 +360,7 @@ def main():
     total_f = {f: [0] * N for f in FMTS}
     classified_f = {f: [0] * N for f in FMTS}
     over_f = {f: [[0] * N for _ in TAXONOMY] for f in FMTS}
+    pair_f = {f: [[0] * N for _ in PAIRS] for f in FMTS}
     oclauses, pclauses = overlap_clauses(), partition_clauses()
     any_genre = " OR ".join(f"({c})" for _, c in oclauses)
 
@@ -356,6 +373,8 @@ def main():
             total_f[f][j] += int(float(row.get("total", 0) or 0))
             classified_f[f][j] += int(float(row.get("classified", 0) or 0))
         ocases = ", ".join(f"sum(case({c}, checkouts, true, 0)) AS o{i}" for i, (n, c) in enumerate(oclauses))
+        clause = dict(oclauses)
+        ocases += "".join(f", sum(case(({clause[a]}) OR ({clause[b]}), checkouts, true, 0)) AS p{k}" for k, (a, b) in enumerate(PAIRS))
         for row in post_by_month(ocases, BOOK, yr):
             slot = _row_slot(row, idx, yr)
             if not slot:
@@ -363,6 +382,8 @@ def main():
             j, f = slot
             for i in range(len(TAXONOMY)):
                 over_f[f][i][j] += int(float(row.get(f"o{i}", 0) or 0))
+            for k in range(len(PAIRS)):
+                pair_f[f][k][j] += int(float(row.get(f"p{k}", 0) or 0))
         total = [sum(total_f[f][j] for f in FMTS) for j in range(N)]
         classified = [sum(classified_f[f][j] for f in FMTS) for j in range(N)]
         asg = sum(classified[idx[f"{yr}-{m:02d}"]] for m in range(1, 13) if f"{yr}-{m:02d}" in idx)
@@ -417,7 +438,9 @@ def main():
 
     OUT.write_text(json.dumps({"months": months, "total": total, "genres": genres_out,
                                "other": other, "otherExamples": other_examples[:10],
-                               "otherTags": other_tags, "byFormat": by_format},
+                               "otherTags": other_tags, "byFormat": by_format,
+                               "pairs": [{"a": a, "b": b, "either": [sum(pair_f[f][k][j] for f in FMTS) for j in range(N)],
+                                          "fmt": {f: pair_f[f][k] for f in FMTS}} for k, (a, b) in enumerate(PAIRS)]},
                               separators=(",", ":")))
     print(f"Wrote {OUT}", flush=True)
 

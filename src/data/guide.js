@@ -9,7 +9,7 @@ export const GUIDE_STEPS = [
 	{
 		chart: "total",
 		title: "Every checkout, every month",
-		text: "The Seattle Public Library publishes how many times each title was checked out, every month since 2006: print books, ebooks and audiobooks. That adds up to more than 120 million checkouts. Each record names a title, an author, a format and subject headings. Nothing in it is connected to individual patrons."
+		text: "The Seattle Public Library publishes how many times each title was checked out, every month since April 2005: print books, ebooks and audiobooks. That adds up to more than 120 million checkouts. Each record names a title, an author, a format and subject headings. Nothing in it is connected to individual patrons."
 	},
 	{
 		chart: "formats",

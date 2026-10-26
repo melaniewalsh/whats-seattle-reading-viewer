@@ -329,6 +329,12 @@ function summaryOverrideFor(title) {
 // Work preview: a manual override first, then an author-constrained title search
 // (trusted), then Wikidata and a plain-title lookup — both verified to actually name
 // the author so a same-titled book by someone else never sneaks through.
+// The summary of an article the build already matched to the book
+// (data-prep/fill_pub_years.py stores its title with each ranked book).
+export function wikiPage(title) {
+	return cached(`wikipage:${title}`, () => summaryByTitle(title));
+}
+
 export function wikiWork(title, author) {
 	const ov = summaryOverrideFor(title);
 	if (ov) return Promise.resolve(ov);

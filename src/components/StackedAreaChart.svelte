@@ -35,6 +35,7 @@
 	// Numbers on the axis, end labels and tooltip: counts ("1,200") or, with
 	// `percent`, shares with just enough decimals ("12%", "2.5%", "0.15%").
 	function fmtVal(v) {
+		if (v == null) return "–"; // a gap (e.g. a share in a month with almost no checkouts)
 		if (!percent) return Math.round(v).toLocaleString();
 		const a = Math.abs(v);
 		return `${parseFloat(v.toFixed(a < 1 ? 2 : a < 10 ? 1 : 0))}%`;
@@ -282,7 +283,8 @@
 	);
 	const linePaths = $derived(
 		lineLayers.map((s, k) => {
-			const line = d3line().x((_, i) => x(i)).y((_, i) => y(s.values[i]));
+			// A null value is a gap in the line.
+			const line = d3line().defined((_, i) => s.values[i] != null).x((_, i) => x(i)).y((_, i) => y(s.values[i]));
 			const n = s.values.length;
 			const split = partialYear && n > 1;
 			return {
@@ -925,7 +927,7 @@
 		</div>
 	{/each}
 	{#each showEventQs ? annotationMarks : [] as a, k}
-		<button type="button" class="ev-q" class:open={evOpen === k} style="left: {evQLeft[k]}px; top: {margin.top - 12 - 21}px;" aria-label="{a.label}: about this dip" aria-expanded={evOpen === k} onpointerdown={(e) => e.stopPropagation()} onclick={() => (evOpen = evOpen === k ? null : k)}>{a.tiny || a.lines[0]} <span class="ev-q-mark" aria-hidden="true">?</span></button>
+		<button type="button" class="ev-q" class:open={evOpen === k} style="left: {evQLeft[k]}px; top: {margin.top - 12 - 21}px;" aria-label="{a.label}: about this dip" aria-expanded={evOpen === k} onpointerdown={(e) => e.stopPropagation()} onclick={() => (evOpen = evOpen === k ? null : k)}>{a.tiny || a.lines[0]}</button>
 	{/each}
 	{#if showEventQs && evOpen !== null && annotationMarks[evOpen]}
 		{@const a = annotationMarks[evOpen]}
@@ -1061,26 +1063,25 @@
 
 	/* Phones: a small "?" over each event band, and the note it opens (spans
 	   the chart, so it never runs off a narrow screen). */
+	/* Plain gray text over the band, as on desktop; tapping it opens the note. */
 	.ev-q {
 		position: absolute;
 		z-index: 7;
 		transform: translateX(-50%);
 		height: 20px;
-		padding: 0 7px;
-		border: 1px solid #c4c4c4;
-		border-radius: 10px;
-		background: #fff;
-		color: #666;
-		font: 600 11px/18px var(--font-sans, system-ui, sans-serif);
+		padding: 0;
+		border: 0;
+		background: none;
+		color: #858585;
+		font: 400 11px/18px var(--font-sans, system-ui, sans-serif);
 		white-space: nowrap;
 		text-align: center;
+		text-shadow: 0 0 3px #fff, 0 0 3px #fff;
 		cursor: pointer;
 	}
-	.ev-q-mark { color: #999; margin-left: 1px; }
-	.ev-q.open .ev-q-mark { color: #fff; }
-	/* A bigger tap target than the circle itself. */
+	/* A bigger tap target than the text itself. */
 	.ev-q::after { content: ""; position: absolute; inset: -10px; }
-	.ev-q.open { background: #555; border-color: #555; color: #fff; }
+	.ev-q.open { color: var(--color-fg, #222); }
 	.ev-sheet {
 		position: absolute;
 		left: 6px;

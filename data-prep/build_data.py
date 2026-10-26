@@ -698,38 +698,52 @@ def annotate_editions(con, out_dir, slug_by_author, base_select, parquet_list=No
         """
     )
     print(f"  [editions] edition rows built ({perf_counter() - t0:.2f}s)", flush=True)
-    cur = con.execute(
-        """
-        WITH f AS (SELECT author, title, fmt, sum(n) AS n FROM edrows GROUP BY ALL),
-        s AS (SELECT author, title, src, sum(n) AS n FROM edrows WHERE src IS NOT NULL GROUP BY ALL),
+    # Run a slice of the authors at a time: all at once ran out of memory on
+    # the 7 GB build machine (each edition carries its monthly series).
+    # An author's rows all land in the same slice, so each file is patched once.
+    PARTS = 64
+    EDITION_QUERY = """
+        WITH er AS (SELECT * FROM edrows WHERE hash(author) % __PARTS__ = __PART__),
+        f AS (SELECT author, title, fmt, sum(n) AS n FROM er GROUP BY ALL),
+        s AS (SELECT author, title, src, sum(n) AS n FROM er WHERE src IS NOT NULL GROUP BY ALL),
         -- One row per edition: publisher, year, format and ISBN. Checkouts from
         -- before mid-2022 have no ISBN; they join their publisher/year/format's
-        -- most-borrowed ISBN. Editions with different ISBNs stay separate.
-        -- Each edition keeps its monthly checkouts, so the site can list and
-        -- chart it on its own.
-        v0 AS (SELECT author, title, pub, py, fmt, isbn, mi, sum(n) AS n FROM edrows
-               WHERE pub IS NOT NULL OR py IS NOT NULL OR isbn IS NOT NULL GROUP BY ALL),
-        dom AS (SELECT author, title, pub, py, fmt, arg_max(isbn, tot) AS isbn
-                FROM (SELECT author, title, pub, py, fmt, isbn, sum(n) AS tot FROM v0
-                      WHERE isbn IS NOT NULL GROUP BY author, title, pub, py, fmt, isbn)
-                GROUP BY author, title, pub, py, fmt),
-        vm AS (SELECT v0.author, v0.title, v0.pub, v0.py, v0.fmt, coalesce(v0.isbn, dom.isbn) AS isbn, v0.mi, sum(v0.n) AS n
-               FROM v0 LEFT JOIN dom ON v0.isbn IS NULL AND v0.author = dom.author AND v0.title = dom.title
-                    AND v0.pub IS NOT DISTINCT FROM dom.pub AND v0.py IS NOT DISTINCT FROM dom.py AND v0.fmt = dom.fmt
-               GROUP BY ALL),
-        v AS (SELECT author, title, pub, py, fmt, isbn, sum(n) AS n, list([mi, n] ORDER BY mi) AS ser
-              FROM vm GROUP BY author, title, pub, py, fmt, isbn),
+        -- most-borrowed ISBN. Editions with different ISBNs stay separate, and
+        -- each keeps its monthly checkouts so the site can chart it on its own.
+        -- Editions are settled on the small per-edition totals first (the top 8
+        -- per title); only then are the monthly rows joined in, on plain
+        -- equality (null-safe joins over the monthly rows ran for hours).
+        v0 AS (SELECT author, title, coalesce(pub, '') AS pub, coalesce(py, '') AS py, fmt,
+                      coalesce(isbn, '') AS isbn, sum(n) AS n
+               FROM er WHERE pub IS NOT NULL OR py IS NOT NULL OR isbn IS NOT NULL GROUP BY ALL),
+        dom AS (SELECT author, title, pub, py, fmt, arg_max(isbn, n) AS disbn FROM v0
+                WHERE isbn <> '' GROUP BY author, title, pub, py, fmt),
+        e AS (SELECT v0.author, v0.title, v0.pub, v0.py, v0.fmt, v0.isbn AS raw_isbn,
+                     CASE WHEN v0.isbn = '' THEN coalesce(dom.disbn, '') ELSE v0.isbn END AS isbn, v0.n
+              FROM v0 LEFT JOIN dom USING (author, title, pub, py, fmt)),
+        ed AS (SELECT author, title, pub, py, fmt, isbn, sum(n) AS n FROM e GROUP BY ALL),
+        top AS (SELECT * FROM (SELECT *, row_number() OVER (PARTITION BY author, title ORDER BY n DESC) AS rn FROM ed)
+                WHERE rn <= 8),
+        etop AS (SELECT e.author, e.title, e.pub, e.py, e.fmt, e.raw_isbn, e.isbn FROM e
+                 JOIN top USING (author, title, pub, py, fmt, isbn)),
+        ser AS (SELECT etop.author, etop.title, etop.pub, etop.py, etop.fmt, etop.isbn, r.mi, sum(r.n) AS n
+                FROM (SELECT author, title, coalesce(pub, '') AS pub, coalesce(py, '') AS py, fmt,
+                             coalesce(isbn, '') AS raw_isbn, mi, n FROM er) r
+                JOIN etop USING (author, title, pub, py, fmt, raw_isbn)
+                GROUP BY ALL),
+        v AS (SELECT top.author, top.title, top.pub, top.py, top.fmt, top.isbn, top.n,
+                     list([ser.mi, ser.n] ORDER BY ser.mi) AS ser
+              FROM top JOIN ser USING (author, title, pub, py, fmt, isbn)
+              GROUP BY top.author, top.title, top.pub, top.py, top.fmt, top.isbn, top.n),
         fa AS (SELECT author, title, list([fmt, CAST(n AS VARCHAR)] ORDER BY n DESC) AS f FROM f GROUP BY ALL),
         sa AS (SELECT author, title, list([src, CAST(n AS VARCHAR)] ORDER BY n DESC) AS s FROM s GROUP BY ALL),
         va AS (SELECT author, title,
-                      list_slice(list({'p': coalesce(pub, ''), 'y': coalesce(py, ''), 'i': coalesce(isbn, ''), 'f': fmt, 'n': n, 'ser': ser} ORDER BY n DESC), 1, 8) AS v
+                      list({'p': pub, 'y': py, 'i': isbn, 'f': fmt, 'n': n, 'ser': ser} ORDER BY n DESC) AS v
                FROM v GROUP BY ALL)
         SELECT fa.author, fa.title, fa.f, sa.s, va.v
         FROM fa LEFT JOIN sa USING (author, title) LEFT JOIN va USING (author, title)
         ORDER BY fa.author
         """
-    )
-    reader = cur.fetch_record_batch(rows_per_batch=TITLE_FETCH_CHUNK)
     num = lambda pairs: [[p[0], int(p[1])] for p in (pairs or [])]
     sentinel = object()
     state = {"author": sentinel, "titles": {}}
@@ -760,17 +774,21 @@ def annotate_editions(con, out_dir, slug_by_author, base_select, parquet_list=No
             path.write_bytes(_dumps(data))
             n_patched[0] += 1
 
-    for batch in reader:
-        for row in batch.to_pylist():
-            if row["author"] != state["author"]:
-                flush()
-                state["author"] = row["author"]
-            state["titles"][row["title"]] = {
-                "f": num(row["f"]),
-                "s": num(row["s"]),
-                "v": [[x["p"], x["y"], x["i"], x["f"], int(x["n"]), [[int(m), int(c)] for m, c in x["ser"]]]
-                      for x in (row["v"] or [])],
-            }
+    for part in range(PARTS):
+        cur = con.execute(EDITION_QUERY.replace("__PARTS__", str(PARTS)).replace("__PART__", str(part)))
+        for batch in cur.fetch_record_batch(rows_per_batch=TITLE_FETCH_CHUNK):
+            for row in batch.to_pylist():
+                if row["author"] != state["author"]:
+                    flush()
+                    state["author"] = row["author"]
+                state["titles"][row["title"]] = {
+                    "f": num(row["f"]),
+                    "s": num(row["s"]),
+                    "v": [[x["p"], x["y"], x["i"], x["f"], int(x["n"]), [[int(m), int(c)] for m, c in x["ser"]]]
+                          for x in (row["v"] or [])],
+                }
+        flush()
+        state["author"] = sentinel
     flush()
     con.execute("DROP TABLE IF EXISTS edrows")
     con.execute("DROP TABLE IF EXISTS edmerge")
