@@ -2134,20 +2134,16 @@
 
 	// Book markers on an author's "Total" chart: the month each of their top
 	// five books was FIRST CHECKED OUT at SPL (not its publication or arrival
-	// date — the data can't tell us those). Skipped for books already circulating
-	// when the data begins, and for the author's very first book, whose marker
-	// would just sit at the left edge.
+	// date — the data can't tell us those). A book already circulating when the
+	// data begins is marked at the data's first month.
 	const MONTH_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 	const bookMarkersAll = $derived.by(() => {
 		if (!current || isOverview || searchMode === "title" || chartMode !== "line" || !months.length) return [];
-		const firstActive = current.series.findIndex((v) => v > 0);
 		return [...workGroups.values()]
 			.sort((a, b) => b.total - a.total)
 			.slice(0, 5)
 			.map((w) => ({ w, f: sumSeries(w.idxs).findIndex((v) => v > 0) }))
-			// Skip the first three years of data: older books' catalog records
-			// trickle in then, so a "first checkout" there isn't a real debut.
-			.filter((o) => o.f >= 36 && o.f > firstActive + 6)
+			.filter((o) => o.f >= 0)
 			.map((o) => {
 				const m = months[o.f];
 				return { month: m, label: o.w.name, sub: `first checkout: ${yearlyView ? "" : MONTH_FULL[Number(m.slice(5, 7)) - 1] + " "}${m.slice(0, 4)}` };

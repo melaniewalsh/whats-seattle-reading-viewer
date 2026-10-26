@@ -360,7 +360,9 @@
 				let spot = null;
 				for (const r of [0, 1]) {
 					for (const side of sides) {
-						const a = side === 'start' ? lx - 4 : lx + 4 - w;
+						// A dot at the left edge (a book there from the data's first
+						// month) starts its label at the edge.
+						const a = side === 'start' ? Math.max(0, lx - 4) : lx + 4 - w;
 						if (fits(r, a, a + w)) { spot = { r, side, a }; break; }
 					}
 					if (spot) break;
@@ -368,7 +370,8 @@
 				if (spot) placed[spot.r].push([spot.a, spot.a + w]);
 				return {
 					...mk, label, sub, lx, ly: y(main.values[mk.i] || 0),
-					ty: spot ? rows[spot.r] : null, end: spot?.side === 'end', hideText: !spot
+					ty: spot ? rows[spot.r] : null, end: spot?.side === 'end', hideText: !spot,
+					tx: spot ? (spot.side === 'end' ? lx + 4 : spot.a) : lx - 4
 				};
 			});
 	});
@@ -845,9 +848,9 @@
 			<g class="marker" pointer-events="none">
 				{#if !mk.hideText}
 					<line class="marker-leader" x1={mk.lx} x2={mk.lx} y1={mk.ty + (mk.sub ? 20 : 6)} y2={mk.ly - 6} />
-					<text class="marker-title" class:peak={mk.kind === 'peak'} x={mk.end ? mk.lx + 4 : mk.lx - 4} y={mk.ty} text-anchor={mk.end ? 'end' : 'start'}>{mk.label}</text>
+					<text class="marker-title" class:peak={mk.kind === 'peak'} x={mk.tx} y={mk.ty} text-anchor={mk.end ? 'end' : 'start'}>{mk.label}</text>
 					{#if mk.sub}
-						<text class="marker-sub" x={mk.end ? mk.lx + 4 : mk.lx - 4} y={mk.ty + 14} text-anchor={mk.end ? 'end' : 'start'}>{mk.sub}</text>
+						<text class="marker-sub" x={mk.tx} y={mk.ty + 14} text-anchor={mk.end ? 'end' : 'start'}>{mk.sub}</text>
 					{/if}
 				{/if}
 				<circle class="marker-dot" cx={mk.lx} cy={mk.ly} r="3" />
