@@ -649,7 +649,7 @@ def annotate_editions(con, out_dir, slug_by_author, base_select, parquet_list=No
     combinations, from the raw rows (the cleaned table doesn't carry them).
 
       title -> "ed": {"f": [[fmt, n], ...], "s": [[source, n], ...],
-                      "v": [[publisher, year, isbn, fmt, n], ...]  (top 8 editions)}
+                      "v": [[publisher, year, isbn, fmt, n, [[month, n], ...]], ...]  (top 8 editions)}
 
     Isolated post-pass: if the raw files lack these columns, the build carries on."""
     authors_dir = out_dir / "authors"
@@ -688,7 +688,7 @@ def annotate_editions(con, out_dir, slug_by_author, base_select, parquet_list=No
         f"""
         CREATE TABLE edrows AS
         WITH base AS ({sel})
-        SELECT COALESCE(e.rep, {canon}) AS author, b.title, b.fmt,
+        SELECT COALESCE(e.rep, {canon}) AS author, b.title, b.fmt, b.mi,
                nullif(trim(b.ed_src), '') AS src, nullif(trim(b.ed_pub), '') AS pub,
                nullif(trim(b.ed_py), '') AS py, nullif(trim(b.ed_isbn), '') AS isbn,
                CAST(sum(b.checkouts) AS BIGINT) AS n
@@ -705,18 +705,24 @@ def annotate_editions(con, out_dir, slug_by_author, base_select, parquet_list=No
         -- One row per edition: publisher, year, format and ISBN. Checkouts from
         -- before mid-2022 have no ISBN; they join their publisher/year/format's
         -- most-borrowed ISBN. Editions with different ISBNs stay separate.
-        v0 AS (SELECT author, title, pub, py, fmt, isbn, sum(n) AS n FROM edrows
+        -- Each edition keeps its monthly checkouts, so the site can list and
+        -- chart it on its own.
+        v0 AS (SELECT author, title, pub, py, fmt, isbn, mi, sum(n) AS n FROM edrows
                WHERE pub IS NOT NULL OR py IS NOT NULL OR isbn IS NOT NULL GROUP BY ALL),
-        dom AS (SELECT author, title, pub, py, fmt, arg_max(isbn, n) AS isbn FROM v0
-                WHERE isbn IS NOT NULL GROUP BY author, title, pub, py, fmt),
-        v AS (SELECT v0.author, v0.title, v0.pub, v0.py, v0.fmt, coalesce(v0.isbn, dom.isbn) AS isbn, sum(v0.n) AS n
-              FROM v0 LEFT JOIN dom ON v0.isbn IS NULL AND v0.author = dom.author AND v0.title = dom.title
-                   AND v0.pub IS NOT DISTINCT FROM dom.pub AND v0.py IS NOT DISTINCT FROM dom.py AND v0.fmt = dom.fmt
-              GROUP BY ALL),
+        dom AS (SELECT author, title, pub, py, fmt, arg_max(isbn, tot) AS isbn
+                FROM (SELECT author, title, pub, py, fmt, isbn, sum(n) AS tot FROM v0
+                      WHERE isbn IS NOT NULL GROUP BY author, title, pub, py, fmt, isbn)
+                GROUP BY author, title, pub, py, fmt),
+        vm AS (SELECT v0.author, v0.title, v0.pub, v0.py, v0.fmt, coalesce(v0.isbn, dom.isbn) AS isbn, v0.mi, sum(v0.n) AS n
+               FROM v0 LEFT JOIN dom ON v0.isbn IS NULL AND v0.author = dom.author AND v0.title = dom.title
+                    AND v0.pub IS NOT DISTINCT FROM dom.pub AND v0.py IS NOT DISTINCT FROM dom.py AND v0.fmt = dom.fmt
+               GROUP BY ALL),
+        v AS (SELECT author, title, pub, py, fmt, isbn, sum(n) AS n, list([mi, n] ORDER BY mi) AS ser
+              FROM vm GROUP BY author, title, pub, py, fmt, isbn),
         fa AS (SELECT author, title, list([fmt, CAST(n AS VARCHAR)] ORDER BY n DESC) AS f FROM f GROUP BY ALL),
         sa AS (SELECT author, title, list([src, CAST(n AS VARCHAR)] ORDER BY n DESC) AS s FROM s GROUP BY ALL),
         va AS (SELECT author, title,
-                      list_slice(list([coalesce(pub, ''), coalesce(py, ''), coalesce(isbn, ''), fmt, CAST(n AS VARCHAR)] ORDER BY n DESC), 1, 8) AS v
+                      list_slice(list({'p': coalesce(pub, ''), 'y': coalesce(py, ''), 'i': coalesce(isbn, ''), 'f': fmt, 'n': n, 'ser': ser} ORDER BY n DESC), 1, 8) AS v
                FROM v GROUP BY ALL)
         SELECT fa.author, fa.title, fa.f, sa.s, va.v
         FROM fa LEFT JOIN sa USING (author, title) LEFT JOIN va USING (author, title)
@@ -762,7 +768,8 @@ def annotate_editions(con, out_dir, slug_by_author, base_select, parquet_list=No
             state["titles"][row["title"]] = {
                 "f": num(row["f"]),
                 "s": num(row["s"]),
-                "v": [[x[0], x[1], x[2], x[3], int(x[4])] for x in (row["v"] or [])],
+                "v": [[x["p"], x["y"], x["i"], x["f"], int(x["n"]), [[int(m), int(c)] for m, c in x["ser"]]]
+                      for x in (row["v"] or [])],
             }
     flush()
     con.execute("DROP TABLE IF EXISTS edrows")
