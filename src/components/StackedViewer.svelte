@@ -1487,11 +1487,9 @@
 		document.querySelector(`[data-work="${CSS.escape(key)}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 	}
 	// What tells one edition from another (data-prep/build_data.py
-	// annotate_editions): publisher and year, ISBN, other formats, and where
-	// its checkouts came from.
+	// annotate_editions): publisher and year, ISBN and other formats.
 	// An ISBN opens that exact edition in the SPL catalog (digital editions included).
 	const isbnUrl = (isbn) => `https://seattle.bibliocommons.com/v2/search?query=${isbn}&searchType=keyword`;
-	const SOURCE = { Horizon: "a library copy", OverDrive: "OverDrive", Hoopla: "Hoopla", Freegal: "Freegal", Zinio: "Zinio" };
 	// The ISBNs in a catalog field, as 13-digit numbers. A field can hold the
 	// same book's 10- and 13-digit forms ("0735219095, 9780735219090"), which
 	// count once, or two editions' (hardcover and paperback), which both show.
@@ -1546,9 +1544,6 @@
 		// as plain "Wuthering Heights") is one row here: say what else it holds.
 		const FMT_NOUN = { ebook: "ebook", audiobook: "audiobook", print: "print", largeprint: "large print" };
 		for (const [f, n] of (ed.f || []).slice(1)) parts.push({ t: `includes ${n.toLocaleString()} ${FMT_NOUN[f] || f} checkout${n === 1 ? "" : "s"}` });
-		// Where its checkouts came from ("checked out via OverDrive").
-		const via = (ed.s || []).map(([src]) => SOURCE[src] || src).join(", ");
-		if (via) parts.push({ t: `checked out via ${via}` });
 		// One edition: it leads the line. Several: a short list under it, plus
 		// the rest (the build keeps the top four).
 		// "Penguin Group (USA), Inc. / Penguin Publishing Group, 2011"
