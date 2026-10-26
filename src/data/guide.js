@@ -38,7 +38,7 @@ export const GUIDE_STEPS = [
 	{
 		chart: "romance",
 		title: "Genres rise and fall",
-		text: "Every record carries Library of Congress or BISAC subject headings. Grouping those headings into genres shows how Seattle's tastes shift: romance, for example, went from about 6% of book checkouts in 2015 to about 14% in 2025.",
+		text: "Every record carries Library of Congress or BISAC subject headings. Grouping those headings into genres shows how Seattle's tastes shift: romance, for example, went from about 7% of book checkouts in 2015 to about 14% in 2025.",
 		link: { label: "Explore genres", tab: "genres" }
 	},
 	{

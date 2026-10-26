@@ -1489,7 +1489,11 @@
 	// What tells one edition from another (data-prep/build_data.py
 	// annotate_editions): publisher and year, ISBN and other formats.
 	// An ISBN opens that exact edition in the SPL catalog (digital editions included).
-	const isbnUrl = (isbn) => `https://seattle.bibliocommons.com/v2/search?query=${isbn}&searchType=keyword`;
+	// Ebooks and audiobooks open in the library's OverDrive (Libby) collection,
+	// which finds editions the main catalog search misses; print opens the catalog.
+	const isbnUrl = (isbn, fmt) => (fmt === "ebook" || fmt === "audiobook"
+		? `https://spl.overdrive.com/search?query=${isbn}`
+		: `https://seattle.bibliocommons.com/v2/search?query=${isbn}&searchType=keyword`);
 	// The ISBNs in a catalog field, as 13-digit numbers. A field can hold the
 	// same book's 10- and 13-digit forms ("0735219095, 9780735219090"), which
 	// count once, or two editions' (hardcover and paperback), which both show.
@@ -2157,7 +2161,7 @@
 </script>
 
 <div class="viewer">
-	{#snippet isbnLinks(list)}ISBN{list.length > 1 ? "s" : ""}{" "}{#each list as x, k}{#if k}, {/if}<a href={isbnUrl(x)} target="_blank" rel="noopener noreferrer" title="Find this edition in the Seattle Public Library catalog">{x}</a>{/each}{/snippet}
+	{#snippet isbnLinks(list, fmt)}ISBN{list.length > 1 ? "s" : ""}{" "}{#each list as x, k}{#if k}, {/if}<a href={isbnUrl(x, fmt)} target="_blank" rel="noopener noreferrer" title="Find this edition at the Seattle Public Library">{x}</a>{/each}{/snippet}
 	{#snippet authorPicker()}
 		<!-- Under the page's search field: a few starting points, half authors and
 		     half books, from a varied mix (recent, classic, romance, nonfiction). -->
@@ -2523,7 +2527,7 @@
 										checked={isSingleSelected(t.idx)}
 										onchange={() => keepTableStill(() => toggleTitle(t.idx))}
 										aria-label="Plot this edition on its own: {t.title}" />
-									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.parts.length}<span class="bk-ed-meta">{#if em.eds.length}{em.eds.length} editions under this title{" · "}{/if}{#each em.parts as p, k}{#if k}{" · "}{/if}{#if p.isbns}{@render isbnLinks(p.isbns)}{:else}{p.t}{/if}{/each}</span>{/if}{#if em.eds.length}<span class="bk-ed-list">{#each em.eds as e}<span class="bk-ed-item">{e.labels.join(" / ") || "Unknown publisher"}{#if e.isbns.length}{" · "}{@render isbnLinks(e.isbns)}{/if}{" · "}{e.n.toLocaleString()}</span>{/each}{#if em.rest >= SMALL_TOTAL}<span class="bk-ed-item">Other editions · {em.rest.toLocaleString()}</span>{/if}</span>{/if}{/if}</span>
+									<span class="bk-ed-title" title={t.title}>{#if isSingleSelected(t.idx) && soloSingleIdxs.includes(t.idx)}<span class="bk-swatch bk-ed-swatch" style="background:{singleColor(soloSingleIdxs.indexOf(t.idx))}"></span>{/if}<span class="bk-ed-fmt">{formatLabel(t.format)}</span>{#each markMatch(titleCase(t.title)) as p}{#if p.hit}<mark class="t-hit">{p.t}</mark>{:else}{p.t}{/if}{/each}{#if !editMode}{@const em = editionMeta(t)}{#if em.parts.length}<span class="bk-ed-meta">{#if em.eds.length}{em.eds.length} editions under this title{" · "}{/if}{#each em.parts as p, k}{#if k}{" · "}{/if}{#if p.isbns}{@render isbnLinks(p.isbns, t.fmt)}{:else}{p.t}{/if}{/each}</span>{/if}{#if em.eds.length}<span class="bk-ed-list">{#each em.eds as e}<span class="bk-ed-item">{e.labels.join(" / ") || "Unknown publisher"}{#if e.isbns.length}{" · "}{@render isbnLinks(e.isbns, t.fmt)}{/if}{" · "}{e.n.toLocaleString()}</span>{/each}{#if em.rest >= SMALL_TOTAL}<span class="bk-ed-item">Other editions · {em.rest.toLocaleString()}</span>{/if}</span>{/if}{/if}</span>
 									{#if editMode}
 										<span class="bk-ed-tools">
 											<select class="bk-move" aria-label="Move this edition to another book" onchange={(e) => { moveEdition(t.idx, e.currentTarget.value); e.currentTarget.value = ""; }}>
