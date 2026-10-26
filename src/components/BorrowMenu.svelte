@@ -26,18 +26,38 @@
 		return () => node.remove();
 	}
 	const links = $derived(lookupUrls(q));
+	// Under the button, or above it when there's no room below; re-placed as
+	// the page scrolls so the menu stays attached to its button.
+	const MENU_W = 236;
+	let menuEl = $state(null);
+	function place() {
+		if (!btnEl) return;
+		const r = btnEl.getBoundingClientRect();
+		const MENU_H = menuEl?.offsetHeight || 200;
+		const below = r.bottom + 6 + MENU_H <= window.innerHeight || r.top - 6 - MENU_H < 0;
+		menuPos = {
+			top: Math.round(below ? r.bottom + 6 : r.top - 6 - MENU_H),
+			left: Math.round(Math.max(8, Math.min(r.left, window.innerWidth - MENU_W - 8)))
+		};
+	}
 	function toggle() {
 		if (open) { open = false; return; }
-		if (btnEl) {
-			const r = btnEl.getBoundingClientRect();
-			const W = 236;
-			menuPos = {
-				top: Math.round(r.bottom + 6),
-				left: Math.round(Math.max(8, Math.min(r.left, window.innerWidth - W - 8)))
-			};
-		}
+		place();
 		open = true;
+		requestAnimationFrame(place); // again, with the menu's real height
 	}
+	$effect(() => {
+		if (!open) return;
+		let raf = 0;
+		const onMove = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(place); };
+		window.addEventListener("scroll", onMove, { capture: true, passive: true });
+		window.addEventListener("resize", onMove);
+		return () => {
+			cancelAnimationFrame(raf);
+			window.removeEventListener("scroll", onMove, { capture: true });
+			window.removeEventListener("resize", onMove);
+		};
+	});
 	function close() { open = false; }
 </script>
 
@@ -61,7 +81,7 @@
 	{#if open}
 		<div class="borrow-portal" {@attach portal}>
 			<button class="borrow-backdrop" aria-label="Close" onclick={close}></button>
-			<div class="borrow-menu" role="menu" style="top:{menuPos.top}px; left:{menuPos.left}px;">
+			<div class="borrow-menu" role="menu" bind:this={menuEl} style="top:{menuPos.top}px; left:{menuPos.left}px;">
 				<a role="menuitem" href={links.spl} target="_blank" rel="noopener noreferrer" onclick={close}>
 					<img class="bm-ic" src="{base}/spl-logo.png" alt="" width="18" height="18" />
 					<span class="bm-text"><span class="bm-name">Seattle Public Library</span><span class="bm-sub">Borrow · the SPL catalog</span></span>
