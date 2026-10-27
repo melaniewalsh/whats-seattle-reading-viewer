@@ -396,19 +396,6 @@
 		return best ? best[0].split("|") : [];
 	});
 
-	// On an author's page: books they're credited on that the library files
-	// under someone else (Dubner on Levitt's Freakonomics).
-	let alsoCredited = $state.raw([]);
-	$effect(() => {
-		const slug = currentSlug;
-		const authorPage = searchMode !== "title" && !isOverview;
-		alsoCredited = [];
-		if (!slug || !authorPage) return;
-		let alive = true;
-		getCoauthors().then((d) => { if (alive) alsoCredited = d?.[slug] || []; });
-		return () => { alive = false; };
-	});
-
 	// Co-authors who have their own page on the site (Stephen J. Dubner does)
 	// get a link to it: name -> slug, looked up in the author index.
 	let coAuthorSlugs = $state.raw({});
@@ -616,6 +603,33 @@
 		return merged; // (the table sorts rows itself)
 	}
 
+	// Books this author co-wrote that the library files under someone else
+	// (Dubner's Freakonomics, under Levitt; data-prep/build_title_index.py lists
+	// them) count on this page too: every format of the book joins the Books
+	// table, the line and the total, marked with who it's filed under.
+	async function addCoWritten(data, slug) {
+		const co = (await getCoauthors().catch(() => null))?.[slug] || [];
+		if (!co.length) return;
+		const have = new Set(data.titles.map((t) => `${t.title}|${t.fmt}`));
+		const byFiler = new Map();
+		for (const [title, filerSlug] of co) {
+			if (!byFiler.has(filerSlug)) byFiler.set(filerSlug, new Set());
+			byFiler.get(filerSlug).add(normalizeWorkKey(title));
+		}
+		const filers = await Promise.all([...byFiler.keys()].map((s) => getAuthor(s).catch(() => null)));
+		[...byFiler.values()].forEach((keys, k) => {
+			const filer = filers[k];
+			if (!filer) return;
+			for (const t of filer.titles) {
+				if (!keys.has(normalizeWorkKey(t.title)) || have.has(`${t.title}|${t.fmt}`)) continue;
+				const series = densify(t.series);
+				data.titles.push({ ...t, series, format: t.fmt, filedUnder: displayName(filer.name) });
+				series.forEach((c, m) => { data.series[m] = (data.series[m] || 0) + c; });
+				data.total += t.total;
+			}
+		});
+	}
+
 	async function selectAuthor(a, { scroll = true } = {}) {
 		// One author's drilldown (their series + every qualifying title) comes
 		// from their static JSON file (see db.js).
@@ -634,6 +648,7 @@
 			t.series = densify(t.series);
 			t.format = t.fmt; // the ETL stores the short field name "fmt"
 		});
+		await addCoWritten(data, a.slug);
 		data.titles = splitEditions(data.titles);
 		current = data;
 		currentSlug = a.slug;
@@ -1623,6 +1638,7 @@
 				if (yr && !same.yrs.includes(yr)) same.yrs.push(yr);
 			} else eds.push({ pubs: [pub].filter(Boolean), yrs: [yr].filter(Boolean), isbns, n });
 		}
+		if (t.filedUnder) parts.push({ t: `co-written; the library files it under ${t.filedUnder}` });
 		if (t.otherEditions) parts.push({ t: "other editions under this title" });
 		if (t.alsoTitles?.length) parts.push({ t: `also catalogued as ${t.alsoTitles.map((x) => `“${x}”`).join(", ")}` });
 		// A title string shared by more than one format (an audiobook also listed
@@ -2634,20 +2650,6 @@
 					<button type="button" class="books-more" onclick={() => (booksShowAll = false)}>Show fewer</button>
 				{:else if hiddenWorkCount > 0}
 					<p class="titles-more">Showing the top {visibleWorkBlocks.length.toLocaleString()} books. Type in the filter to find others.</p>
-				{/if}
-				{#if alsoCredited.length}
-					{@const filers = [...new Set(alsoCredited.map((b) => displayName(b[2])))]}
-					<!-- Credited, but filed under the first author the library lists, so
-					     these checkouts count on that author's page, not this one. -->
-					<div class="also-credited">
-						<h3 class="ac-title">Also credited on</h3>
-						<ul>
-							{#each alsoCredited as [title, slug, name, total] (slug + "~" + title)}
-								<li><button type="button" class="ac-book" onclick={() => openTitle(title, slug)}>{cleanTitleForDisplay(title) || title}</button> <span class="ac-with">with {displayName(name)}</span> <span class="ac-n">{compactNumber(total)} checkouts</span></li>
-							{/each}
-						</ul>
-						<p class="ac-note">The library files {alsoCredited.length === 1 ? "this" : "these"} under {filers.length === 1 ? filers[0] : "the other authors"}, so {alsoCredited.length === 1 ? "its" : "their"} checkouts count there, not in the totals above.</p>
-					</div>
 				{/if}
 			</section>
 			{/if}
@@ -3909,15 +3911,6 @@
 		.iso-note { display: none !important; }
 		.format-legend { justify-content: flex-start; gap: 2px 12px; font-size: 13px; }
 	}
-	.also-credited { margin: 22px 0 0; padding-top: 14px; border-top: 1px solid var(--color-border); font-family: var(--font-sans); }
-	.ac-title { margin: 0 0 8px; font-size: 1rem; font-weight: 600; color: var(--color-fg); }
-	.also-credited ul { list-style: none; margin: 0; padding: 0; }
-	.also-credited li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 5px 0; }
-	.ac-book { padding: 0; border: 0; background: none; font-family: var(--font-serif); font-size: 1.05rem; color: var(--color-fg); cursor: pointer; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 3px; }
-	.ac-book:hover { text-decoration-color: currentColor; }
-	.ac-with { font-size: 14px; color: var(--color-fg-light); }
-	.ac-n { margin-left: auto; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--color-fg); }
-	.ac-note { margin: 8px 0 0; font-size: 13px; color: var(--color-fg-light); }
 	.compare-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: #fff; font-family: var(--font-sans); font-size: 14px; font-weight: 500; color: var(--color-fg); cursor: pointer; }
 	.compare-btn:hover { border-color: var(--color-fg-light); }
 	.plot-toolbar {
