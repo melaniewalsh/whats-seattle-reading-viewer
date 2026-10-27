@@ -1564,10 +1564,12 @@
 	// annotate_editions): publisher and year, ISBN and other formats.
 	// An ISBN opens that exact edition in the SPL catalog (digital editions included).
 	// Ebooks and audiobooks open in the library's OverDrive (Libby) collection,
-	// which finds editions the main catalog search misses; print opens the catalog.
+	// which has every edition SPL lends. Print opens Google Books, which shows
+	// that exact edition even after the library replaces it (the catalog then
+	// finds nothing, or the ebook, whose record lists the print ISBN).
 	const isbnUrl = (isbn, fmt) => (fmt === "ebook" || fmt === "audiobook"
 		? `https://spl.overdrive.com/search?query=${isbn}`
-		: `https://seattle.bibliocommons.com/v2/search?query=${isbn}&searchType=keyword`);
+		: `https://books.google.com/books?vid=ISBN${isbn}`);
 	// The ISBNs in a catalog field, as 13-digit numbers. A field can hold the
 	// same book's 10- and 13-digit forms ("0735219095, 9780735219090"), which
 	// count once, or two editions' (hardcover and paperback), which both show.
@@ -2237,7 +2239,7 @@
 </script>
 
 <div class="viewer">
-	{#snippet isbnLinks(list, fmt)}ISBN{list.length > 1 ? "s" : ""}{" "}{#each list as x, k}{#if k}, {/if}<a href={isbnUrl(x, fmt)} target="_blank" rel="noopener noreferrer" title="Find this edition at the Seattle Public Library">{x}</a>{/each}{/snippet}
+	{#snippet isbnLinks(list, fmt)}ISBN{list.length > 1 ? "s" : ""}{" "}{#each list as x, k}{#if k}, {/if}<a href={isbnUrl(x, fmt)} target="_blank" rel="noopener noreferrer" title={fmt === "ebook" || fmt === "audiobook" ? "This edition in the library's OverDrive collection" : "This edition on Google Books"}>{x}</a>{/each}{/snippet}
 	{#snippet authorPicker()}
 		<!-- Under the page's search field: a few starting points, half authors and
 		     half books, from a varied mix (recent, classic, romance, nonfiction). -->
