@@ -274,9 +274,6 @@
 		}))
 	);
 
-	// A single line counted by year is drawn as bars, not a line.
-	const yearBars = $derived(yearly && mode === 'line' && lineLayers.length === 1 ? lineLayers[0] : null);
-	const yearBarW = $derived(Math.max(4, Math.min(56, (months.length > 1 ? x(1) - x(0) : 80) * 0.62)));
 	// With yearly points, the current year isn't over: its segment is dashed.
 	const partialYear = $derived(
 		yearly && lastMonth && !lastMonth.endsWith('-12') && months[months.length - 1]?.slice(0, 4) === lastMonth.slice(0, 4)
@@ -769,14 +766,6 @@
 
 		<!-- Layers: overlaid lines (line mode) or stacked areas (area mode) -->
 		{#if mode === 'line'}
-			{#if yearBars}
-				<!-- One line counted by year: a bar per year (the unfinished year lighter). -->
-				<g class="year-bars" fill={yearBars.color}>
-					{#each yearBars.values as v, i}
-						{#if v > 0}<rect x={x(i) - yearBarW / 2} width={yearBarW} y={y(v)} height={Math.max(0, y(0) - y(v))} rx="2" opacity={partialYear && i === yearBars.values.length - 1 ? 0.35 : 1} />{/if}
-					{/each}
-				</g>
-			{:else}
 			{#if barLayer}
 				<g class="month-bars" fill={barLayer.color}>
 					{#each barLayer.raw as v, i}
@@ -798,8 +787,14 @@
 				{#if p.dPartial}
 					<path d={p.dPartial} fill="none" stroke={p.color} stroke-width={p.isAggregate ? 2.25 : 2} stroke-dasharray="4 4" stroke-linecap="round" opacity={pathOpacity(p)} class="line-path" />
 				{/if}
+				<!-- Counted by year: a dot on each year, so it still reads as a line
+				     chart like every other page (it used to be bars). -->
+				{#if yearly}
+					{#each p.values as v, i}
+						{#if v != null}<circle class="year-dot" cx={x(i)} cy={y(v)} r="3.5" fill={p.color} opacity={pathOpacity(p) * (partialYear && i === p.values.length - 1 ? 0.5 : 1)} />{/if}
+					{/each}
+				{/if}
 			{/each}
-			{/if}
 		{:else}
 			{#each areaPaths as p (p.eachKey)}
 				<path
@@ -914,6 +909,10 @@
 			{/if}
 		{/each}
 	</svg>
+	<!-- What the faint bars are: each month's count, behind the 3-month average. -->
+	{#if barLayer}
+		<p class="bar-key"><span class="bar-key-bar" style="background:{barLayer.color}"></span>Each month <span class="bar-key-line" style="background:{barLayer.color}"></span>3-month average</p>
+	{/if}
 	<!-- Event labels: short text at the top of each band; hover/focus for the note -->
 	<!-- A narrow plot (phones, beside the line names) keeps the shaded bands but
 	     drops their text labels, which would pile up over the lines. -->
@@ -1123,6 +1122,9 @@
 		stroke-linejoin: round;
 	}
 	.month-bars { opacity: 0.28; }
+	.bar-key { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; font-family: var(--font-sans); font-size: 12px; color: var(--color-fg-light); }
+	.bar-key-bar { display: inline-block; width: 6px; height: 11px; border-radius: 1px; opacity: 0.35; }
+	.bar-key-line { display: inline-block; width: 16px; height: 2.5px; border-radius: 2px; margin-left: 10px; }
 
 	/* Book markers */
 	.marker-leader { stroke: #8a8a8a; stroke-width: 0.75; }
