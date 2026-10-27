@@ -552,11 +552,14 @@
 			const v = t.ed?.v || [];
 			const groups = [];
 			if (v.length > 1 && v.every((e) => Array.isArray(e[5]))) {
+				// Without an ISBN, the same publisher, year and format is one edition:
+				// a re-cataloged record ("c1952." became "[1952]") isn't a new book.
+				const sig = (e) => `${(e[0] || "").replace(/[\s,;:/.]+$/, "").toLowerCase()}|${(e[1] || "").match(/\d{4}/)?.[0] || ""}|${e[3]}`;
 				for (const e of v) {
 					const isbns = isbnList(e[2]);
-					const g = groups.find((x) => isbns.some((i) => x.isbns.includes(i)));
+					const g = groups.find((x) => (isbns.length ? isbns.some((i) => x.isbns.includes(i)) : !x.isbns.length && x.sig === sig(e)));
 					if (g) { g.v.push(e); isbns.forEach((i) => g.isbns.includes(i) || g.isbns.push(i)); }
-					else groups.push({ isbns, v: [e] });
+					else groups.push({ isbns, sig: sig(e), v: [e] });
 				}
 			}
 			if (groups.length < 2) { out.push(t); continue; }
@@ -1822,7 +1825,7 @@
 	// LC punctuation ("Dublin Ireland Fiction", "Man woman relationships Fiction"),
 	// mixes in format words ("Large type books", "Novels") and near-duplicates
 	// ("Horror" / "Horror fiction"). Clean that up and keep the top five.
-	const SUBJ_DROP = /^(fiction|nonfiction|non-fiction|literature|novels?|large type books|large print books|audiobooks?|downloadable audio books|electronic books|juvenile fiction|juvenile literature|general|adult|stories)$/i;
+	const SUBJ_DROP = /^(fiction|nonfiction|non-fiction|literature|novels?|large type books|large print books|audiobooks?|downloadable audio books|electronic books|juvenile fiction|juvenile literature|general|adult|stories|na|n\/a)$/i; // "NA": the data's "no headings"
 	const PLACES = new Set(["Ireland", "England", "Scotland", "Wales", "France", "Italy", "Spain", "Germany", "Japan", "China", "India", "Mexico", "Canada", "Australia", "Russia", "Nigeria", "Israel", "Egypt", "Greece", "Korea", "Washington", "Calif", "California", "Texas", "Florida", "Alaska", "Oregon", "Mass", "Massachusetts", "Ill", "Illinois", "N.Y", "N Y", "Ohio", "Mich", "Minn", "Ga", "La", "Va", "Pa"]);
 	// US state abbreviations as LC writes them ("Jackson Miss" -> "Jackson (Miss.)").
 	const STATE_ABBR = new Set(["Ala", "Ariz", "Ark", "Calif", "Colo", "Conn", "Del", "Fla", "Ga", "Ill", "Ind", "Kan", "Ky", "La", "Md", "Mass", "Mich", "Minn", "Miss", "Mo", "Mont", "Neb", "Nev", "Okla", "Or", "Ore", "Pa", "Tenn", "Tex", "Va", "Vt", "Wash", "Wis", "Wyo"]);
