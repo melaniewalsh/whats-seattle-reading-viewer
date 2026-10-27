@@ -18,8 +18,7 @@
 	import TableIcon from "@lucide/svelte/icons/table";
 	import ChartAreaIcon from "@lucide/svelte/icons/chart-area";
 	import ChartLineIcon from "@lucide/svelte/icons/chart-line";
-	import MergeIcon from "@lucide/svelte/icons/merge";
-	import LineChart from "$components/StackedAreaChart.svelte";
+		import LineChart from "$components/StackedAreaChart.svelte";
 	import DataInfo from "$components/DataInfo.svelte";
 	import { EVENT_ANNOTATIONS } from "$data/eventAnnotations.js";
 	import YearBrush from "$components/YearBrush.svelte";
@@ -62,10 +61,6 @@
 	// share of ALL book checkouts, so the three add up to the genre's line.
 	// (genres.json splits each genre's count by format.)
 	let byFmt = $state(false);
-	// "Combine": two genres as one line ("Science Fiction or Fantasy"), plus the
-	// books in both. Only for the pairs the build counts (build_partition.py
-	// PAIRS): a book can be in both, so the two lines can't just be added.
-	let combine = $state(false);
 	const FMT_LINES = [["print", "Print", "#3f88cc"], ["ebook", "Ebook", "#e58a00"], ["audiobook", "Audiobook", "#1f7a4d"]];
 	let loadError = $state("");
 	let shown = $state(new Set());  // genre names currently plotted
@@ -126,7 +121,6 @@
 			try {
 				const sp = new URLSearchParams(window.location.search);
 				if (sp.get("view") === "format") byFmt = true;
-				if (sp.get("view") === "combine") combine = true;
 				const want = (sp.get("genres") || "").split(",").map((x) => x.trim()).filter((x) => by[x] || x === "Other");
 				if (want.length) {
 					shown = new Set(want.filter((x) => x !== "Other"));
@@ -151,31 +145,18 @@
 		if (!raw) return;
 		const iso = isolatedKeys.map((k) => k.replace(/^g:/, "")).map((n) => (n === "__other" ? "Other" : n));
 		const names = iso.length ? iso : [...shown, ...(showOther ? ["Other"] : [])];
-		const sig = `${byFmt}|${combine}|${names.join(",")}`;
+		const sig = `${byFmt}|${names.join(",")}`;
 		if (defaultSig === null) defaultSig = sig;
 		if (sig === defaultSig && !window.location.search.includes("genres=")) return;
 		try {
 			const url = new URL(window.location.href);
 			if (showByFmt) url.searchParams.set("view", "format");
-			else if (showCombine) url.searchParams.set("view", "combine");
 			else url.searchParams.delete("view");
 			if (names.length) url.searchParams.set("genres", names.join(","));
 			else url.searchParams.delete("genres");
 			if (url.href !== window.location.href) window.history.replaceState({}, "", url);
 		} catch {}
 	});
-
-	// Pick a pair from the menu: plot just those two, combined.
-	function pickPair(v) {
-		if (!v) { combine = false; return; }
-		const [a, b] = v.split("|");
-		shown = new Set([a, b]);
-		showOther = false;
-		isolatedKeys = [];
-		openGroupsFor(shown);
-		byFmt = false;
-		combine = true;
-	}
 
 	function sum(a) { let s = 0; for (const v of a || []) s += v; return s; }
 	// A share of almost nothing is noise: in spring 2020 the closed branches
@@ -329,20 +310,8 @@
 	// by format, the one genre's print / ebook / audiobook lines.
 	const canByFmt = $derived(!!(headGenre?.fmt && raw?.byFormat));
 	const showByFmt = $derived(byFmt && canByFmt);
-	const pair = $derived.by(() => {
-		if (!raw?.pairs || plotGenres.length !== 2) return null;
-		const [x, y] = plotGenres;
-		return raw.pairs.find((p) => (p.a === x && p.b === y) || (p.a === y && p.b === x)) || null;
-	});
-	const showCombine = $derived(combine && !!pair && !showByFmt);
 	const chartSeries = $derived(
-		showCombine
-			? [
-				{ key: "c:either", name: `${pair.a} or ${pair.b}`, label: `${pair.a} or ${pair.b}`, color: "#6a4c93", values: share(pair.either).slice(lo, hi + 1) },
-				{ key: "c:both", name: "Both", label: "Both", color: "#c1666b",
-					values: share(pair.either.map((e, i) => (genreByName[pair.a].overlap[i] || 0) + (genreByName[pair.b].overlap[i] || 0) - e)).slice(lo, hi + 1) }
-			]
-		: showByFmt
+		showByFmt
 			? FMT_LINES.map(([f, label, color]) => ({ key: `f:${f}`, name: label, label, color, values: share(headGenre.fmt[f]).slice(lo, hi + 1) }))
 			: (isolatedKeys.length ? series.filter((s) => isolatedKeys.includes(s.key)) : series).map((s) => ({ ...s, label: s.name })),
 	);
@@ -602,33 +571,18 @@
 			<div class="tb-left">
 				<!-- The chart's views, the same buttons as on an author's page. -->
 				<div class="mode-toggle" role="group" aria-label="Chart type">
-					<button type="button" class:active={!showByFmt && !showCombine} onclick={() => { byFmt = false; combine = false; }} title="Total" aria-label="Total">
+					<button type="button" class:active={!showByFmt} onclick={() => { byFmt = false; }} title="Total" aria-label="Total">
 						<ChartAreaIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">Total</span>
 					</button>
 					{#if raw.byFormat}
 						<button type="button" class:active={showByFmt} disabled={!canByFmt}
 							title={canByFmt ? "Split this genre into print, ebook and audiobook" : "Show one genre to split it by format"} aria-label="By format"
-							onclick={() => { byFmt = true; combine = false; }}>
+							onclick={() => { byFmt = true; }}>
 							<ChartLineIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">By format</span>
 						</button>
 					{/if}
-					{#if pair}
-						<button type="button" class:active={showCombine} title="Show {pair.a} and {pair.b} as one line, counting each book once" aria-label="Combine"
-							onclick={() => { combine = true; byFmt = false; }}>
-							<MergeIcon size={17} strokeWidth={2} aria-hidden="true" /><span class="mt-txt">Combine</span>
-						</button>
-					{/if}
 				</div>
-				{#if raw.pairs?.length}
-					<!-- The pairs the build counts, so they can be combined (see Combine). -->
-					<select class="pair-pick" aria-label="Combine two genres" value={showCombine ? `${pair.a}|${pair.b}` : ""}
-						onchange={(e) => pickPair(e.currentTarget.value)}>
-						<option value="">Combine genres…</option>
-						{#each raw.pairs as p}<option value="{p.a}|{p.b}">{p.a} + {p.b}</option>{/each}
-					</select>
-				{/if}
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
-				{#if showCombine}<span class="iso-note">Books in either genre, counted once, and the books in both.</span>{/if}
 				{#if showByFmt}<span class="iso-note">Each line is a share of all book checkouts; together they make {headName}'s total.</span>{/if}
 				{#if !showByFmt && isolatedKeys.length && series.length >= 2}
 					<span class="iso-note">Showing {chartSeries.length} of {series.length}<span aria-hidden="true">{" · "}</span><button type="button" class="iso-showall" onclick={() => (isolatedKeys = [])}>Show all</button></span>
@@ -640,7 +594,7 @@
 		<div class="chart-panel" style="--hang: {Math.max(0, plotInset - 16)}px">
 		<div class="chartwrap" bind:this={chartWrap}>
 			<LineChart bind:plotInset months={viewMonths} series={chartSeries} mode="line" percent unit="of {fmtNoun} checkouts"
-				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={showByFmt || showCombine ? null : (k) => toggleIsolate(k)} />
+				smooth={smoothOn} annotations={EVENT_ANNOTATIONS} {legendHoverKey} onSeriesClick={showByFmt ? null : (k) => toggleIsolate(k)} />
 		</div>
 
 		<!-- A swatch legend under the chart (phones have no end-of-line names).
@@ -928,8 +882,6 @@
 	.smooth-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-fg-light); cursor: pointer; user-select: none; }
 	.smooth-toggle input { margin: 0; width: 16px; height: 16px; accent-color: var(--color-fg); appearance: auto; -webkit-appearance: auto; }
 	/* Chart views: as on an author's page (StackedViewer .plot-toolbar .mode-toggle). */
-	.pair-pick { padding: 7px 28px 7px 11px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white, #fff) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center; appearance: none; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; color: var(--color-fg); cursor: pointer; }
-	.pair-pick:hover { border-color: var(--color-fg-light); }
 	.mode-toggle { display: inline-flex; gap: 6px; font-family: var(--font-sans); }
 	.mode-toggle button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white, #fff); font-size: var(--text-sm); font-weight: 500; line-height: 1; color: var(--color-fg); cursor: pointer; }
 	.mode-toggle button:hover:not(.active):not(:disabled) { border-color: var(--color-fg-light); }
