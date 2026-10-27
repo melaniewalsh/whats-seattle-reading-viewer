@@ -165,6 +165,18 @@
 		} catch {}
 	});
 
+	// Pick a pair from the menu: plot just those two, combined.
+	function pickPair(v) {
+		if (!v) { combine = false; return; }
+		const [a, b] = v.split("|");
+		shown = new Set([a, b]);
+		showOther = false;
+		isolatedKeys = [];
+		openGroupsFor(shown);
+		byFmt = false;
+		combine = true;
+	}
+
 	function sum(a) { let s = 0; for (const v of a || []) s += v; return s; }
 	// A share of almost nothing is noise: in spring 2020 the closed branches
 	// lent about 70 print books a month, so a few picture books were "70%" of
@@ -607,6 +619,14 @@
 						</button>
 					{/if}
 				</div>
+				{#if raw.pairs?.length}
+					<!-- The pairs the build counts, so they can be combined (see Combine). -->
+					<select class="pair-pick" aria-label="Combine two genres" value={showCombine ? `${pair.a}|${pair.b}` : ""}
+						onchange={(e) => pickPair(e.currentTarget.value)}>
+						<option value="">Combine genres…</option>
+						{#each raw.pairs as p}<option value="{p.a}|{p.b}">{p.a} + {p.b}</option>{/each}
+					</select>
+				{/if}
 				<label class="smooth-toggle"><input type="checkbox" bind:checked={smoothOn} /> 3-month average</label>
 				{#if showCombine}<span class="iso-note">Books in either genre, counted once, and the books in both.</span>{/if}
 				{#if showByFmt}<span class="iso-note">Each line is a share of all book checkouts; together they make {headName}'s total.</span>{/if}
@@ -908,6 +928,8 @@
 	.smooth-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-fg-light); cursor: pointer; user-select: none; }
 	.smooth-toggle input { margin: 0; width: 16px; height: 16px; accent-color: var(--color-fg); appearance: auto; -webkit-appearance: auto; }
 	/* Chart views: as on an author's page (StackedViewer .plot-toolbar .mode-toggle). */
+	.pair-pick { padding: 7px 28px 7px 11px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white, #fff) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center; appearance: none; font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; color: var(--color-fg); cursor: pointer; }
+	.pair-pick:hover { border-color: var(--color-fg-light); }
 	.mode-toggle { display: inline-flex; gap: 6px; font-family: var(--font-sans); }
 	.mode-toggle button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-white, #fff); font-size: var(--text-sm); font-weight: 500; line-height: 1; color: var(--color-fg); cursor: pointer; }
 	.mode-toggle button:hover:not(.active):not(:disabled) { border-color: var(--color-fg-light); }
