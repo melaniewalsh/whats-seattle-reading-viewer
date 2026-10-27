@@ -1630,6 +1630,14 @@
 		const oneBook = idxs.every((j) => normalizeWorkKey(current.titles[j]?.title) === normalizeWorkKey(t.title));
 		return oneBook && ed ? ed : `${title} (${pub ? `${fmt}, ${pub}` : fmt})`;
 	}
+	// The legend under the chart always names the book too ("Where the Crawdads
+	// Sing — Print · G.P. Putnam's Sons, 2018"); on a book's own page the
+	// heading already does.
+	function editionLegendLabel(idx, idxs) {
+		const short = editionLineLabel(idx, idxs);
+		const title = cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title;
+		return searchMode === "title" || short.startsWith(title) ? short : `${title} — ${short}`;
+	}
 	function editionMeta(t) {
 		const parts = [];
 		const ed = t.ed || {};
@@ -2183,13 +2191,13 @@
 		// up and the rest dim, and you can click again to bring them back.
 		if (chartMode === "line") {
 			// Label any editions overlaid on the total (the total area needs none).
-			return singleIdxs.map((idx, i) => ({ label: editionLineLabel(idx, singleIdxs), color: singleColor(i), key: `s${idx}` }));
+			return singleIdxs.map((idx, i) => ({ label: editionLegendLabel(idx, singleIdxs), color: singleColor(i), key: `s${idx}` }));
 		}
 		const out = [];
 		groups.forEach((g, gi) => { if (g.idxs.length) out.push({ label: groupLabel(g), color: groupColor(gi), key: `g${g.id}` }); });
 		// Full edition title (not the cleaned work name): if you plotted one specific
 		// edition, the legend should name exactly which one.
-		soloSingleIdxs.forEach((idx, i) => out.push({ label: editionLineLabel(idx, soloSingleIdxs), color: singleColor(i), key: `s${idx}` }));
+		soloSingleIdxs.forEach((idx, i) => out.push({ label: editionLegendLabel(idx, soloSingleIdxs), color: singleColor(i), key: `s${idx}` }));
 		return out;
 	});
 
