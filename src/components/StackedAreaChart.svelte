@@ -346,10 +346,12 @@
 		const rows = narrow ? [24, 44] : [24, 58];
 		const placed = [[], []];
 		const fits = (r, a, b) => a >= 0 && b <= width && placed[r].every(([p, q]) => b + 8 <= p || a >= q + 8);
+		// Most-borrowed books get their places first (`weight`), so when labels
+		// crowd, a minor book loses its text, not the big one (Everett's James).
 		return markers
 			.map((mk) => ({ ...mk, i: months.indexOf(yearly ? `${mk.month.slice(0, 4)}-01` : mk.month) }))
 			.filter((mk) => mk.i >= 0)
-			.sort((a, b) => a.i - b.i)
+			.sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0) || a.i - b.i)
 			.map((mk) => {
 				const lx = x(mk.i);
 				const label = narrow ? shortName(mk.label) : mk.label;
