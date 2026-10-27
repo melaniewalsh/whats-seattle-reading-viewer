@@ -1616,6 +1616,20 @@
 		}
 		return m;
 	});
+	// A ticked edition's name on the chart: its format and publisher ("Print ·
+	// G.P. Putnam's Sons, 2018"); with the book's title too when the ticked
+	// editions come from different books.
+	function editionLineLabel(idx, idxs) {
+		const t = current.titles[idx];
+		const title = cleanTitleForDisplay(t.title) || t.title;
+		const e = t.ed?.v?.[0];
+		const pub = t.otherEditions ? "other editions"
+			: e ? [(e[0] || "").replace(/[\s,;:/]+$/, ""), (e[1] || "").match(/\d{4}/)?.[0]].filter(Boolean).join(", ") : "";
+		const fmt = formatLabel(t.format);
+		const ed = pub ? `${fmt[0].toUpperCase()}${fmt.slice(1)} · ${pub}` : "";
+		const oneBook = idxs.every((j) => normalizeWorkKey(current.titles[j]?.title) === normalizeWorkKey(t.title));
+		return oneBook && ed ? ed : `${title} (${pub ? `${fmt}, ${pub}` : fmt})`;
+	}
 	function editionMeta(t) {
 		const parts = [];
 		const ed = t.ed || {};
@@ -2012,7 +2026,7 @@
 		singleIdxs.forEach((idx, i) => {
 			parts.push({
 				key: `s${idx}`,
-				label: `${cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title} (${formatLabel(current.titles[idx].format)})`,
+				label: editionLineLabel(idx, singleIdxs),
 				color: singleColor(i),
 				values: current.titles[idx].series,
 				isSingle: true
@@ -2148,7 +2162,7 @@
 			if (g.idxs.length) parts.push({ key: `g${g.id}`, legendKey: `g${g.id}`, label: groupLabel(g), color: groupColor(gi), values: sumSeries(g.idxs), groupIndex: gi, isGroup: true });
 		});
 		soloSingleIdxs.forEach((idx, i) => {
-			parts.push({ key: `s${idx}`, legendKey: `s${idx}`, label: `${cleanTitleForDisplay(current.titles[idx].title) || current.titles[idx].title} (${formatLabel(current.titles[idx].format)})`, color: singleColor(i), values: current.titles[idx].series, isSingle: true });
+			parts.push({ key: `s${idx}`, legendKey: `s${idx}`, label: editionLineLabel(idx, singleIdxs), color: singleColor(i), values: current.titles[idx].series, isSingle: true });
 		});
 		const shown = isolatedKeys.length ? parts.filter((p) => isolatedKeys.includes(p.key)) : parts;
 		return shown.length ? shown : [authorLine].filter(Boolean);
@@ -2169,13 +2183,13 @@
 		// up and the rest dim, and you can click again to bring them back.
 		if (chartMode === "line") {
 			// Label any editions overlaid on the total (the total area needs none).
-			return singleIdxs.map((idx, i) => ({ label: titleCase(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
+			return singleIdxs.map((idx, i) => ({ label: editionLineLabel(idx, singleIdxs), color: singleColor(i), key: `s${idx}` }));
 		}
 		const out = [];
 		groups.forEach((g, gi) => { if (g.idxs.length) out.push({ label: groupLabel(g), color: groupColor(gi), key: `g${g.id}` }); });
 		// Full edition title (not the cleaned work name): if you plotted one specific
 		// edition, the legend should name exactly which one.
-		soloSingleIdxs.forEach((idx, i) => out.push({ label: titleCase(current.titles[idx].title), color: singleColor(i), key: `s${idx}` }));
+		soloSingleIdxs.forEach((idx, i) => out.push({ label: editionLineLabel(idx, soloSingleIdxs), color: singleColor(i), key: `s${idx}` }));
 		return out;
 	});
 
