@@ -4,7 +4,7 @@
 	// (build-data-to-r2.yml) run on the 7th at 06:00 and 12:00 UTC; new data is
 	// usually live by about 14:00 UTC that day.
 	import { onMount } from "svelte";
-	import { getMonths, getDataRefreshed } from "$components/db.js";
+	import { getMonths } from "$components/db.js";
 
 	let { compact = false, inline = false } = $props();
 
@@ -12,7 +12,6 @@
 	const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 	let through = $state("");    // "August 2026"
-	let refreshed = $state(null); // Date
 	let now = $state(Date.now());
 
 	onMount(() => {
@@ -20,7 +19,6 @@
 			const last = m?.[m.length - 1];
 			if (last) through = `${MONTHS[Number(last.slice(5, 7)) - 1]} ${last.slice(0, 4)}`;
 		}).catch(() => {});
-		getDataRefreshed().then((d) => (refreshed = d));
 		const id = setInterval(() => (now = Date.now()), 60000);
 		return () => clearInterval(id);
 	});
@@ -40,13 +38,12 @@
 	});
 	// Whole days to go (rounded up, so the day before shows "1 day").
 	const daysLeft = $derived(Math.max(0, Math.ceil((next - now) / 86400000)));
-	const fmtDate = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 	const nextLabel = $derived(new Date(next).toLocaleDateString(undefined, { month: "long", day: "numeric" }));
 </script>
 
 {#if compact}
 	<span class="ds-compact">
-		{#if through}Data through {through}{/if}{#if refreshed}{" · "}refreshed {fmtDate(refreshed)}{/if}<br />
+		{#if through}Data through {through}{/if}<br />
 		Updated monthly · next scheduled update {nextLabel}
 	</span>
 {:else if inline}
