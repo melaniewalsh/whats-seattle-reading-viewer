@@ -137,19 +137,6 @@ export function getGenreTerms() {
 	return genreTermsPromise;
 }
 
-// When the data was last refreshed: the Last-Modified time of meta.json on R2
-// (rewritten by every data build). Always asks R2, so the local preview shows
-// the live site's date too. null if it can't be read.
-export async function getDataRefreshed() {
-	try {
-		const r = await fetch(`${R2_BASE}/meta.json`, { method: 'HEAD', cache: 'no-cache' });
-		const lm = r.headers.get('last-modified');
-		return lm ? new Date(lm) : null;
-	} catch {
-		return null;
-	}
-}
-
 export async function getMonths() {
 	if (!monthsPromise) {
 		monthsPromise = fetchJson(`${DATA_BASE}/meta.json`)
